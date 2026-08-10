@@ -1,0 +1,304 @@
+import { useState } from "react";
+import { FileText, FileSpreadsheet, ChevronDown, DollarSign, CheckCircle, AlertCircle, XCircle } from "lucide-react";
+import { useReportDateRange } from "../../../hooks/useReportDateRange";
+import { ReportDateRangeFilter } from "./ReportDateRangeFilter";
+import { useLanguage } from "../../../i18n/LanguageContext";
+
+import { pickLang } from "../../../i18n/pickLang";
+interface InvoiceItem {
+  id: string;
+  invoiceNo: string;
+  customer: string;
+  dueDate: string;
+  amount: number;
+  paid: number;
+  amountDue: number;
+  status: "Paid" | "Unpaid" | "Overdue";
+}
+
+export function InvoiceReport() {
+  const { language } = useLanguage();
+  const t = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  
+  const [selectedCustomer, setSelectedCustomer] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const {
+    preset,
+    setPreset,
+    customFrom,
+    setCustomFrom,
+    customTo,
+    setCustomTo,
+  } = useReportDateRange("month");
+
+  const invoiceItems: InvoiceItem[] = [
+    { id: "1", invoiceNo: "INV001", customer: "Carl Evans", dueDate: "24 Dec 2024", amount: 500, paid: 500, amountDue: 0, status: "Paid" },
+    { id: "2", invoiceNo: "INV002", customer: "Minerva Rameriz", dueDate: "10 Dec 2024", amount: 1500, paid: 1500, amountDue: 0, status: "Paid" },
+    { id: "3", invoiceNo: "INV003", customer: "Robert Lamon", dueDate: "27 Nov 2024", amount: 600, paid: 600, amountDue: 0, status: "Paid" },
+    { id: "4", invoiceNo: "INV004", customer: "Patricia Lewis", dueDate: "18 Nov 2024", amount: 1000, paid: 1000, amountDue: 0, status: "Paid" },
+    { id: "5", invoiceNo: "INV005", customer: "Mark Joslyn", dueDate: "08 Nov 2024", amount: 1200, paid: 1200, amountDue: 0, status: "Paid" },
+    { id: "6", invoiceNo: "INV006", customer: "Martha Betts", dueDate: "25 Oct 2024", amount: 800, paid: 800, amountDue: 0, status: "Paid" },
+    { id: "7", invoiceNo: "INV007", customer: "Daniel Judd", dueDate: "14 Oct 2024", amount: 2000, paid: 2000, amountDue: 0, status: "Paid" },
+    { id: "8", invoiceNo: "INV008", customer: "Emma Bates", dueDate: "03 Oct 2024", amount: 100, paid: 100, amountDue: 0, status: "Paid" },
+    { id: "9", invoiceNo: "INV009", customer: "Richard Fralick", dueDate: "20 Sep 2024", amount: 300, paid: 300, amountDue: 0, status: "Paid" },
+    { id: "10", invoiceNo: "INV010", customer: "Michelle Rabuan", dueDate: "10 Sep 2024", amount: 9000, paid: 9000, amountDue: 0, status: "Overdue" },
+  ];
+
+  const totalAmount = 4156000;
+  const totalPaid = 2156.42;
+  const totalUnpaid = 1152.45;
+  const overdue = 2156.12;
+
+  const handleExportPDF = () => {
+    alert(t("PDF yüklənir...", "Exporting PDF..."));
+  };
+
+  const handleExportExcel = () => {
+    alert(t("Excel yüklənir...", "Exporting Excel..."));
+  };
+
+  const handleGenerateReport = () => {
+    alert(t("Hesabat yaradılır...", "Generating report..."));
+  };
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
+      <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
+        {/* Header */}
+        <div className="mb-4">
+          <h1 className="text-lg sm:text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 dark:text-white">
+            Invoice Report
+          </h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Manage your Invoice Report
+          </p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Total Amount</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white"> ₼{totalAmount.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/20 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-[#0026f6] dark:text-[#0026f6]" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Total Paid</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white"> ₼{totalPaid.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Total Unpaid</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white"> ₼{totalUnpaid.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Overdue</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white"> ₼{overdue.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters Bar */}
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
+          <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+            <ReportDateRangeFilter
+              preset={preset}
+              onPresetChange={setPreset}
+              customFrom={customFrom}
+              customTo={customTo}
+              onCustomFromChange={setCustomFrom}
+              onCustomToChange={setCustomTo}
+              className="flex-1"
+            />
+
+            {/* Customer Filter */}
+            <div className="relative">
+              <select
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[120px]"
+              >
+                <option value="all">Customer</option>
+                <option value="customer1">Customer 1</option>
+                <option value="customer2">Customer 2</option>
+              </select>
+              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Status Filter */}
+            <div className="relative">
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[120px]"
+              >
+                <option value="all">Status</option>
+                <option value="paid">Paid</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="overdue">Overdue</option>
+              </select>
+              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Generate Button */}
+            <button
+              onClick={handleGenerateReport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition bg-orange-500/10 dark:bg-orange-500/20 border border-orange-500/20 dark:border-orange-500/30"
+            >
+              <span className="text-xs font-medium text-orange-600 dark:text-orange-400">Generate Report</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Invoice Table */}
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+          {/* Table Header with Export Buttons */}
+          <div className="border-b border-gray-200 dark:border-gray-800 p-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Invoice Report
+            </h2>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportPDF}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5 text-red-500" />
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                    Invoice No
+                  </th>
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                    Customer
+                  </th>
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                    Due Date
+                  </th>
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                    Amount
+                  </th>
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                    Paid
+                  </th>
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                    Amount Due
+                  </th>
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoiceItems.map((item, index) => (
+                  <tr
+                    key={item.id}
+                    className={`border-b border-gray-200 dark:border-gray-800  ₼{
+                      index % 2 === 0
+                        ? "bg-white dark:bg-gray-900"
+                        : "bg-gray-50 dark:bg-gray-800/30"
+                    }`}
+                  >
+                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
+                      {item.invoiceNo}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {item.customer}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {item.dueDate}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
+                       ₼{item.amount}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
+                       ₼{item.paid}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
+                       ₼{item.amountDue}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium  ₼{
+                          item.status === "Paid"
+                            ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                            : item.status === "Overdue"
+                            ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                            : "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
+                        }`}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="border-t border-gray-200 dark:border-gray-800 p-3 flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-2">
+              <span>Rows Per Page:</span>
+              <select className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+                <option>10</option>
+                <option>25</option>
+                <option>50</option>
+              </select>
+              <span>- Entries</span>
+            </div>
+            <div className="flex gap-1">
+              <button className="w-7 h-7 rounded flex items-center justify-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
+                ‹
+              </button>
+              <button className="w-7 h-7 rounded flex items-center justify-center bg-orange-500 text-white">
+                1
+              </button>
+              <button className="w-7 h-7 rounded flex items-center justify-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
+                ›
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

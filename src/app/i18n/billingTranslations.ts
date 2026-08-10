@@ -1,0 +1,92 @@
+import type { Language } from "./translations";
+
+export const billingTranslations = {
+  en: {
+    payNow: "Pay now",
+    logout: "Log out",
+    close: "Close",
+    amountDue: "Amount due",
+    warningTitle: "Payment reminder",
+    warningBody: "You can close this and keep using the software, but you have {days} day(s) left until your payment is due.",
+    dueTodayTitle: "Payment due today",
+    dueTodayBody: "Today is your payment day. You can keep using the software for now, but it can be locked at any time.",
+    overdueTitle: "Payment overdue",
+    overdueBody: "Your payment is {days} day(s) overdue. Please pay soon to keep using Inflero.",
+    lockedTitle: "Software locked",
+    lockedBody: "Your payment is overdue. You must pay to continue using Inflero.",
+    bannerWarning: "Payment due soon — {days} day(s) left",
+    bannerDueToday: "Payment is due today",
+    bannerOverdue: "Payment overdue — {days} day(s)",
+    bannerLocked: "Account locked — payment required",
+    resultSuccessTitle: "Payment successful",
+    resultSuccessBody: "Thank you! Your subscription has been extended by one month.",
+    resultErrorTitle: "Payment failed",
+    resultErrorBody: "The payment was not completed. You can try again from the dashboard.",
+    resultPendingTitle: "Confirming payment",
+    resultPendingBody: "We are confirming your payment. This may take a moment.",
+    backToDashboard: "Back to dashboard",
+    tryAgain: "Try again",
+  },
+  az: {
+    payNow: "İndi ödə",
+    logout: "Çıxış",
+    close: "Bağla",
+    amountDue: "Ödəniləcək məbləğ",
+    warningTitle: "Ödəniş xatırlatması",
+    warningBody: "Bu pəncərəni bağlayıb proqramdan istifadə edə bilərsiniz, lakin ödənişə {days} gün qalıb.",
+    dueTodayTitle: "Ödəniş bu gündür",
+    dueTodayBody: "Bu gün ödəniş gününüzdür. Hələlik proqramdan istifadə edə bilərsiniz, lakin istənilən vaxt kilidlənə bilər.",
+    overdueTitle: "Ödəniş gecikir",
+    overdueBody: "Ödənişiniz {days} gün gecikir. Inflero-dan istifadəni davam etdirmək üçün tezliklə ödəyin.",
+    lockedTitle: "Proqram kilidlənib",
+    lockedBody: "Ödənişiniz gecikir. Inflero-dan istifadəni davam etdirmək üçün ödəniş etməlisiniz.",
+    bannerWarning: "Ödəniş tezliklə — {days} gün qalıb",
+    bannerDueToday: "Ödəniş bu gündür",
+    bannerOverdue: "Ödəniş gecikir — {days} gün",
+    bannerLocked: "Hesab kilidlənib — ödəniş tələb olunur",
+    resultSuccessTitle: "Ödəniş uğurlu oldu",
+    resultSuccessBody: "Təşəkkürlər! Abunəliyiniz bir ay uzadıldı.",
+    resultErrorTitle: "Ödəniş uğursuz oldu",
+    resultErrorBody: "Ödəniş tamamlanmadı. İdarə panelindən yenidən cəhd edə bilərsiniz.",
+    resultPendingTitle: "Ödəniş təsdiqlənir",
+    resultPendingBody: "Ödənişinizi təsdiqləyirik. Bu bir qədər vaxt apara bilər.",
+    backToDashboard: "İdarə panelinə qayıt",
+    tryAgain: "Yenidən cəhd et",
+  },
+  ru: {
+    payNow: "Оплатить",
+    logout: "Выйти",
+    close: "Закрыть",
+    amountDue: "Сумма к оплате",
+    warningTitle: "Напоминание об оплате",
+    warningBody: "Вы можете закрыть это окно и продолжать пользоваться программой, но до оплаты осталось {days} дн.",
+    dueTodayTitle: "Оплата сегодня",
+    dueTodayBody: "Сегодня день оплаты. Пока вы можете пользоваться программой, но она может быть заблокирована в любой момент.",
+    overdueTitle: "Оплата просрочена",
+    overdueBody: "Ваша оплата просрочена на {days} дн. Пожалуйста, оплатите, чтобы продолжить пользоваться Inflero.",
+    lockedTitle: "Программа заблокирована",
+    lockedBody: "Ваша оплата просрочена. Чтобы продолжить пользоваться Inflero, необходимо произвести оплату.",
+    bannerWarning: "Скоро оплата — осталось {days} дн.",
+    bannerDueToday: "Оплата сегодня",
+    bannerOverdue: "Оплата просрочена — {days} дн.",
+    bannerLocked: "Аккаунт заблокирован — требуется оплата",
+    resultSuccessTitle: "Оплата прошла успешно",
+    resultSuccessBody: "Спасибо! Ваша подписка продлена на один месяц.",
+    resultErrorTitle: "Оплата не удалась",
+    resultErrorBody: "Оплата не была завершена. Вы можете попробовать снова из панели управления.",
+    resultPendingTitle: "Подтверждение оплаты",
+    resultPendingBody: "Мы подтверждаем ваш платёж. Это может занять немного времени.",
+    backToDashboard: "Назад к панели",
+    tryAgain: "Попробовать снова",
+  },
+} as const;
+
+export type BillingCopy = (typeof billingTranslations)["en"];
+
+export function billingT(lang: Language): BillingCopy {
+  return billingTranslations[lang] ?? billingTranslations.en;
+}
+
+export function fillDays(template: string, days: number | null | undefined): string {
+  return template.replace("{days}", String(days ?? 0));
+}

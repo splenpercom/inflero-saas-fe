@@ -1,0 +1,41 @@
+/* My Website module styles — import once in your Vite app entry */
+
+.mw-scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.mw-scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.mw-smooth-transition {
+  transition: all 0.2s ease;
+}
+
+/* Shared form control look used by the website builder */
+.mw-input {
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #111827;
+  transition: box-shadow 0.15s ease;
+}
+.mw-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #22c55e;
+  border-color: transparent;
+}
+.dark .mw-input {
+  border-color: #374151;
+  background: #1f2937;
+  color: #fff;
+}
+
+.mw-textarea {
+  resize: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}

@@ -1,0 +1,1281 @@
+0	 · limit reached
+1	+50 or -30
+2	1 Year
+3	3 Months
+4	6 Months
+5	99.9% uptime
+6	A branded subdomain booking site for your customers to self-schedule appointments online.
+7	A complete operations suite managed from a single panel.
+8	ACCOUNT BALANCE
+9	ACCOUNT HOLDER NAME
+10	ACCOUNT NAME
+11	ACCOUNT NO
+12	ACTIONS
+13	ADDRESS
+14	ADJUSTMENT
+15	AMOUNT
+16	AMOUNT DUE
+17	Account
+18	Account Holder Name
+19	Account Name
+20	Account No
+21	Account Number
+22	Account Statement
+23	Account Status
+24	Account Type
+25	Account deleted
+26	Account updated
+27	Active
+28	Active Businesses
+29	Active Customers
+30	Ad
+31	Ad və soyad mütləqdir.
+32	Add
+33	Add Account
+34	Add Adjustment
+35	Add Biller
+36	Add Branch
+37	Add Brand
+38	Add Category
+39	Add Customer
+40	Add Discount
+41	Add Expense
+42	Add Expense Category
+43	Add Income
+44	Add Income Category
+45	Add Invoice
+46	Add Money Transfer
+47	Add New Category
+48	Add Payment
+49	Add Purchase
+50	Add Purchase Return
+51	Add Reservation
+52	Add Sale
+53	Add Sales
+54	Add Sales Return
+55	Add Stock
+56	Add Store
+57	Add Sub Category
+58	Add Supplier
+59	Add Transfer
+60	Add Unit
+61	Add Variant Attribute
+62	Add Vehicle
+63	Add Warranty
+64	Add a new branch
+65	Add a note...
+66	Add line
+67	Add note about payment...
+68	Add products
+69	Additional notes...
+70	Address
+71	Adjustment
+72	Adjustment Details
+73	Adjustment Quantity
+74	Adjustment created
+75	Adjustment deleted
+76	Adjustment quantity
+77	Admin
+78	Administrator
+79	Aktiv
+80	Aktiv İşçilər
+81	Ali Mammadov
+82	All
+83	All Categories
+84	All Status
+85	All Statuses
+86	All branches
+87	All branches selected — you must pick a branch for income.
+88	All rights reserved.
+89	Amazon Echo Dot stock added - (+50 units)
+90	Amount
+91	Amount Due
+92	Amount Due:
+93	Amount cannot be changed
+94	Amount cannot exceed due amount
+95	Amount must be greater than 0
+96	Anar Həsənov · Toyota Camry
+97	Anonymous
+98	Apply
+99	Approve
+100	Approve this expense?
+101	Approved
+102	Are you sure you want to delete this biller?
+103	Are you sure you want to delete this branch?
+104	Are you sure you want to delete this brand?
+105	Are you sure you want to delete this category?
+106	Are you sure you want to delete this customer?
+107	Are you sure you want to delete this expense?
+108	Are you sure you want to delete this income?
+109	Are you sure you want to delete this invoice?
+110	Are you sure you want to delete this item?
+111	Are you sure you want to delete this product/service?
+112	Are you sure you want to delete this purchase?
+113	Are you sure you want to delete this return?
+114	Are you sure you want to delete this sale?
+115	Are you sure you want to delete this store?
+116	Are you sure you want to delete this sub category?
+117	Are you sure you want to delete this supplier?
+118	Are you sure you want to delete this unit?
+119	Are you sure you want to delete this variant attribute?
+120	Are you sure you want to delete this warranty?
+121	Are you sure?
+122	Auto Service
+123	Ay
+124	Aylıq Performans
+125	Aylıq Təfsilatlar
+126	Aylıq icmal
+127	Az Stok
+128	Az Stoklu Məhsullar
+129	Azerbaijan's #1 Car Service ERP Platform
+130	BALANCE
+131	BANK & ACCOUNT NUMBER
+132	BILLER
+133	BRANCH
+134	BRAND
+135	Back to Dashboard
+136	Back to invoices
+137	Balance Sheet
+138	Balanced — debits equal credits
+139	Bank
+140	Bank Account
+141	Bank Accounts
+142	Bank Transfer
+143	Bank account created
+144	Bank transfer
+145	Bill To
+146	Biller
+147	Biller added successfully!
+148	Billers
+149	Booking link copied
+150	Booking page
+151	Borc
+152	Branch
+153	Branch Management
+154	Branch Manager
+155	Branch Slots
+156	Branch added
+157	Branch deleted
+158	Branch landing pages
+159	Branch updated
+160	Branches
+161	Brand
+162	Brand Name *
+163	Brand added
+164	Brand added successfully!
+165	Brand deleted
+166	Brand name is required
+167	Brand updated successfully!
+168	Brands Report
+169	Brands imported successfully!
+170	Bu Ay
+171	Bu Həftə
+172	Bu Rüb
+173	Bu dövrdə işçi satışı yoxdur
+174	Bu dövrdə maliyyə məlumatı yoxdur
+175	Bu dövrdə satış yoxdur
+176	Bu gün rezervasiya yoxdur
+177	Bu həftə ən məşğul slotlar
+178	Bu il üçün məlumat yoxdur
+179	Bu linklər müştəri saytınızda göstərilir.
+180	Bu İl
+181	Bugün
+182	Bugünkü Cədvəl
+183	Bugünkü Rezervasiyalar
+184	Bugünkü Sifarişlər
+185	Business name
+186	Bütün Kateqoriyalar
+187	Bütün şifrə sahələrini doldurun.
+188	CATEGORY
+189	CODE
+190	COMPANY
+191	CREATED DATE
+192	CREATED ON
+193	CREDIT
+194	CSV files
+195	CSV or XLSX files
+196	CURRENT BALANCE
+197	CUSTOMER
+198	Cancel
+199	Cancelled
+200	Cannot add branches
+201	Card
+202	Cari Şifrə
+203	Cart is empty
+204	Cash
+205	Cash Flow
+206	Categories Report
+207	Categories imported successfully!
+208	Category
+209	Category *
+210	Category Name *
+211	Category added
+212	Category added successfully!
+213	Category deleted
+214	Category is required
+215	Category name
+216	Category name is required
+217	Category updated
+218	Category updated successfully!
+219	Centralize every customer's vehicles, service history, and maintenance records in one place.
+220	Change Status
+221	Cheque
+222	Choose Biller
+223	Choose Customer
+224	Choose Your Date
+225	Choose customer
+226	Choose customer (optional)
+227	Click to upload
+228	Close
+229	Closed
+230	Code
+231	Coming soon
+232	Company
+233	Complete & Print
+234	Completed
+235	Computers
+236	Configure
+237	Confirm
+238	Confirm deletion
+239	Confirm reject
+240	Confirmed
+241	Contact
+242	Contact us today
+243	Copy
+244	Could not access your location
+245	Could not copy link
+246	Country
+247	Create
+248	Create Account
+249	Create Invoice
+250	Create Payment
+251	Create adjustment
+252	Create your account
+253	Created Date
+254	Created On
+255	Creating...
+256	Credit
+257	Credit Card
+258	Current
+259	Current Balance
+260	Current Order
+261	Custom info and link for each branch
+262	Customer
+263	Customer Information
+264	Customer Return
+265	Customer Satisfaction
+266	Customer added
+267	Customer booking link
+268	Customer deleted
+269	Customer not found
+270	Customer updated
+271	Customer-Facing Site
+272	Customers
+273	Cəmi
+274	DATE
+275	DATE & TIME
+276	DEBIT
+277	DESCRIPTION
+278	DUE
+279	DUE DATE
+280	DURATION
+281	Daily Reservations
+282	Damaged Goods
+283	Damaged goods
+284	Data is filtered for this branch
+285	Date
+286	Date & Time
+287	Date From
+288	Date To
+289	Date:
+290	Debit
+291	Debit Card
+292	Decrease quantity
+293	Defective Items
+294	Delete
+295	Delete Reservation
+296	Delete Sale
+297	Delete this vehicle?
+298	Demo
+299	Demo Brand 1
+300	Demo Brand 2
+301	Demo Brand 3
+302	Demo Category 1
+303	Demo Category 2
+304	Demo Category 3
+305	Demo Product/Service 1
+306	Demo Product/Service 2
+307	Demo Product/Service 3
+308	Demo Sub 1
+309	Demo Sub 2
+310	Demo Sub 3
+311	Demo Unit 1
+312	Demo Unit 2
+313	Demo Unit 3
+314	Demo Variant 1
+315	Demo Variant 2
+316	Demo Variant 3
+317	Demo Warranty 1
+318	Demo Warranty 2
+319	Demo Warranty 3
+320	Demo description for warranty 1
+321	Demo description for warranty 2
+322	Demo description for warranty 3
+323	Demo İstifadəçi
+324	Deposited
+325	Deposited transfer
+326	Description
+327	Description *
+328	Description is required
+329	Description or search product
+330	Details not found
+331	Discount
+332	Discount:
+333	Document no.
+334	Download
+335	Download Demo CSV
+336	Download pdf
+337	Download the demo file to see the correct format.
+338	Drag the pin, click the map, or search.
+339	Due
+340	Due Date
+341	Due Date:
+342	Duration
+343	Duration *
+344	Duration is required
+345	Dövr Gəliri
+346	Dəyişikliklər ləğv edildi.
+347	Dəyişiklikləri Yadda Saxla
+348	E-poçt
+349	E-poçt ünvanı yeniləndi.
+350	E-poçtu Dəyişdir
+351	EMAIL
+352	EXPENSE NAME
+353	EXPIRED DATE
+354	Edit
+355	Edit Account
+356	Edit Adjustment
+357	Edit Branch
+358	Edit Brand
+359	Edit Category
+360	Edit Customer
+361	Edit Expense
+362	Edit Income
+363	Edit Purchase
+364	Edit Reservation
+365	Edit Sale
+366	Edit Stock
+367	Edit Sub Category
+368	Edit Supplier
+369	Edit Unit
+370	Edit Vehicle
+371	Electronics
+372	Email
+373	End Time
+374	Enter a valid phone number.
+375	Enter address
+376	Enter biller name
+377	Enter brand name
+378	Enter category name
+379	Enter company name
+380	Enter country
+381	Enter customer name
+382	Enter description
+383	Enter email
+384	Enter mileage (km)...
+385	Enter phone number
+386	Enter store name
+387	Enter sub category name
+388	Enter supplier name
+389	Enter unit name
+390	Enter warranty name
+391	Entries
+392	Everything your
+393	Excel export feature coming soon
+394	Expense
+395	Expense Details
+396	Expense Name
+397	Expense approved
+398	Expense deleted
+399	Expense rejected
+400	Expense updated
+401	Expenses
+402	Expenses Report
+403	Expired Date
+404	Expired Products
+405	Expired Products/Services
+406	Expired Products/Services Report
+407	Explore the demo
+408	Export CSV
+409	Export Excel
+410	Export Excel coming soon
+411	Export Excel functionality coming soon
+412	Export PDF
+413	Export PDF coming soon
+414	Export PDF functionality coming soon
+415	FROM ACCOUNT
+416	FROM BRANCH
+417	Failed to add user
+418	Failed to create payment
+419	Failed to create role
+420	Failed to create sale
+421	Failed to delete purchase
+422	Failed to delete return
+423	Failed to delete role
+424	Failed to delete sale
+425	Failed to delete user
+426	Failed to generate PDF
+427	Failed to load adjustments
+428	Failed to load annual report
+429	Failed to load bank accounts
+430	Failed to load branches
+431	Failed to load brands
+432	Failed to load categories
+433	Failed to load customers
+434	Failed to load employee sales report
+435	Failed to load expenses
+436	Failed to load expired products/services
+437	Failed to load finance report
+438	Failed to load form options
+439	Failed to load income
+440	Failed to load invoice
+441	Failed to load invoices
+442	Failed to load low stock products
+443	Failed to load order
+444	Failed to load orders
+445	Failed to load payment info
+446	Failed to load product
+447	Failed to load product report
+448	Failed to load products
+449	Failed to load purchase
+450	Failed to load purchase details
+451	Failed to load purchase orders
+452	Failed to load purchases
+453	Failed to load reservations
+454	Failed to load return
+455	Failed to load returns
+456	Failed to load roles
+457	Failed to load sale
+458	Failed to load sale details
+459	Failed to load sales report
+460	Failed to load stock levels
+461	Failed to load sub categories
+462	Failed to load suppliers
+463	Failed to load transfers
+464	Failed to load trial balance
+465	Failed to load units
+466	Failed to load users
+467	Failed to load variant attributes
+468	Failed to update product
+469	Failed to update purchase
+470	Failed to update role
+471	Failed to update sale
+472	Failed to update user
+473	Failed to upload image
+474	Features
+475	Finance & Reports
+476	Fixed (₼)
+477	From
+478	From Account
+479	From and To accounts cannot be the same
+480	From branch
+481	Full Due
+482	Full name
+483	Furniture
+484	GRAND TOTAL
+485	Generated
+486	Get in touch
+487	Get real-time insights on sales, customer retention, and top-performing services.
+488	Get started
+489	Global mode
+490	Go back
+491	Grand Total
+492	Grand total
+493	Grow with analytics
+494	Guest walk-in
+495	Göndərilir…
+496	Gözləyir
+497	Gəlir
+498	Gəlir vs Xərclər
+499	Gəlir və Xərclər
+500	Gəlir üzrə Ən Yaxşı Məhsullar
+501	Half
+502	Hamısı
+503	Hamısını Gör
+504	Held
+505	Hesab məlumatlarınızı idarə edin
+506	Hold Order
+507	Holder
+508	Hour Support
+509	How it works
+510	Hələ məlumat yoxdur
+511	ID
+512	IMAGE
+513	INSTOCK QTY
+514	INVOICE
+515	INVOICE NO
+516	Import Brands
+517	Import CSV
+518	Import Categories
+519	Import Expired Products/Services
+520	Import Sub Categories
+521	Import Units
+522	Import Variant Attributes
+523	Import Warranties
+524	Importing...
+525	Inactive
+526	Income
+527	Income Report
+528	Income added
+529	Income deleted
+530	Income updated
+531	Increase quantity
+532	Inflero Auto
+533	Instock qty
+534	Invoice
+535	Invoice Details
+536	Invoice No
+537	Invoice No:
+538	Invoice Number
+539	Invoice created
+540	Invoice deleted
+541	Invoice details
+542	Invoice downloaded
+543	Invoice not found
+544	Invoices
+545	Items loaded from previous purchase
+546	John Smith
+547	Kat. Miqdar
+548	Kat. Məbləğ
+549	Kateqoriya
+550	Kateqoriya Performansı
+551	Kateqoriya məlumatı yoxdur
+552	Kateqoriya üzrə Satışlar
+553	Kateqoriya üzrə satış
+554	Kateqoriyalar
+555	Kod
+556	Kod göndər
+557	Last 30 days
+558	Last 7 days
+559	Last 90 days
+560	Launch your booking site
+561	Leyla Ismayilova
+562	Line Items
+563	Lines subtotal
+564	Link copied
+565	Linked:
+566	Loading...
+567	Location
+568	Loqonu silmək alınmadı.
+569	Low Stock Parts
+570	Low Stocks
+571	Ləğv et
+572	Make
+573	Maliyyə Hesabatı
+574	Maliyyə İcmalı
+575	Maliyyəyə Bax
+576	Manage Categories
+577	Manage Expense Categories
+578	Manage Income Categories
+579	Manage Money Transfer List
+580	Manage Stock
+581	Manage Your Expenses
+582	Manage car service reservations
+583	Manage categories
+584	Manage multiple branches, warehouse slots, and staff roles from a single central account.
+585	Manage stock transfers
+586	Manage your Accounts List
+587	Manage your POS orders
+588	Manage your billing partners
+589	Manage your branches
+590	Manage your brands
+591	Manage your customers
+592	Manage your income
+593	Manage your invoices
+594	Manage your purchase orders
+595	Manage your purchase returns
+596	Manage your purchases
+597	Manage your returns
+598	Manage your stock
+599	Manage your stock adjustment
+600	Manage your stores
+601	Manage your suppliers
+602	Manage your units
+603	Manage your variant attributes
+604	Manage your warranties
+605	Manager
+606	Marja
+607	Max Reservations per Slot
+608	Menyunu aç
+609	Method
+610	Mileage
+611	Min
+612	Miqdar
+613	Miqdar üzrə Ən Yaxşı Məhsullar
+614	Model
+615	Money Transfer
+616	Money transfer added successfully
+617	Money transfer deleted
+618	Money transfers refreshed
+619	Monthly Revenue
+620	Multi-Branch Support
+621	My location
+622	Müştəri
+623	Müştəri Əlavə Et
+624	Məbləğ
+625	Məhsul
+626	Məhsul Hesabatı
+627	Məhsul Təfsilatı
+628	Məhsul axtar...
+629	Məhsul satışları və inventar statusu
+630	Məhsul satışları və ödəniş təfərrüatı
+631	Məhsul tapılmadı
+632	Məhsullar
+633	Məlumat yoxdur
+634	Mənfəət
+635	Mənfəət Marjası
+636	Mənfəət Tendensiyası
+637	Mənfəət-zərər seçilmiş filial üzrədir. Xərc bölgüsü bütün tenant üzrədir.
+638	Mənfəət-zərər və xərc bölgüsü
+639	NAME
+640	NO OF PRODUCTS
+641	NOTES
+642	Name
+643	Name *
+644	Name is required
+645	Net Unit Price(₼)
+646	New reservation
+647	Next
+648	Nike Jordan stock adjusted - (-8 units)
+649	No
+650	No accounts found
+651	No adjustments found
+652	No branch
+653	No branches found
+654	No customer
+655	No customer assigned
+656	No customers found
+657	No data for this period
+658	No data found
+659	No eligible branch manager (Manager/Administrator without a branch).
+660	No expenses found
+661	No income found
+662	No invoices found
+663	No items
+664	No locations found
+665	No matching services — type your own
+666	No of Products
+667	No orders found.
+668	No payments recorded yet
+669	No previous purchases with this supplier.
+670	No products found
+671	No products/services found
+672	No purchase history
+673	No purchases found
+674	No reservations found
+675	No returns found
+676	No suppliers found
+677	No transfers found
+678	No vehicles registered
+679	Note
+680	Notes
+681	Növ
+682	OPENING BALANCE
+683	One link for every branch
+684	Open
+685	Opening
+686	Opening Balance
+687	Option A, Option B
+688	Optional
+689	Order held!
+690	Order not found
+691	Order tax
+692	Ordered
+693	Orders
+694	Orta
+695	Orta Aylıq Gəlir
+696	Orta Sifariş
+697	Other
+698	Out of balance — debits and credits differ
+699	Out of stock
+700	Overdue
+701	Overview
+702	PAID
+703	PAYMENT METHOD
+704	PAYMENT STATUS
+705	PDF export feature coming soon
+706	PERSON
+707	PHONE
+708	PLATES
+709	POS
+710	POS Order
+711	POS Order ID
+712	POS Orders
+713	POS Satış
+714	PRODUCT
+715	PRODUCT NAME
+716	PRODUCT/SERVICE NAME
+717	PRODUCTS
+718	PURCHASED AMOUNT
+719	PURCHASED QTY
+720	Package branch limit reached
+721	Page
+722	Paid
+723	Paid:
+724	Parametrlər
+725	Parametrlər uğurla saxlanıldı!
+726	Parametrləri aç
+727	Parametrləri saxlamaq alınmadı.
+728	Partial
+729	Parts Inventory
+730	Payment
+731	Payment Date
+732	Payment History
+733	Payment Method
+734	Payment Status
+735	Payment created successfully
+736	Payment history
+737	Payment recorded
+738	Payment reference
+739	Payment status
+740	Payments
+741	Pending
+742	Percent (%)
+743	Person
+744	Phone
+745	Plate
+746	Plate suffix (last 3)
+747	Platform features
+748	Please add items to cart
+749	Please fill all required fields
+750	Please fill in all fields.
+751	Please fill in all required fields
+752	Please select a branch
+753	Please select a date range
+754	Please select a payment method
+755	Please select an employee / biller
+756	Please type product code and select
+757	Popup blocked. Please disable your popup blocker.
+758	Poçt Kodu
+759	Poçt kodunu daxil edin
+760	Previous
+761	Price
+762	Price is required
+763	Print
+764	Privacy
+765	Processing
+766	Processing...
+767	Product
+768	Product Name
+769	Product deleted
+770	Product details not available
+771	Product/Service Name
+772	Product/Service deleted
+773	Product/Service name is required
+774	Products
+775	Products/Services imported successfully!
+776	Profil
+777	Profil Məlumatı
+778	Profil yeniləndi.
+779	Purchase
+780	Purchase Details
+781	Purchase History
+782	Purchase ID
+783	Purchase Order
+784	Purchase Order Stats
+785	Purchase Return
+786	Purchase Returns
+787	Purchase Returns Report
+788	Purchase created
+789	Purchase deleted
+790	Purchase not found
+791	Purchase return created
+792	Purchase updated successfully
+793	Purchased Beats Pro headphones - 10 units
+794	Purchased amount
+795	Purchased qty
+796	Purchases
+797	Purchases Report
+798	QTY
+799	QTY ALERT
+800	Qaranlıq rejim
+801	Qismən Borc
+802	Qty
+803	Quantity
+804	Quick setup & onboarding
+805	REF
+806	REF-2024-001
+807	REFERENCE
+808	REFERENCE NUMBER
+809	Rashad Hasanov
+810	Reason
+811	Received
+812	Recent Activity
+813	Recent purchases
+814	Record Payment
+815	Record adjustment
+816	Record payment
+817	Record return
+818	Record sale
+819	Records
+820	Ref
+821	Reference
+822	Reference / Note
+823	Reference Number
+824	Reference number
+825	Refresh
+826	Refreshing account statement...
+827	Refreshing balance sheet...
+828	Refreshing billers...
+829	Refreshing cash flow...
+830	Refreshing stores...
+831	Register your business, add your team, and configure your branches in minutes.
+832	Registered customer
+833	Registration failed. Please try again.
+834	Reject
+835	Reject reason
+836	Reject this expense?
+837	Rejected
+838	Remaining
+839	Remaining Due
+840	Request submitted!
+841	Reservation Details
+842	Reservation ID
+843	Reservation Management
+844	Reservation Settings
+845	Reservation cancelled
+846	Reservation created
+847	Reservation updated
+848	Reservations
+849	Reservations, customer CRM, parts inventory, financial analytics, and a customer-facing booking site — all in one platform.
+850	Responsible Person
+851	Responsible person
+852	Restocked
+853	Return
+854	Return deleted
+855	Return recorded
+856	Returned
+857	Reuse
+858	Revenue, expenses, profit analytics, and customer payment history all in one dashboard.
+859	Rezervasiyalar
+860	Row Per Page:
+861	Run Report
+862	Run your car
+863	Rüblük Performans
+864	SALES INVOICE
+865	SERVICE
+866	SHORT NAME
+867	SOC 2 compliant
+868	SOLD AMOUNT
+869	SOLD QTY
+870	STATUS
+871	STORE
+872	STORE NAME
+873	SUB CATEGORY
+874	SUPPLIER
+875	SUPPLIER NAME
+876	Sale Detail
+877	Sale Details
+878	Sale added successfully
+879	Sale deleted
+880	Sale not found
+881	Sale recorded
+882	Sale updated successfully
+883	Sales Invoice
+884	Sales Return
+885	Sales Transaction
+886	Sales return created
+887	Satılan
+888	Satılan Məhsullar
+889	Satılan Vahid üzrə Ən Yaxşı Məhsullar
+890	Satılan Vahidlər
+891	Satınalma
+892	Satınalma Əlavə Et
+893	Satış
+894	Satış Hesabatı
+895	Satış məlumatı yoxdur
+896	Satış − satınalma − xərc
+897	Satışlar & Satınalmalar
+898	Save
+899	Save Changes
+900	Saving...
+901	Sağlam
+902	Schedule and manage customer appointments in real-time across daily, weekly, and monthly views.
+903	Search Product
+904	Search brands...
+905	Search categories...
+906	Search customer
+907	Search customer...
+908	Search failed. Try again.
+909	Search for a place or address...
+910	Search name, phone, plate...
+911	Search product
+912	Search product or service...
+913	Search products...
+914	Search products/services...
+915	Search sub categories...
+916	Search supplier
+917	Search units...
+918	Search variant attributes...
+919	Search warranties...
+920	Search...
+921	Select
+922	Select (optional)
+923	Select Product
+924	Select a branch to update quantity
+925	Select account
+926	Select branch
+927	Select customer
+928	Select customer first
+929	Select customer...
+930	Select date range
+931	Select dates and run the report
+932	Select employee...
+933	Select or type service
+934	Select time
+935	Select vehicle
+936	Select vehicle...
+937	Selected branch
+938	Sell
+939	Send
+940	Separate page per branch
+941	Service
+942	Service Type
+943	Service list
+944	Settings
+945	Settings saved
+946	Seçilmiş dövr
+947	Shared page for all branches
+948	Shipping
+949	Short Name
+950	Short Name *
+951	Short name
+952	Short name is required
+953	Show Payments
+954	Showing
+955	Sifariş
+956	Sifariş Aktivliyi
+957	Sifarişlər
+958	Sign in
+959	Simple process
+960	Slot Preview
+961	Sold
+962	Sold Apple iPhone 15 - 5 units
+963	Sold Macbook Pro - 2 units
+964	Son Fəaliyyət
+965	Sort By : Last 30 Days
+966	Sort By : Last 7 Days
+967	Sort By : Last 90 Days
+968	Sort By : Latest
+969	Sort By : Name
+970	Sort By : Oldest
+971	Sort By : This Year
+972	Sosial Media & Linklər
+973	Source and destination must differ
+974	Soyad
+975	Start Time
+976	Statement of Account
+977	Status
+978	Status updated
+979	Status:
+980	Step 1: Download Demo File
+981	Step 2: Upload Your File
+982	Stock
+983	Stock Adjustment
+984	Stock Adjustments
+985	Stock Count Correction
+986	Stock List
+987	Stock Replenishment
+988	Stock Transfer
+989	Stock Transfers
+990	Stock count correction
+991	Stock deducted
+992	Stock replenishment
+993	Stock updated
+994	Stok
+995	Stok səviyyəsi normaldır
+996	Stokda Yoxdur
+997	Store
+998	Store / Branch
+999	Store 1
+1000	Store 2
+1001	Store 3
+1002	Store added successfully!
+1003	Stores
+1004	Sub Categories Report
+1005	Sub Category
+1006	Sub Category Name *
+1007	Sub categories imported successfully!
+1008	Sub category added
+1009	Sub category added successfully!
+1010	Sub category deleted
+1011	Sub category name
+1012	Sub category name is required
+1013	Sub category updated successfully!
+1014	Submit
+1015	Submit request
+1016	Submitting account statement...
+1017	Submitting...
+1018	Submitting…
+1019	Subtotal
+1020	Subtotal (₼)
+1021	Subtotal:
+1022	Supplier
+1023	Supplier Name
+1024	Supplier added
+1025	Supplier deleted
+1026	Supplier updated
+1027	Suppliers
+1028	Suspended
+1029	TO ACCOUNT
+1030	TO BRANCH
+1031	TOTAL
+1032	TOTAL BALANCE
+1033	TRANSACTION TYPE
+1034	TYPE
+1035	Tam ekran rejimi
+1036	Tamamlandı
+1037	Tax
+1038	Tax %
+1039	Tax:
+1040	Telefon
+1041	Telefon Nömrəsi
+1042	Tenant-wide trial balance (all branches)
+1043	Terms
+1044	Thank you for your business!
+1045	The platform trusted by thousands of car service businesses. Our team will reach out to get you started.
+1046	Theft/Loss
+1047	This Month Activity
+1048	This reservation will be permanently deleted.
+1049	This slot is locked
+1050	This year
+1051	Time
+1052	Time Slot Interval
+1053	To
+1054	To Account
+1055	To branch
+1056	Today's Reservations
+1057	Total
+1058	Total Amount
+1059	Total Credit
+1060	Total Debit
+1061	Total Income
+1062	Total Sales
+1063	Total spent
+1064	Total:
+1065	Track spare parts inventory, receive low-stock alerts, and automate reorder workflows.
+1066	Transactions
+1067	Transfer approved
+1068	Transfer created
+1069	Transfer deleted
+1070	Transfer details
+1071	Transfer rejected
+1072	Transferred
+1073	Transform your
+1074	Trial Balance
+1075	Type
+1076	Type X, Type Y
+1077	Tövsiyə olunan ölçü 450x+ x 450px. Maks ölçü 5mb.
+1078	Təchizatçı Əlavə Et
+1079	Təhlükəsizlik
+1080	Təsdiq kodu
+1081	Təsdiqlə və yenilə
+1082	Təsdiqlənib
+1083	Təsdiqlənir…
+1084	Təsdiqlənmiş xərc yoxdur
+1085	Təsdiqlənmiş xərclər
+1086	UNIT
+1087	Unikal
+1088	Unit
+1089	Unit Name *
+1090	Unit Price
+1091	Unit added
+1092	Unit added successfully!
+1093	Unit deleted
+1094	Unit name
+1095	Unit price (₼)
+1096	Unit updated successfully!
+1097	Units
+1098	Units Report
+1099	Units imported successfully!
+1100	Unpaid
+1101	Up and running in 3 steps
+1102	Update
+1103	Updated
+1104	Use detail view for pending deposited transfers
+1105	VALUES
+1106	VARIANT
+1107	VEHICLE
+1108	VEHICLES
+1109	Value1, Value2, Value3
+1110	Values
+1111	Values *
+1112	Values are required
+1113	Variant
+1114	Variant *
+1115	Variant Attributes
+1116	Variant Attributes Report
+1117	Variant attribute added successfully!
+1118	Variant attribute deleted
+1119	Variant attributes imported successfully!
+1120	Variant is required
+1121	Vebsayt
+1122	Vehicle
+1123	Vehicle & Customer CRM
+1124	Vehicle added
+1125	Vehicle deleted
+1126	Vehicle updated
+1127	Vehicles
+1128	View
+1129	View Your Balance Sheet
+1130	View Your Cashflows
+1131	View Your Statement
+1132	View demo
+1133	View live demo
+1134	WARRANTY
+1135	Warehouse
+1136	Warehouse 1
+1137	Warehouse 2
+1138	Warehouse 3
+1139	Warranties
+1140	Warranties Report
+1141	Warranties imported successfully!
+1142	Warranty
+1143	Warranty added successfully!
+1144	Will be auto-generated
+1145	Working Days
+1146	Xalis Mənfəət
+1147	Xoş gəldiniz
+1148	Xüsusi Aralıq
+1149	Xərc Bölgüsü
+1150	Xərc Nisbəti
+1151	Xərc Əlavə Et
+1152	Xərclər
+1153	Xəritədə Yer
+1154	Xəritədə yerləşdiyiniz yeri axtarın və işarələyin
+1155	Yadda saxlanılır…
+1156	Yan paneli genişlət
+1157	Yan paneli yığ
+1158	Yarat
+1159	Year
+1160	Yeni e-poçt
+1161	Yeni e-poçt və təsdiq kodunu daxil edin.
+1162	Yeni e-poçt ünvanı daxil edin.
+1163	Yeni e-poçtunuza təsdiq kodu göndərildi.
+1164	Yeni Şifrə
+1165	Yeni Şifrəni Təsdiqlə
+1166	Yeni şifrə ən azı 8 simvol olmalıdır.
+1167	Yeni şifrələr uyğun gəlmir.
+1168	Yenidən
+1169	Yenidən Stok Fəaliyyəti
+1170	Yenidən stok zaman sırası API-dən mövcud deyil.
+1171	Yenilə
+1172	Yenilənir…
+1173	Yes
+1174	Your branded booking site goes live instantly at your custom subdomain.
+1175	Yoxdur
+1176	Yüklənir...
+1177	auto
+1178	bookings per time slot
+1179	brands
+1180	brands-demo
+1181	car service needs
+1182	categories
+1183	categories-demo
+1184	dövr satışı
+1185	e.g., 1 Year
+1186	e.g., 54500
+1187	e.g., BL001
+1188	e.g., S, M, L, XL
+1189	e.g., STR001
+1190	e.g., Size, Color
+1191	e.g., kg
+1192	expired-products
+1193	expired-products-demo
+1194	gözləyir
+1195	items
+1196	marja
+1197	max
+1198	min
+1199	more
+1200	məhsul
+1201	not harder.
+1202	of
+1203	or drag and drop
+1204	per slot
+1205	purchases
+1206	qaldı
+1207	results
+1208	rezervasiyanız var
+1209	satılan vahid
+1210	service smarter
+1211	service today.
+1212	sifariş
+1213	slots total
+1214	sub-categories
+1215	sub-categories-demo
+1216	to
+1217	təchizatçı
+1218	units
+1219	units-demo
+1220	variant-attributes
+1221	variant-attributes-demo
+1222	warranties
+1223	warranties-demo
+1224	Çıxış
+1225	Ödənilib
+1226	Ödənilmiş satışlar
+1227	Ödənilməmiş faktura
+1228	Ödənilməyib
+1229	Ödəniləcək Faktura
+1230	Ümumi Gəlir
+1231	Ümumi Müştərilər
+1232	Ümumi Məhsullar
+1233	Ümumi Mənfəət
+1234	Ümumi Satışlar
+1235	Ümumi Sifarişlər
+1236	Ümumi Xərclər
+1237	Ünvan
+1238	Ünvan Məlumatı
+1239	Ünvan və ya yer axtarın...
+1240	Ünvan, şəhər və poçt kodu mütləqdir.
+1241	Üzv Olduğu Tarix
+1242	ümumi gözləyən
+1243	İldən İlə Artım
+1244	İldən-İlə Artım
+1245	İllik Gəlir
+1246	İllik Hesabat
+1247	İxrac
+1248	İşçi
+1249	İşçi Satış Hesabatı
+1250	İşçi Təfərrüatı
+1251	İşçi axtar...
+1252	İşçi üzrə Gəlir
+1253	İşçi üzrə Kateqoriyalar
+1254	İşçi üzrə POS performansı — gəlir, məhsul və kateqoriyalar
+1255	Şifrə yeniləndi.
+1256	Şifrəni Dəyişdir
+1257	Şifrəni Yenilə
+1258	Şifrəni gizlət
+1259	Şifrəni göstər
+1260	Şirkət
+1261	Şirkət Adı
+1262	Şirkət E-poçt Ünvanı
+1263	Şirkət Loqosu
+1264	Şirkət Məlumatı
+1265	Şirkət Parametrləri
+1266	Şirkət adı, e-poçt və telefon mütləqdir.
+1267	Şirkət loqosu silindi.
+1268	Şirkət və sistem parametrlərini idarə edin
+1269	Şirkət Şəkilləri
+1270	Şirkətinizin loqosunu yükləyin
+1271	Şəhər
+1272	Şəhəri daxil edin
+1273	Şəkil Yüklə
+1274	Şəxsi Məlumat
+1275	Əməliyyat yoxdur
+1276	Ən Yaxşı Müştərilər
+1277	Ətraflı illik performans xülasəsi
+1278	Əvvəlki illər üçün kifayət qədər məlumat yoxdur
+1279	ədəd
+1280	—
