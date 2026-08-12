@@ -7,8 +7,6 @@ import {
   FileSpreadsheet,
   RefreshCw,
   Edit2,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -23,11 +21,12 @@ import { ModernSelect } from "../ui/ModernSelect";
 import { fetchStockLevels, type StockLevelRow } from "../../api/stock";
 import { formatStockDate, branchLabel } from "../../lib/stockMappers";
 import { notifyFromError } from "../../lib/toast";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { pickLang } from "../../i18n/pickLang";
-const PAGE_SIZE = 10;
 
 export function ManageStock() {
   const { language } = useLanguage();
@@ -47,24 +46,28 @@ export function ManageStock() {
   const [items, setItems] = useState<StockLevelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedBranch]);
 
   const loadItems = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setItems([]);
       setTotalItems(0);
-      setTotalPages(0);
+      setTotalPages(1);
       setLoading(false);
       return;
     }
@@ -72,14 +75,17 @@ export function ManageStock() {
     try {
       const data = await fetchStockLevels({
         page: currentPage,
-        pageSize: PAGE_SIZE,
+        pageSize: itemsPerPage,
         search: debouncedSearch.trim() || undefined,
         storeId:
           isGlobalMode && selectedBranch !== "all" ? selectedBranch : undefined,
       });
       setItems(data.items);
       setTotalItems(data.total);
-      setTotalPages(data.totalPages);
+      setTotalPages(Math.max(1, data.totalPages || 1));
+      if (data.totalPages > 0 && currentPage > data.totalPages) {
+        setCurrentPage(data.totalPages);
+      }
     } catch (err) {
       notifyFromError(err, tr("Ehtiyat siyahısını yükləmək alınmadı", "Failed to load stock levels"));
     } finally {
@@ -94,6 +100,7 @@ export function ManageStock() {
     selectedBranch,
     isGlobalMode,
     branchRevision,
+    itemsPerPage,
   ]);
 
   useEffect(() => {
@@ -343,34 +350,16 @@ export function ManageStock() {
             </table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-3 py-2 border-t border-gray-200 dark:border-gray-800">
-              <p className="text-xs text-gray-500">
-                {tr("Cəmi", "Total")}: {totalItems}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => p - 1)}
-                  className="p-1 rounded border border-gray-300 dark:border-gray-700 disabled:opacity-50"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  {currentPage} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                  className="p-1 rounded border border-gray-300 dark:border-gray-700 disabled:opacity-50"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
+          </div>
         </div>
 
         <EditStockModal

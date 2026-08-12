@@ -28,11 +28,12 @@ import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { ModernSelect } from "../ui/ModernSelect";
 import { ProductImage } from "../ui/ProductImage";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { pickLang } from "../../i18n/pickLang";
-const PAGE_SIZE = 10;
 
 interface StockItem {
   id: string;
@@ -73,18 +74,22 @@ export function LowStocks() {
   const [categories, setCategories] = useState<CategoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedCategory]);
 
   useEffect(() => {
     if (!(isAuthenticated || isDemo) || !canView) {
@@ -102,7 +107,7 @@ export function LowStocks() {
     if (!(isAuthenticated || isDemo) || !canView) {
       setItems([]);
       setTotalItems(0);
-      setTotalPages(0);
+      setTotalPages(1);
       setLoading(false);
       return;
     }
@@ -110,19 +115,22 @@ export function LowStocks() {
     try {
       const data = await fetchLowStockProducts({
         page: currentPage,
-        pageSize: PAGE_SIZE,
+        pageSize: itemsPerPage,
         search: debouncedSearch.trim() || undefined,
         categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
       });
       setItems(data.items.map(mapProduct));
       setTotalItems(data.total);
-      setTotalPages(data.totalPages);
+      setTotalPages(Math.max(1, data.totalPages || 1));
+      if (data.totalPages > 0 && currentPage > data.totalPages) {
+        setCurrentPage(data.totalPages);
+      }
     } catch (err) {
       notifyFromError(err, tr("Az ehtiyatlı məhsulları yükləmək alınmadı", "Failed to load low stock products"));
     } finally {
       setLoading(false);
     }
-  }, [isDemo, isAuthenticated, canView, currentPage, debouncedSearch, selectedCategory, language, branchRevision]);
+  }, [isDemo, isAuthenticated, canView, currentPage, debouncedSearch, selectedCategory, language, branchRevision, itemsPerPage]);
 
   useEffect(() => {
     void loadItems();
@@ -271,10 +279,7 @@ export function LowStocks() {
             <div className="flex flex-wrap gap-2">
               <ModernSelect
                 value={selectedCategory}
-                onChange={(value) => {
-                  setSelectedCategory(value);
-                  setCurrentPage(1);
-                }}
+                onChange={setSelectedCategory}
                 options={categoryOptions}
               />
             </div>
@@ -445,34 +450,16 @@ export function LowStocks() {
             </table>
           </div>
 
-          {!loading && totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800">
-              <div className="text-xs text-gray-600 dark:text-gray-400">
-                {tr("Göstərilir", "Showing")} {(currentPage - 1) * PAGE_SIZE + 1}{" "}
-                {tr("-", "to")} {Math.min(currentPage * PAGE_SIZE, totalItems)} {tr("/", "of")}{" "}
-                {totalItems} {tr("nəticə", "results")}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {tr("Əvvəlki", "Previous")}
-                </button>
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  {tr("Səhifə", "Page")} {currentPage} {tr("/", "of")} {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {tr("Növbəti", "Next")}
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
+          </div>
         </div>
       </div>
     </div>

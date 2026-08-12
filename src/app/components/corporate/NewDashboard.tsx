@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import {
   TrendingUp,
   Users,
-  Car,
   Calendar,
   CalendarDays,
   DollarSign,
@@ -452,12 +451,9 @@ export function NewDashboard() {
                   <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{r.customer}</p>
-                    <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                      <Car className="w-2.5 h-2.5" /> {r.car}
-                    </p>
+                    <p className="text-[10px] text-gray-400 truncate mt-0.5">{r.service}</p>
                   </div>
                   <div className="flex-shrink-0 text-right">
-                    <p className="text-xs text-gray-600 dark:text-gray-400">{r.service}</p>
                     <span
                       className={`inline-flex mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium ${r.status === "confirmed" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"}`}
                     >

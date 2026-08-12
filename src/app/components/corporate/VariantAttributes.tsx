@@ -31,6 +31,8 @@ import { formatInventoryDate } from "../../lib/inventoryMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { ModernSelect } from "../ui/ModernSelect";
+import { DataPagination } from "../ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -51,6 +53,7 @@ export function VariantAttributes() {
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -104,11 +107,16 @@ export function VariantAttributes() {
     void loadVariantAttributes();
   }, [loadVariantAttributes]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Filter items
   const filteredItems = variantAttributes.filter((item) => {
     const matchesSearch =
-      item.variant.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.values.toLowerCase().includes(searchQuery.toLowerCase());
+      item.variant.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      item.values.toLowerCase().includes(debouncedSearch.toLowerCase());
     const matchesStatus = selectedStatus === "all" || item.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
@@ -124,6 +132,19 @@ export function VariantAttributes() {
         : bValue.localeCompare(aValue);
     }
     return 0;
+  });
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: sortedItems,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${debouncedSearch}|${selectedStatus}`,
   });
 
   const handleExportPDF = () => {
@@ -522,7 +543,7 @@ export function VariantAttributes() {
                 </tr>
               </thead>
               <tbody>
-                {sortedItems.map((attribute, index) => (
+                {paginatedData.map((attribute, index) => (
                   <tr
                     key={attribute.id}
                     className={`border-b border-gray-200 dark:border-gray-800 ${
@@ -577,6 +598,21 @@ export function VariantAttributes() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={{
+                showing: tr("Göstərilir", "Showing"),
+                to: tr("-", "to"),
+                of: tr("/", "of"),
+                results: tr("nəticə", "results"),
+              }}
+            />
           </div>
         </div>
 

@@ -73,7 +73,7 @@ const DEFAULT_SERVICES: ServiceTypeOption[] = [
   { value: "other", label: "Other", labelAz: "Digər", labelTr: "Diğer" },
 ];
 
-type Step = "date" | "time" | "service" | "car" | "contact" | "done";
+type Step = "date" | "time" | "service" | "contact" | "done";
 
 function dateToYmd(d: Date): string {
   const y = d.getFullYear();
@@ -122,8 +122,6 @@ export function CarServiceCustomerSite({
   const [selTime,  setSelTime]  = useState("");
   const [selService, setSelService] = useState("");
   const [customService, setCustomService] = useState("");
-  const [carModel, setCarModel] = useState("");
-  const [plate3,   setPlate3]   = useState("");
   const [custName, setCustName] = useState("");
   const [custPhone,setCustPhone]= useState("");
 
@@ -242,7 +240,7 @@ export function CarServiceCustomerSite({
     setSelService(value);
     if (!isOtherService(value)) {
       setCustomService("");
-      setStep("car");
+      setStep("contact");
     }
   };
 
@@ -260,8 +258,6 @@ export function CarServiceCustomerSite({
         {
           guestName: custName.trim(),
           guestPhone: custPhone.trim(),
-          guestPlateSuffix: plate3.trim() || null,
-          carModel: carModel.trim() || null,
           serviceType,
           scheduledAt: buildScheduledAtIso(selDate, selTime),
           branchSlug: activeBranchSlug ?? undefined,
@@ -278,7 +274,7 @@ export function CarServiceCustomerSite({
 
   const resetAll = () => {
     setStep("date"); setSelDate(null); setSelTime(""); setSelService(""); setCustomService("");
-    setCarModel(""); setPlate3(""); setCustName(""); setCustPhone("");
+    setCustName(""); setCustPhone("");
     setSubmitError(null); setSlots([]);
   };
 
@@ -309,7 +305,6 @@ export function CarServiceCustomerSite({
     { key: "date",    label: "Date",    labelAz: "Tarix",    labelTr: "Tarih" },
     { key: "time",    label: "Time",    labelAz: "Saat",     labelTr: "Saat" },
     { key: "service", label: "Service", labelAz: "Xidmət",   labelTr: "Hizmet" },
-    { key: "car",     label: "Vehicle", labelAz: "Avtomobil", labelTr: "Araç" },
     { key: "contact", label: "Contact", labelAz: "Əlaqə",    labelTr: "İletişim" },
   ];
   const stepIdx = STEPS.findIndex(s => s.key === step);
@@ -612,7 +607,7 @@ export function CarServiceCustomerSite({
                       />
                     </div>
                     <button
-                      onClick={() => customService.trim() && setStep("car")}
+                      onClick={() => customService.trim() && setStep("contact")}
                       disabled={!customService.trim()}
                       className="w-full py-3 rounded-xl bg-[#0026f6] text-white text-sm font-bold hover:bg-[#001fc4] transition-colors shadow-lg shadow-[#0026f6]/20 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
@@ -623,53 +618,10 @@ export function CarServiceCustomerSite({
               </div>
             )}
 
-            {step === "car" && (
-              <div className="p-5">
-                <div className="flex items-center gap-2 mb-5">
-                  <button onClick={() => setStep("service")}
-                    className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center">
-                    <ArrowLeft className="w-3.5 h-3.5 text-gray-500" />
-                  </button>
-                  <div>
-                    <p className="text-xs text-gray-400">{t("Appointment", "Görüş", "Randevu")}</p>
-                    <p className="text-sm font-bold text-gray-900">
-                      {selDate ? fmtDate(selDate) : ""} · {selTime}
-                      {selService && ` · ${serviceLabel(selService)}`}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                      {t("Car Model", "Avtomobil modeli", "Araç modeli")}
-                    </label>
-                    <input type="text" value={carModel} onChange={e => setCarModel(e.target.value)}
-                      placeholder={t("e.g. Toyota Camry 2020", "məs. Toyota Camry 2020", "örn. Toyota Camry 2020")}
-                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent placeholder-gray-300" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                      {t("Last 3 digits of plate number", "Nömrə nişanının son 3 rəqəmi", "Plaka numarasının son 3 hanesi")}
-                    </label>
-                    <input type="text" value={plate3} onChange={e => setPlate3(e.target.value.slice(0,3))}
-                      placeholder="001" maxLength={3}
-                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent placeholder-gray-300 tracking-widest" />
-                    <p className="text-[10px] text-gray-400 mt-1">{t("e.g. for 77-AB-001 enter 001", "məs. 77-AB-001 üçün 001 daxil edin", "örn. 77-AB-001 için 001 girin")}</p>
-                  </div>
-                </div>
-
-                <button onClick={() => setStep("contact")}
-                  className="w-full mt-6 py-3 rounded-xl bg-[#0026f6] text-white text-sm font-bold hover:bg-[#001fc4] transition-colors shadow-lg shadow-[#0026f6]/20">
-                  {t("Continue", "Davam Et", "Devam Et")} →
-                </button>
-              </div>
-            )}
-
             {step === "contact" && (
               <div className="p-5">
                 <div className="flex items-center gap-2 mb-5">
-                  <button onClick={() => setStep("car")}
+                  <button onClick={() => setStep("service")}
                     className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center">
                     <ArrowLeft className="w-3.5 h-3.5 text-gray-500" />
                   </button>
@@ -678,7 +630,6 @@ export function CarServiceCustomerSite({
                     <p className="text-sm font-bold text-gray-900">
                       {selDate ? fmtDate(selDate) : ""} · {selTime}
                       {selService && ` · ${serviceLabel(selService)}`}
-                      {carModel && ` · ${carModel}`}
                     </p>
                   </div>
                 </div>
@@ -707,7 +658,6 @@ export function CarServiceCustomerSite({
                   {[
                     { label: t("Date & Time", "Tarix & Saat", "Tarih & Saat"), val: `${selDate ? fmtDate(selDate) : ""} · ${selTime}` },
                     ...(selService ? [{ label: t("Service", "Xidmət", "Hizmet"), val: serviceLabel(selService) }] : []),
-                    ...(carModel ? [{ label: t("Vehicle", "Avtomobil", "Araç"), val: carModel + (plate3 ? ` ···${plate3}` : "") }] : []),
                   ].map(r => (
                     <div key={r.label} className="flex justify-between">
                       <span className="text-gray-400">{r.label}</span>
@@ -740,7 +690,6 @@ export function CarServiceCustomerSite({
                 <div className="bg-gray-50 rounded-xl px-5 py-3 text-sm text-gray-700 font-semibold mb-6 space-y-1 w-full">
                   <p>{selDate ? fmtDate(selDate) : ""} · {selTime}</p>
                   {selService && <p className="text-xs text-gray-500">{serviceLabel(selService)}</p>}
-                  {carModel && <p className="text-xs text-gray-500">{carModel}{plate3 && ` ···${plate3}`}</p>}
                   <p className="text-xs text-gray-500">{custName} · {custPhone}</p>
                 </div>
                 <button onClick={resetAll}

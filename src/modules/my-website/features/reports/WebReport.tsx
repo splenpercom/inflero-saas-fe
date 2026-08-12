@@ -10,6 +10,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 import { useTr } from "../../i18n";
+import { DataPagination, dataPaginationShowText } from "../../../../app/components/ui/DataPagination";
+import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../../app/hooks/usePagination";
 
 import {
   type Period,
@@ -155,6 +157,32 @@ export function WebReport() {
 
   const chartRevenueName = tr("Gəlir", "Revenue");
   const chartOrdersName = tr("Sifarişlər", "Orders");
+
+  const {
+    currentPage: productsPage,
+    totalPages: productsTotalPages,
+    totalItems: productsTotalItems,
+    paginatedData: pagedProducts,
+    setCurrentPage: setProductsPage,
+    itemsPerPage: productsPerPage,
+  } = usePagination({
+    data: TOP_PRODUCTS,
+    itemsPerPage: DEFAULT_REPORT_PAGE_SIZE,
+    resetKey: period,
+  });
+
+  const {
+    currentPage: ordersPage,
+    totalPages: ordersTotalPages,
+    totalItems: ordersTotalItems,
+    paginatedData: pagedRecentOrders,
+    setCurrentPage: setOrdersPage,
+    itemsPerPage: ordersPerPage,
+  } = usePagination({
+    data: RECENT_ORDERS,
+    itemsPerPage: DEFAULT_REPORT_PAGE_SIZE,
+    resetKey: period,
+  });
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
@@ -357,7 +385,7 @@ export function WebReport() {
           <div className="xl:col-span-2">
             <Section title={tr("Ən Çox Satan Məhsullar", "Top Selling Products")}>
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                {TOP_PRODUCTS.map((p, i) => (
+                {pagedProducts.map((p, i) => (
                   <div key={p.name} className="flex items-center gap-3 px-4 py-3">
                     <span
                       className={cn(
@@ -369,7 +397,7 @@ export function WebReport() {
                             : "bg-gray-50 dark:bg-gray-800/50 text-gray-400",
                       )}
                     >
-                      {i + 1}
+                      {(productsPage - 1) * productsPerPage + i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{p.name}</p>
@@ -403,6 +431,16 @@ export function WebReport() {
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-3">
+                <DataPagination
+                  currentPage={productsPage}
+                  totalPages={productsTotalPages}
+                  onPageChange={setProductsPage}
+                  totalItems={productsTotalItems}
+                  itemsPerPage={productsPerPage}
+                  showText={dataPaginationShowText(tr)}
+                />
               </div>
             </Section>
           </div>
@@ -480,7 +518,7 @@ export function WebReport() {
                 </tr>
               </thead>
               <tbody>
-                {RECENT_ORDERS.map((o, i) => (
+                {pagedRecentOrders.map((o, i) => (
                   <tr
                     key={o.ref}
                     className={cn(
@@ -514,6 +552,16 @@ export function WebReport() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-3">
+            <DataPagination
+              currentPage={ordersPage}
+              totalPages={ordersTotalPages}
+              onPageChange={setOrdersPage}
+              totalItems={ordersTotalItems}
+              itemsPerPage={ordersPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
           </div>
         </Section>
 

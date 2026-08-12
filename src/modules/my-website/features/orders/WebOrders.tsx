@@ -19,6 +19,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useLanguage, useTr } from "../../i18n";
+import { DataPagination, dataPaginationShowText } from "../../../../app/components/ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../../app/hooks/usePagination";
 import type { WebOrder } from "./types";
 import { DUMMY_ORDERS } from "./data";
 import {
@@ -290,6 +292,19 @@ export function WebOrders() {
     return matchSearch && matchStatus && matchPayment;
   });
 
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData: pagedOrders,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: filtered,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${search}|${filterStatus}|${filterPayment}|${sortBy}`,
+  });
+
   const totalRevenue = orders.filter(o => o.paymentStatus === "paid").reduce((s, o) => s + o.grandTotal, 0);
   const pendingCount = orders.filter(o => o.status === "pending").length;
   const completedCount = orders.filter(o => o.status === "completed").length;
@@ -422,7 +437,7 @@ export function WebOrders() {
                       <p className="text-xs text-gray-400">{tr("Sifariş tapılmadı", "No orders found")}</p>
                     </td>
                   </tr>
-                ) : filtered.map((order, i) => {
+                ) : pagedOrders.map((order, i) => {
                   const qty = totalQty(order);
                   return (
                     <tr key={order.id} className={cn(
@@ -503,12 +518,14 @@ export function WebOrders() {
 
           {filtered.length > 0 && (
             <div className="px-4 py-2.5 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
-              <p className="text-[10px] text-gray-400">
-                {tr(
-                  `${orders.length} sifarişdən ${filtered.length} nəticə göstərilir`,
-                  `Showing ${filtered.length} of ${orders.length} orders`
-                )}
-              </p>
+              <DataPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                showText={dataPaginationShowText(tr)}
+              />
             </div>
           )}
         </div>

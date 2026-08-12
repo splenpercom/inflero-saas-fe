@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { cn } from "../ui/utils";
 import {
   Search,
@@ -31,6 +31,8 @@ import {
 } from "../../lib/financeMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { CreateBankAccountModal, type BankAccountFormData } from "./CreateBankAccountModal";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -45,7 +47,7 @@ export function BankAccounts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [selectedSort, setSelectedSort] = useState("latest");
+  const [selectedSort, setSelectedSort] = useState<"latest" | "oldest" | "name">("latest");
   const [activeTab, setActiveTab] = useState("bank");
   const [accounts, setAccounts] = useState<BankAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +55,10 @@ export function BankAccounts() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<BankAccountRow | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -61,9 +67,15 @@ export function BankAccounts() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedStatus, selectedSort]);
+
   const loadAccounts = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setAccounts([]);
+      setTotalItems(0);
+      setTotalPages(1);
       setLoading(false);
       return;
     }
@@ -72,31 +84,34 @@ export function BankAccounts() {
       const result = await fetchBankAccounts({
         search: debouncedSearch.trim() || undefined,
         status: selectedStatus,
-        pageSize: 200,
+        sort: selectedSort,
+        page: currentPage,
+        pageSize: itemsPerPage,
       });
       setAccounts(Array.isArray(result.items) ? result.items : []);
+      setTotalItems(result.total ?? 0);
+      const pages = Math.max(1, result.totalPages || 1);
+      setTotalPages(pages);
+      if (pages > 0 && currentPage > pages) setCurrentPage(pages);
     } catch (err) {
       notifyFromError(err, tr("Bank hesablarını yükləmək alınmadı", "Failed to load bank accounts"));
     } finally {
       setLoading(false);
     }
-  }, [isDemo, isAuthenticated, canView, debouncedSearch, selectedStatus]);
+  }, [
+    isDemo,
+    isAuthenticated,
+    canView,
+    debouncedSearch,
+    selectedStatus,
+    selectedSort,
+    currentPage,
+    itemsPerPage,
+  ]);
 
   useEffect(() => {
     void loadAccounts();
   }, [loadAccounts]);
-
-  const sortedAccounts = useMemo(() => {
-    const list = [...accounts];
-    if (selectedSort === "name") {
-      list.sort((a, b) => a.accountHolderName.localeCompare(b.accountHolderName));
-    } else if (selectedSort === "oldest") {
-      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    } else {
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }
-    return list;
-  }, [accounts, selectedSort]);
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -169,54 +184,73 @@ export function BankAccounts() {
     }
   };
 
-  const exportRows = sortedAccounts.map((a) => [
-    a.accountHolderName,
-    a.accountNo,
-    mapBankAccountTypeLabel(a.type, tr),
-    parseFinanceMoney(a.openingBalance).toFixed(2),
-    parseFinanceMoney(a.currentBalance).toFixed(2),
-    a.notes,
-    mapBankAccountStatusLabel(a.status, tr),
-  ]);
+  const loadExportRows = async () => {
+    const result = await fetchBankAccounts({
+      search: debouncedSearch.trim() || undefined,
+      status: selectedStatus,
+      sort: selectedSort,
+      page: 1,
+      pageSize: 200,
+    });
+    return (result.items ?? []).map((a) => [
+      a.accountHolderName,
+      a.accountNo,
+      mapBankAccountTypeLabel(a.type, tr),
+      parseFinanceMoney(a.openingBalance).toFixed(2),
+      parseFinanceMoney(a.currentBalance).toFixed(2),
+      a.notes,
+      mapBankAccountStatusLabel(a.status, tr),
+    ]);
+  };
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(tr("Bank Hesabları", "Bank Accounts"), 14, 20);
-    doc.setFontSize(10);
-    doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDateTime(language)}`, 14, 28);
-    autoTable(doc, {
-      startY: 35,
-      head: [[
+  const handleExportPDF = async () => {
+    try {
+      const body = await loadExportRows();
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text(tr("Bank Hesabları", "Bank Accounts"), 14, 20);
+      doc.setFontSize(10);
+      doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDateTime(language)}`, 14, 28);
+      autoTable(doc, {
+        startY: 35,
+        head: [[
+          tr("Hesab Sahibi", "Holder"),
+          tr("Hesab No", "Account No"),
+          tr("Növ", "Type"),
+          tr("Açılış", "Opening"),
+          tr("Cari", "Current"),
+          tr("Qeydlər", "Notes"),
+          tr("Status", "Status"),
+        ]],
+        body,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [0, 38, 246], textColor: [255, 255, 255], fontStyle: "bold" },
+      });
+      doc.save(`bank-accounts-${Date.now()}.pdf`);
+    } catch (err) {
+      notifyFromError(err);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const body = await loadExportRows();
+      const headers = [
         tr("Hesab Sahibi", "Holder"),
         tr("Hesab No", "Account No"),
         tr("Növ", "Type"),
-        tr("Açılış", "Opening"),
-        tr("Cari", "Current"),
+        tr("Açılış Balansı", "Opening Balance"),
+        tr("Cari Balans", "Current Balance"),
         tr("Qeydlər", "Notes"),
         tr("Status", "Status"),
-      ]],
-      body: exportRows,
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [0, 38, 246], textColor: [255, 255, 255], fontStyle: "bold" },
-    });
-    doc.save(`bank-accounts-${Date.now()}.pdf`);
-  };
-
-  const handleExportExcel = () => {
-    const headers = [
-      tr("Hesab Sahibi", "Holder"),
-      tr("Hesab No", "Account No"),
-      tr("Növ", "Type"),
-      tr("Açılış Balansı", "Opening Balance"),
-      tr("Cari Balans", "Current Balance"),
-      tr("Qeydlər", "Notes"),
-      tr("Status", "Status"),
-    ];
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...exportRows]);
-    XLSX.utils.book_append_sheet(wb, ws, tr("Bank", "Bank"));
-    XLSX.writeFile(wb, `bank-accounts-${Date.now()}.xlsx`);
+      ];
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...body]);
+      XLSX.utils.book_append_sheet(wb, ws, tr("Bank", "Bank"));
+      XLSX.writeFile(wb, `bank-accounts-${Date.now()}.xlsx`);
+    } catch (err) {
+      notifyFromError(err);
+    }
   };
 
   return (
@@ -245,10 +279,10 @@ export function BankAccounts() {
         </div>
 
         <div className="flex justify-end gap-2 mb-4">
-          <button onClick={handleExportPDF} disabled={!sortedAccounts.length} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50" title={tr("PDF İxrac Et", "Export PDF")}>
+          <button onClick={() => void handleExportPDF()} disabled={!totalItems} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50" title={tr("PDF İxrac Et", "Export PDF")}>
             <FileText className="w-3.5 h-3.5 text-red-500" />
           </button>
-          <button onClick={handleExportExcel} disabled={!sortedAccounts.length} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50" title={tr("Excel İxrac Et", "Export Excel")}>
+          <button onClick={() => void handleExportExcel()} disabled={!totalItems} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50" title={tr("Excel İxrac Et", "Export Excel")}>
             <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
           </button>
           <button onClick={() => void handleRefresh()} disabled={isRefreshing} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" title={tr("Yenilə", "Refresh")}>
@@ -301,7 +335,9 @@ export function BankAccounts() {
               <div className="relative">
                 <select
                   value={selectedSort}
-                  onChange={(e) => setSelectedSort(e.target.value)}
+                  onChange={(e) =>
+                    setSelectedSort(e.target.value as "latest" | "oldest" | "name")
+                  }
                   className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
                 >
                   <option value="latest">{tr("Sırala : Ən Yeni", "Sort By : Latest")}</option>
@@ -334,12 +370,12 @@ export function BankAccounts() {
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td>
                   </tr>
-                ) : sortedAccounts.length === 0 ? (
+                ) : accounts.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Hesab tapılmadı", "No accounts found")}</td>
                   </tr>
                 ) : (
-                  sortedAccounts.map((account, index) => (
+                  accounts.map((account, index) => (
                     <tr
                       key={account.id}
                       className={cn(
@@ -401,6 +437,16 @@ export function BankAccounts() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
           </div>
         </div>
       </div>

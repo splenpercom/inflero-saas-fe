@@ -24,6 +24,8 @@ import { fetchPurchases, deletePurchase, type PurchaseListRow } from "../../api/
 import { formatPurchaseDate } from "../../lib/purchaseMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -49,6 +51,10 @@ export function Purchase() {
   const [purchases, setPurchases] = useState<PurchaseListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -62,9 +68,15 @@ export function Purchase() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedStatus, selectedPaymentStatus, sortBy]);
+
   const loadPurchases = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setPurchases([]);
+      setTotalItems(0);
+      setTotalPages(1);
       setLoading(false);
       return;
     }
@@ -75,9 +87,14 @@ export function Purchase() {
         status: selectedStatus,
         paymentStatus: selectedPaymentStatus,
         sortBy,
-        limit: 5000,
+        page: currentPage,
+        pageSize: itemsPerPage,
       });
-      setPurchases(data);
+      setPurchases(data.items ?? []);
+      setTotalItems(data.total ?? 0);
+      const pages = Math.max(1, data.totalPages || 1);
+      setTotalPages(pages);
+      if (pages > 0 && currentPage > pages) setCurrentPage(pages);
     } catch (err) {
       notifyFromError(err, tr("Satınalmaları yükləmək alınmadı", "Failed to load purchases"));
     } finally {
@@ -92,6 +109,8 @@ export function Purchase() {
     selectedPaymentStatus,
     sortBy,
     branchRevision,
+    currentPage,
+    itemsPerPage,
   ]);
 
   useEffect(() => {
@@ -145,73 +164,95 @@ export function Purchase() {
     return statusMap[status] || status;
   };
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(tr("Satınalmalar Hesabatı", "Purchases Report"), 14, 20);
-    doc.setFontSize(10);
-    doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDateTime(language)}`, 14, 28);
+  const loadExportRows = async () => {
+    const data = await fetchPurchases({
+      search: debouncedSearch.trim() || undefined,
+      status: selectedStatus,
+      paymentStatus: selectedPaymentStatus,
+      sortBy,
+      page: 1,
+      pageSize: 200,
+    });
+    return data.items ?? [];
+  };
 
-    const tableData = purchases.map((item) => [
-      item.supplierName,
-      item.reference,
-      formatPurchaseDate(item.date),
-      translateStatus(item.status),
-      `${item.total} AZN`,
-      `${item.paid} AZN`,
-      `${item.due.toFixed(2)} AZN`,
-      translatePaymentStatus(item.paymentStatus),
-    ]);
+  const handleExportPDF = async () => {
+    try {
+      const rows = await loadExportRows();
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text(tr("Satınalmalar Hesabatı", "Purchases Report"), 14, 20);
+      doc.setFontSize(10);
+      doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDateTime(language)}`, 14, 28);
 
-    autoTable(doc, {
-      startY: 35,
-      head: [[
-        tr("Təchizatçı", "Supplier"),
+      const tableData = rows.map((item) => [
+        item.supplierName,
+        item.reference,
+        formatPurchaseDate(item.date),
+        translateStatus(item.status),
+        `${item.total} AZN`,
+        `${item.paid} AZN`,
+        `${item.due.toFixed(2)} AZN`,
+        translatePaymentStatus(item.paymentStatus),
+      ]);
+
+      autoTable(doc, {
+        startY: 35,
+        head: [[
+          tr("Təchizatçı", "Supplier"),
+          tr("İstinad", "Reference"),
+          tr("Tarix", "Date"),
+          tr("Status", "Status"),
+          tr("Cəmi", "Total"),
+          tr("Ödənilib", "Paid"),
+          tr("Borc", "Due"),
+          tr("Ödəniş", "Payment"),
+        ]],
+        body: tableData,
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [249, 115, 22], textColor: [255, 255, 255], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { top: 35 },
+      });
+
+      doc.save(`${tr("Satınalmalar", "purchases")}-${new Date().getTime()}.pdf`);
+    } catch (err) {
+      notifyFromError(err);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const items = await loadExportRows();
+      const headers = [
+        tr("Təchizatçı Adı", "Supplier Name"),
         tr("İstinad", "Reference"),
         tr("Tarix", "Date"),
         tr("Status", "Status"),
         tr("Cəmi", "Total"),
         tr("Ödənilib", "Paid"),
         tr("Borc", "Due"),
-        tr("Ödəniş", "Payment"),
-      ]],
-      body: tableData,
-      styles: { fontSize: 9, cellPadding: 2 },
-      headStyles: { fillColor: [249, 115, 22], textColor: [255, 255, 255], fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-      margin: { top: 35 },
-    });
+        tr("Ödəniş Statusu", "Payment Status"),
+      ];
+      const rows = items.map((item) => [
+        item.supplierName,
+        item.reference,
+        formatPurchaseDate(item.date),
+        translateStatus(item.status),
+        item.total,
+        item.paid,
+        item.due,
+        translatePaymentStatus(item.paymentStatus),
+      ]);
 
-    doc.save(`${tr("Satınalmalar", "purchases")}-${new Date().getTime()}.pdf`);
-  };
-
-  const handleExportCSV = () => {
-    const headers = [
-      tr("Təchizatçı Adı", "Supplier Name"),
-      tr("İstinad", "Reference"),
-      tr("Tarix", "Date"),
-      tr("Status", "Status"),
-      tr("Cəmi", "Total"),
-      tr("Ödənilib", "Paid"),
-      tr("Borc", "Due"),
-      tr("Ödəniş Statusu", "Payment Status"),
-    ];
-    const rows = purchases.map((item) => [
-      item.supplierName,
-      item.reference,
-      formatPurchaseDate(item.date),
-      translateStatus(item.status),
-      item.total,
-      item.paid,
-      item.due,
-      translatePaymentStatus(item.paymentStatus),
-    ]);
-
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    ws["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, ws, tr("Satınalmalar", "Purchases"));
-    XLSX.writeFile(wb, `${tr("Satınalmalar", "purchases")}-${new Date().getTime()}.xlsx`);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(wb, ws, tr("Satınalmalar", "Purchases"));
+      XLSX.writeFile(wb, `${tr("Satınalmalar", "purchases")}-${new Date().getTime()}.xlsx`);
+    } catch (err) {
+      notifyFromError(err);
+    }
   };
 
   const handleRefresh = async () => {
@@ -510,6 +551,16 @@ export function Purchase() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
           </div>
         </div>
       </div>

@@ -120,6 +120,7 @@ export type IncomesListQuery = FinancePagedQuery & {
 
 export type BankAccountsListQuery = FinancePagedQuery & {
   status?: string;
+  sort?: "latest" | "oldest" | "name";
 };
 
 export type TrialBalanceQuery = {
@@ -167,6 +168,7 @@ export function bankAccountsListQueryString(q: BankAccountsListQuery = {}): stri
     pageSize: q.pageSize,
     search: q.search?.trim(),
     status: q.status && q.status !== "all" ? mapBankAccountStatusToApi(q.status) : undefined,
+    sort: q.sort && q.sort !== "latest" ? q.sort : undefined,
   });
 }
 

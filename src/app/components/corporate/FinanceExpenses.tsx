@@ -38,6 +38,8 @@ import {
 import { useExpenseCategories } from "../../hooks/useFinanceCategories";
 import { useFinanceBankAccounts } from "../../hooks/useFinanceBankAccounts";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { useServerPagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -64,6 +66,15 @@ export function FinanceExpenses() {
   const [isManageCategoriesModalOpen, setIsManageCategoriesModalOpen] = useState(false);
   const [editExpense, setEditExpense] = useState<ExpenseListRow | null>(null);
   const [viewExpense, setViewExpense] = useState<ExpenseListRow | null>(null);
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage,
+    setCurrentPage,
+    setTotals,
+    resetToFirstPage,
+  } = useServerPagination(DEFAULT_LIST_PAGE_SIZE);
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -72,9 +83,14 @@ export function FinanceExpenses() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    resetToFirstPage();
+  }, [debouncedSearch, selectedCategory, selectedStatus, dateFrom, dateTo, resetToFirstPage]);
+
   const loadExpenses = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setExpenses([]);
+      setTotals(0, 1);
       setLoading(false);
       return;
     }
@@ -86,15 +102,17 @@ export function FinanceExpenses() {
         status: selectedStatus,
         dateFrom: dateFrom ? dateInputToIso(dateFrom) : undefined,
         dateTo: dateTo ? dateInputToIso(dateTo) : undefined,
-        pageSize: 200,
+        page: currentPage,
+        pageSize: itemsPerPage,
       });
       setExpenses(Array.isArray(result.items) ? result.items : []);
+      setTotals(result.total ?? 0, result.totalPages);
     } catch (err) {
       notifyFromError(err, tr("Xərcləri yükləmək alınmadı", "Failed to load expenses"));
     } finally {
       setLoading(false);
     }
-  }, [isDemo, isAuthenticated, canView, debouncedSearch, selectedCategory, selectedStatus, dateFrom, dateTo]);
+  }, [isDemo, isAuthenticated, canView, debouncedSearch, selectedCategory, selectedStatus, dateFrom, dateTo, currentPage, itemsPerPage, setTotals]);
 
   useEffect(() => {
     void loadExpenses();
@@ -363,6 +381,16 @@ export function FinanceExpenses() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
           </div>
         </div>
       </div>

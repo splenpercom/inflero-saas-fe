@@ -2,15 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft,
-  Car,
   Phone,
   Mail,
   MapPin,
-  Plus,
-  Gauge,
   Receipt,
   Edit2,
-  Trash2,
   BadgeCheck,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -20,20 +16,13 @@ import { useBranchRevision } from "../../hooks/useBranchRevision";
 import {
   fetchCustomers,
   updateCustomer,
-  fetchCustomerVehicles,
-  createCustomerVehicle,
-  updateCustomerVehicle,
-  deleteCustomerVehicle,
   type PeopleCustomer,
-  type CustomerVehicle,
 } from "../../api/people";
 import { fetchPosOrders, type PosOrderListRow } from "../../api/sales";
 import { formatSalesDate } from "../../lib/salesMappers";
 import { formatCurrency } from "../../utils/currency";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
-import { useConfirm } from "../../context/ConfirmContext";
 import { AddCustomerModal, type CustomerFormData } from "./people/AddCustomerModal";
-import { AddVehicleModal, type VehicleFormData } from "./people/AddVehicleModal";
 
 import { pickLang } from "../../i18n/pickLang";
 function StatusBadge({ status }: { status: string }) {
@@ -46,38 +35,20 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function vehicleBody(data: VehicleFormData, includeStatus: boolean) {
-  const body: Record<string, unknown> = {
-    make: data.make.trim() || null,
-    model: data.model.trim() || null,
-    year: data.year ? Number(data.year) : null,
-    plate: data.plate.trim() || null,
-    mileage: data.mileage ? Number(data.mileage) : null,
-    vin: data.vin.trim() || null,
-    notes: data.notes.trim() || null,
-  };
-  if (includeStatus) body.status = data.status;
-  return body;
-}
-
 export function CustomerProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
+  const { canView, canEdit } = useModulePermissions("People");
   const branchRevision = useBranchRevision();
-  const askConfirm = useConfirm();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [customer, setCustomer] = useState<PeopleCustomer | null>(null);
-  const [vehicles, setVehicles] = useState<CustomerVehicle[]>([]);
   const [purchases, setPurchases] = useState<PosOrderListRow[]>([]);
   const [purchasesLoading, setPurchasesLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editCustomerOpen, setEditCustomerOpen] = useState(false);
-  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState<CustomerVehicle | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadPurchases = useCallback(async () => {
@@ -92,9 +63,10 @@ export function CustomerProfile() {
         sortBy: "all",
         status: "all",
         paymentStatus: "all",
-        limit: 100,
+        page: 1,
+        pageSize: 100,
       });
-      setPurchases(orders);
+      setPurchases(orders.items ?? []);
     } catch {
       setPurchases([]);
     } finally {
@@ -105,22 +77,16 @@ export function CustomerProfile() {
   const loadData = useCallback(async () => {
     if (!id || !(isAuthenticated || isDemo) || !canView) {
       setCustomer(null);
-      setVehicles([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const [rows, veh] = await Promise.all([
-        fetchCustomers(),
-        fetchCustomerVehicles(id),
-      ]);
+      const rows = await fetchCustomers();
       setCustomer(rows.find((c) => c.id === id) ?? null);
-      setVehicles(veh);
     } catch (err) {
       notifyFromError(err);
       setCustomer(null);
-      setVehicles([]);
     } finally {
       setLoading(false);
     }
@@ -175,45 +141,6 @@ export function CustomerProfile() {
     }
   };
 
-  const handleSaveVehicle = async (data: VehicleFormData) => {
-    if (!id || !(isAuthenticated || isDemo)) return;
-    if (editingVehicle ? !canEdit : !canCreate) return;
-    setSaving(true);
-    try {
-      if (editingVehicle) {
-        await updateCustomerVehicle(id, editingVehicle.id, vehicleBody(data, true));
-        notifySuccess(tr("Avtomobil yeniləndi", "Vehicle updated"));
-      } else {
-        await createCustomerVehicle(id, vehicleBody(data, false));
-        notifySuccess(tr("Avtomobil əlavə edildi", "Vehicle added"));
-      }
-      setVehicleModalOpen(false);
-      setEditingVehicle(null);
-      const veh = await fetchCustomerVehicles(id);
-      setVehicles(veh);
-    } catch (err) {
-      notifyFromError(err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteVehicle = async (vehicleId: string) => {
-    if (!id || !(await askConfirm({
-      title: tr("Silmə təsdiqi", "Confirm deletion"),
-      message: tr("Bu avtomobili silmək istədiyinizə əminsiniz?", "Delete this vehicle?"),
-      variant: "danger",
-    }))) return;
-    if (isDemo || !isAuthenticated || !canDelete) return;
-    try {
-      await deleteCustomerVehicle(id, vehicleId);
-      notifySuccess(tr("Avtomobil silindi", "Vehicle deleted"));
-      setVehicles((prev) => prev.filter((v) => v.id !== vehicleId));
-    } catch (err) {
-      notifyFromError(err);
-    }
-  };
-
   return (
     <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
       <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4 max-w-5xl">
@@ -246,11 +173,7 @@ export function CustomerProfile() {
             </button>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3 mt-5 pt-5 border-t border-gray-100 dark:border-gray-800">
-            <div className="text-center">
-              <p className="text-lg font-bold text-[#0026f6] dark:text-[#0026f6]">{vehicles.length}</p>
-              <p className="text-[10px] text-gray-400">{tr("Avtomobil", "Vehicles")}</p>
-            </div>
+          <div className="grid grid-cols-1 gap-3 mt-5 pt-5 border-t border-gray-100 dark:border-gray-800">
             <div className="text-center">
               <p className="text-lg font-bold text-[#0026f6] dark:text-[#0026f6]">{purchases.length}</p>
               <p className="text-[10px] text-gray-400">{tr("Satınalma", "Purchases")}</p>
@@ -261,49 +184,6 @@ export function CustomerProfile() {
               {tr("Cəmi xərclənib", "Total spent")}: {formatCurrency(totalSpent)}
             </p>
           )}
-        </div>
-
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <Car className="w-4 h-4 text-[#0026f6]" />
-              {tr("Avtomobillər", "Vehicles")}
-            </h2>
-            {canCreate && (
-            <button onClick={() => { setEditingVehicle(null); setVehicleModalOpen(true); }} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg">
-              <Plus className="w-3 h-3" />
-              {tr("Avtomobil əlavə et", "Add Vehicle")}
-            </button>
-            )}
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {vehicles.map((car) => (
-              <div key={car.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center shrink-0"><Car className="w-5 h-5 text-gray-500" /></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{car.year ? `${car.year} ` : ""}{car.make} {car.model}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{car.plate || "—"}</p>
-                  {car.mileage != null && (
-                    <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-1"><Gauge className="w-3 h-3" />{car.mileage.toLocaleString()} km</p>
-                  )}
-                </div>
-                <div className="flex gap-1.5">
-                  {canEdit && (
-                  <button onClick={() => { setEditingVehicle(car); setVehicleModalOpen(true); }} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
-                  )}
-                  {canDelete && (
-                  <button onClick={() => void handleDeleteVehicle(car.id)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
-                  )}
-                </div>
-              </div>
-            ))}
-            {vehicles.length === 0 && (
-              <div className="sm:col-span-2 bg-white dark:bg-gray-900 border border-dashed border-gray-300 rounded-xl p-6 text-center">
-                <Car className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-xs text-gray-400">{tr("Avtomobil yoxdur", "No vehicles registered")}</p>
-              </div>
-            )}
-          </div>
         </div>
 
         <div>
@@ -358,7 +238,6 @@ export function CustomerProfile() {
       </div>
 
       <AddCustomerModal isOpen={editCustomerOpen} onClose={() => setEditCustomerOpen(false)} onSave={handleSaveCustomer} customer={customer} saving={saving} />
-      <AddVehicleModal isOpen={vehicleModalOpen} onClose={() => { setVehicleModalOpen(false); setEditingVehicle(null); }} onSave={handleSaveVehicle} vehicle={editingVehicle} saving={saving} />
     </div>
   );
 }

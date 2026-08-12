@@ -52,6 +52,8 @@ export type SalesListQuery = {
   status?: string;
   paymentStatus?: string;
   sortBy?: string;
+  page?: number;
+  pageSize?: number;
   limit?: number;
 };
 
@@ -62,6 +64,8 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   if (q.status && q.status !== "all") params.set("status", q.status);
   if (q.paymentStatus && q.paymentStatus !== "all") params.set("paymentStatus", q.paymentStatus);
   if (q.sortBy && q.sortBy !== "all") params.set("sortBy", q.sortBy);
+  if (q.page) params.set("page", String(q.page));
+  if (q.pageSize) params.set("pageSize", String(q.pageSize));
   if (q.limit) params.set("limit", String(q.limit));
   const s = params.toString();
   return s ? `?${s}` : "";

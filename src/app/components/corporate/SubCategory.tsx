@@ -33,6 +33,8 @@ import {
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { ModernSelect } from "../ui/ModernSelect";
+import { DataPagination } from "../ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -53,6 +55,7 @@ export function SubCategory() {
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -112,11 +115,16 @@ export function SubCategory() {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Filter items
   const filteredItems = subCategories.filter((item) => {
     const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase());
+      item.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      item.category.toLowerCase().includes(debouncedSearch.toLowerCase());
 
     const matchesCategory =
       selectedCategory === "all" ||
@@ -138,6 +146,19 @@ export function SubCategory() {
         : bValue.localeCompare(aValue);
     }
     return 0;
+  });
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: sortedItems,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${debouncedSearch}|${selectedCategory}|${selectedStatus}`,
   });
 
   const handleExportPDF = () => {
@@ -567,7 +588,7 @@ export function SubCategory() {
                 </tr>
               </thead>
               <tbody>
-                {sortedItems.map((subCategory, index) => (
+                {paginatedData.map((subCategory, index) => (
                   <tr
                     key={subCategory.id}
                     className={`border-b border-gray-200 dark:border-gray-800 ${
@@ -622,6 +643,21 @@ export function SubCategory() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={{
+                showing: tr("Göstərilir", "Showing"),
+                to: tr("-", "to"),
+                of: tr("/", "of"),
+                results: tr("nəticə", "results"),
+              }}
+            />
           </div>
         </div>
 

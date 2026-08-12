@@ -1014,35 +1014,49 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   if (pathname === "/tenant/sales/billers") return ok(DEMO_BILLERS);
   if (pathname === "/tenant/sales/pos-orders") {
     const customerId = params.get("customerId");
+    const page = Number(params.get("page") ?? 1);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
     const rows = customerId
       ? DEMO_POS_ORDERS.filter((o) => o.customerId === customerId)
       : DEMO_POS_ORDERS;
-    return ok(rows);
+    return ok(paged(rows, page, pageSize));
   }
   const posMatch = pathname.match(/^\/tenant\/sales\/pos-orders\/([^/]+)$/);
   if (posMatch) return ok(posOrderDetail(posMatch[1]));
-  if (pathname === "/tenant/sales/invoices") return ok(DEMO_INVOICES);
+  if (pathname === "/tenant/sales/invoices") {
+    const page = Number(params.get("page") ?? 1);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    return ok(paged(DEMO_INVOICES, page, pageSize));
+  }
   const invMatch = pathname.match(/^\/tenant\/sales\/invoices\/([^/]+)$/);
   if (invMatch) return ok(invoiceDetail(invMatch[1]));
   if (pathname === "/tenant/sales/returns") {
-    return ok([
-      {
-        id: "sr-1",
-        productIcon: "🎧",
-        productName: "Beats Pro",
-        date: NOW,
-        customerAvatar: "",
-        customerName: "Carl Evans",
-        status: "Completed",
-        total: 160,
-        paid: 160,
-        due: 0,
-        paymentStatus: "Paid",
-        storeId: DEMO_STORE_ID,
-        posOrderReference: "POS-1001",
-        restocked: true,
-      },
-    ]);
+    const page = Number(params.get("page") ?? 1);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    return ok(
+      paged(
+        [
+          {
+            id: "sr-1",
+            productIcon: "🎧",
+            productName: "Beats Pro",
+            date: NOW,
+            customerAvatar: "",
+            customerName: "Carl Evans",
+            status: "Completed",
+            total: 160,
+            paid: 160,
+            due: 0,
+            paymentStatus: "Paid",
+            storeId: DEMO_STORE_ID,
+            posOrderReference: "POS-1001",
+            restocked: true,
+          },
+        ],
+        page,
+        pageSize,
+      ),
+    );
   }
   const srMatch = pathname.match(/^\/tenant\/sales\/returns\/([^/]+)$/);
   if (srMatch) {
@@ -1082,31 +1096,43 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   if (pathname === "/tenant/sales/reports/biller-report") return ok(billerReportResult());
 
   // Purchases
-  if (pathname === "/tenant/purchases") return ok(DEMO_PURCHASES);
+  if (pathname === "/tenant/purchases") {
+    const page = Number(params.get("page") ?? 1);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    return ok(paged(DEMO_PURCHASES, page, pageSize));
+  }
   const purMatch = pathname.match(/^\/tenant\/purchases\/([^/]+)$/);
   if (purMatch && purMatch[1] !== "returns" && purMatch[1] !== "order-stats") {
     return ok(purchaseDetail(purMatch[1]));
   }
   if (pathname === "/tenant/purchases/returns") {
-    return ok([
-      {
-        id: "pr-1",
-        productIcon: "📦",
-        productName: "Brake pads (set)",
-        date: NOW,
-        supplierName: "AutoParts Supply Co.",
-        reference: "PR-001",
-        status: "Completed",
-        total: 120,
-        paid: 120,
-        due: 0,
-        paymentStatus: "Paid",
-        storeId: DEMO_STORE_ID,
-        stockDeducted: true,
-        purchaseId: "pur-1",
-        purchaseReference: "PUR-2001",
-      },
-    ]);
+    const page = Number(params.get("page") ?? 1);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    return ok(
+      paged(
+        [
+          {
+            id: "pr-1",
+            productIcon: "📦",
+            productName: "Brake pads (set)",
+            date: NOW,
+            supplierName: "AutoParts Supply Co.",
+            reference: "PR-001",
+            status: "Completed",
+            total: 120,
+            paid: 120,
+            due: 0,
+            paymentStatus: "Paid",
+            storeId: DEMO_STORE_ID,
+            stockDeducted: true,
+            purchaseId: "pur-1",
+            purchaseReference: "PUR-2001",
+          },
+        ],
+        page,
+        pageSize,
+      ),
+    );
   }
   const prMatch = pathname.match(/^\/tenant\/purchases\/returns\/([^/]+)$/);
   if (prMatch) {

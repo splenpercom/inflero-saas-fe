@@ -133,7 +133,6 @@ export function mapTodayReservations(rows: ReservationRecord[], locale: Language
       id: r.id,
       time: formatTime(r.scheduledAt, locale),
       customer: r.customerName ?? r.guestName ?? "—",
-      car: r.vehicleLabel ?? r.guestPlateSuffix ?? "—",
       service: r.serviceType,
       status: r.status === "confirmed" || r.status === "completed" ? "confirmed" as const : "pending" as const,
     }));

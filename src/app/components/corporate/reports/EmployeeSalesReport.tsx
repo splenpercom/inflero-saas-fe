@@ -40,6 +40,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { pickLang } from "../../../i18n/pickLang";
+import { DataPagination } from "../../ui/DataPagination";
+import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
+
 const PIE_COLORS = ["#0026f6", "#0026f6", "#f97316", "#10b981", "#a78bfa", "#ec4899", "#0ea5e9", "#64748b"];
 
 export function EmployeeSalesReport() {
@@ -114,6 +117,19 @@ export function EmployeeSalesReport() {
   useEffect(() => {
     void loadReport();
   }, [loadReport]);
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData: pagedItems,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: items,
+    itemsPerPage: DEFAULT_REPORT_PAGE_SIZE,
+    resetKey: `${dateFrom}|${dateTo}|${search}`,
+  });
 
   const revenueChartData = useMemo(
     () =>
@@ -414,7 +430,7 @@ export function EmployeeSalesReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((row) => {
+                  {pagedItems.map((row) => {
                     const rowKey = row.billerId ?? "__none__";
                     const isOpen = expandedId === rowKey;
                     return (
@@ -472,6 +488,21 @@ export function EmployeeSalesReport() {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+              <DataPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                showText={{
+                  showing: pt("Showing", "Göstərilir"),
+                  to: pt("to", "-"),
+                  of: pt("of", "/"),
+                  results: pt("results", "nəticə"),
+                }}
+              />
             </div>
           </div>
         </>

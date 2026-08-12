@@ -7,17 +7,13 @@ export interface ReservationUi {
   customerId: string;
   customerName: string;
   customerPhone: string;
-  carId: string;
-  carLabel: string;
   serviceType: string;
   date: string;
   time: string;
-  mileage: string;
   notes: string;
   status: ReservationStatus;
   source: "internal" | "customer_site";
   createdAt: string;
-  guestPlateSuffix?: string | null;
   branchName?: string | null;
 }
 
@@ -40,27 +36,19 @@ export function combineScheduledAt(date: string, time: string): string {
 
 export function apiReservationToUi(row: ReservationRecord): ReservationUi {
   const { date, time } = splitScheduledAt(row.scheduledAt);
-  const guestCar =
-    row.source === "customer_site" && row.notes?.startsWith("Vehicle: ")
-      ? row.notes.replace(/^Vehicle:\s*/, "")
-      : "";
 
   return {
     id: row.id,
     customerId: row.customerId ?? "",
     customerName: row.customerName ?? row.guestName ?? "—",
     customerPhone: row.guestPhone ?? "",
-    carId: row.vehicleId ?? "",
-    carLabel: row.vehicleLabel ?? guestCar,
     serviceType: row.serviceType,
     date,
     time,
-    mileage: row.mileage != null ? String(row.mileage) : "",
     notes: row.notes ?? "",
     status: row.status,
     source: row.source,
     createdAt: row.createdAt.split("T")[0],
-    guestPlateSuffix: row.guestPlateSuffix,
     branchName: row.branchName ?? null,
   };
 }

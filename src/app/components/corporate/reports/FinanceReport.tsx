@@ -20,6 +20,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { pickLang } from "../../../i18n/pickLang";
+import { DataPagination } from "../../ui/DataPagination";
+import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
+
 export function FinanceReport() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
@@ -77,6 +80,19 @@ export function FinanceReport() {
   useEffect(() => {
     void loadReport();
   }, [loadReport]);
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData: pagedMonthly,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: monthlyData,
+    itemsPerPage: DEFAULT_REPORT_PAGE_SIZE,
+    resetKey: `${dateFrom}|${dateTo}`,
+  });
 
   const totals = useMemo(() => {
     return monthlyData.reduce(
@@ -264,7 +280,7 @@ export function FinanceReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {monthlyData.map((row, index) => {
+                  {pagedMonthly.map((row, index) => {
                     const margin = row.revenue > 0 ? ((row.profit / row.revenue) * 100).toFixed(1) : "—";
                     return (
                       <tr key={index} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -278,6 +294,21 @@ export function FinanceReport() {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+              <DataPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                showText={{
+                  showing: pt("Showing", "Göstərilir"),
+                  to: pt("to", "-"),
+                  of: pt("of", "/"),
+                  results: pt("results", "nəticə"),
+                }}
+              />
             </div>
           </div>
         </>

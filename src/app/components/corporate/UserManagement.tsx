@@ -40,6 +40,8 @@ import {
 import { fetchStores } from "../../api/stores";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
+import { DataPagination } from "../ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 export function UserManagement() {
@@ -183,6 +185,32 @@ export function UserManagement() {
     const matchesStatus =
       statusFilter === "all" || role.status.toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
+  });
+
+  const {
+    currentPage: usersPage,
+    totalPages: usersTotalPages,
+    totalItems: usersTotalItems,
+    paginatedData: paginatedUsers,
+    setCurrentPage: setUsersPage,
+    itemsPerPage: usersItemsPerPage,
+  } = usePagination({
+    data: filteredUsers,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${searchQuery}|${statusFilter}`,
+  });
+
+  const {
+    currentPage: rolesPage,
+    totalPages: rolesTotalPages,
+    totalItems: rolesTotalItems,
+    paginatedData: paginatedRoles,
+    setCurrentPage: setRolesPage,
+    itemsPerPage: rolesItemsPerPage,
+  } = usePagination({
+    data: filteredRoles,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${searchQuery}|${statusFilter}`,
   });
 
   const handleExportPDF = () => {
@@ -579,7 +607,7 @@ export function UserManagement() {
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((user, index) => (
+                    paginatedUsers.map((user, index) => (
                       <tr
                         key={user.id}
                         className={`border-b border-gray-200 dark:border-gray-800 ${
@@ -649,6 +677,21 @@ export function UserManagement() {
                 </tbody>
               </table>
             </div>
+            <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+              <DataPagination
+                currentPage={usersPage}
+                totalPages={usersTotalPages}
+                onPageChange={setUsersPage}
+                totalItems={usersTotalItems}
+                itemsPerPage={usersItemsPerPage}
+                showText={{
+                  showing: tr("Göstərilir", "Showing"),
+                  to: tr("-", "to"),
+                  of: tr("/", "of"),
+                  results: tr("nəticə", "results"),
+                }}
+              />
+            </div>
           </div>
         )}
 
@@ -680,7 +723,7 @@ export function UserManagement() {
                       </td>
                     </tr>
                   ) : (
-                    filteredRoles.map((role, index) => (
+                    paginatedRoles.map((role, index) => (
                       <tr
                         key={role.id}
                         className={`border-b border-gray-200 dark:border-gray-800 ${
@@ -738,6 +781,21 @@ export function UserManagement() {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+              <DataPagination
+                currentPage={rolesPage}
+                totalPages={rolesTotalPages}
+                onPageChange={setRolesPage}
+                totalItems={rolesTotalItems}
+                itemsPerPage={rolesItemsPerPage}
+                showText={{
+                  showing: tr("Göstərilir", "Showing"),
+                  to: tr("-", "to"),
+                  of: tr("/", "of"),
+                  results: tr("nəticə", "results"),
+                }}
+              />
             </div>
           </div>
         )}

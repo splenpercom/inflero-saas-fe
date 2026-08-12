@@ -19,6 +19,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { pickLang } from "../../i18n/pickLang";
+import { DataPagination } from "../ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
+
 function productInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -68,6 +71,19 @@ export function PurchaseOrder() {
         item.productName.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q),
     );
   }, [items, searchQuery]);
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData: pagedItems,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: filteredItems,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${searchQuery}|${sortBy}`,
+  });
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
@@ -237,7 +253,7 @@ export function PurchaseOrder() {
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map((item, index) => (
+                  pagedItems.map((item, index) => (
                     <tr
                       key={item.productId}
                       className={`border-b border-gray-200 dark:border-gray-800 ${
@@ -271,6 +287,21 @@ export function PurchaseOrder() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={{
+                showing: tr("Göstərilir", "Showing"),
+                to: tr("-", "to"),
+                of: tr("/", "of"),
+                results: tr("nəticə", "results"),
+              }}
+            />
           </div>
         </div>
       </div>

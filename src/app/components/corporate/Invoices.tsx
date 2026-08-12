@@ -20,6 +20,8 @@ import { formatSalesDate } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { CreateInvoiceModal } from "./CreateInvoiceModal";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 
 import { pickLang } from "../../i18n/pickLang";
 export function Invoices() {
@@ -37,6 +39,10 @@ export function Invoices() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const { customers } = useSalesCustomers("", canView);
 
@@ -47,21 +53,33 @@ export function Invoices() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedCustomer, selectedStatus, sortBy]);
+
   const loadInvoices = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setInvoices([]);
+      setTotalItems(0);
+      setTotalPages(1);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const rows = await fetchInvoices({
+      const data = await fetchInvoices({
         search: debouncedSearch.trim() || undefined,
         customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
         status: selectedStatus,
         sortBy,
+        page: currentPage,
+        pageSize: itemsPerPage,
       });
-      setInvoices(rows);
+      setInvoices(data.items ?? []);
+      setTotalItems(data.total ?? 0);
+      const pages = Math.max(1, data.totalPages || 1);
+      setTotalPages(pages);
+      if (pages > 0 && currentPage > pages) setCurrentPage(pages);
     } catch (err) {
       notifyFromError(err, tr("Qaimələri yükləmək alınmadı", "Failed to load invoices"));
     } finally {
@@ -75,7 +93,8 @@ export function Invoices() {
     selectedCustomer,
     selectedStatus,
     sortBy,
-    language,
+    currentPage,
+    itemsPerPage,
   ]);
 
   useEffect(() => {
@@ -362,6 +381,16 @@ export function Invoices() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
           </div>
         </div>
       </div>

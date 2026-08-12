@@ -3,7 +3,6 @@ import { X, Scan, Trash2, Save } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { fetchPosOrder, updatePosOrder, type PosOrderDetail } from "../../api/sales";
-import { fetchCustomerVehicles, type CustomerVehicle } from "../../api/people";
 import { fetchProduct } from "../../api/inventory";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
 import { useSalesCustomers } from "../../hooks/useSalesCustomers";
@@ -33,10 +32,6 @@ interface EditSaleModalProps {
   onSaved: () => void;
 }
 
-function vehicleOptionLabel(v: CustomerVehicle) {
-  return [v.make, v.model, v.plate].filter(Boolean).join(" · ") || v.id;
-}
-
 export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleModalProps) {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user } = useAuth();
@@ -48,10 +43,6 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
 
   const [customerId, setCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
-  const [vehicleId, setVehicleId] = useState("");
-  const [vehicles, setVehicles] = useState<CustomerVehicle[]>([]);
-  const [vehiclesLoading, setVehiclesLoading] = useState(false);
-  const [mileage, setMileage] = useState("");
   const [billerId, setBillerId] = useState("");
   const [date, setDate] = useState("");
   const [reference, setReference] = useState("");
@@ -87,12 +78,6 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
         setOrder(data);
         setCustomerId(data.customerId ?? "");
         setCustomerSearch(data.customerName ?? "");
-        setVehicleId(data.vehicleId ?? "");
-        setMileage(
-          data.mileageAtService != null && data.mileageAtService !== undefined
-            ? String(data.mileageAtService)
-            : "",
-        );
         setBillerId(data.billerId ?? "");
         setDate(data.date.slice(0, 10));
         setReference(data.reference && data.reference !== "—" ? data.reference : "");
@@ -125,34 +110,8 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
       .finally(() => setLoading(false));
   }, [isOpen, orderId, language]);
 
-  useEffect(() => {
-    if (!isOpen || !customerId) {
-      setVehicles([]);
-      return;
-    }
-    let cancelled = false;
-    setVehiclesLoading(true);
-    fetchCustomerVehicles(customerId)
-      .then((list) => {
-        if (cancelled) return;
-        setVehicles(list);
-        setVehicleId((prev) => (prev && list.some((v) => v.id === prev) ? prev : ""));
-      })
-      .catch(() => {
-        if (!cancelled) setVehicles([]);
-      })
-      .finally(() => {
-        if (!cancelled) setVehiclesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, customerId]);
-
   const handleCustomerChange = (nextId: string) => {
     setCustomerId(nextId);
-    setVehicleId("");
-    setMileage("");
   };
 
   const handleAddProduct = async (productId: string) => {
@@ -213,8 +172,6 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
       const body: Parameters<typeof updatePosOrder>[1] = {
         customerId: customerId || null,
         billerId: billerId || null,
-        vehicleId: vehicleId || null,
-        mileageAtService: mileage ? parseInt(mileage, 10) : null,
         paymentMethod: mapPaymentMethodToApi(paymentMethod),
         status: mapOrderStatusToApi(status),
         date,
@@ -318,46 +275,6 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                     <option value={customerId}>{order.customerName}</option>
                   )}
                 </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                  {tr("Avtomobil", "Vehicle")}
-                </label>
-                <select
-                  value={vehicleId}
-                  onChange={(e) => {
-                    setVehicleId(e.target.value);
-                    setMileage("");
-                  }}
-                  disabled={!customerId || vehiclesLoading}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer disabled:opacity-60"
-                >
-                  <option value="">{tr("Avtomobil seçin", "Select vehicle")}</option>
-                  {vehicles.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {vehicleOptionLabel(v)}
-                    </option>
-                  ))}
-                  {vehicleId && !vehicles.some((v) => v.id === vehicleId) && order.vehicleLabel && (
-                    <option value={vehicleId}>{order.vehicleLabel}</option>
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                  {tr("Km göstərici", "Mileage (km)")}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={mileage}
-                  onChange={(e) => setMileage(e.target.value)}
-                  disabled={!vehicleId}
-                  placeholder={tr("Km göstərici...", "Enter mileage (km)...")}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
-                />
               </div>
 
               <div>

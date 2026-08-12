@@ -23,6 +23,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { pickLang } from "../../../i18n/pickLang";
+import { DataPagination } from "../../ui/DataPagination";
+import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
+
 export function ProductReport() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
@@ -119,6 +122,19 @@ export function ProductReport() {
       return matchesSearch && matchesCategory;
     });
   }, [items, searchTerm, categoryFilter]);
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData: pagedProducts,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: filteredProducts,
+    itemsPerPage: DEFAULT_REPORT_PAGE_SIZE,
+    resetKey: `${dateFrom}|${dateTo}|${searchTerm}|${categoryFilter}`,
+  });
 
   const summaryCards = [
     {
@@ -332,7 +348,7 @@ export function ProductReport() {
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((product) => (
+                pagedProducts.map((product) => (
                     <tr key={product.productId} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                       <td className="py-2 px-3 text-xs font-medium text-gray-900 dark:text-white">{product.productName}</td>
                       <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">{product.category}</td>
@@ -345,6 +361,21 @@ export function ProductReport() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+          <DataPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            showText={{
+              showing: pt("Showing", "Göstərilir"),
+              to: pt("to", "-"),
+              of: pt("of", "/"),
+              results: pt("results", "nəticə"),
+            }}
+          />
         </div>
       </div>
     </div>

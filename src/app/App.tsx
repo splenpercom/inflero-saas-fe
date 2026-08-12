@@ -51,6 +51,7 @@ import { AnnualReport } from "./components/corporate/reports/AnnualReport";
 import { EmployeeSalesReport } from "./components/corporate/reports/EmployeeSalesReport";
 import { Login } from "./components/Login";
 import { Reservations } from "./components/corporate/Reservations";
+import { ServiceTypes } from "./components/corporate/ServiceTypes";
 import { CustomerLandingPage } from "./components/customer/CustomerLandingPage";
 import { PublicStorefront } from "./components/storefront/PublicStorefront";
 import {
@@ -311,6 +312,7 @@ function AppShell() {
 
               {/* Settings */}
               <Route path="reservations" element={<Reservations />} />
+              <Route path="reservations/service-types" element={<ServiceTypes />} />
               <Route
                 path="my-website"
                 element={

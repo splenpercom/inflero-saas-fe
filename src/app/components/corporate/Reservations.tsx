@@ -14,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Car,
   Calendar,
   Clock,
   User,
@@ -40,7 +39,7 @@ import {
   updateReservation,
   deleteReservation,
 } from "../../api/reservations";
-import { fetchCustomers, fetchCustomerVehicles, type PeopleCustomer, type CustomerVehicle } from "../../api/people";
+import { fetchCustomers, type PeopleCustomer } from "../../api/people";
 import {
   apiReservationToUi,
   combineScheduledAt,
@@ -62,6 +61,8 @@ import type { BranchLandingPage } from "../../lib/branchBooking";
 import { BranchBookingPagesEditor } from "./BranchBookingPagesEditor";
 
 import { pickLang } from "../../i18n/pickLang";
+import { DataPagination } from "../ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 type Reservation = ReservationUi;
 
 const STATUS_CONFIG: Record<ReservationStatus, { label: string; labelAz: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -111,27 +112,21 @@ export function Reservations() {
   const [saving, setSaving] = useState(false);
 
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
-  const [vehicles, setVehicles] = useState<CustomerVehicle[]>([]);
 
   const [formMode, setFormMode] = useState<"registered" | "guest">("registered");
   const [formCustomerId, setFormCustomerId] = useState("");
-  const [formCarId, setFormCarId] = useState("");
   const [formGuestName, setFormGuestName] = useState("");
   const [formGuestPhone, setFormGuestPhone] = useState("");
-  const [formGuestPlate, setFormGuestPlate] = useState("");
   const [formService, setFormService] = useState("");
   const [formDate, setFormDate] = useState("");
   const [formTime, setFormTime] = useState("");
-  const [formMileage, setFormMileage] = useState("");
   const [formNotes, setFormNotes] = useState("");
   const [formStatus, setFormStatus] = useState<ReservationStatus>("pending");
 
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
-  const [carDropdownOpen, setCarDropdownOpen] = useState(false);
   const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
-  const selectedCustomer = customers.find((c) => c.id === formCustomerId);
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const loadReservations = useCallback(async () => {
@@ -142,14 +137,14 @@ export function Reservations() {
     }
     setLoading(true);
     try {
-      const rows = await fetchReservations({ limit: 500 });
+      const rows = await fetchReservations({ limit: viewMode === "list" ? 200 : 500 });
       setReservations(rows.map(apiReservationToUi));
     } catch (err) {
       notifyFromError(err, tr("Rezervasiyaları yükləmək alınmadı", "Failed to load reservations"));
     } finally {
       setLoading(false);
     }
-  }, [isDemo, isAuthenticated, canView, language, branchRevision]);
+  }, [isDemo, isAuthenticated, canView, language, branchRevision, viewMode]);
 
   const loadSettings = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) return;
@@ -174,16 +169,6 @@ export function Reservations() {
     }
   }, [location.pathname, acknowledgeReservations]);
 
-  useEffect(() => {
-    if (!formCustomerId || !(isAuthenticated || isDemo)) {
-      setVehicles([]);
-      return;
-    }
-    void fetchCustomerVehicles(formCustomerId)
-      .then(setVehicles)
-      .catch(() => setVehicles([]));
-  }, [formCustomerId, isDemo, isAuthenticated]);
-
   const loadCustomers = useCallback(async () => {
     if (!(isAuthenticated || isDemo)) return;
     try {
@@ -197,14 +182,11 @@ export function Reservations() {
   const resetForm = () => {
     setFormMode("registered");
     setFormCustomerId("");
-    setFormCarId("");
     setFormGuestName("");
     setFormGuestPhone("");
-    setFormGuestPlate("");
     setFormService("");
     setFormDate("");
     setFormTime("");
-    setFormMileage("");
     setFormNotes("");
     setFormStatus("pending");
   };
@@ -212,23 +194,22 @@ export function Reservations() {
   const openAddModal = () => {
     resetForm();
     void loadCustomers();
+    void loadSettings();
     setIsAddModalOpen(true);
   };
 
   const openEditModal = (res: Reservation) => {
     void loadCustomers();
-    const isGuest = !res.customerId && (res.source === "customer_site" || !!res.guestPlateSuffix);
+    void loadSettings();
+    const isGuest = !res.customerId && res.source === "customer_site";
     setFormMode(isGuest ? "guest" : "registered");
     setEditReservation(res);
     setFormCustomerId(res.customerId);
-    setFormCarId(res.carId);
     setFormGuestName(res.customerName !== "—" ? res.customerName : "");
     setFormGuestPhone(res.customerPhone);
-    setFormGuestPlate(res.guestPlateSuffix ?? "");
     setFormService(serviceLabel(res.serviceType, language, serviceTypes));
     setFormDate(res.date);
     setFormTime(res.time);
-    setFormMileage(res.mileage);
     setFormNotes(res.notes);
     setFormStatus(res.status);
   };
@@ -236,7 +217,7 @@ export function Reservations() {
   const handleSave = async () => {
     const serviceType = resolveServiceType(formService, serviceTypes);
     if (!serviceType || !formDate || !formTime) return;
-    if (formMode === "registered" && (!formCustomerId || !formCarId)) return;
+    if (formMode === "registered" && !formCustomerId) return;
     if (formMode === "guest" && (!formGuestName.trim() || !formGuestPhone.trim())) return;
     if (isDemo || !isAuthenticated) return;
     if (editReservation ? !canEdit : !canCreate) return;
@@ -244,18 +225,17 @@ export function Reservations() {
     setSaving(true);
     try {
       const scheduledAt = combineScheduledAt(formDate, formTime);
-      const mileage = formMileage.trim() ? Number(formMileage) : null;
 
       if (editReservation) {
         const updated = await updateReservation(editReservation.id, {
           customerId: formMode === "registered" ? formCustomerId : null,
-          vehicleId: formMode === "registered" ? formCarId : null,
+          vehicleId: null,
           guestName: formMode === "guest" ? formGuestName.trim() : null,
           guestPhone: formMode === "guest" ? formGuestPhone.trim() : null,
-          guestPlateSuffix: formMode === "guest" ? formGuestPlate.trim() || null : null,
+          guestPlateSuffix: null,
           serviceType,
           scheduledAt,
-          mileage,
+          mileage: null,
           notes: formNotes.trim() || null,
           status: formStatus,
         });
@@ -267,13 +247,13 @@ export function Reservations() {
       } else {
         const created = await createReservation({
           customerId: formMode === "registered" ? formCustomerId : null,
-          vehicleId: formMode === "registered" ? formCarId : null,
+          vehicleId: null,
           guestName: formMode === "guest" ? formGuestName.trim() : null,
           guestPhone: formMode === "guest" ? formGuestPhone.trim() : null,
-          guestPlateSuffix: formMode === "guest" ? formGuestPlate.trim() || null : null,
+          guestPlateSuffix: null,
           serviceType,
           scheduledAt,
-          mileage,
+          mileage: null,
           notes: formNotes.trim() || null,
           status: formStatus,
         });
@@ -325,10 +305,22 @@ export function Reservations() {
   const filtered = reservations.filter((r) => {
     const matchSearch =
       r.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.carLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchStatus = selectedStatus === "all" || r.status === selectedStatus;
     return matchSearch && matchStatus;
+  });
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData: pagedReservations,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: filtered,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${searchQuery}|${selectedStatus}|${viewMode}`,
   });
 
   const serviceLabelFor = (value: string) => serviceLabel(value, language, serviceTypes);
@@ -345,12 +337,11 @@ export function Reservations() {
   }, [formService, serviceTypes]);
 
   const exportCsv = () => {
-    const headers = ["ID", "Customer", "Phone", "Vehicle", "Service", "Date", "Time", "Status", "Source"];
+    const headers = ["ID", "Customer", "Phone", "Service", "Date", "Time", "Status", "Source"];
     const rows = filtered.map((r) => [
       r.id,
       r.customerName,
       r.customerPhone,
-      r.carLabel,
       serviceLabelFor(r.serviceType),
       r.date,
       r.time,
@@ -372,7 +363,7 @@ export function Reservations() {
     formDate &&
     formTime &&
     (formMode === "registered"
-      ? formCustomerId && formCarId
+      ? formCustomerId
       : formGuestName.trim() && formGuestPhone.trim());
 
   // --- Date navigation helpers ---
@@ -408,7 +399,7 @@ export function Reservations() {
 
   const resForDate = (dateStr: string) =>
     reservations.filter((r) => {
-      const matchSearch = r.customerName.toLowerCase().includes(searchQuery.toLowerCase()) || r.carLabel.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = r.customerName.toLowerCase().includes(searchQuery.toLowerCase());
       const matchStatus = selectedStatus === "all" || r.status === selectedStatus;
       return r.date === dateStr && matchSearch && matchStatus;
     });
@@ -481,7 +472,7 @@ export function Reservations() {
         <div className="relative">
           <button
             type="button"
-            onClick={() => { setCustomerDropdownOpen(!customerDropdownOpen); setCarDropdownOpen(false); setServiceDropdownOpen(false); }}
+            onClick={() => { setCustomerDropdownOpen(!customerDropdownOpen); setServiceDropdownOpen(false); }}
             className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-left flex items-center justify-between text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
           >
             <span className={formCustomerId ? "" : "text-gray-400"}>
@@ -497,56 +488,13 @@ export function Reservations() {
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => { setFormCustomerId(c.id); setFormCarId(""); setCustomerDropdownOpen(false); }}
+                    onClick={() => { setFormCustomerId(c.id); setCustomerDropdownOpen(false); }}
                     className={cn("w-full px-2.5 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", formCustomerId === c.id && "bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6]")}
                   >
                     <div className="flex items-center gap-2">
                       <User className="w-3 h-3 text-gray-400" />
                       <span>{c.name}</span>
                       <span className="text-gray-400 ml-auto">{c.phone}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Car */}
-      <div>
-        <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-          {tr("Avtomobil", "Vehicle")} <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <button
-            type="button"
-            disabled={!formCustomerId}
-            onClick={() => { setCarDropdownOpen(!carDropdownOpen); setCustomerDropdownOpen(false); setServiceDropdownOpen(false); }}
-            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-left flex items-center justify-between text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-50"
-          >
-            <span className={formCarId ? "" : "text-gray-400"}>
-              {formCarId && selectedCustomer
-                ? (() => { const c = vehicles.find((x) => x.id === formCarId); return c ? `${c.make} ${c.model} (${c.plate})` : tr("Avtomobil seçin", "Select vehicle"); })()
-                : tr("Əvvəlcə müştəri seçin", "Select customer first")}
-            </span>
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-          </button>
-          {carDropdownOpen && selectedCustomer && (
-            <>
-              <div className="fixed inset-0 z-[100]" onClick={() => setCarDropdownOpen(false)} />
-              <div className="absolute z-[110] w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {vehicles.map((car) => (
-                  <button
-                    key={car.id}
-                    type="button"
-                    onClick={() => { setFormCarId(car.id); setCarDropdownOpen(false); }}
-                    className={cn("w-full px-2.5 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", formCarId === car.id && "bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6]")}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Car className="w-3 h-3 text-gray-400" />
-                      <span>{car.make} {car.model} — {car.plate}</span>
-                      <span className="text-gray-400 ml-auto">{car.year}</span>
                     </div>
                   </button>
                 ))}
@@ -580,18 +528,6 @@ export function Reservations() {
               className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
             />
           </div>
-          <div>
-            <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              {tr("Nömrə nişanı (son 3)", "Plate suffix (last 3)")}
-            </label>
-            <input
-              type="text"
-              value={formGuestPlate}
-              onChange={(e) => setFormGuestPlate(e.target.value.slice(0, 3))}
-              maxLength={3}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
-            />
-          </div>
         </div>
       )}
 
@@ -612,7 +548,6 @@ export function Reservations() {
               onFocus={() => {
                 setServiceDropdownOpen(true);
                 setCustomerDropdownOpen(false);
-                setCarDropdownOpen(false);
               }}
               placeholder={tr("Xidmət seçin və ya yazın", "Select or type service")}
               className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
@@ -622,7 +557,6 @@ export function Reservations() {
               onClick={() => {
                 setServiceDropdownOpen(!serviceDropdownOpen);
                 setCustomerDropdownOpen(false);
-                setCarDropdownOpen(false);
               }}
               className="shrink-0 p-1.5 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800/80"
               aria-label={tr("Xidmət siyahısı", "Service list")}
@@ -693,20 +627,6 @@ export function Reservations() {
             ))}
           </select>
         </div>
-      </div>
-
-      {/* Mileage */}
-      <div>
-        <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-          {tr("Kilometraj", "Mileage")}
-        </label>
-        <input
-          type="number"
-          value={formMileage}
-          onChange={(e) => setFormMileage(e.target.value)}
-          placeholder={tr("məs., 54500", "e.g., 54500")}
-          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
-        />
       </div>
 
       {/* Status (edit only) */}
@@ -1014,9 +934,6 @@ export function Reservations() {
                                 <Clock className="w-2.5 h-2.5 flex-shrink-0" />
                                 <span>{r.time}</span>
                                 <span className="font-semibold">{r.customerName}</span>
-                                <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">·</span>
-                                <Car className="w-2.5 h-2.5 flex-shrink-0 hidden sm:inline" />
-                                <span className="hidden sm:inline truncate">{r.carLabel}</span>
                                 <span className="ml-auto hidden sm:inline">{serviceLabelFor(r.serviceType).split("/")[0].trim()}</span>
                               </button>
                             );
@@ -1142,7 +1059,6 @@ export function Reservations() {
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("ID", "ID")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("MÜŞTƏRİ", "CUSTOMER")}</th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("AVTOMOBİL", "VEHICLE")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("XİDMƏT", "SERVICE")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("TARİX & SAAT", "DATE & TIME")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("STATUS", "STATUS")}</th>
@@ -1152,18 +1068,18 @@ export function Reservations() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                       {tr("Yüklənir...", "Loading...")}
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-xs text-gray-400">
+                    <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-400">
                       {tr("Rezervasiya tapılmadı", "No reservations found")}
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((res, index) => {
+                  pagedReservations.map((res, index) => {
                     const cfg = STATUS_CONFIG[res.status];
                     return (
                       <tr
@@ -1178,12 +1094,6 @@ export function Reservations() {
                               <Phone className="w-2.5 h-2.5" />{res.customerPhone}
                             </p>
                           </div>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
-                            <Car className="w-3 h-3 flex-shrink-0" />
-                            {res.carLabel}
-                          </span>
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                           {serviceLabelFor(res.serviceType).split("/")[0].trim()}
@@ -1237,6 +1147,21 @@ export function Reservations() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={{
+                showing: tr("Göstərilir", "Showing"),
+                to: tr("-", "to"),
+                of: tr("/", "of"),
+                results: tr("nəticə", "results"),
+              }}
+            />
           </div>
         </div>
         </>
@@ -1542,10 +1467,6 @@ export function Reservations() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Avtomobil", "Vehicle")}</span>
-                <span className="text-xs text-gray-600 dark:text-gray-400">{viewReservation.carLabel}</span>
-              </div>
-              <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Xidmət", "Service")}</span>
                 <span className="text-xs text-gray-600 dark:text-gray-400">{serviceLabelFor(viewReservation.serviceType).split("/")[0].trim()}</span>
               </div>
@@ -1553,12 +1474,6 @@ export function Reservations() {
                 <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Tarix & Saat", "Date & Time")}</span>
                 <span className="text-xs text-gray-600 dark:text-gray-400">{formatDate(viewReservation.date, language)} — {viewReservation.time}</span>
               </div>
-              {viewReservation.mileage && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Kilometraj", "Mileage")}</span>
-                  <span className="text-xs text-gray-600 dark:text-gray-400">{viewReservation.mileage} km</span>
-                </div>
-              )}
               {viewReservation.notes && (
                 <div>
                   <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{tr("Qeydlər", "Notes")}</span>

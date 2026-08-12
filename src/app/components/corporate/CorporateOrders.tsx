@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Search, Eye, Edit2, Plus, ChevronDown } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { DataPagination } from "../ui/DataPagination";
+import { pickLang } from "../../i18n/pickLang";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 
 interface Order {
   id: string;
@@ -14,11 +16,10 @@ interface Order {
 }
 
 export function CorporateOrders() {
-  const { t } = useLanguage();
+  const { language } = useLanguage();
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [ordersPerPage] = useState(5);
 
   // Mock data
   const orders: Order[] = [
@@ -76,6 +77,19 @@ export function CorporateOrders() {
     return matchesSearch && matchesStatus;
   });
 
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData: currentOrders,
+    setCurrentPage,
+    itemsPerPage: ordersPerPage,
+  } = usePagination({
+    data: filteredOrders,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${searchQuery}|${statusFilter}`,
+  });
+
   const statusCounts = {
     all: orders.length,
     pending: orders.filter(o => o.status === "Pending").length,
@@ -83,10 +97,6 @@ export function CorporateOrders() {
     completed: orders.filter(o => o.status === "Completed").length,
     cancelled: orders.filter(o => o.status === "Cancelled").length,
   };
-
-  const indexOfLastOrder = currentPage * ordersPerPage;
-  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
-  const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
 
   return (
     <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
@@ -288,11 +298,12 @@ export function CorporateOrders() {
       {/* Pagination */}
       <div className="mt-4">
         <DataPagination
-          totalItems={filteredOrders.length}
+          totalItems={totalItems}
           itemsPerPage={ordersPerPage}
           currentPage={currentPage}
-          totalPages={Math.ceil(filteredOrders.length / ordersPerPage)}
+          totalPages={totalPages}
           onPageChange={setCurrentPage}
+          showText={dataPaginationShowText(tr)}
         />
       </div>
     </div>

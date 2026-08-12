@@ -24,6 +24,8 @@ import {
 import { notifyFromError, notifySuccess } from "../../../lib/toast";
 import { useConfirm } from "../../../context/ConfirmContext";
 import { AddSupplierModal, type SupplierFormData } from "./AddSupplierModal";
+import { DataPagination } from "../../ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../hooks/usePagination";
 
 import { pickLang } from "../../../i18n/pickLang";
 export function Suppliers() {
@@ -72,6 +74,19 @@ export function Suppliers() {
   useEffect(() => {
     void loadSuppliers();
   }, [loadSuppliers]);
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: suppliers,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${debouncedSearch}|${selectedStatus}`,
+  });
 
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {
@@ -246,7 +261,7 @@ export function Suppliers() {
                     <td colSpan={7} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Təchizatçı tapılmadı", "No suppliers found")}</td>
                   </tr>
                 ) : (
-                  suppliers.map((supplier, index) => (
+                  paginatedData.map((supplier, index) => (
                     <tr
                       key={supplier.id}
                       className={`border-b border-gray-200 dark:border-gray-800 ${index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"}`}
@@ -285,6 +300,21 @@ export function Suppliers() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={{
+                showing: tr("Göstərilir", "Showing"),
+                to: tr("-", "to"),
+                of: tr("/", "of"),
+                results: tr("nəticə", "results"),
+              }}
+            />
           </div>
         </div>
 

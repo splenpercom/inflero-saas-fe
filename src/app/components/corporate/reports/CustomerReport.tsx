@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { DataPagination } from "../../ui/DataPagination";
+import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
 import { FileText, FileSpreadsheet, ChevronDown } from "lucide-react";
 import { useReportDateRange } from "../../../hooks/useReportDateRange";
 import { ReportDateRangeFilter } from "./ReportDateRangeFilter";
@@ -45,6 +47,18 @@ export function CustomerReport() {
     { id: "9", reference: "INV2056", code: "CU008", customerName: "Emma Bates", customerIcon: "👩‍🦳", totalOrders: 78, amount: 1100, paymentMethod: "Stripe", status: "Completed" },
   ];
 
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData: pagedItems,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: customerItems,
+    itemsPerPage: DEFAULT_REPORT_PAGE_SIZE,
+    resetKey: `${selectedCustomer}|${selectedPaymentMethod}|${selectedPaymentStatus}|${preset}|${customFrom}|${customTo}`,
+  });
   const totalAmount = customerItems.reduce((sum, item) => sum + item.amount, 0);
 
   const handleExportPDF = () => {
@@ -189,7 +203,7 @@ export function CustomerReport() {
                 </tr>
               </thead>
               <tbody>
-                {customerItems.map((item, index) => (
+                {pagedItems.map((item, index) => (
                   <tr
                     key={item.id}
                     className={`border-b border-gray-200 dark:border-gray-800  ₼{
@@ -242,28 +256,20 @@ export function CustomerReport() {
             </div>
           </div>
 
-          {/* Pagination */}
-          <div className="border-t border-gray-200 dark:border-gray-800 p-3 flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-            <div className="flex items-center gap-2">
-              <span>Rows Per Page:</span>
-              <select className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-                <option>10</option>
-                <option>25</option>
-                <option>50</option>
-              </select>
-              <span>- Entries</span>
-            </div>
-            <div className="flex gap-1">
-              <button className="w-7 h-7 rounded flex items-center justify-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
-                ‹
-              </button>
-              <button className="w-7 h-7 rounded flex items-center justify-center bg-orange-500 text-white">
-                1
-              </button>
-              <button className="w-7 h-7 rounded flex items-center justify-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
-                ›
-              </button>
-            </div>
+          <div className="border-t border-gray-200 dark:border-gray-800 px-3 py-3">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={{
+                showing: t("Göstərilir", "Showing"),
+                to: t("-", "to"),
+                of: t("/", "of"),
+                results: t("nəticə", "results"),
+              }}
+            />
           </div>
         </div>
       </div>

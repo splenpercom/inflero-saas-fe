@@ -34,7 +34,8 @@ import {
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
-import { DataPagination } from "../ui/DataPagination";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface Product {
@@ -129,7 +130,7 @@ export function Products() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const itemsPerPage = 10;
+  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -193,8 +194,11 @@ export function Products() {
         );
       }
       setProducts(items);
-      setTotalPages(data.totalPages);
+      setTotalPages(Math.max(1, data.totalPages || 1));
       setTotalItems(data.total);
+      if (data.totalPages > 0 && currentPage > data.totalPages) {
+        setCurrentPage(data.totalPages);
+      }
     } catch (err) {
       notifyFromError(err, pickLang(language, "Məhsulları yükləmək alınmadı", "Failed to load products"));
     } finally {
@@ -412,7 +416,6 @@ export function Products() {
       setSortField(field);
       setSortDirection("asc");
     }
-    setCurrentPage(1);
   };
 
   const paginatedProducts = products;
@@ -819,12 +822,7 @@ export function Products() {
             onPageChange={setCurrentPage}
             totalItems={totalItems}
             itemsPerPage={itemsPerPage}
-            showText={{
-              showing: pickLang(language, "Göstərilir", "Showing"),
-              to: pickLang(language, "-", "to"),
-              of: pickLang(language, "/", "of"),
-              results: pickLang(language, "nəticə", "results"),
-            }}
+            showText={dataPaginationShowText((az, en, ru) => pickLang(language, az, en, ru))}
           />
         </div>
 

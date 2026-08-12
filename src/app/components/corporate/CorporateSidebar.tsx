@@ -97,6 +97,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       userManagement: { en: "User Management", az: "İstifadəçi İdarəetməsi" },
       settings: { en: "Settings", az: "Parametrlər" },
       reservations: { en: "Reservations", az: "Rezervasiyalar" },
+      serviceTypes: { en: "Service Types", az: "Xidmət Növləri" },
       myWebsite: { en: "My Website", az: "Mənim Saytım" },
       webOrders: { en: "Web Orders", az: "Veb Sifarişlər" },
       webReports: { en: "Web Report", az: "Veb Hesabat" },
@@ -164,6 +165,14 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         : [...prev, labelKey]
     );
   };
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/dashboard/reservations")) {
+      setExpandedItems((prev) =>
+        prev.includes("reservations") ? prev : [...prev, "reservations"],
+      );
+    }
+  }, [location.pathname]);
 
   // Mock warehouse data - only active/configured warehouses
   const branchLabel = branchesLoading
@@ -319,8 +328,11 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       icon: CalendarDays,
       labelKey: "reservations",
       label: st("reservations"),
-      path: "/dashboard/reservations",
       permissionModule: "Reservations",
+      subItems: [
+        { labelKey: "reservationsList", label: st("reservations"), path: "/dashboard/reservations" },
+        { labelKey: "serviceTypes", label: st("serviceTypes"), path: "/dashboard/reservations/service-types" },
+      ],
     },
     {
       icon: Globe,
@@ -636,7 +648,16 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                             key={subItem.labelKey}
                             to={subItem.path || "#"}
                             onMouseEnter={() => subItem.path && preloadRoute(subItem.path)}
-                            onClick={onClose}
+                            onClick={() => {
+                              if (
+                                isReservations &&
+                                subItem.path === "/dashboard/reservations" &&
+                                newResCount > 0
+                              ) {
+                                acknowledgeReservations();
+                              }
+                              onClose?.();
+                            }}
                             className={cn(
                               "block w-full text-left px-3 py-1.5 rounded-lg text-xs smooth-transition font-medium",
                               isSubActive

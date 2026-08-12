@@ -41,6 +41,8 @@ import {
 import { useIncomeCategories } from "../../hooks/useFinanceCategories";
 import { useFinanceBankAccounts } from "../../hooks/useFinanceBankAccounts";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -69,6 +71,10 @@ export function Income() {
   const [isManageCategoriesModalOpen, setIsManageCategoriesModalOpen] = useState(false);
   const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
   const [editIncome, setEditIncome] = useState<IncomeListRow | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -77,9 +83,15 @@ export function Income() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedStore, selectedCategory, dateFrom, dateTo]);
+
   const loadIncomes = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setIncomes([]);
+      setTotalItems(0);
+      setTotalPages(1);
       setLoading(false);
       return;
     }
@@ -91,9 +103,14 @@ export function Income() {
         categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
         dateFrom: dateFrom ? dateInputToIso(dateFrom) : undefined,
         dateTo: dateTo ? dateInputToIso(dateTo) : undefined,
-        pageSize: 200,
+        page: currentPage,
+        pageSize: itemsPerPage,
       });
       setIncomes(Array.isArray(result.items) ? result.items : []);
+      setTotalItems(result.total ?? 0);
+      const pages = Math.max(1, result.totalPages || 1);
+      setTotalPages(pages);
+      if (pages > 0 && currentPage > pages) setCurrentPage(pages);
     } catch (err) {
       notifyFromError(err, tr("Gəlirləri yükləmək alınmadı", "Failed to load income"));
     } finally {
@@ -109,6 +126,8 @@ export function Income() {
     dateFrom,
     dateTo,
     branchRevision,
+    currentPage,
+    itemsPerPage,
   ]);
 
   useEffect(() => {
@@ -345,6 +364,16 @@ export function Income() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
           </div>
         </div>
       </div>

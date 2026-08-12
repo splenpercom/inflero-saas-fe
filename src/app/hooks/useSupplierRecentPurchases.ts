@@ -19,9 +19,10 @@ export function useSupplierRecentPurchases(supplierId: string, enabled: boolean)
         status: "all",
         paymentStatus: "all",
         sortBy: "all",
-        limit: 5,
+        page: 1,
+        pageSize: 5,
       });
-      setPurchases(rows);
+      setPurchases(rows.items ?? []);
     } catch {
       setPurchases([]);
     } finally {

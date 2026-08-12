@@ -281,9 +281,16 @@ export async function updateSalesBiller(
 }
 
 export async function fetchPosOrders(query: SalesListQuery = {}) {
-  const res = await apiGet<{ success: boolean; data: PosOrderListRow[] }>(
-    `/tenant/sales/pos-orders${salesListQueryString(query)}`,
-  );
+  const res = await apiGet<{
+    success: boolean;
+    data: {
+      items: PosOrderListRow[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    };
+  }>(`/tenant/sales/pos-orders${salesListQueryString(query)}`);
   return res.data;
 }
 
@@ -320,9 +327,16 @@ export async function recordPosOrderPayment(id: string, body: RecordPaymentBody)
 }
 
 export async function fetchInvoices(query: SalesListQuery = {}) {
-  const res = await apiGet<{ success: boolean; data: InvoiceListRow[] }>(
-    `/tenant/sales/invoices${salesListQueryString(query)}`,
-  );
+  const res = await apiGet<{
+    success: boolean;
+    data: {
+      items: InvoiceListRow[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    };
+  }>(`/tenant/sales/invoices${salesListQueryString(query)}`);
   return res.data;
 }
 
@@ -354,9 +368,16 @@ export async function recordInvoicePayment(id: string, body: RecordPaymentBody) 
 }
 
 export async function fetchSalesReturns(query: SalesListQuery = {}) {
-  const res = await apiGet<{ success: boolean; data: SalesReturnListRow[] }>(
-    `/tenant/sales/returns${salesListQueryString(query)}`,
-  );
+  const res = await apiGet<{
+    success: boolean;
+    data: {
+      items: SalesReturnListRow[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    };
+  }>(`/tenant/sales/returns${salesListQueryString(query)}`);
   return res.data;
 }
 

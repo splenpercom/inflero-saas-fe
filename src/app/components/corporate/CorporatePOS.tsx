@@ -15,8 +15,6 @@ import {
   UserCheck,
   Tag,
   Check,
-  Car,
-  Gauge,
   Printer,
   ArrowLeft,
   Home,
@@ -28,7 +26,7 @@ import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { formatCurrency } from "../../utils/currency";
 import { fetchProducts } from "../../api/inventory";
-import { fetchCustomers, fetchCustomerVehicles, type PeopleCustomer, type CustomerVehicle } from "../../api/people";
+import { fetchCustomers, type PeopleCustomer } from "../../api/people";
 import { posCheckout } from "../../api/sales";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -147,9 +145,6 @@ interface ReceiptData {
   customer: string;
   customerPhone: string;
   employee: string;
-  car: string;
-  plate: string;
-  mileage: number;
   items: { name: string; qty: number; price: number }[];
   subtotal: number;
   shipping: number;
@@ -192,8 +187,6 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
       customer: latinize(data.customer),
       customerPhone: data.customerPhone,
       employee: latinize(data.employee),
-      car: latinize(data.car),
-      plate: latinize(data.plate),
       paymentMethod: latinize(data.paymentMethod),
       paymentStatusLabel: latinize(data.paymentStatusLabel),
       discountLabel: latinize(data.discountLabel),
@@ -246,11 +239,6 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
         <div class="row"><span class="label">Musteri:</span><span class="bold">${d.customer}</span></div>
         <div class="row"><span class="label">Telefon:</span><span>${d.customerPhone}</span></div>
         <div class="row"><span class="label">Isci:</span><span>${d.employee}</span></div>
-        <div class="divider"></div>
-
-        <div class="row"><span class="label">Avtomobil:</span><span class="bold">${d.car}</span></div>
-        <div class="row"><span class="label">Qeydiyyat:</span><span>${d.plate}</span></div>
-        <div class="row"><span class="label">Km gostericisi:</span><span>${d.mileage.toLocaleString()} km</span></div>
         <div class="divider-solid"></div>
 
         <div style="font-size:10px;font-weight:bold;margin-bottom:3px;">MEHSUL / XIDMET</div>
@@ -313,10 +301,6 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
           <div className="flex justify-between"><span className="text-gray-400">Müştəri:</span><span className="font-semibold">{data.customer}</span></div>
           <div className="flex justify-between"><span className="text-gray-400">Telefon:</span><span>{data.customerPhone}</span></div>
           <div className="flex justify-between"><span className="text-gray-400">İşçi:</span><span>{data.employee}</span></div>
-          <hr className="border-dashed border-gray-300 dark:border-gray-600 my-1" />
-          <div className="flex justify-between"><span className="text-gray-400">Avtomobil:</span><span className="font-semibold">{data.car}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">Qeydiyyat:</span><span>{data.plate}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">Km:</span><span>{data.mileage.toLocaleString()} km</span></div>
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
           <p className="text-[9px] font-bold mb-1">MƏHSUL / XİDMƏT</p>
           {data.items.map((it, i) => (
@@ -378,8 +362,6 @@ export function CorporatePOS() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [selectedCarId, setSelectedCarId] = useState("");
-  const [mileage, setMileage] = useState("");
   const [selectedBillerId, setSelectedBillerId] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoice>("paid");
@@ -394,7 +376,6 @@ export function CorporatePOS() {
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
-  const [vehicles, setVehicles] = useState<CustomerVehicle[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const { billers, defaultBillerId } = useSalesBillers((isAuthenticated || isDemo));
 
@@ -471,32 +452,14 @@ export function CorporatePOS() {
     };
   }, [isAuthenticated, isDemo, branchRevision]);
 
-  useEffect(() => {
-    if (!selectedCustomerId || !(isAuthenticated || isDemo)) {
-      setVehicles([]);
-      return;
-    }
-    void fetchCustomerVehicles(selectedCustomerId)
-      .then(setVehicles)
-      .catch(() => setVehicles([]));
-  }, [selectedCustomerId, isDemo, isAuthenticated]);
-
   // Derived selections
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? null;
-  const selectedCar = vehicles.find((c) => c.id === selectedCarId) ?? null;
 
   const customerOptions = customers.map((c) => ({ id: c.id, label: c.name, sub: c.phone }));
-  const carOptions = vehicles.map((c) => ({
-    id: c.id,
-    label: `${c.year ?? ""} ${c.make} ${c.model}`.trim(),
-    sub: c.plate,
-  }));
   const billerOptions = billers.map((b) => ({ id: b.id, label: b.name, sub: b.code }));
 
   const handleCustomerChange = (id: string) => {
     setSelectedCustomerId(id);
-    setSelectedCarId("");
-    setMileage("");
   };
 
   const categories = useMemo(() => {
@@ -668,9 +631,6 @@ export function CorporatePOS() {
     const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
     const receiptPhone = selectedCustomer?.phone ?? "—";
     const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
-    const receiptCar = selectedCar ? `${selectedCar.year ?? ""} ${selectedCar.make} ${selectedCar.model}`.trim() : "—";
-    const receiptPlate = selectedCar?.plate ?? "—";
-    const receiptMileage = parseInt(mileage, 10) || selectedCar?.mileage || 0;
 
     setPlacingOrder(true);
     try {
@@ -687,8 +647,6 @@ export function CorporatePOS() {
         // Pending: explicit 0 so collectFullPaymentIfMethodSet does not auto-charge.
         ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
         ...(isGlobalMode ? { storeId: branchId ?? null } : {}),
-        vehicleId: selectedCarId || null,
-        mileageAtService: mileage ? parseInt(mileage, 10) : null,
       });
 
       const orderDate = new Date(detail.date);
@@ -718,9 +676,6 @@ export function CorporatePOS() {
         customer: detail.customerName ?? receiptCustomer,
         customerPhone: receiptPhone,
         employee: detail.billerName ?? receiptBiller,
-        car: receiptCar,
-        plate: receiptPlate,
-        mileage: receiptMileage,
         items: detail.items.map((item) => ({
           name: item.productName,
           qty: item.quantity,
@@ -744,8 +699,6 @@ export function CorporatePOS() {
       setShippingInput("0");
       setServiceFeeInput("0");
       setSelectedCustomerId("");
-      setSelectedCarId("");
-      setMileage("");
       setSelectedBillerId(defaultBillerId || "");
       setSelectedPaymentMethod(null);
       setPaymentStatusChoice("paid");
@@ -940,31 +893,6 @@ export function CorporatePOS() {
                   placeholder={tr("Müştəri seçin...", "Select customer...")}
                   icon={User}
                 />
-
-                {selectedCustomerId && (
-                  <SelectDropdown
-                    value={selectedCarId}
-                    onChange={setSelectedCarId}
-                    options={carOptions}
-                    placeholder={tr("Avtomobil seçin...", "Select vehicle...")}
-                    icon={Car}
-                  />
-                )}
-
-                {selectedCarId && (
-                  <div className="relative">
-                    <Gauge className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder={tr("Km göstərici...", "Enter mileage (km)...")}
-                      value={mileage}
-                      onChange={(e) => setMileage(e.target.value)}
-                      className="w-full pl-9 pr-10 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">km</span>
-                  </div>
-                )}
 
                 <SelectDropdown
                   value={selectedBillerId}

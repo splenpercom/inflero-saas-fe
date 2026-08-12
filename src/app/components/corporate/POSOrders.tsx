@@ -37,6 +37,8 @@ import {
 import { formatSalesDate, mapPaymentMethodToApi, type PosUiPaymentMethod } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
+import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
+import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -69,6 +71,10 @@ export function POSOrders() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [paymentsReloadKey, setPaymentsReloadKey] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -77,9 +83,15 @@ export function POSOrders() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedCustomer, selectedStatus, selectedPaymentStatus, sortBy]);
+
   const loadItems = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setOrders([]);
+      setTotalItems(0);
+      setTotalPages(1);
       setLoading(false);
       return;
     }
@@ -91,8 +103,14 @@ export function POSOrders() {
         status: selectedStatus,
         paymentStatus: selectedPaymentStatus,
         sortBy,
+        page: currentPage,
+        pageSize: itemsPerPage,
       });
-      setOrders(data);
+      setOrders(data.items ?? []);
+      setTotalItems(data.total ?? 0);
+      const pages = Math.max(1, data.totalPages || 1);
+      setTotalPages(pages);
+      if (pages > 0 && currentPage > pages) setCurrentPage(pages);
     } catch (err) {
       notifyFromError(err, tr("Sifarişləri yükləmək alınmadı", "Failed to load orders"));
     } finally {
@@ -108,6 +126,8 @@ export function POSOrders() {
     selectedPaymentStatus,
     sortBy,
     branchRevision,
+    currentPage,
+    itemsPerPage,
   ]);
 
   useEffect(() => {
@@ -211,78 +231,101 @@ export function POSOrders() {
 
   const openMenuOrder = openMenuId ? orders.find((o) => o.id === openMenuId) : null;
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text(tr("POS Sifarişləri", "POS Orders"), 14, 15);
-    doc.setFontSize(10);
-    doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDate(language)}`, 14, 22);
-    autoTable(doc, {
-      head: [
-        [
-          tr("Müştəri", "Customer"),
-          tr("İstinad", "Reference"),
-          tr("Tarix", "Date"),
-          tr("Status", "Status"),
-          tr("Ümumi", "Total"),
-          tr("Ödənilib", "Paid"),
-          tr("Borc", "Due"),
-          tr("Ödəniş", "Payment"),
-          tr("Kassir", "Biller"),
+  const loadExportRows = async () => {
+    const data = await fetchPosOrders({
+      search: debouncedSearch.trim() || undefined,
+      customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
+      status: selectedStatus,
+      paymentStatus: selectedPaymentStatus,
+      sortBy,
+      page: 1,
+      pageSize: 200,
+    });
+    return data.items ?? [];
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const exportOrders = await loadExportRows();
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(tr("POS Sifarişləri", "POS Orders"), 14, 15);
+      doc.setFontSize(10);
+      doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDate(language)}`, 14, 22);
+      autoTable(doc, {
+        head: [
+          [
+            tr("Müştəri", "Customer"),
+            tr("İstinad", "Reference"),
+            tr("Tarix", "Date"),
+            tr("Status", "Status"),
+            tr("Ümumi", "Total"),
+            tr("Ödənilib", "Paid"),
+            tr("Borc", "Due"),
+            tr("Ödəniş", "Payment"),
+            tr("Kassir", "Biller"),
+          ],
         ],
-      ],
-      body: orders.map((order) => [
+        body: exportOrders.map((order) => [
+          order.customerName,
+          order.reference,
+          formatSalesDate(order.date),
+          order.status,
+          String(order.grandTotal),
+          String(order.paid),
+          String(order.due),
+          order.paymentStatus,
+          order.biller,
+        ]),
+        startY: 28,
+        theme: "grid",
+        headStyles: { fillColor: [0, 38, 246], fontSize: 8 },
+        bodyStyles: { fontSize: 7 },
+      });
+      doc.save(`pos_orders_${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (err) {
+      notifyFromError(err);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const exportOrders = await loadExportRows();
+      const headers = [
+        tr("Müştəri", "Customer"),
+        tr("İstinad", "Reference"),
+        tr("Tarix", "Date"),
+        tr("Status", "Status"),
+        tr("Ümumi Cəmi", "Grand Total"),
+        tr("Ödənilib", "Paid"),
+        tr("Borc", "Due"),
+        tr("Ödəniş Statusu", "Payment Status"),
+        tr("Kassir", "Biller"),
+      ];
+      const rows = exportOrders.map((order) => [
         order.customerName,
         order.reference,
         formatSalesDate(order.date),
         order.status,
-        String(order.grandTotal),
-        String(order.paid),
-        String(order.due),
+        order.grandTotal,
+        order.paid,
+        order.due,
         order.paymentStatus,
         order.biller,
-      ]),
-      startY: 28,
-      theme: "grid",
-      headStyles: { fillColor: [0, 38, 246], fontSize: 8 },
-      bodyStyles: { fontSize: 7 },
-    });
-    doc.save(`pos_orders_${new Date().toISOString().split("T")[0]}.pdf`);
-  };
-
-  const handleExportExcel = () => {
-    const headers = [
-      tr("Müştəri", "Customer"),
-      tr("İstinad", "Reference"),
-      tr("Tarix", "Date"),
-      tr("Status", "Status"),
-      tr("Ümumi Cəmi", "Grand Total"),
-      tr("Ödənilib", "Paid"),
-      tr("Borc", "Due"),
-      tr("Ödəniş Statusu", "Payment Status"),
-      tr("Kassir", "Biller"),
-    ];
-    const rows = orders.map((order) => [
-      order.customerName,
-      order.reference,
-      formatSalesDate(order.date),
-      order.status,
-      order.grandTotal,
-      order.paid,
-      order.due,
-      order.paymentStatus,
-      order.biller,
-    ]);
-    let csvContent = headers.join(";") + "\n";
-    rows.forEach((row) => {
-      csvContent += row.join(";") + "\n";
-    });
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `pos_orders_${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+      ]);
+      let csvContent = headers.join(";") + "\n";
+      rows.forEach((row) => {
+        csvContent += row.join(";") + "\n";
+      });
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `pos_orders_${new Date().toISOString().split("T")[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      notifyFromError(err);
+    }
   };
 
   const handleRefresh = async () => {
@@ -731,6 +774,16 @@ export function POSOrders() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={dataPaginationShowText(tr)}
+            />
           </div>
         </div>
       </div>

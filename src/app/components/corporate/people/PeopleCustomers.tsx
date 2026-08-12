@@ -25,6 +25,8 @@ import {
 import { notifyFromError, notifySuccess } from "../../../lib/toast";
 import { useConfirm } from "../../../context/ConfirmContext";
 import { AddCustomerModal, type CustomerFormData } from "./AddCustomerModal";
+import { DataPagination } from "../../ui/DataPagination";
+import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../hooks/usePagination";
 
 import { pickLang } from "../../../i18n/pickLang";
 export function PeopleCustomers() {
@@ -74,6 +76,19 @@ export function PeopleCustomers() {
   useEffect(() => {
     void loadCustomers();
   }, [loadCustomers]);
+
+  const {
+    currentPage,
+    totalPages,
+    totalItems,
+    paginatedData,
+    setCurrentPage,
+    itemsPerPage,
+  } = usePagination({
+    data: customers,
+    itemsPerPage: DEFAULT_LIST_PAGE_SIZE,
+    resetKey: `${debouncedSearch}|${selectedStatus}`,
+  });
 
   const translateStatus = (status: string) =>
     status === "Active" ? tr("Aktiv", "Active") : tr("Qeyri-aktiv", "Inactive");
@@ -148,7 +163,7 @@ export function PeopleCustomers() {
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
             <div className="flex-1 relative max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input type="text" placeholder={tr("Ad, telefon, nömrə ilə axtar...", "Search name, phone, plate...")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white" />
+              <input type="text" placeholder={tr("Ad, telefon ilə axtar...", "Search name, phone...")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white" />
             </div>
             <div className="flex gap-2 ml-auto">
               <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value as "all" | "active" | "inactive")} className="pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white">
@@ -169,37 +184,21 @@ export function PeopleCustomers() {
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("MÜŞTƏRİ", "CUSTOMER")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("E-POÇT", "EMAIL")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("TELEFON", "PHONE")}</th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("AVTOMOBİL", "VEHICLES")}</th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("NÖMRƏLƏR", "PLATES")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("STATUS", "STATUS")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("ƏMƏLİYYATLAR", "ACTIONS")}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
+                  <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
                 ) : customers.length === 0 ? (
-                  <tr><td colSpan={8} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Müştəri tapılmadı", "No customers found")}</td></tr>
-                ) : customers.map((customer, index) => (
+                  <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Müştəri tapılmadı", "No customers found")}</td></tr>
+                ) : paginatedData.map((customer, index) => (
                   <tr key={customer.id} className={`border-b border-gray-200 dark:border-gray-800 ${index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"}`}>
                     <td className="px-3 py-2 text-xs text-gray-600">{customer.code}</td>
                     <td className="px-3 py-2 text-xs text-gray-900 dark:text-white">{customer.name}</td>
                     <td className="px-3 py-2 text-xs text-gray-600">{customer.email || "—"}</td>
                     <td className="px-3 py-2 text-xs text-gray-600">{customer.phone || "—"}</td>
-                    <td className="px-3 py-2 text-xs text-gray-600">{customer.vehicleCount ?? 0}</td>
-                    <td className="px-3 py-2 text-xs text-gray-600">
-                      {customer.plates?.length ? (
-                        <span className="inline-flex flex-wrap gap-1">
-                          {customer.plates.map((plate) => (
-                            <span key={plate} className="inline-flex px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-[10px] font-medium text-gray-700 dark:text-gray-300">
-                              {plate}
-                            </span>
-                          ))}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
                     <td className="px-3 py-2"><span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 border border-green-300">{translateStatus(customer.status)}</span></td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
@@ -216,6 +215,21 @@ export function PeopleCustomers() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+            <DataPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showText={{
+                showing: tr("Göstərilir", "Showing"),
+                to: tr("-", "to"),
+                of: tr("/", "of"),
+                results: tr("nəticə", "results"),
+              }}
+            />
           </div>
         </div>
 

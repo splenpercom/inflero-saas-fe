@@ -157,9 +157,16 @@ export type RecordPurchasePaymentBody = {
 };
 
 export async function fetchPurchases(query: PurchasesListQuery = {}) {
-  const res = await apiGet<{ success: boolean; data: PurchaseListRow[] }>(
-    `/tenant/purchases${purchasesListQueryString(query)}`,
-  );
+  const res = await apiGet<{
+    success: boolean;
+    data: {
+      items: PurchaseListRow[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    };
+  }>(`/tenant/purchases${purchasesListQueryString(query)}`);
   return res.data;
 }
 
@@ -191,9 +198,16 @@ export async function recordPurchasePayment(id: string, body: RecordPurchasePaym
 }
 
 export async function fetchPurchaseReturns(query: PurchasesListQuery = {}) {
-  const res = await apiGet<{ success: boolean; data: PurchaseReturnListRow[] }>(
-    `/tenant/purchases/returns${purchasesListQueryString(query)}`,
-  );
+  const res = await apiGet<{
+    success: boolean;
+    data: {
+      items: PurchaseReturnListRow[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    };
+  }>(`/tenant/purchases/returns${purchasesListQueryString(query)}`);
   return res.data;
 }
 
