@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
-import { DEFAULT_CONFIG, generateTimeSlots } from "../utils/reservationConfig";
+import { DEFAULT_CONFIG } from "../utils/reservationConfig";
 import {
   fetchPublicReservationConfig,
   fetchPublicReservationSlots,
@@ -141,8 +141,6 @@ export function CarServiceCustomerSite({
         setCompany(data.tenant);
         if (data.mode === "per_branch" && !branchSlug) {
           setBranchOptions(data.branches ?? []);
-          setResConfig(DEFAULT_CONFIG);
-          setServiceTypes(DEFAULT_SERVICES);
           return;
         }
         setBranchOptions([]);
@@ -154,7 +152,6 @@ export function CarServiceCustomerSite({
       } catch (err) {
         if (!cancelled) {
           setConfigError(err instanceof ApiError ? err.message : "Failed to load booking settings");
-          setResConfig(DEFAULT_CONFIG);
         }
       } finally {
         if (!cancelled) setConfigLoading(false);
@@ -170,16 +167,8 @@ export function CarServiceCustomerSite({
       const data = await fetchPublicReservationSlots(tenantSlug, dateToYmd(date), activeBranchSlug);
       setSlots(data);
     } catch (err) {
-      const fallback = generateTimeSlots(resConfig).map((time) => ({
-        time,
-        available: resConfig.capacityPerSlot,
-        capacity: resConfig.capacityPerSlot,
-        booked: 0,
-      }));
-      setSlots(fallback);
-      if (fallback.length === 0) {
-        setSlotsError(err instanceof ApiError ? err.message : "Failed to load time slots");
-      }
+      setSlots([]);
+      setSlotsError(err instanceof ApiError ? err.message : "Failed to load time slots");
     } finally {
       setSlotsLoading(false);
     }
@@ -318,6 +307,22 @@ export function CarServiceCustomerSite({
     return (
       <div className="min-h-screen flex items-center justify-center bg-white text-sm text-gray-500">
         {t("Loading...", "Yüklənir...", "Yükleniyor...")}
+      </div>
+    );
+  }
+
+  if (configError) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
+        {company.companyLogoUrl && (
+          <img src={company.companyLogoUrl} alt={company.name} className="h-14 max-w-48 object-contain mb-4" />
+        )}
+        <h1 className="text-xl font-bold text-gray-900">{company.name}</h1>
+        <p className="mt-3 text-sm text-gray-500">
+          {t("Booking is currently unavailable.", "Rezervasiya hazırda əlçatan deyil.", "Rezervasyon şu anda kullanılamıyor.")}
+        </p>
+        {company.phone && <a className="mt-4 text-sm font-semibold text-[#0026f6]" href={`tel:${company.phone}`}>{company.phone}</a>}
+        <a className="mt-1 text-sm text-gray-500" href={`mailto:${company.companyEmail}`}>{company.companyEmail}</a>
       </div>
     );
   }
@@ -532,15 +537,7 @@ export function CarServiceCustomerSite({
                 )}
 
                 <div className="grid grid-cols-4 gap-2">
-                  {(slots.length > 0
-                    ? slots
-                    : generateTimeSlots(resConfig).map((time) => ({
-                        time,
-                        available: resConfig.capacityPerSlot,
-                        capacity: resConfig.capacityPerSlot,
-                        booked: 0,
-                      }))
-                  ).map((slot) => {
+                  {slots.map((slot) => {
                     const full = slot.available <= 0;
                     return (
                     <button

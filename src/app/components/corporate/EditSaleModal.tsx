@@ -16,6 +16,7 @@ import {
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { DateInput } from "../ui/DateInput";
 import { pickLang } from "../../i18n/pickLang";
+import { fetchCustomerVehicles, type CustomerVehicle } from "../../api/people";
 
 interface ProductItem {
   id: string;
@@ -34,7 +35,9 @@ interface EditSaleModalProps {
 
 export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleModalProps) {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated, user } = useAuth();
+  const { isDemo, isAuthenticated, user, hasModule } = useAuth();
+  const autoEnabled = hasModule("AUTO");
+  const stockEnabled = hasModule("STOCK");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
@@ -43,6 +46,9 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
 
   const [customerId, setCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
+  const [vehicleId, setVehicleId] = useState("");
+  const [mileageAtService, setMileageAtService] = useState("");
+  const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([]);
   const [billerId, setBillerId] = useState("");
   const [date, setDate] = useState("");
   const [reference, setReference] = useState("");
@@ -59,11 +65,12 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
   const [showProductList, setShowProductList] = useState(false);
   const [stockDeducted, setStockDeducted] = useState(false);
   const [paidAmount, setPaidAmount] = useState(0);
+  const linesLocked = stockEnabled && stockDeducted;
 
   const { customers } = useSalesCustomers(customerSearch, isOpen);
   const { products: searchResults, loading: productsLoading } = useSalesProductSearch(
     productSearch,
-    isOpen && !stockDeducted,
+    isOpen && !linesLocked,
   );
   const { billers, loading: billersLoading } = useSalesBillers(isOpen);
 
@@ -78,6 +85,8 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
         setOrder(data);
         setCustomerId(data.customerId ?? "");
         setCustomerSearch(data.customerName ?? "");
+        setVehicleId(data.vehicleId ?? "");
+        setMileageAtService(data.mileageAtService == null ? "" : String(data.mileageAtService));
         setBillerId(data.billerId ?? "");
         setDate(data.date.slice(0, 10));
         setReference(data.reference && data.reference !== "—" ? data.reference : "");
@@ -110,12 +119,34 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
       .finally(() => setLoading(false));
   }, [isOpen, orderId, language]);
 
+  useEffect(() => {
+    if (!isOpen || !autoEnabled || !customerId) {
+      setCustomerVehicles([]);
+      return;
+    }
+    let cancelled = false;
+    fetchCustomerVehicles(customerId)
+      .then((rows) => {
+        if (!cancelled) setCustomerVehicles(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCustomerVehicles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, autoEnabled, customerId]);
+
   const handleCustomerChange = (nextId: string) => {
+    if (autoEnabled && nextId !== customerId) {
+      setVehicleId("");
+      setMileageAtService("");
+    }
     setCustomerId(nextId);
   };
 
   const handleAddProduct = async (productId: string) => {
-    if (stockDeducted) return;
+    if (linesLocked) return;
     if (products.find((p) => p.id === productId)) return;
     try {
       const detail = await fetchProduct(productId);
@@ -137,12 +168,12 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
   };
 
   const handleUpdateProduct = (id: string, field: keyof ProductItem, value: number) => {
-    if (stockDeducted) return;
+    if (linesLocked) return;
     setProducts(products.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
   };
 
   const handleRemoveProduct = (id: string) => {
-    if (stockDeducted) return;
+    if (linesLocked) return;
     setProducts(products.filter((p) => p.id !== id));
   };
 
@@ -171,6 +202,10 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
     try {
       const body: Parameters<typeof updatePosOrder>[1] = {
         customerId: customerId || null,
+        ...(autoEnabled && vehicleId ? { vehicleId } : {}),
+        ...(autoEnabled && vehicleId && mileageAtService.trim()
+          ? { mileageAtService: Number(mileageAtService) }
+          : {}),
         billerId: billerId || null,
         paymentMethod: mapPaymentMethodToApi(paymentMethod),
         status: mapOrderStatusToApi(status),
@@ -181,7 +216,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
         shipping,
         serviceFee,
       };
-      if (!stockDeducted) {
+      if (!linesLocked) {
         body.items = products.map((p) => ({
           productId: p.id,
           quantity: p.qty,
@@ -239,7 +274,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
           <p className="p-6 text-center text-sm text-gray-500">{tr("Satış tapılmadı", "Sale not found")}</p>
         ) : (
           <div className="p-4 space-y-3">
-            {stockDeducted && (
+            {linesLocked && (
               <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
                 {tr(
                   "Stok çıxıldığı üçün məhsul sətirləri dəyişdirilə bilməz. Digər sahələr redaktə oluna bilər.",
@@ -276,6 +311,47 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   )}
                 </select>
               </div>
+
+              {autoEnabled && customerId && (
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                      {tr("Avtomobil", "Vehicle")}
+                    </label>
+                    <select
+                      value={vehicleId}
+                      onChange={(e) => {
+                        setVehicleId(e.target.value);
+                        if (!e.target.value) setMileageAtService("");
+                      }}
+                      className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="">{tr("Avtomobil seçilməyib", "No vehicle")}</option>
+                      {customerVehicles.map((vehicle) => (
+                        <option key={vehicle.id} value={vehicle.id}>
+                          {[vehicle.make, vehicle.model, vehicle.plate].filter(Boolean).join(" · ")}
+                        </option>
+                      ))}
+                      {vehicleId && !customerVehicles.some((vehicle) => vehicle.id === vehicleId) && order.vehicleLabel && (
+                        <option value={vehicleId}>{order.vehicleLabel}</option>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                      {tr("Yürüş (km)", "Mileage (km)")}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={mileageAtService}
+                      onChange={(e) => setMileageAtService(e.target.value)}
+                      disabled={!vehicleId}
+                      className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50"
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
@@ -376,13 +452,13 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                     setShowProductList(true);
                   }}
                   onFocus={() => setShowProductList(true)}
-                  disabled={stockDeducted}
+                  disabled={linesLocked}
                   placeholder={tr("Məhsul kodu daxil edin və seçin", "Please type product code and select")}
                   className="w-full px-2.5 py-1.5 pr-10 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
                 />
                 <Scan className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
 
-                {!stockDeducted && showProductList && productSearch && (
+                {!linesLocked && showProductList && productSearch && (
                   <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                     {productsLoading ? (
                       <p className="px-3 py-2 text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</p>
@@ -415,9 +491,9 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                     <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
                       {tr("Vahid Qiymət(₼)", "Net Unit Price(₼)")}
                     </th>
-                    <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                    {stockEnabled && <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
                       {tr("Stok", "Stock")}
-                    </th>
+                    </th>}
                     <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
                       {tr("Miqdar", "QTY")}
                     </th>
@@ -430,7 +506,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <tbody>
                   {products.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-2 py-4 text-center text-gray-500">
+                      <td colSpan={stockEnabled ? 6 : 5} className="px-2 py-4 text-center text-gray-500">
                         {tr("Məhsul əlavə edin", "Add products")}
                       </td>
                     </tr>
@@ -439,7 +515,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                       <tr key={product.id} className="border-t border-gray-200 dark:border-gray-700">
                         <td className="px-2 py-2 text-gray-900 dark:text-white">{product.name}</td>
                         <td className="px-2 py-2">
-                          {stockDeducted ? (
+                          {linesLocked ? (
                             <span className="text-gray-900 dark:text-white">₼{product.unitPrice.toFixed(2)}</span>
                           ) : (
                             <input
@@ -454,11 +530,11 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                             />
                           )}
                         </td>
-                        <td className="px-2 py-2 text-gray-900 dark:text-white">
-                          {stockDeducted ? "—" : product.stock}
-                        </td>
+                        {stockEnabled && <td className="px-2 py-2 text-gray-900 dark:text-white">
+                          {linesLocked ? "—" : product.stock}
+                        </td>}
                         <td className="px-2 py-2">
-                          {stockDeducted ? (
+                          {linesLocked ? (
                             <span className="text-gray-900 dark:text-white">{product.qty}</span>
                           ) : (
                             <input
@@ -476,7 +552,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                           ₼{calculateLineTotal(product).toFixed(2)}
                         </td>
                         <td className="px-2 py-2">
-                          {!stockDeducted && (
+                          {!linesLocked && (
                             <button
                               type="button"
                               onClick={() => handleRemoveProduct(product.id)}

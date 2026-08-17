@@ -35,7 +35,8 @@ function formatStatus(value: string | undefined, language: "en" | "az" | "ru"): 
 export function ProductDetails() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { canView } = useModulePermissions("Inventory");
   const branchRevision = useBranchRevision();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -186,11 +187,11 @@ export function ProductDetails() {
                 { label: pt("brand"), value: product.brand || "—" },
                 { label: pt("unit"), value: product.unit || "—" },
                 { label: pt("sku"), value: product.sku },
-                {
+                ...(stockEnabled ? [{
                   label: pt("minimumQty"),
                   value: product.quantityAlert != null ? product.quantityAlert : "—",
                 },
-                { label: pt("quantity"), value: product.quantity },
+                { label: pt("quantity"), value: product.quantity }] : []),
                 { label: pt("tax"), value: taxDisplay },
                 { label: pt("discountType"), value: formatDiscountType(product.discountType, language) },
                 { label: pt("price"), value: product.price },

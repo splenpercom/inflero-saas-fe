@@ -20,8 +20,11 @@ import {
 } from "lucide-react";
 
 import { pickLang } from "../../i18n/pickLang";
+import { useAuth } from "../../context/AuthContext";
 export function Reports() {
   const { language } = useLanguage();
+  const { hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const t = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const reportCategories = [
@@ -177,7 +180,19 @@ export function Reports() {
         },
       ],
     },
-  ];
+  ].map((category) => ({
+    ...category,
+    reports: category.reports.filter((report) =>
+      stockEnabled ||
+      ![
+        "/reports/inventory",
+        "/reports/stock-history",
+        "/reports/sold-stock",
+        "/reports/product-expiry",
+        "/reports/product-quantity-alert",
+      ].includes(report.path),
+    ),
+  })).filter((category) => category.reports.length > 0);
 
   const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; text: string; border: string }> = {

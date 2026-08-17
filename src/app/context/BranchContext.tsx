@@ -23,6 +23,7 @@ export interface BranchContextValue {
   /** Increments when branch selection changes so pages can refetch. */
   branchRevision: number;
   isLoading: boolean;
+  ready: boolean;
   setBranchId: (id: string | null) => void;
   refreshBranches: () => Promise<void>;
 }
@@ -30,7 +31,8 @@ export interface BranchContextValue {
 const BranchContext = createContext<BranchContextValue | null>(null);
 
 export function BranchProvider({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated, isDemo, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isDemo, isLoading: authLoading, hasModule } = useAuth();
+  const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
   const [branches, setBranches] = useState<BranchSwitcherStore[]>([]);
   const [branchId, setBranchIdState] = useState<string | null>(() => getBranchStoreId());
   const [branchRevision, setBranchRevision] = useState(0);
@@ -92,6 +94,18 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (!branchManagementEnabled && branches.length > 0) {
+      const requiredId =
+        user.storeId ??
+        (stored && branches.some((b) => b.id === stored) ? stored : branches[0].id);
+      if (branchId !== requiredId) {
+        setBranchStoreId(requiredId);
+        setBranchIdState(requiredId);
+        setBranchRevision((n) => n + 1);
+      }
+      return;
+    }
+
     if (stored && branches.some((b) => b.id === stored)) {
       setBranchIdState(stored);
       return;
@@ -123,11 +137,11 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     if (!stored) {
       setBranchIdState(null);
     }
-  }, [user, branches, branchesLoaded, authLoading]);
+  }, [user, branches, branchesLoaded, authLoading, branchManagementEnabled, branchId]);
 
   const setBranchId = useCallback(
     (id: string | null) => {
-      if (isBranchLocked) return;
+      if (isBranchLocked || (!branchManagementEnabled && id === null)) return;
       const prev = getBranchStoreId();
       setBranchStoreId(id);
       setBranchIdState(id);
@@ -135,7 +149,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         setBranchRevision((n) => n + 1);
       }
     },
-    [isBranchLocked],
+    [isBranchLocked, branchManagementEnabled],
   );
 
   const selectedBranch = useMemo(
@@ -143,8 +157,14 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     [branches, branchId],
   );
 
-  const isGlobalMode = !isBranchLocked && branchId === null;
+  const isGlobalMode = branchManagementEnabled && !isBranchLocked && branchId === null;
   const hasBranches = branches.length > 0;
+  const ready =
+    authLoading || !(isAuthenticated || isDemo)
+      ? true
+      : branchManagementEnabled
+        ? true
+        : branchesLoaded && (branches.length === 0 || branchId !== null);
 
   const value = useMemo(
     () => ({
@@ -156,6 +176,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       hasBranches,
       branchRevision,
       isLoading,
+      ready,
       setBranchId,
       refreshBranches,
     }),
@@ -168,12 +189,13 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       hasBranches,
       branchRevision,
       isLoading,
+      ready,
       setBranchId,
       refreshBranches,
     ],
   );
 
-  return <BranchContext.Provider value={value}>{children}</BranchContext.Provider>;
+  return <BranchContext.Provider value={value}>{ready ? children : null}</BranchContext.Provider>;
 }
 
 export function useBranch() {

@@ -52,7 +52,8 @@ function emptyToNull(value: string): string | null {
 
 export function Settings() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated, refresh } = useAuth();
+  const { isDemo, isAuthenticated, refresh, hasModule } = useAuth();
+  const posEnabled = hasModule("POS");
   const { canView, canEdit } = useModulePermissions("Settings");
   const branchRevision = useBranchRevision();
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
@@ -183,7 +184,7 @@ export function Settings() {
       try {
         const [data, billerRows] = await Promise.all([
           fetchTenantSettings(),
-          fetchSalesBillers().catch(() => [] as SalesBillerRow[]),
+          posEnabled ? fetchSalesBillers().catch(() => [] as SalesBillerRow[]) : Promise.resolve([]),
         ]);
         if (cancelled) return;
         applyFromApi(data);
@@ -231,7 +232,7 @@ export function Settings() {
         URL.revokeObjectURL(blobUrlRef.current);
       }
     };
-  }, [isDemo, isAuthenticated, canView, applyFromApi, applyBillerDrafts, language, branchRevision]);
+  }, [isDemo, isAuthenticated, canView, applyFromApi, applyBillerDrafts, language, branchRevision, posEnabled]);
 
   const requireSignedIn = () => {
     if (isDemo || !isAuthenticated) {
@@ -315,7 +316,7 @@ export function Settings() {
 
     setSaving(true);
     try {
-      for (const b of billers) {
+      for (const b of posEnabled ? billers : []) {
         const draft = commissionDrafts[b.id];
         if (!draft) continue;
         const nextType = draft.commissionType === "" ? null : draft.commissionType;
@@ -362,8 +363,7 @@ export function Settings() {
         website: emptyToNull(website),
         latitude,
         longitude,
-        employeeCommissionEnabled,
-        posServiceFeeEnabled,
+        ...(posEnabled ? { employeeCommissionEnabled, posServiceFeeEnabled } : {}),
         socialLinks: {
           instagram: emptyToNull(instagram),
           facebook: emptyToNull(facebook),
@@ -390,7 +390,9 @@ export function Settings() {
         });
       }
 
-      const refreshedBillers = await fetchSalesBillers().catch(() => billers);
+      const refreshedBillers = posEnabled
+        ? await fetchSalesBillers().catch(() => billers)
+        : [];
       applyBillerDrafts(refreshedBillers);
       addonSnapshotRef.current = {
         employeeCommissionEnabled,
@@ -829,7 +831,7 @@ export function Settings() {
           </div>
 
           {/* Add-ons */}
-          <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 overflow-hidden">
+          {posEnabled && <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 overflow-hidden">
             <button
               type="button"
               onClick={() => setAddonsOpen(!addonsOpen)}
@@ -990,7 +992,7 @@ export function Settings() {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Action Buttons */}
           {canEdit && (

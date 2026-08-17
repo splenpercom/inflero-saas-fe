@@ -16,8 +16,6 @@ interface ThemeContextType {
   setLogoUrl: (url: string | null) => void;
   faviconUrls: { [key: string]: string | null };
   setFaviconUrls: (urls: { [key: string]: string | null }) => void;
-  showRestaurantNameWithLogo: boolean;
-  setShowRestaurantNameWithLogo: (show: boolean) => void;
   theme: "light" | "dark";
   toggleTheme: () => void;
 }
@@ -35,10 +33,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const [faviconUrls, setFaviconUrlsState] = useState<{ [key: string]: string | null }>(() => {
     return getStorageJson(localStorage, STORAGE_KEYS.faviconUrls) ?? {};
-  });
-
-  const [showRestaurantNameWithLogo, setShowRestaurantNameWithLogoState] = useState<boolean>(() => {
-    return getStorageJson<boolean>(localStorage, STORAGE_KEYS.showRestaurantName) ?? true;
   });
 
   const [theme, setThemeState] = useState<"light" | "dark">(readInitialTheme);
@@ -60,11 +54,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setFaviconUrls = (urls: { [key: string]: string | null }) => {
     setFaviconUrlsState(urls);
     localStorage.setItem(STORAGE_KEYS.faviconUrls, JSON.stringify(urls));
-  };
-
-  const setShowRestaurantNameWithLogo = (show: boolean) => {
-    setShowRestaurantNameWithLogoState(show);
-    localStorage.setItem(STORAGE_KEYS.showRestaurantName, JSON.stringify(show));
   };
 
   const toggleTheme = () => {
@@ -96,8 +85,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setLogoUrl,
         faviconUrls,
         setFaviconUrls,
-        showRestaurantNameWithLogo,
-        setShowRestaurantNameWithLogo,
         theme,
         toggleTheme,
       }}

@@ -8,6 +8,7 @@ import {
   Receipt,
   Edit2,
   BadgeCheck,
+  Car,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -15,7 +16,9 @@ import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
 import {
   fetchCustomers,
+  fetchCustomerVehicles,
   updateCustomer,
+  type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
 import { fetchPosOrders, type PosOrderListRow } from "../../api/sales";
@@ -23,6 +26,7 @@ import { formatSalesDate } from "../../lib/salesMappers";
 import { formatCurrency } from "../../utils/currency";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { AddCustomerModal, type CustomerFormData } from "./people/AddCustomerModal";
+import { CustomerVehiclesModal } from "./people/CustomerVehiclesModal";
 
 import { pickLang } from "../../i18n/pickLang";
 function StatusBadge({ status }: { status: string }) {
@@ -39,7 +43,8 @@ export function CustomerProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const autoEnabled = hasModule("AUTO");
   const { canView, canEdit } = useModulePermissions("People");
   const branchRevision = useBranchRevision();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -50,6 +55,9 @@ export function CustomerProfile() {
   const [loading, setLoading] = useState(true);
   const [editCustomerOpen, setEditCustomerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [vehicles, setVehicles] = useState<CustomerVehicle[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(false);
+  const [vehiclesOpen, setVehiclesOpen] = useState(false);
 
   const loadPurchases = useCallback(async () => {
     if (!id || !(isAuthenticated || isDemo)) {
@@ -99,6 +107,26 @@ export function CustomerProfile() {
   useEffect(() => {
     void loadPurchases();
   }, [loadPurchases]);
+
+  const loadVehicles = useCallback(async () => {
+    if (!autoEnabled || !id || !(isAuthenticated || isDemo) || !canView) {
+      setVehicles([]);
+      return;
+    }
+    setVehiclesLoading(true);
+    try {
+      setVehicles(await fetchCustomerVehicles(id));
+    } catch (err) {
+      notifyFromError(err);
+      setVehicles([]);
+    } finally {
+      setVehiclesLoading(false);
+    }
+  }, [autoEnabled, id, isAuthenticated, isDemo, canView]);
+
+  useEffect(() => {
+    void loadVehicles();
+  }, [loadVehicles]);
 
   const totalSpent = purchases.reduce((sum, order) => sum + order.grandTotal, 0);
 
@@ -186,6 +214,48 @@ export function CustomerProfile() {
           )}
         </div>
 
+        {autoEnabled && (
+          <div className="mb-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                <Car className="h-4 w-4 text-[#0026f6]" />
+                {tr("Avtomobillər", "Vehicles")}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setVehiclesOpen(true)}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs dark:border-gray-700"
+              >
+                {tr("Bax / idarə et", "View / manage")}
+              </button>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+              {vehiclesLoading ? (
+                <p className="p-6 text-center text-xs text-gray-400">{tr("Yüklənir...", "Loading...")}</p>
+              ) : vehicles.length === 0 ? (
+                <p className="p-6 text-center text-xs text-gray-400">{tr("Avtomobil əlavə edilməyib", "No vehicles added")}</p>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {vehicles.map((vehicle) => (
+                    <div key={vehicle.id} className="flex items-center gap-3 px-4 py-3">
+                      <Car className="h-4 w-4 text-gray-400" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium text-gray-900 dark:text-white">
+                          {[vehicle.make, vehicle.model].filter(Boolean).join(" ") || tr("Avtomobil", "Vehicle")}
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {vehicle.plate || "—"}{vehicle.mileage != null ? ` · ${vehicle.mileage} km` : ""}
+                        </p>
+                      </div>
+                      <StatusBadge status={vehicle.status} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div>
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
             <Receipt className="w-4 h-4 text-[#0026f6]" />
@@ -238,6 +308,13 @@ export function CustomerProfile() {
       </div>
 
       <AddCustomerModal isOpen={editCustomerOpen} onClose={() => setEditCustomerOpen(false)} onSave={handleSaveCustomer} customer={customer} saving={saving} />
+      {autoEnabled && (
+        <CustomerVehiclesModal
+          customer={vehiclesOpen ? customer : null}
+          onClose={() => setVehiclesOpen(false)}
+          onChanged={() => void loadVehicles()}
+        />
+      )}
     </div>
   );
 }

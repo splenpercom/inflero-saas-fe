@@ -35,7 +35,8 @@ export function PurchaseReturnDetailModal({
   onChanged,
 }: PurchaseReturnDetailModalProps) {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { branchId, isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
   const [detail, setDetail] = useState<PurchaseReturnDetail | null>(null);
@@ -108,7 +109,7 @@ export function PurchaseReturnDetailModal({
 
   const handleSaveStatus = async () => {
     if (!canEdit || isDemo || !detail || !statusUi) return;
-    if (statusUi === "received" && detail.statusLabel.toLowerCase() !== "received") {
+    if (stockEnabled && statusUi === "received" && detail.statusLabel.toLowerCase() !== "received") {
       const ok = await askConfirm({
         title: tr("Təsdiq", "Confirm"),
         message: tr(
@@ -121,7 +122,7 @@ export function PurchaseReturnDetailModal({
     const resolvedStoreId =
       resolvePurchaseStoreIdForApi(isGlobalMode, branchId, storeId) ?? detail.storeId;
 
-    if (statusUi === "received" && !resolvedStoreId) {
+    if (stockEnabled && statusUi === "received" && !resolvedStoreId) {
       notifyFromError(
         new Error(
           tr(
@@ -137,7 +138,7 @@ export function PurchaseReturnDetailModal({
     try {
       const updated = await updatePurchaseReturn(detail.id, {
         status: mapPurchaseStatusToApi(statusUi),
-        ...(!detail.storeId && resolvedStoreId ? { storeId: resolvedStoreId } : {}),
+        ...(stockEnabled && !detail.storeId && resolvedStoreId ? { storeId: resolvedStoreId } : {}),
       });
       setDetail(updated);
       setStatusUi(updated.statusLabel.toLowerCase());
@@ -225,7 +226,7 @@ export function PurchaseReturnDetailModal({
                 )}
                 <div>
                   <p className="text-gray-500">{tr("Status", "Status")}</p>
-                  {!detail.storeId && canEdit && !isDemo && (
+                  {stockEnabled && !detail.storeId && canEdit && !isDemo && (
                     <div className="mb-2">
                       <PurchaseBranchField value={storeId} onChange={setStoreId} required />
                     </div>
@@ -272,7 +273,7 @@ export function PurchaseReturnDetailModal({
                     {detail.paymentStatus}
                   </span>
                 </div>
-                {detail.stockDeductedAt && (
+                {stockEnabled && detail.stockDeductedAt && (
                   <div>
                     <p className="text-gray-500">{tr("Stokdan çıxarıldı", "Stock deducted")}</p>
                     <p className="text-gray-900 dark:text-white">

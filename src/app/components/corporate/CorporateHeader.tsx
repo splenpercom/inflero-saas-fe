@@ -71,7 +71,7 @@ export const CorporateHeader = memo(function CorporateHeader({
   sidebarCollapsed,
 }: CorporateHeaderProps) {
   const { language, t } = useLanguage();
-  const { user, isDemo, logout, exitDemo, hasPermission } = useAuth();
+  const { user, isDemo, logout, exitDemo, hasPermission, hasModule } = useAuth();
   const navigate = useNavigate();
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -142,8 +142,8 @@ export const CorporateHeader = memo(function CorporateHeader({
     return actions.filter((action) => hasPermission(action.module, action.action));
   }, [hasPermission, language]);
 
-  const canViewSales = hasPermission("Sales", "view");
-  const canViewReservations = hasPermission("Reservations", "view");
+  const canViewPos = hasModule("POS") && hasPermission("Sales", "view");
+  const canViewReservations = hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
 
   // Check fullscreen status
   useEffect(() => {
@@ -227,7 +227,7 @@ export const CorporateHeader = memo(function CorporateHeader({
               variant="primary"
             />
           )}
-          {canViewSales && (
+          {canViewPos && (
             <StatBadge
               icon={ShoppingCart}
               label={pt("Orders", "Sifarişlər")}
@@ -268,7 +268,7 @@ export const CorporateHeader = memo(function CorporateHeader({
         )}
 
         {/* POS Shortcut */}
-        {canViewSales && (
+        {canViewPos && (
           <Link
             to="/dashboard/sales/pos"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition bg-[#0026f6]/10 dark:bg-[#0026f6]/20 border border-[#0026f6]/20 dark:border-[#0026f6]/30"

@@ -32,7 +32,8 @@ export function SalesReturnDetailModal({
   onChanged,
 }: SalesReturnDetailModalProps) {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const [detail, setDetail] = useState<SalesReturnDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [statusUi, setStatusUi] = useState("");
@@ -234,7 +235,7 @@ export function SalesReturnDetailModal({
                     {detail.paymentStatus}
                   </span>
                 </div>
-                {detail.restockedAt && (
+                {stockEnabled && detail.restockedAt && (
                   <div>
                     <p className="text-gray-500">{tr("Stoka qaytarıldı", "Restocked")}</p>
                     <p className="text-gray-900 dark:text-white">

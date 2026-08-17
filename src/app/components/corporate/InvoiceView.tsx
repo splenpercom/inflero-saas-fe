@@ -7,9 +7,11 @@ import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import {
   fetchInvoice,
+  fetchPosOrder,
   deleteInvoice,
   recordInvoicePayment,
   type InvoiceDetail,
+  type PosOrderDetail,
   type PaymentMethodApi,
 } from "../../api/sales";
 import { formatSalesDate } from "../../lib/salesMappers";
@@ -42,6 +44,7 @@ export function InvoiceView() {
   const { canEdit, canDelete } = useModulePermissions("Sales");
   const askConfirm = useConfirm();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  const [sourceOrder, setSourceOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
@@ -57,9 +60,15 @@ export function InvoiceView() {
     try {
       const data = await fetchInvoice(id);
       setInvoice(data);
+      if (data.posOrderId) {
+        setSourceOrder(await fetchPosOrder(data.posOrderId).catch(() => null));
+      } else {
+        setSourceOrder(null);
+      }
     } catch (err) {
       notifyFromError(err, tr("Qaiməni yükləmək alınmadı", "Failed to load invoice"));
       setInvoice(null);
+      setSourceOrder(null);
     } finally {
       setLoading(false);
     }
@@ -163,6 +172,12 @@ export function InvoiceView() {
       }
     } else {
       doc.text(tr("Müştəri təyin edilməyib", "No customer assigned"), 14, 58);
+    }
+    if (sourceOrder?.vehicleLabel) {
+      doc.text(`${tr("Avtomobil", "Vehicle")}: ${sourceOrder.vehicleLabel}`, 105, 58);
+      if (sourceOrder.mileageAtService != null) {
+        doc.text(`${tr("Yürüş", "Mileage")}: ${sourceOrder.mileageAtService} km`, 105, 63);
+      }
     }
 
     autoTable(doc, {
@@ -412,6 +427,14 @@ export function InvoiceView() {
                 <p className="text-gray-600 dark:text-gray-400">{tr("Müştəri təyin edilməyib", "No customer assigned")}</p>
               )}
             </div>
+            {sourceOrder?.vehicleLabel && (
+              <div className="mt-3 text-sm text-gray-900 dark:text-white">
+                <p><span className="text-gray-500 dark:text-gray-400">{tr("Avtomobil", "Vehicle")}:</span> {sourceOrder.vehicleLabel}</p>
+                {sourceOrder.mileageAtService != null && (
+                  <p><span className="text-gray-500 dark:text-gray-400">{tr("Yürüş", "Mileage")}:</span> {sourceOrder.mileageAtService} km</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="mb-8 overflow-x-auto">

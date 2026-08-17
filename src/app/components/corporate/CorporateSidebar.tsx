@@ -63,7 +63,7 @@ interface SidebarProps {
 export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const { t, language } = useLanguage();
   const isDarkMode = useIsDarkMode();
-  const { user, isDemo, isAuthenticated, hasPermission } = useAuth();
+  const { user, isDemo, isAuthenticated, hasPermission, hasModule } = useAuth();
   const {
     branches,
     branchId,
@@ -185,7 +185,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
           ? st("allBranches")
           : selectedBranch?.name ?? (branchId ? "…" : st("globalMode"));
 
-  const showBranchSwitcher = (isAuthenticated || isDemo);
+  const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
+  const showBranchSwitcher = (isAuthenticated || isDemo) && (branchManagementEnabled || !hasBranches);
   const isOwnerAllBranches = !!user?.isTenantOwner && isGlobalMode;
 
   const allBranchesNavItems: NavItem[] = useMemo(() => {
@@ -362,9 +363,21 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
 
     return itemsToFilter
       .map((item) => {
+        if (item.labelKey === "stock" && !hasModule("STOCK")) return null;
+        if (item.labelKey === "reservations" && !hasModule("RESERVATIONS")) return null;
+        if (item.labelKey === "myWebsite" && !hasModule("WEB_EDITOR")) return null;
+        if (item.labelKey === "warehouses" && !branchManagementEnabled && hasBranches) return null;
         const parentModule = item.permissionModule ?? "Dashboard";
         if (item.subItems) {
           const filteredSubItems = item.subItems.filter((sub) => {
+            if (["expiredProducts", "lowStocks"].includes(sub.labelKey) && !hasModule("STOCK")) return false;
+            if (["pos", "posOrders"].includes(sub.labelKey) && !hasModule("POS")) return false;
+            if (sub.labelKey === "stockTransfer" && !branchManagementEnabled) return false;
+            if (
+              sub.labelKey === "warehouses" &&
+              !branchManagementEnabled &&
+              hasBranches
+            ) return false;
             const perm = getNavPermission(sub.path, parentModule, {
               permissionModule: sub.permissionModule,
               permissionAction: sub.permissionAction,
@@ -381,7 +394,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         return item;
       })
       .filter((item): item is NavItem => item !== null);
-  }, [hasPermission, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems]);
+  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches]);
 
   const tenantSlug = user?.tenant?.slug ?? null;
   const myStorePath = tenantSlug ? storePath(tenantSlug) : null;
@@ -481,7 +494,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
               </button>
             }
           >
-            {!isBranchLocked && hasBranches && (
+            {!isBranchLocked && hasBranches && branchManagementEnabled && (
               <SimpleDropdownItem
                 onClick={() => setBranchId(null)}
                 className={cn(

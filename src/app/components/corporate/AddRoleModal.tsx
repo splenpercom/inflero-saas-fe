@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Shield, Check, Minus } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import {
@@ -7,9 +7,11 @@ import {
 } from "../../i18n/userManagementTranslations";
 import {
   defaultPermissionMatrix,
+  isRbacModuleVisible,
   toApiPermissions,
   type RolePermission,
 } from "../../lib/rolePermissions";
+import { useAuth } from "../../context/AuthContext";
 
 export interface AddRoleFormData {
   roleName: string;
@@ -25,15 +27,23 @@ interface AddRoleModalProps {
 
 export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalProps) {
   const { language } = useLanguage();
+  const { hasModule } = useAuth();
   const t = (key: Parameters<typeof getUserManagementTranslation>[0]) =>
     getUserManagementTranslation(key, language);
 
   const [roleName, setRoleName] = useState("");
-  const [permissions, setPermissions] = useState<RolePermission[]>(defaultPermissionMatrix());
+  const [permissions, setPermissions] = useState<RolePermission[]>(() =>
+    defaultPermissionMatrix(hasModule),
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setPermissions(defaultPermissionMatrix(hasModule));
+  }, [isOpen, hasModule]);
 
   const resetForm = () => {
     setRoleName("");
-    setPermissions(defaultPermissionMatrix());
+    setPermissions(defaultPermissionMatrix(hasModule));
   };
 
   const togglePermission = (
@@ -142,19 +152,27 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
                       </tr>
                     </thead>
                     <tbody>
-                      {permissions.map((permission, index) => (
+                      {permissions.map((permission, index) => {
+                        const moduleAvailable = isRbacModuleVisible(permission.module, hasModule);
+                        return (
                         <tr
                           key={permission.module}
                           className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
                         >
                           <td className="px-3 py-2 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                             {translateModuleName(permission.module, language)}
+                            {!moduleAvailable && (
+                              <span className="ml-2 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                {t("unavailableModule")}
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-2 text-center">
                             <button
                               type="button"
+                              disabled={!moduleAvailable}
                               onClick={() => togglePermission(index, "view")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
                                 permission.view
                                   ? "bg-green-500 text-white"
                                   : "bg-gray-200 dark:bg-gray-700 text-gray-400"
@@ -166,8 +184,9 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
                           <td className="px-3 py-2 text-center">
                             <button
                               type="button"
+                              disabled={!moduleAvailable}
                               onClick={() => togglePermission(index, "create")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
                                 permission.create
                                   ? "bg-blue-500 text-white"
                                   : "bg-gray-200 dark:bg-gray-700 text-gray-400"
@@ -179,8 +198,9 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
                           <td className="px-3 py-2 text-center">
                             <button
                               type="button"
+                              disabled={!moduleAvailable}
                               onClick={() => togglePermission(index, "edit")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
                                 permission.edit
                                   ? "bg-[#0026f6] text-white"
                                   : "bg-gray-200 dark:bg-gray-700 text-gray-400"
@@ -192,8 +212,9 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
                           <td className="px-3 py-2 text-center">
                             <button
                               type="button"
+                              disabled={!moduleAvailable}
                               onClick={() => togglePermission(index, "delete")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
                                 permission.delete
                                   ? "bg-red-500 text-white"
                                   : "bg-gray-200 dark:bg-gray-700 text-gray-400"
@@ -205,8 +226,9 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
                           <td className="px-3 py-2 text-center">
                             <button
                               type="button"
+                              disabled={!moduleAvailable}
                               onClick={() => toggleAll(index)}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
                                 permission.view &&
                                 permission.create &&
                                 permission.edit &&
@@ -219,7 +241,8 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

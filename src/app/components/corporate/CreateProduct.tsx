@@ -51,7 +51,8 @@ interface ProductImage {
 export function CreateProduct() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { canCreate } = useModulePermissions("Inventory");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
@@ -427,7 +428,7 @@ export function CreateProduct() {
 
       const qty = quantity.trim() ? parseInt(quantity, 10) : 0;
       const initialStocks =
-        qty > 0 && branchId ? [{ storeId: branchId, quantity: qty }] : undefined;
+        stockEnabled && qty > 0 && branchId ? [{ storeId: branchId, quantity: qty }] : undefined;
 
       await createProduct({
         name: productName.trim(),
@@ -441,11 +442,12 @@ export function CreateProduct() {
         price: String(parsePrice(price)),
         discountType: mapDiscountType(discountType),
         discountValue: discountValue.trim() ? String(parsePrice(discountValue)) : null,
-        quantityAlert: quantityAlert.trim() ? parseInt(quantityAlert, 10) : null,
+        ...(stockEnabled
+          ? { quantityAlert: quantityAlert.trim() ? parseInt(quantityAlert, 10) : null, initialStocks }
+          : {}),
         manufacturedDate: manufacturedDate || null,
         expiryDate: expiryDate || null,
         images: imageUrls,
-        initialStocks,
       });
 
       notifySuccess(pt("productCreated"));
@@ -755,7 +757,7 @@ export function CreateProduct() {
               <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6 mt-4">
                   {/* Quantity */}
-                  <div>
+                  {stockEnabled && <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                       {pt("quantity")}
                     </label>
@@ -765,7 +767,7 @@ export function CreateProduct() {
                       onChange={(e) => setQuantity(e.target.value)}
                       className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
                     />
-                  </div>
+                  </div>}
 
                   {/* Price */}
                   <div>
@@ -812,7 +814,7 @@ export function CreateProduct() {
                 </div>
 
                 {/* Quantity Alert */}
-                <div className="mt-6">
+                {stockEnabled && <div className="mt-6">
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                     {pt("quantityAlert")}
                   </label>
@@ -822,7 +824,7 @@ export function CreateProduct() {
                     onChange={(e) => setQuantityAlert(e.target.value)}
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
                   />
-                </div>
+                </div>}
               </div>
             )}
           </div>

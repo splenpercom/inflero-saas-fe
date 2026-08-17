@@ -20,7 +20,8 @@ interface EditPurchaseModalProps {
 
 export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: EditPurchaseModalProps) {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { branchId, isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -66,7 +67,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
       purchase.storeId ?? resolvePurchaseStoreIdForApi(isGlobalMode, branchId, storeId);
     const markingReceived = status === "received";
 
-    if (markingReceived && !resolvedStoreId) {
+    if (stockEnabled && markingReceived && !resolvedStoreId) {
       notifyFromError(
         new Error(
           tr(
@@ -78,7 +79,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
       return;
     }
 
-    if (markingReceived && purchase.statusLabel.toLowerCase() !== "received") {
+    if (stockEnabled && markingReceived && purchase.statusLabel.toLowerCase() !== "received") {
       const ok = await askConfirm({
         title: tr("Təsdiq", "Confirm"),
         message: tr(
@@ -97,7 +98,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
         discount,
         shipping,
         description: description.trim() || null,
-        ...(resolvedStoreId && !purchase.storeId ? { storeId: resolvedStoreId } : {}),
+        ...(stockEnabled && resolvedStoreId && !purchase.storeId ? { storeId: resolvedStoreId } : {}),
       });
       notifySuccess(tr("Satınalma uğurla yeniləndi", "Purchase updated successfully"));
       onSaved();
@@ -143,7 +144,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
           <p className="p-6 text-center text-sm text-gray-500">{tr("Satınalma tapılmadı", "Purchase not found")}</p>
         ) : (
           <form onSubmit={(e) => void handleSubmit(e)} className="overflow-y-auto max-h-[calc(90vh-140px)] p-6 space-y-4">
-            {!purchase.storeId && (
+            {stockEnabled && !purchase.storeId && (
               <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
                 {tr(
                   "Bu satınalmanın filialı yoxdur — filial təyin edin, sonra Qəbul edildi statusuna keçin. Filialsız satınalmalar yalnız «Bütün filiallar» görünüşündə görünür.",

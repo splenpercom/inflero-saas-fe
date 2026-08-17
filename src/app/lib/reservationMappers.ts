@@ -7,6 +7,9 @@ export interface ReservationUi {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  vehicleId: string;
+  vehicleLabel: string;
+  mileage: number | null;
   serviceType: string;
   date: string;
   time: string;
@@ -42,6 +45,9 @@ export function apiReservationToUi(row: ReservationRecord): ReservationUi {
     customerId: row.customerId ?? "",
     customerName: row.customerName ?? row.guestName ?? "—",
     customerPhone: row.guestPhone ?? "",
+    vehicleId: row.vehicleId ?? "",
+    vehicleLabel: row.vehicleLabel ?? "",
+    mileage: row.mileage,
     serviceType: row.serviceType,
     date,
     time,

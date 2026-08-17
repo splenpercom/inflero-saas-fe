@@ -7,7 +7,9 @@ import { useAuth } from "../context/AuthContext";
 import { useBranchRevision } from "./useBranchRevision";
 
 export function useDashboardData(period: DashboardPeriod) {
-  const { isAuthenticated, isDemo } = useAuth();
+  const { isAuthenticated, isDemo, hasModule, hasPermission } = useAuth();
+  const reservationsEnabled =
+    hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
   const branchRevision = useBranchRevision();
   const enabled = isAuthenticated || isDemo;
 
@@ -30,24 +32,22 @@ export function useDashboardData(period: DashboardPeriod) {
 
     setLoading(true);
     setError(null);
-    try {
-      const { dateFrom, dateTo } = todayRangeIso();
-      const [main, today, reservations, pending] = await Promise.all([
-        fetchDashboardSummary(period),
-        fetchDashboardSummary("1D"),
-        fetchReservations({ dateFrom, dateTo, limit: 50 }),
-        fetchPendingReservationCount(),
-      ]);
-      setSummary(main);
-      setTodaySummary(today);
-      setTodayReservations(reservations ?? []);
-      setPendingReservationCount(pending);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard");
-    } finally {
-      setLoading(false);
+    const { dateFrom, dateTo } = todayRangeIso();
+    const [main, today, reservations, pending] = await Promise.allSettled([
+      fetchDashboardSummary(period),
+      fetchDashboardSummary("1D"),
+      reservationsEnabled ? fetchReservations({ dateFrom, dateTo, limit: 50 }) : Promise.resolve([]),
+      reservationsEnabled ? fetchPendingReservationCount() : Promise.resolve(0),
+    ]);
+    setSummary(main.status === "fulfilled" ? main.value : null);
+    setTodaySummary(today.status === "fulfilled" ? today.value : null);
+    setTodayReservations(reservations.status === "fulfilled" ? reservations.value ?? [] : []);
+    setPendingReservationCount(pending.status === "fulfilled" ? pending.value : 0);
+    if (main.status === "rejected" && today.status === "rejected") {
+      setError(main.reason instanceof Error ? main.reason.message : "Failed to load dashboard");
     }
-  }, [enabled, period]);
+    setLoading(false);
+  }, [enabled, period, reservationsEnabled]);
 
   useEffect(() => {
     void load();

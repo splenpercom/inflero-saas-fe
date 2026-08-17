@@ -44,7 +44,8 @@ function lineTotalCost(price: number, qty: number, discount: number, taxPercent:
 
 export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalProps) {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { branchId, isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
 
@@ -189,7 +190,7 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
     if (invalidLine) return;
 
     const resolvedStoreId = resolvePurchaseStoreIdForApi(isGlobalMode, branchId, storeId);
-    const branchRequired = isGlobalMode || status === "received";
+    const branchRequired = isGlobalMode || (stockEnabled && status === "received");
     if (branchRequired && !resolvedStoreId) {
       notifyFromError(
         new Error(
@@ -202,7 +203,7 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
       return;
     }
 
-    if (status === "received") {
+    if (stockEnabled && status === "received") {
       const ok = await askConfirm({
         title: tr("Təsdiq", "Confirm"),
         message: tr(
@@ -219,7 +220,7 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
         supplierId,
         date,
         reference: reference.trim() || null,
-        storeId: resolvedStoreId,
+        ...(resolvedStoreId ? { storeId: resolvedStoreId } : {}),
         orderTax,
         discount,
         shipping,

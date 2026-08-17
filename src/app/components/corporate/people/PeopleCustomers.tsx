@@ -10,6 +10,7 @@ import {
   Eye,
   Edit2,
   Trash2,
+  Car,
 } from "lucide-react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { useAuth } from "../../../context/AuthContext";
@@ -25,6 +26,7 @@ import {
 import { notifyFromError, notifySuccess } from "../../../lib/toast";
 import { useConfirm } from "../../../context/ConfirmContext";
 import { AddCustomerModal, type CustomerFormData } from "./AddCustomerModal";
+import { CustomerVehiclesModal } from "./CustomerVehiclesModal";
 import { DataPagination } from "../../ui/DataPagination";
 import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../hooks/usePagination";
 
@@ -32,7 +34,8 @@ import { pickLang } from "../../../i18n/pickLang";
 export function PeopleCustomers() {
   const { language } = useLanguage();
   const navigate = useNavigate();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const autoEnabled = hasModule("AUTO");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
@@ -45,6 +48,7 @@ export function PeopleCustomers() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [vehicleCustomer, setVehicleCustomer] = useState<PeopleCustomer | null>(null);
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -185,14 +189,15 @@ export function PeopleCustomers() {
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("E-POÇT", "EMAIL")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("TELEFON", "PHONE")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("STATUS", "STATUS")}</th>
+                  {autoEnabled && <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("AVTOMOBİLLƏR", "CARS")}</th>}
                   <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("ƏMƏLİYYATLAR", "ACTIONS")}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
+                  <tr><td colSpan={autoEnabled ? 7 : 6} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
                 ) : customers.length === 0 ? (
-                  <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Müştəri tapılmadı", "No customers found")}</td></tr>
+                  <tr><td colSpan={autoEnabled ? 7 : 6} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Müştəri tapılmadı", "No customers found")}</td></tr>
                 ) : paginatedData.map((customer, index) => (
                   <tr key={customer.id} className={`border-b border-gray-200 dark:border-gray-800 ${index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"}`}>
                     <td className="px-3 py-2 text-xs text-gray-600">{customer.code}</td>
@@ -200,6 +205,11 @@ export function PeopleCustomers() {
                     <td className="px-3 py-2 text-xs text-gray-600">{customer.email || "—"}</td>
                     <td className="px-3 py-2 text-xs text-gray-600">{customer.phone || "—"}</td>
                     <td className="px-3 py-2"><span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 border border-green-300">{translateStatus(customer.status)}</span></td>
+                    {autoEnabled && <td className="px-3 py-2">
+                      <button type="button" onClick={() => setVehicleCustomer(customer)} className="flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs">
+                        <Car className="h-3 w-3" /> {customer.vehicleCount}
+                      </button>
+                    </td>}
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <button onClick={() => navigate(`/dashboard/people/customers/${customer.id}`)} className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg"><Eye className="w-3 h-3" /></button>
@@ -240,6 +250,7 @@ export function PeopleCustomers() {
           customer={editingCustomer}
           saving={saving}
         />
+        {autoEnabled && <CustomerVehiclesModal customer={vehicleCustomer} onClose={() => setVehicleCustomer(null)} onChanged={() => void loadCustomers()} />}
       </div>
     </div>
   );

@@ -70,7 +70,11 @@ function chartMonthCount(range: ChartRange): number {
 export function NewDashboard() {
   const { language } = useLanguage();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasModule, hasPermission } = useAuth();
+  const reservationsEnabled =
+    hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
+  const stockEnabled = hasModule("STOCK") && hasPermission("Inventory", "view");
+  const posEnabled = hasModule("POS") && hasPermission("Sales", "view");
   const [selectedPeriod, setSelectedPeriod] = useState<ChartRange>("1M");
   const [finPeriod, setFinPeriod] = useState<ChartRange>("1M");
   const [txTab, setTxTab] = useState<"all" | "completed" | "pending">("all");
@@ -146,7 +150,9 @@ export function NewDashboard() {
   );
 
   const transactions = useMemo(() => {
-    return (summary?.recent.activity ?? []).map((row) => ({
+    return (summary?.recent.activity ?? [])
+      .filter((row) => posEnabled || row.kind !== "POS")
+      .map((row) => ({
       id: row.subtitle || row.id,
       date: formatShortDate(row.at, language),
       customer: row.title.replace(/^POS — |^Purchase — /, ""),
@@ -154,7 +160,7 @@ export function NewDashboard() {
       amount: parseMoney(row.amount),
       status: activityIsCompleted(row) ? ("completed" as const) : ("pending" as const),
     }));
-  }, [summary, language]);
+  }, [summary, language, posEnabled]);
 
   const filteredTx =
     txTab === "all" ? transactions : transactions.filter((t) => t.status === txTab);
@@ -249,7 +255,7 @@ export function NewDashboard() {
             <h1 className="text-xl font-bold text-white mb-0.5">
               {tr("Welcome back", "Xoş gəldiniz")}, {displayName} 👋
             </h1>
-            <p className="text-sm text-white/70">
+            {reservationsEnabled && <p className="text-sm text-white/70">
               {tr("You have", "Bugün")}{" "}
               <span className="text-white font-semibold">
                 {todayRes.length} {tr("reservations today", "rezervasiyanız var")}
@@ -265,21 +271,21 @@ export function NewDashboard() {
                   ({pendingReservationCount} {tr("pending total", "ümumi gözləyən")})
                 </>
               )}
-            </p>
+            </p>}
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs">
               <Calendar className="w-3.5 h-3.5 text-white/70" />
               <span className="text-white/80">{todayDateLabel}</span>
             </div>
-            <button
+            {reservationsEnabled && <button
               type="button"
               onClick={() => navigate("/dashboard/reservations")}
               className="flex items-center gap-1.5 bg-white text-[#0026f6] rounded-xl px-3 py-2 text-xs font-bold hover:bg-white/90 transition-colors"
             >
               <CalendarDays className="w-3.5 h-3.5" />
               {tr("View Reservations", "Rezervasiyalar")}
-            </button>
+            </button>}
           </div>
         </div>
       </div>
@@ -287,14 +293,14 @@ export function NewDashboard() {
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {
+          ...(reservationsEnabled ? [{
             label: tr("Today's Reservations", "Bugünkü Rezervasiyalar"),
             value: String(todayRes.length),
             sub: `${todayResPending} ${tr("pending", "gözləyir")}`,
             icon: CalendarDays,
             iconBg: "bg-[#e8ebff] dark:bg-[#0026f6]/25",
             iconColor: "text-[#0026f6] dark:text-[#0026f6]",
-          },
+          }] : []),
           {
             label: tr("Total Customers", "Ümumi Müştərilər"),
             value: String(summary?.counts.customers ?? 0),
@@ -303,14 +309,14 @@ export function NewDashboard() {
             iconBg: "bg-orange-50 dark:bg-orange-900/20",
             iconColor: "text-orange-500",
           },
-          {
+          ...(posEnabled ? [{
             label: tr("Today's Orders", "Bugünkü Sifarişlər"),
             value: String(todaySummary?.counts.posOrders ?? 0),
             sub: `${summary?.counts.products ?? 0} ${tr("products", "məhsul")}`,
             icon: Package,
             iconBg: "bg-teal-50 dark:bg-teal-900/20",
             iconColor: "text-teal-600 dark:text-teal-400",
-          },
+          }] : []),
           {
             label: tr("Period Revenue", "Dövr Gəliri"),
             value: formatMoney(totals?.salesPaid),
@@ -425,6 +431,7 @@ export function NewDashboard() {
 
       {/* Today's schedule + top customers */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {reservationsEnabled && (
         <div className="lg:col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -465,6 +472,7 @@ export function NewDashboard() {
             </div>
           )}
         </div>
+        )}
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
@@ -562,7 +570,7 @@ export function NewDashboard() {
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+        {stockEnabled && <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-500" />
@@ -604,11 +612,11 @@ export function NewDashboard() {
               ))}
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Order heatmap */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+      {posEnabled && <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Order Activity Heatmap", "Sifariş Aktivliyi")}</h3>
@@ -642,10 +650,10 @@ export function NewDashboard() {
             ))}
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Top selling */}
-      {topSelling.length > 0 && (
+      {posEnabled && topSelling.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {topSelling.slice(0, 4).map((p, i) => {
             const icons = [Shield, Zap, Package, TrendingUp];

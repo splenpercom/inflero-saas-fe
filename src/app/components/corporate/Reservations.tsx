@@ -39,7 +39,7 @@ import {
   updateReservation,
   deleteReservation,
 } from "../../api/reservations";
-import { fetchCustomers, type PeopleCustomer } from "../../api/people";
+import { fetchCustomers, fetchCustomerVehicles, type CustomerVehicle, type PeopleCustomer } from "../../api/people";
 import {
   apiReservationToUi,
   combineScheduledAt,
@@ -74,7 +74,8 @@ const STATUS_CONFIG: Record<ReservationStatus, { label: string; labelAz: string;
 
 export function Reservations() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated, user } = useAuth();
+  const { isDemo, isAuthenticated, user, hasModule } = useAuth();
+  const autoEnabled = hasModule("AUTO");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Reservations");
   const branchRevision = useBranchRevision();
   const { acknowledge: acknowledgeReservations } = usePendingReservationCount();
@@ -115,6 +116,9 @@ export function Reservations() {
 
   const [formMode, setFormMode] = useState<"registered" | "guest">("registered");
   const [formCustomerId, setFormCustomerId] = useState("");
+  const [formVehicleId, setFormVehicleId] = useState("");
+  const [formMileage, setFormMileage] = useState("");
+  const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([]);
   const [formGuestName, setFormGuestName] = useState("");
   const [formGuestPhone, setFormGuestPhone] = useState("");
   const [formService, setFormService] = useState("");
@@ -182,6 +186,9 @@ export function Reservations() {
   const resetForm = () => {
     setFormMode("registered");
     setFormCustomerId("");
+    setFormVehicleId("");
+    setFormMileage("");
+    setCustomerVehicles([]);
     setFormGuestName("");
     setFormGuestPhone("");
     setFormService("");
@@ -190,6 +197,17 @@ export function Reservations() {
     setFormNotes("");
     setFormStatus("pending");
   };
+
+  useEffect(() => {
+    if (!autoEnabled || !formCustomerId) {
+      setCustomerVehicles([]);
+      setFormVehicleId("");
+      return;
+    }
+    void fetchCustomerVehicles(formCustomerId)
+      .then(setCustomerVehicles)
+      .catch(() => setCustomerVehicles([]));
+  }, [autoEnabled, formCustomerId]);
 
   const openAddModal = () => {
     resetForm();
@@ -205,6 +223,8 @@ export function Reservations() {
     setFormMode(isGuest ? "guest" : "registered");
     setEditReservation(res);
     setFormCustomerId(res.customerId);
+    setFormVehicleId(res.vehicleId);
+    setFormMileage(res.mileage == null ? "" : String(res.mileage));
     setFormGuestName(res.customerName !== "—" ? res.customerName : "");
     setFormGuestPhone(res.customerPhone);
     setFormService(serviceLabel(res.serviceType, language, serviceTypes));
@@ -217,7 +237,7 @@ export function Reservations() {
   const handleSave = async () => {
     const serviceType = resolveServiceType(formService, serviceTypes);
     if (!serviceType || !formDate || !formTime) return;
-    if (formMode === "registered" && !formCustomerId) return;
+    if (formMode === "registered" && (!formCustomerId || (autoEnabled && !formVehicleId))) return;
     if (formMode === "guest" && (!formGuestName.trim() || !formGuestPhone.trim())) return;
     if (isDemo || !isAuthenticated) return;
     if (editReservation ? !canEdit : !canCreate) return;
@@ -229,13 +249,17 @@ export function Reservations() {
       if (editReservation) {
         const updated = await updateReservation(editReservation.id, {
           customerId: formMode === "registered" ? formCustomerId : null,
-          vehicleId: null,
+          ...(autoEnabled && formMode === "registered"
+            ? {
+                vehicleId: formVehicleId,
+                mileage: formMileage.trim() ? Number(formMileage) : null,
+              }
+            : {}),
           guestName: formMode === "guest" ? formGuestName.trim() : null,
           guestPhone: formMode === "guest" ? formGuestPhone.trim() : null,
           guestPlateSuffix: null,
           serviceType,
           scheduledAt,
-          mileage: null,
           notes: formNotes.trim() || null,
           status: formStatus,
         });
@@ -247,13 +271,17 @@ export function Reservations() {
       } else {
         const created = await createReservation({
           customerId: formMode === "registered" ? formCustomerId : null,
-          vehicleId: null,
+          ...(autoEnabled && formMode === "registered"
+            ? {
+                vehicleId: formVehicleId,
+                ...(formMileage.trim() ? { mileage: Number(formMileage) } : {}),
+              }
+            : {}),
           guestName: formMode === "guest" ? formGuestName.trim() : null,
           guestPhone: formMode === "guest" ? formGuestPhone.trim() : null,
           guestPlateSuffix: null,
           serviceType,
           scheduledAt,
-          mileage: null,
           notes: formNotes.trim() || null,
           status: formStatus,
         });
@@ -363,7 +391,7 @@ export function Reservations() {
     formDate &&
     formTime &&
     (formMode === "registered"
-      ? formCustomerId
+      ? formCustomerId && (!autoEnabled || formVehicleId)
       : formGuestName.trim() && formGuestPhone.trim());
 
   // --- Date navigation helpers ---
@@ -488,7 +516,14 @@ export function Reservations() {
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => { setFormCustomerId(c.id); setCustomerDropdownOpen(false); }}
+                    onClick={() => {
+                      if (c.id !== formCustomerId) {
+                        setFormVehicleId("");
+                        setFormMileage("");
+                      }
+                      setFormCustomerId(c.id);
+                      setCustomerDropdownOpen(false);
+                    }}
                     className={cn("w-full px-2.5 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", formCustomerId === c.id && "bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6]")}
                   >
                     <div className="flex items-center gap-2">
@@ -503,6 +538,43 @@ export function Reservations() {
           )}
         </div>
       </div>
+      {autoEnabled && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+              {tr("Avtomobil", "Vehicle")} <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formVehicleId}
+              onChange={(e) => {
+                setFormVehicleId(e.target.value);
+                if (!e.target.value) setFormMileage("");
+              }}
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+            >
+              <option value="">{tr("Avtomobil seçin", "Select vehicle")}</option>
+              {customerVehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {[vehicle.make, vehicle.model, vehicle.plate].filter(Boolean).join(" · ")}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+              {tr("Yürüş (km)", "Mileage (km)")}
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={formMileage}
+              onChange={(e) => setFormMileage(e.target.value)}
+              disabled={!formVehicleId}
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+            />
+          </div>
+        </div>
+      )}
       </>
       ) : (
         <div className="space-y-3">
@@ -1059,6 +1131,7 @@ export function Reservations() {
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("ID", "ID")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("MÜŞTƏRİ", "CUSTOMER")}</th>
+                  {autoEnabled && <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("AVTOMOBİL / KM", "VEHICLE / KM")}</th>}
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("XİDMƏT", "SERVICE")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("TARİX & SAAT", "DATE & TIME")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">{tr("STATUS", "STATUS")}</th>
@@ -1068,13 +1141,13 @@ export function Reservations() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <td colSpan={autoEnabled ? 7 : 6} className="px-4 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                       {tr("Yüklənir...", "Loading...")}
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-400">
+                    <td colSpan={autoEnabled ? 7 : 6} className="px-3 py-8 text-center text-xs text-gray-400">
                       {tr("Rezervasiya tapılmadı", "No reservations found")}
                     </td>
                   </tr>
@@ -1095,6 +1168,12 @@ export function Reservations() {
                             </p>
                           </div>
                         </td>
+                        {autoEnabled && (
+                          <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            <p>{res.vehicleLabel || "—"}</p>
+                            {res.mileage != null && <p className="text-[10px] text-gray-400">{res.mileage} km</p>}
+                          </td>
+                        )}
                         <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                           {serviceLabelFor(res.serviceType).split("/")[0].trim()}
                         </td>
@@ -1460,6 +1539,18 @@ export function Reservations() {
                 <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Telefon", "Phone")}</span>
                 <span className="text-xs text-gray-600 dark:text-gray-400">{viewReservation.customerPhone}</span>
               </div>
+              {viewReservation.vehicleLabel && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Avtomobil", "Vehicle")}</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">{viewReservation.vehicleLabel}</span>
+                </div>
+              )}
+              {viewReservation.mileage != null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Yürüş", "Mileage")}</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">{viewReservation.mileage} km</span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Filial", "Branch")}</span>
                 <span className="text-xs text-gray-600 dark:text-gray-400">

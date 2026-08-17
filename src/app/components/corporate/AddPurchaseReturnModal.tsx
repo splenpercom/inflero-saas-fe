@@ -41,7 +41,8 @@ function lineTotalCost(price: number, qty: number, discount: number, taxPercent:
 
 export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchaseReturnModalProps) {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { branchId, isGlobalMode } = useBranch();
 
   const [supplierId, setSupplierId] = useState("");
@@ -169,10 +170,13 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
   const getMaxQty = useCallback(
     (productId: string): number | null => {
       const row = limitsByProductId.get(productId);
-      if (!row || row.maxReturnQty == null) return null;
-      return row.maxReturnQty;
+      if (!row) return null;
+      if (!stockEnabled && row.purchasedQty != null) {
+        return Math.max(0, row.purchasedQty - (row.alreadyReturnedQty ?? 0));
+      }
+      return row.maxReturnQty ?? null;
     },
-    [limitsByProductId],
+    [limitsByProductId, stockEnabled],
   );
 
   const getQtyHint = useCallback(
@@ -184,7 +188,7 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
         const left = Math.max(0, row.purchasedQty - (row.alreadyReturnedQty ?? 0));
         parts.push(tr(`Qaytarıla bilər: ${left}`, `Returnable: ${left}`));
       }
-      if (status === "received" || row.stockQty >= 0) {
+      if (stockEnabled && (status === "received" || row.stockQty >= 0)) {
         parts.push(tr(`Stokda: ${row.stockQty}`, `In stock: ${row.stockQty}`));
       }
       if (row.maxReturnQty != null) {
@@ -192,7 +196,7 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
       }
       return parts.join(" · ");
     },
-    [limitsByProductId, limitsLoading, status, language],
+    [limitsByProductId, limitsLoading, status, language, stockEnabled],
   );
 
   useEffect(() => {
@@ -290,6 +294,7 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
     }
 
     if (
+      stockEnabled &&
       status === "received" &&
       linkedPurchase &&
       linkedPurchase.statusLabel.toLowerCase() !== "received"
@@ -306,7 +311,7 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
     }
 
     const resolvedStoreId = resolvePurchaseStoreIdForApi(isGlobalMode, branchId, storeId);
-    if ((isGlobalMode || status === "received") && !resolvedStoreId) {
+    if ((isGlobalMode || (stockEnabled && status === "received")) && !resolvedStoreId) {
       notifyFromError(
         new Error(
           tr(
@@ -325,7 +330,7 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
         purchaseId: purchaseId.trim() || null,
         date,
         reference: reference.trim() || null,
-        storeId: resolvedStoreId,
+        ...(resolvedStoreId ? { storeId: resolvedStoreId } : {}),
         orderTax,
         discount,
         shipping,

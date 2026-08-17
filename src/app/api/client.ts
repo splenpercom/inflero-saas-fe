@@ -20,13 +20,18 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api/v1";
 
 let accessToken: string | null = null;
 let branchStoreId: string | null | undefined = undefined;
+let branchTenantId: string | null = null;
 
 const TOKEN_KEY = "inflero-platform-token";
 const BRANCH_KEY = "inflero-platform-branch";
 
+function branchStorageKey(): string {
+  return branchTenantId ? `${BRANCH_KEY}:${branchTenantId}` : BRANCH_KEY;
+}
+
 function readBranchFromStorage(): string | null {
   try {
-    return localStorage.getItem(BRANCH_KEY);
+    return localStorage.getItem(branchStorageKey());
   } catch {
     return null;
   }
@@ -61,11 +66,18 @@ export function getBranchStoreId(): string | null {
 export function setBranchStoreId(id: string | null): void {
   branchStoreId = id;
   try {
-    if (id) localStorage.setItem(BRANCH_KEY, id);
-    else localStorage.removeItem(BRANCH_KEY);
+    const key = branchStorageKey();
+    if (id) localStorage.setItem(key, id);
+    else localStorage.removeItem(key);
   } catch {
     /* ignore */
   }
+}
+
+export function setBranchTenantId(tenantId: string | null): void {
+  if (branchTenantId === tenantId) return;
+  branchTenantId = tenantId;
+  branchStoreId = undefined;
 }
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {
@@ -114,6 +126,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const code = typeof json.code === "string" ? json.code : undefined;
     if (res.status === 402 || code === "SUBSCRIPTION_LOCKED") {
       window.dispatchEvent(new CustomEvent("inflero:subscription-locked"));
+    }
+    if (code === "MODULE_DISABLED") {
+      window.dispatchEvent(new CustomEvent("inflero:module-disabled"));
     }
     throw new ApiError(
       res.status,

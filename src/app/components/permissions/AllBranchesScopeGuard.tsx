@@ -1,21 +1,17 @@
-import { useEffect, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router";
+import type { ReactNode } from "react";
+import { Navigate, useLocation } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
 import { isAllBranchesAllowedPath } from "../../lib/allBranchesNav";
 
 export function AllBranchesScopeGuard({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const { user, isLoading } = useAuth();
-  const { isGlobalMode } = useBranch();
+  const { isGlobalMode, ready } = useBranch();
 
-  useEffect(() => {
-    if (isLoading || !user?.isTenantOwner || !isGlobalMode) return;
-    if (!isAllBranchesAllowedPath(location.pathname)) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isLoading, user?.isTenantOwner, isGlobalMode, location.pathname, navigate]);
+  if (!isLoading && ready && user?.isTenantOwner && isGlobalMode && !isAllBranchesAllowedPath(location.pathname)) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return <>{children}</>;
 }

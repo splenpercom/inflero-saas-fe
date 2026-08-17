@@ -28,7 +28,8 @@ import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagin
 
 export function ProductReport() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { canView } = useModulePermissions("Reports");
   const branchRevision = useBranchRevision();
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
@@ -62,7 +63,7 @@ export function ProductReport() {
     try {
       const [productResult, alertItems] = await Promise.all([
         fetchProductReport({ dateFrom, dateTo, limit: 200 }),
-        fetchProductQuantityAlert({ limit: 500 }),
+        stockEnabled ? fetchProductQuantityAlert({ limit: 500 }) : Promise.resolve([]),
       ]);
       setItems(Array.isArray(productResult.items) ? productResult.items : []);
       setAlerts(Array.isArray(alertItems) ? alertItems : []);
@@ -73,7 +74,7 @@ export function ProductReport() {
     } finally {
       setLoading(false);
     }
-  }, [isDemo, isAuthenticated, canView, dateFrom, dateTo, branchRevision]);
+  }, [isDemo, isAuthenticated, canView, dateFrom, dateTo, branchRevision, stockEnabled]);
 
   useEffect(() => {
     void loadReport();
@@ -165,7 +166,7 @@ export function ProductReport() {
       color: "text-red-600 dark:text-red-400",
       bgColor: "bg-red-50 dark:bg-red-900/20",
     },
-  ];
+  ].filter((_, index) => stockEnabled || index < 2);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -201,20 +202,19 @@ export function ProductReport() {
       p.category,
       p.totalOrdered ?? 0,
       p.revenue ?? 0,
-      p.qty ?? 0,
-      stockStatusFromQty(p.qty ?? 0),
+      ...(stockEnabled ? [p.qty ?? 0, stockStatusFromQty(p.qty ?? 0)] : []),
     ]);
     const doc = new jsPDF();
     doc.text(pt("Product Report", "Məhsul Hesabatı"), 14, 15);
     autoTable(doc, {
-      head: [[pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold", "Satılan"), pt("Revenue", "Gəlir"), pt("Stock", "Stok"), pt("Status", "Status")]],
+      head: [[pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold", "Satılan"), pt("Revenue", "Gəlir"), ...(stockEnabled ? [pt("Stock", "Stok"), pt("Status", "Status")] : [])]],
       body: rows,
       startY: 22,
       styles: { fontSize: 8 },
     });
     doc.save("product-report.pdf");
     const ws = XLSX.utils.aoa_to_sheet([
-      [pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold", "Satılan"), pt("Revenue", "Gəlir"), pt("Stock", "Stok"), pt("Status", "Status")],
+      [pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold", "Satılan"), pt("Revenue", "Gəlir"), ...(stockEnabled ? [pt("Stock", "Stok"), pt("Status", "Status")] : [])],
       ...rows,
     ]);
     const wb = XLSX.utils.book_new();
@@ -270,7 +270,7 @@ export function ProductReport() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
+        {stockEnabled && <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
             {pt("Top Products by Units Sold", "Satılan Vahid üzrə Ən Yaxşı Məhsullar")}
           </h2>
@@ -287,7 +287,7 @@ export function ProductReport() {
               </BarChart>
             </ResponsiveContainer>
           )}
-        </div>
+        </div>}
 
         <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
@@ -336,14 +336,14 @@ export function ProductReport() {
                 <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Category", "Kateqoriya")}</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Units Sold", "Satılan")}</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Revenue", "Gəlir")}</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Stock", "Stok")}</th>
-                <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Status", "Status")}</th>
+                {stockEnabled && <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Stock", "Stok")}</th>}
+                {stockEnabled && <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Status", "Status")}</th>}
               </tr>
             </thead>
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                  <td colSpan={stockEnabled ? 6 : 4} className="py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                     {loading ? pt("Loading...", "Yüklənir...") : pt("No products found", "Məhsul tapılmadı")}
                   </td>
                 </tr>
@@ -354,8 +354,8 @@ export function ProductReport() {
                       <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">{product.category}</td>
                       <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{(product.totalOrdered ?? 0).toLocaleString()}</td>
                       <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(product.revenue ?? 0)}</td>
-                      <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{product.qty ?? 0}</td>
-                      <td className="py-2 px-3 text-xs">{getStatusBadge(stockStatusFromQty(product.qty ?? 0))}</td>
+                      {stockEnabled && <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{product.qty ?? 0}</td>}
+                      {stockEnabled && <td className="py-2 px-3 text-xs">{getStatusBadge(stockStatusFromQty(product.qty ?? 0))}</td>}
                     </tr>
                   ))
               )}

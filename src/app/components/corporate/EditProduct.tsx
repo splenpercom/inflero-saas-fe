@@ -73,7 +73,8 @@ export function EditProduct() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { canCreate, canEdit } = useModulePermissions("Inventory");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
@@ -422,13 +423,15 @@ export function EditProduct() {
         price: String(parsePrice(price)),
         discountType: mapDiscountToApi(discountType),
         discountValue: discountValue.trim() ? String(parsePrice(discountValue)) : null,
-        quantityAlert: quantityAlert.trim() ? parseInt(quantityAlert, 10) : null,
+        ...(stockEnabled
+          ? { quantityAlert: quantityAlert.trim() ? parseInt(quantityAlert, 10) : null }
+          : {}),
         manufacturedDate: manufacturedDate || null,
         expiryDate: expiryDate || null,
         images: imageUrls,
       };
 
-      if (branchId) {
+      if (stockEnabled && branchId) {
         payload.quantity = qty;
       }
 
@@ -608,13 +611,13 @@ export function EditProduct() {
             {pricingStocksOpen && (
               <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6 mt-4">
-                  <div>
+                  {stockEnabled && <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("quantity")}</label>
                     <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
                     {!branchId && (
                       <p className="text-[10px] text-amber-600 mt-1">{tr("Miqdarı yeniləmək üçün filial seçin", "Select a branch to update quantity")}</p>
                     )}
-                  </div>
+                  </div>}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("price")} <span className="text-red-500">*</span></label>
                     <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
@@ -637,10 +640,10 @@ export function EditProduct() {
                     <input type="number" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
                   </div>
                 </div>
-                <div className="mt-6">
+                {stockEnabled && <div className="mt-6">
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("quantityAlert")}</label>
                   <input type="number" value={quantityAlert} onChange={(e) => setQuantityAlert(e.target.value)} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
-                </div>
+                </div>}
               </div>
             )}
           </div>

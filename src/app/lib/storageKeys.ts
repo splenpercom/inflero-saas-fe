@@ -7,12 +7,4 @@ export const STORAGE_KEYS = {
   themeColor: "inflero-theme-color",
   logoUrl: "inflero-logo-url",
   faviconUrls: "inflero-favicon-urls",
-  showRestaurantName: "inflero-show-restaurant-name",
-  kitchenTypes: "inflero-kitchen-types",
-  orders: "inflero-orders",
-  categories: "inflero-categories",
-  modifierGroups: "inflero-modifier-groups",
-  modifiers: "inflero-modifiers",
-  menuItems: "inflero-menu-items",
-  menus: "inflero-menus",
 } as const;

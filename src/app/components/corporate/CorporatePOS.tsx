@@ -18,6 +18,7 @@ import {
   Printer,
   ArrowLeft,
   Home,
+  Car,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -26,7 +27,12 @@ import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { formatCurrency } from "../../utils/currency";
 import { fetchProducts } from "../../api/inventory";
-import { fetchCustomers, type PeopleCustomer } from "../../api/people";
+import {
+  fetchCustomers,
+  fetchCustomerVehicles,
+  type CustomerVehicle,
+  type PeopleCustomer,
+} from "../../api/people";
 import { posCheckout } from "../../api/sales";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -39,6 +45,7 @@ import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { useIsDarkMode } from "../../hooks/useIsDarkMode";
 import { BrandLogo, brandLogoReceiptHtml } from "../ui/BrandLogo";
 import { useNavigate } from "react-router";
+import { pickCurrentUserBillerId } from "../../lib/salesBiller";
 
 interface Product {
   id: string;
@@ -75,12 +82,14 @@ function SelectDropdown({
   options,
   placeholder,
   icon: Icon,
+  disabled = false,
 }: {
   value: string;
   onChange: (val: string) => void;
   options: { id: string; label: string; sub?: string }[];
   placeholder: string;
   icon: React.ElementType;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -99,8 +108,11 @@ function SelectDropdown({
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((p) => !p)}
-        className="w-full flex items-center gap-2 pl-9 pr-3 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-[#0026f6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+        onClick={() => {
+          if (!disabled) setOpen((p) => !p);
+        }}
+        disabled={disabled}
+        className="w-full flex items-center gap-2 pl-9 pr-3 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-[#0026f6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-white dark:disabled:hover:bg-gray-900"
       >
         <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
         <span className={selected ? "text-gray-900 dark:text-white" : "text-gray-400"}>
@@ -144,6 +156,8 @@ interface ReceiptData {
   date: string;
   customer: string;
   customerPhone: string;
+  vehicle?: string;
+  mileage?: number;
   employee: string;
   items: { name: string; qty: number; price: number }[];
   subtotal: number;
@@ -186,6 +200,7 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
       orderNo: latinize(data.orderNo),
       customer: latinize(data.customer),
       customerPhone: data.customerPhone,
+      vehicle: data.vehicle ? latinize(data.vehicle) : undefined,
       employee: latinize(data.employee),
       paymentMethod: latinize(data.paymentMethod),
       paymentStatusLabel: latinize(data.paymentStatusLabel),
@@ -238,6 +253,8 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
 
         <div class="row"><span class="label">Musteri:</span><span class="bold">${d.customer}</span></div>
         <div class="row"><span class="label">Telefon:</span><span>${d.customerPhone}</span></div>
+        ${d.vehicle ? `<div class="row"><span class="label">Avtomobil:</span><span>${d.vehicle}</span></div>` : ""}
+        ${d.mileage != null ? `<div class="row"><span class="label">Yurus:</span><span>${d.mileage} km</span></div>` : ""}
         <div class="row"><span class="label">Isci:</span><span>${d.employee}</span></div>
         <div class="divider-solid"></div>
 
@@ -300,6 +317,8 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
           <hr className="border-dashed border-gray-300 dark:border-gray-600 my-1" />
           <div className="flex justify-between"><span className="text-gray-400">Müştəri:</span><span className="font-semibold">{data.customer}</span></div>
           <div className="flex justify-between"><span className="text-gray-400">Telefon:</span><span>{data.customerPhone}</span></div>
+          {data.vehicle && <div className="flex justify-between"><span className="text-gray-400">Avtomobil:</span><span>{data.vehicle}</span></div>}
+          {data.mileage != null && <div className="flex justify-between"><span className="text-gray-400">Yürüş:</span><span>{data.mileage} km</span></div>}
           <div className="flex justify-between"><span className="text-gray-400">İşçi:</span><span>{data.employee}</span></div>
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
           <p className="text-[9px] font-bold mb-1">MƏHSUL / XİDMƏT</p>
@@ -350,7 +369,9 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
 export function CorporatePOS() {
   const { language } = useLanguage();
   const navigate = useNavigate();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { user, isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
+  const autoEnabled = hasModule("AUTO");
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const { canCreate } = useModulePermissions("Sales");
@@ -362,6 +383,9 @@ export function CorporatePOS() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
+  const [mileageInput, setMileageInput] = useState("");
+  const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([]);
   const [selectedBillerId, setSelectedBillerId] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoice>("paid");
@@ -378,12 +402,21 @@ export function CorporatePOS() {
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const { billers, defaultBillerId } = useSalesBillers((isAuthenticated || isDemo));
+  const isEmployee = !isDemo && user?.role?.name.trim().toLowerCase() === "employee";
+  const currentUserBillerId = useMemo(
+    () => pickCurrentUserBillerId(billers, user),
+    [billers, user],
+  );
 
   useEffect(() => {
+    if (isEmployee) {
+      setSelectedBillerId(currentUserBillerId);
+      return;
+    }
     if (defaultBillerId && !selectedBillerId) {
       setSelectedBillerId(defaultBillerId);
     }
-  }, [defaultBillerId, selectedBillerId]);
+  }, [currentUserBillerId, defaultBillerId, isEmployee, selectedBillerId]);
 
   const loadProducts = useCallback(async () => {
     if (!(isAuthenticated || isDemo)) {
@@ -435,6 +468,24 @@ export function CorporatePOS() {
   }, [loadCustomers]);
 
   useEffect(() => {
+    if (!autoEnabled || !selectedCustomerId) {
+      setCustomerVehicles([]);
+      return;
+    }
+    let cancelled = false;
+    fetchCustomerVehicles(selectedCustomerId)
+      .then((rows) => {
+        if (!cancelled) setCustomerVehicles(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCustomerVehicles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [autoEnabled, selectedCustomerId]);
+
+  useEffect(() => {
     if (!(isAuthenticated || isDemo)) {
       setPosServiceFeeEnabled(false);
       return;
@@ -459,6 +510,10 @@ export function CorporatePOS() {
   const billerOptions = billers.map((b) => ({ id: b.id, label: b.name, sub: b.code }));
 
   const handleCustomerChange = (id: string) => {
+    if (autoEnabled && id !== selectedCustomerId) {
+      setSelectedVehicleId("");
+      setMileageInput("");
+    }
     setSelectedCustomerId(id);
   };
 
@@ -515,11 +570,11 @@ export function CorporatePOS() {
     const existing = cart.find((i) => i.id === product.id);
     const nextQty = existing ? existing.quantity + 1 : 1;
 
-    if (product.stock <= 0) {
+    if (stockEnabled && product.stock <= 0) {
       warnOutOfStock(product);
       return;
     }
-    if (nextQty > product.stock) {
+    if (stockEnabled && nextQty > product.stock) {
       warnInsufficientStock(product, product.stock);
       return;
     }
@@ -558,11 +613,11 @@ export function CorporatePOS() {
 
     const next = item.quantity + delta;
     if (delta > 0) {
-      if (product && product.stock <= 0) {
+      if (stockEnabled && product && product.stock <= 0) {
         warnOutOfStock(product);
         return;
       }
-      if (maxStock != null && maxStock > 0 && next > maxStock) {
+      if (stockEnabled && maxStock != null && maxStock > 0 && next > maxStock) {
         if (product) warnInsufficientStock(product, maxStock);
         return;
       }
@@ -605,7 +660,7 @@ export function CorporatePOS() {
     if (!selectedPaymentMethod) { alert(tr("Ödəniş üsulunu seçin", "Please select a payment method")); return; }
     if (!selectedBillerId) { alert(tr("Kassir seçin", "Please select an employee / biller")); return; }
 
-    const stockIssue = cart.find((item) => {
+    const stockIssue = stockEnabled && cart.find((item) => {
       const product = products.find((p) => p.id === item.id);
       return !product || product.stock <= 0 || item.quantity > product.stock;
     });
@@ -637,6 +692,10 @@ export function CorporatePOS() {
       const detail = await posCheckout({
         status: "COMPLETED",
         customerId: selectedCustomerId || null,
+        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+          ? { mileageAtService: Number(mileageInput) }
+          : {}),
         billerId: selectedBillerId || null,
         paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod),
         shipping,
@@ -675,6 +734,8 @@ export function CorporatePOS() {
         date: dateStr,
         customer: detail.customerName ?? receiptCustomer,
         customerPhone: receiptPhone,
+        vehicle: detail.vehicleLabel ?? undefined,
+        mileage: detail.mileageAtService ?? undefined,
         employee: detail.billerName ?? receiptBiller,
         items: detail.items.map((item) => ({
           name: item.productName,
@@ -772,9 +833,9 @@ export function CorporatePOS() {
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-4">
                 {filteredProducts.map((product) => {
                   const qtyInCart = getCartQuantity(product.id);
-                  const outOfStock = product.stock <= 0;
+                  const outOfStock = stockEnabled && product.stock <= 0;
                   const atStockLimit =
-                    product.stock > 0 && qtyInCart >= product.stock;
+                    stockEnabled && product.stock > 0 && qtyInCart >= product.stock;
 
                   return (
                   <div
@@ -794,7 +855,7 @@ export function CorporatePOS() {
                         : "border-gray-200 dark:border-gray-800 hover:border-[#0026f6] dark:hover:border-[#001db8]"
                     } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none`}
                   >
-                    {outOfStock && (
+                    {stockEnabled && outOfStock && (
                       <span className="absolute top-2 right-2 z-10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
                         {tr("Stokda yoxdur", "Out of stock")}
                       </span>
@@ -810,13 +871,13 @@ export function CorporatePOS() {
                       <span className="text-sm font-bold text-[#0026f6] dark:text-[#0026f6]">
                         {formatCurrency(product.price)}
                       </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
+                      {stockEnabled && <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
                         outOfStock
                           ? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
                           : "text-gray-400 bg-gray-100 dark:bg-gray-800"
                       }`}>
                         {product.stock < 99 ? `${product.stock}` : "∞"}
-                      </span>
+                      </span>}
                     </div>
                     {canCreate && qtyInCart > 0 && (
                       <div
@@ -894,12 +955,45 @@ export function CorporatePOS() {
                   icon={User}
                 />
 
+                {autoEnabled && selectedCustomerId && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <SelectDropdown
+                      value={selectedVehicleId}
+                      onChange={(id) => {
+                        setSelectedVehicleId(id);
+                        if (!id) setMileageInput("");
+                      }}
+                      options={customerVehicles.map((vehicle) => ({
+                        id: vehicle.id,
+                        label: [vehicle.make, vehicle.model].filter(Boolean).join(" ") || tr("Avtomobil", "Vehicle"),
+                        sub: vehicle.plate || undefined,
+                      }))}
+                      placeholder={tr("Avtomobil (istəyə bağlı)", "Vehicle (optional)")}
+                      icon={Car}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      value={mileageInput}
+                      onChange={(e) => setMileageInput(e.target.value)}
+                      disabled={!selectedVehicleId}
+                      placeholder={tr("KM (istəyə bağlı)", "KM (optional)")}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
                 <SelectDropdown
                   value={selectedBillerId}
                   onChange={setSelectedBillerId}
-                  options={billerOptions}
+                  options={
+                    isEmployee
+                      ? billerOptions.filter((biller) => biller.id === currentUserBillerId)
+                      : billerOptions
+                  }
                   placeholder={tr("İşçi seçin...", "Select employee...")}
                   icon={UserCheck}
+                  disabled={isEmployee}
                 />
                 </div>
 
@@ -912,9 +1006,9 @@ export function CorporatePOS() {
                 ) : (
                   cart.map((item) => {
                     const product = products.find((p) => p.id === item.id);
-                    const itemOutOfStock = product != null && product.stock <= 0;
+                    const itemOutOfStock = stockEnabled && product != null && product.stock <= 0;
                     const itemExceedsStock =
-                      product != null && product.stock > 0 && item.quantity > product.stock;
+                      stockEnabled && product != null && product.stock > 0 && item.quantity > product.stock;
 
                     return (
                     <div key={item.id} className={`bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border ${

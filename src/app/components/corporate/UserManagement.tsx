@@ -19,6 +19,7 @@ import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { NoAccessPanel } from "../permissions/NoAccessPanel";
 import { PermissionGate } from "../permissions/PermissionGate";
 import { translateModuleName } from "../../i18n/userManagementTranslations";
+import { isRbacModuleVisible } from "../../lib/rolePermissions";
 import { ViewUserModal } from "./ViewUserModal";
 import { AddUserModal, type AddUserFormData } from "./AddUserModal";
 import { AddRoleModal } from "./AddRoleModal";
@@ -46,7 +47,7 @@ import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination
 import { pickLang, mapLang } from "../../i18n/pickLang";
 export function UserManagement() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated, user: authUser } = useAuth();
+  const { isDemo, isAuthenticated, user: authUser, hasModule } = useAuth();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("User Management");
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
@@ -738,7 +739,7 @@ export function UserManagement() {
                             {role.permissions && role.permissions.length > 0 && (
                               <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
                                 {role.permissions
-                                  .filter((p) => p.view)
+                                  .filter((p) => p.view && isRbacModuleVisible(p.module, hasModule))
                                   .map((p) => translateModuleName(p.module, language))
                                   .join(", ") || "—"}
                               </div>

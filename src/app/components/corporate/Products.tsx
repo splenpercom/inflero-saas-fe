@@ -58,7 +58,8 @@ type SortDirection = "asc" | "desc" | null;
 export function Products() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const stockEnabled = hasModule("STOCK");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Inventory");
   const branchRevision = useBranchRevision();
   
@@ -262,7 +263,11 @@ export function Products() {
         doc.text(`Generated: ${formatNowDate(language)}`, 14, 22);
         
         // Prepare table data
-        const headers = [["SKU", "Product Name", "Category", "Brand", "Price", "Unit", "Qty", "Created By"]];
+        const headers = [[
+          "SKU", "Product Name", "Category", "Brand", "Price", "Unit",
+          ...(stockEnabled ? ["Qty"] : []),
+          "Created By",
+        ]];
         const data = sortedProducts.map(product => [
           product.sku,
           product.name,
@@ -270,7 +275,7 @@ export function Products() {
           product.brand,
           `${product.price} ₼`,
           product.unit,
-          product.quantity.toString(),
+          ...(stockEnabled ? [product.quantity.toString()] : []),
           product.createdBy
         ]);
         
@@ -296,7 +301,11 @@ export function Products() {
 
   const handleExportExcel = () => {
     // Create CSV content with semicolon separator for better international Excel compatibility
-    const headers = ["SKU", "Product Name", "Category", "Brand", "Price", "Unit", "Quantity", "Created By"];
+    const headers = [
+      "SKU", "Product Name", "Category", "Brand", "Price", "Unit",
+      ...(stockEnabled ? ["Quantity"] : []),
+      "Created By",
+    ];
     
     // Create CSV rows with semicolon separator
     const rows = sortedProducts.map((product) => [
@@ -306,7 +315,7 @@ export function Products() {
       product.brand,
       product.price,
       product.unit,
-      product.quantity,
+      ...(stockEnabled ? [product.quantity] : []),
       product.createdBy,
     ]);
     
@@ -368,10 +377,14 @@ export function Products() {
 
   const handleDownloadDemo = () => {
     // Create demo CSV content
-    const headers = ["SKU", "Product Name", "Category", "Brand", "Price", "Unit", "Quantity", "Created By"];
+    const headers = [
+      "SKU", "Product Name", "Category", "Brand", "Price", "Unit",
+      ...(stockEnabled ? ["Quantity"] : []),
+      "Created By",
+    ];
     const demoData = [
-      ["PT009", "Demo Product 1", "Electronics", "Demo Brand", "100", "Pc", "50", "Demo User"],
-      ["PT010", "Demo Product 2", "Computers", "Demo Brand", "200", "Pc", "30", "Demo User"],
+      ["PT009", "Demo Product 1", "Electronics", "Demo Brand", "100", "Pc", ...(stockEnabled ? ["50"] : []), "Demo User"],
+      ["PT010", "Demo Product 2", "Computers", "Demo Brand", "200", "Pc", ...(stockEnabled ? ["30"] : []), "Demo User"],
     ];
     const csvContent = [headers.join(","), ...demoData.map((row) => row.join(","))].join("\n");
 
@@ -675,7 +688,7 @@ export function Products() {
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                     {pt("unit")}
                   </th>
-                  <th
+                  {stockEnabled && <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
                     onClick={() => handleSort("quantity")}
                   >
@@ -691,7 +704,7 @@ export function Products() {
                         <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-50" />
                       )}
                     </div>
-                  </th>
+                  </th>}
                   <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
                     onClick={() => handleSort("createdBy")}
@@ -717,13 +730,13 @@ export function Products() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <td colSpan={stockEnabled ? 9 : 8} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                       {pickLang(language, "Yüklənir...", "Loading...")}
                     </td>
                   </tr>
                 ) : paginatedProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <td colSpan={stockEnabled ? 9 : 8} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                       {pickLang(language, "Məhsul tapılmadı", "No products found")}
                     </td>
                   </tr>
@@ -766,11 +779,11 @@ export function Products() {
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {product.unit}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    {stockEnabled && <td className="px-3 py-2 whitespace-nowrap">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700">
                         {product.quantity}
                       </span>
-                    </td>
+                    </td>}
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       <button
                         onClick={() => navigate("/staff")}

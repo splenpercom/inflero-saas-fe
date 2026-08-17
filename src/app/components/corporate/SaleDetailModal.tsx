@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, User, Calendar, Package, FileText, CreditCard, UserCheck } from "lucide-react";
+import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { fetchPosOrder, type PosOrderDetail } from "../../api/sales";
 import { formatSalesDate } from "../../lib/salesMappers";
@@ -113,6 +113,20 @@ export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalPro
                   </div>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.paymentStatus}</p>
                 </div>
+                {order.vehicleLabel && (
+                  <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
+                        <Car className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Avtomobil", "Vehicle")}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.vehicleLabel}</p>
+                    {order.mileageAtService != null && (
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{order.mileageAtService} km</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">

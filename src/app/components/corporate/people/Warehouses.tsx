@@ -35,7 +35,8 @@ import { AddWarehouseModal, type BranchFormData } from "./AddWarehouseModal";
 import { pickLang } from "../../../i18n/pickLang";
 export function Warehouses() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
   const { refreshBranches } = useBranch();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
   const askConfirm = useConfirm();
@@ -61,9 +62,9 @@ export function Warehouses() {
     setLoading(true);
     try {
       const [storeRows, quotaRow, managerRows] = await Promise.all([
-        fetchStores({ managed: true }),
-        fetchBranchQuota(),
-        fetchNewStoreManagerCandidates(),
+        fetchStores(branchManagementEnabled ? { managed: true } : undefined),
+        branchManagementEnabled ? fetchBranchQuota() : Promise.resolve(null),
+        branchManagementEnabled ? fetchNewStoreManagerCandidates() : Promise.resolve([]),
       ]);
       setStores(storeRows);
       setQuota(quotaRow);
@@ -73,7 +74,7 @@ export function Warehouses() {
     } finally {
       setLoading(false);
     }
-  }, [isDemo, isAuthenticated, canView, language]);
+  }, [isDemo, isAuthenticated, canView, language, branchManagementEnabled]);
 
   useEffect(() => {
     void loadData();
@@ -100,7 +101,10 @@ export function Warehouses() {
         await updateStore(editingStore.id, body);
         notifySuccess(tr("Filial yeniləndi", "Branch updated"));
       } else {
-        await createStore({ ...body, branchManagerUserId: data.branchManagerUserId });
+        await createStore({
+          ...body,
+          ...(branchManagementEnabled ? { branchManagerUserId: data.branchManagerUserId } : {}),
+        });
         notifySuccess(tr("Filial əlavə edildi", "Branch added"));
       }
       setIsModalOpen(false);
@@ -154,7 +158,7 @@ export function Warehouses() {
           </button>
         </div>
 
-        <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
+        {branchManagementEnabled && <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{tr("Filial Slotları", "Branch Slots")}</h3>
           <p className="text-xs text-gray-600 dark:text-gray-400">
             {maxBranches != null
@@ -162,7 +166,7 @@ export function Warehouses() {
               : tr(`${used} aktiv filial`, `${used} active branches`)}
             {!canAdd && maxBranches != null ? tr(" · limit dolub", " · limit reached") : ""}
           </p>
-        </div>
+        </div>}
 
         {loading ? (
           <p className="text-xs text-gray-500 text-center py-8">{tr("Yüklənir...", "Loading...")}</p>
@@ -195,7 +199,7 @@ export function Warehouses() {
                       <Settings className="w-3 h-3" /><span>{tr("Tənzimlə", "Configure")}</span>
                     </button>
                     )}
-                    {canDelete && (
+                    {branchManagementEnabled && canDelete && (
                     <button onClick={() => void handleDelete(store.id)} className="px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs text-red-600"><Trash2 className="w-3 h-3" /></button>
                     )}
                   </div>
@@ -203,7 +207,7 @@ export function Warehouses() {
               </div>
             ))}
 
-            {canCreate && canAdd && (
+            {canCreate && (branchManagementEnabled ? canAdd : stores.length === 0) && (
               <div className="glass-card rounded-xl border border-[#0026f6]/20 bg-[#f0f3ff]/50 dark:bg-[#0026f6]/10">
                 <div className="p-4 text-center py-6">
                   <WarehouseIcon className="w-8 h-8 mx-auto mb-2 text-[#0026f6]" />
@@ -215,7 +219,7 @@ export function Warehouses() {
               </div>
             )}
 
-            {Array.from({ length: lockedCount }).map((_, i) => (
+            {branchManagementEnabled && Array.from({ length: lockedCount }).map((_, i) => (
               <div key={`locked-${i}`} className="glass-card rounded-xl border border-gray-200 bg-gray-50 dark:bg-gray-900/50">
                 <div className="p-4 text-center py-6">
                   <Lock className="w-8 h-8 mx-auto mb-2 text-gray-400" />

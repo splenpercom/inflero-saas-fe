@@ -1035,8 +1035,6 @@ export interface Translations {
     uploadLogoForRestaurant: string;
     uploadLogo: string;
     logoSupportedFormats: string;
-    showRestaurantNameWithLogo: string;
-    showRestaurantNameWithLogoDesc: string;
     favicon: string;
     uploadFaviconFor: string;
     generateFavicon: string;
@@ -2434,8 +2432,6 @@ export const translations: Record<Language, Translations> = {
       uploadLogoForRestaurant: "Upload a logo for your restaurant",
       uploadLogo: "Upload Logo",
       logoSupportedFormats: "Supported formats: PNG, PNG, JPG, GIF, SVG, JPEG. Maximum size: 5 Mb. Recommended size: 57 × 57 pixels.",
-      showRestaurantNameWithLogo: "Show Restaurant Name with Logo",
-      showRestaurantNameWithLogoDesc: "Enable this to show the restaurant name with the logo",
       favicon: "Favicon",
       uploadFaviconFor: "Upload a favicon for your",
       generateFavicon: "Generate favicon",
@@ -3723,8 +3719,6 @@ export const translations: Record<Language, Translations> = {
       uploadLogoForRestaurant: "Restoranınız üçün loqo yükləyin",
       uploadLogo: "Loqo Yüklə",
       logoSupportedFormats: "Dəstəklənən formatlar: PNG, PNG, JPG, GIF, SVG, JPEG. Maksimum ölçü: 5 Mb. Tövsiyə edilən ölçü: 57 × 57 piksel.",
-      showRestaurantNameWithLogo: "Loqo ilə Restoran Adını Göstər",
-      showRestaurantNameWithLogoDesc: "Loqo ilə restoran adını göstərmək üçün bunu aktivləşdirin",
       favicon: "Favicon",
       uploadFaviconFor: "Üçün favicon yükləyin",
       generateFavicon: "Favicon yarat",
@@ -4923,8 +4917,6 @@ export const translations: Record<Language, Translations> = {
       uploadLogoForRestaurant: "Загрузите логотип вашего заведения",
       uploadLogo: "Загрузить логотип",
       logoSupportedFormats: "Поддерживаемые форматы: PNG, JPG, GIF, SVG, JPEG. Максимальный размер: 5 МБ. Рекомендуемый размер: 57 × 57 пикселей.",
-      showRestaurantNameWithLogo: "Показывать название заведения с логотипом",
-      showRestaurantNameWithLogoDesc: "Включите, чтобы показывать название заведения рядом с логотипом",
       favicon: "Favicon",
       uploadFaviconFor: "Загрузить favicon для",
       generateFavicon: "Сгенерировать favicon",

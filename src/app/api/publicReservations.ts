@@ -62,7 +62,7 @@ export interface CreatePublicReservationBody {
   branchSlug?: string;
 }
 
-const publicOpts = { skipAuth: true as const };
+const publicOpts = { skipAuth: true as const, skipBranch: true as const };
 
 function branchQuery(branchSlug?: string | null): string {
   if (!branchSlug?.trim()) return "";

@@ -72,6 +72,7 @@ import { BranchScopeBanner } from "./components/BranchScopeBanner";
 import { Toaster } from "sonner";
 import { useTheme } from "./i18n/ThemeContext";
 import { AppBrandingEffects } from "./components/AppBrandingEffects";
+import { ModuleRouteGuard } from "./components/modules/ModuleRouteGuard";
 
 // Suppress recharts internal duplicate key warnings (library issue, not our code)
 const originalWarn = console.warn;
@@ -227,7 +228,9 @@ function AppShell() {
                     <DashboardPermissionGuard>
                       <>
                         <DemoBanner />
-                        <CorporatePOS />
+                        <ModuleRouteGuard module="POS">
+                          <CorporatePOS />
+                        </ModuleRouteGuard>
                       </>
                     </DashboardPermissionGuard>
                   </AllBranchesScopeGuard>
@@ -262,8 +265,8 @@ function AppShell() {
               <Route path="inventory/products/:id/edit" element={<EditProduct />} />
               <Route path="inventory/products/:id" element={<ProductDetails />} />
               <Route path="inventory/products" element={<Products />} />
-              <Route path="inventory/products/low-stocks" element={<LowStocks />} />
-              <Route path="inventory/products/expired" element={<ExpiredProducts />} />
+              <Route path="inventory/products/low-stocks" element={<ModuleRouteGuard module="STOCK"><LowStocks /></ModuleRouteGuard>} />
+              <Route path="inventory/products/expired" element={<ModuleRouteGuard module="STOCK"><ExpiredProducts /></ModuleRouteGuard>} />
               <Route path="inventory/category" element={<Category />} />
               <Route path="inventory/sub-category" element={<SubCategory />} />
               <Route path="inventory/brands" element={<Brands />} />
@@ -271,12 +274,21 @@ function AppShell() {
               <Route path="inventory/variant-attributes" element={<VariantAttributes />} />
 
               {/* Stock Routes */}
-              <Route path="stock/manage" element={<ManageStock />} />
-              <Route path="stock/adjustment" element={<StockAdjustment />} />
-              <Route path="stock/transfer" element={<StockTransfer />} />
+              <Route path="stock/manage" element={<ModuleRouteGuard module="STOCK"><ManageStock /></ModuleRouteGuard>} />
+              <Route path="stock/adjustment" element={<ModuleRouteGuard module="STOCK"><StockAdjustment /></ModuleRouteGuard>} />
+              <Route
+                path="stock/transfer"
+                element={
+                  <ModuleRouteGuard module="STOCK">
+                    <ModuleRouteGuard module="BRANCH_MANAGEMENT">
+                      <StockTransfer />
+                    </ModuleRouteGuard>
+                  </ModuleRouteGuard>
+                }
+              />
 
               {/* Sales Routes */}
-              <Route path="sales/pos-orders" element={<POSOrders />} />
+              <Route path="sales/pos-orders" element={<ModuleRouteGuard module="POS"><POSOrders /></ModuleRouteGuard>} />
               <Route path="sales/invoices" element={<Invoices />} />
               <Route path="sales/invoice-view/:id" element={<InvoiceView />} />
               <Route path="sales/return" element={<SalesReturn />} />
@@ -311,30 +323,36 @@ function AppShell() {
               <Route path="reports/annual" element={<AnnualReport />} />
 
               {/* Settings */}
-              <Route path="reservations" element={<Reservations />} />
-              <Route path="reservations/service-types" element={<ServiceTypes />} />
+              <Route path="reservations" element={<ModuleRouteGuard module="RESERVATIONS"><Reservations /></ModuleRouteGuard>} />
+              <Route path="reservations/service-types" element={<ModuleRouteGuard module="RESERVATIONS"><ServiceTypes /></ModuleRouteGuard>} />
               <Route
                 path="my-website"
                 element={
-                  <MyWebsiteProvider>
-                    <MyWebsitePage />
-                  </MyWebsiteProvider>
+                  <ModuleRouteGuard module="WEB_EDITOR">
+                    <MyWebsiteProvider>
+                      <MyWebsitePage />
+                    </MyWebsiteProvider>
+                  </ModuleRouteGuard>
                 }
               />
               <Route
                 path="my-website/orders"
                 element={
-                  <MyWebsiteProvider>
-                    <WebOrdersPage />
-                  </MyWebsiteProvider>
+                  <ModuleRouteGuard module="WEB_EDITOR">
+                    <MyWebsiteProvider>
+                      <WebOrdersPage />
+                    </MyWebsiteProvider>
+                  </ModuleRouteGuard>
                 }
               />
               <Route
                 path="my-website/reports"
                 element={
-                  <MyWebsiteProvider>
-                    <WebReportPage />
-                  </MyWebsiteProvider>
+                  <ModuleRouteGuard module="WEB_EDITOR">
+                    <MyWebsiteProvider>
+                      <WebReportPage />
+                    </MyWebsiteProvider>
+                  </ModuleRouteGuard>
                 }
               />
               <Route path="settings" element={<CorporateSettings />} />

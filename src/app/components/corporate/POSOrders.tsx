@@ -45,7 +45,8 @@ import autoTable from "jspdf-autotable";
 import { pickLang } from "../../i18n/pickLang";
 export function POSOrders() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const posEnabled = hasModule("POS");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Sales");
   const branchRevision = useBranchRevision();
   const { customers } = useSalesCustomers("", true);
@@ -335,7 +336,7 @@ export function POSOrders() {
   };
 
   const handleAddSales = () => {
-    if (!canCreate || isDemo) return;
+    if (!posEnabled || !canCreate || isDemo) return;
     setIsAddSalesModalOpen(true);
   };
 
@@ -354,7 +355,7 @@ export function POSOrders() {
   };
 
   const handleEditSale = (orderId: string) => {
-    if (!canEdit || isDemo) return;
+    if (!posEnabled || !canEdit || isDemo) return;
     setSelectedOrderId(orderId);
     setIsEditSaleModalOpen(true);
   };
@@ -429,8 +430,15 @@ export function POSOrders() {
     }
 
     let itemsHtml = `<tr><td colspan="4" style="text-align: center; color: #999; padding: 20px;">${tr("Məhsul detalları mövcud deyil", "Product details not available")}</td></tr>`;
+    let vehicleHtml = "";
     try {
       const detail = await fetchPosOrder(order.id);
+      if (detail.vehicleLabel) {
+        vehicleHtml = `
+          <p>${tr("Avtomobil", "Vehicle")}: ${detail.vehicleLabel}</p>
+          ${detail.mileageAtService != null ? `<p>${tr("Yürüş", "Mileage")}: ${detail.mileageAtService} km</p>` : ""}
+        `;
+      }
       if (detail.items.length > 0) {
         itemsHtml = detail.items
           .map(
@@ -482,6 +490,7 @@ export function POSOrders() {
           <div class="info-block">
             <h3>${tr("Müştəri Məlumatları", "Customer Information")}</h3>
             <p><strong>${order.customerName}</strong></p>
+            ${vehicleHtml}
           </div>
           <div class="info-block">
             <h3>${tr("Qaimə Detalları", "Invoice Details")}</h3>
@@ -646,7 +655,7 @@ export function POSOrders() {
                 <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
               </button>
 
-              {canCreate && (
+              {posEnabled && canCreate && (
                 <button
                   type="button"
                   onClick={handleAddSales}
@@ -847,7 +856,7 @@ export function POSOrders() {
                 <span>{tr("Satış Detalları", "Sale Detail")}</span>
               </button>
 
-              {canEdit && (
+              {posEnabled && canEdit && (
                 <button
                   type="button"
                   onClick={() => {

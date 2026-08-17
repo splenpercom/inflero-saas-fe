@@ -1,5 +1,17 @@
 import { apiGet, apiPatch, apiPost, getAccessToken, setAccessToken } from "./client";
 
+export const TENANT_MODULE_KEYS = [
+  "AUTO",
+  "RESERVATIONS",
+  "POS",
+  "STOCK",
+  "BRANCH_MANAGEMENT",
+  "WEB_EDITOR",
+] as const;
+
+export type TenantModuleKey = (typeof TENANT_MODULE_KEYS)[number];
+export type TenantModuleMap = Record<TenantModuleKey, boolean>;
+
 export interface PlatformUser {
   id: string;
   email: string;
@@ -35,6 +47,8 @@ export interface PlatformUser {
     status: string;
     companyLogoUrl: string | null;
     companyDarkLogoUrl: string | null;
+    modules: TenantModuleMap;
+    modulesVersion: number;
     subscription: {
       cycle: "monthly" | "annual";
       expiringOn: string;

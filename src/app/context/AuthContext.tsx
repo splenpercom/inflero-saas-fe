@@ -7,9 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getAccessToken, setBranchStoreId } from "../api/client";
+import { getAccessToken, setBranchStoreId, setBranchTenantId } from "../api/client";
 import { fetchMe, login as apiLogin, logout as apiLogout } from "../api/auth";
-import type { PlatformUser } from "../api/auth";
+import type { PlatformUser, TenantModuleKey } from "../api/auth";
 import {
   enterDemoSession,
   exitDemoSession,
@@ -30,6 +30,8 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  modulesLoaded: boolean;
+  hasModule: (module: TenantModuleKey) => boolean;
   hasPermission: (module: string, action?: "view" | "create" | "edit" | "delete") => boolean;
 }
 
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PlatformUser | null>(null);
   const [isDemo, setIsDemo] = useState(() => isDemoSession());
   const [isLoading, setIsLoading] = useState(true);
+  const [modulesLoaded, setModulesLoaded] = useState(() => isDemoSession());
 
   const syncDemoFlag = useCallback(() => {
     setIsDemo(isDemoSession());
@@ -48,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getAccessToken();
     if (!token) {
       setUser(null);
+      setModulesLoaded(isDemoSession());
       syncDemoFlag();
       return;
     }
@@ -56,9 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const me = await fetchMe();
     if (me.actorType !== "USER") {
       setUser(null);
+      setModulesLoaded(false);
       return;
     }
     setUser(me.user);
+    setModulesLoaded(true);
+    setBranchTenantId(me.user.tenant.id);
     if (me.user.storeId) {
       setBranchStoreId(me.user.storeId);
     }
@@ -68,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getAccessToken();
     if (!token) {
       syncDemoFlag();
+      setModulesLoaded(isDemoSession());
       setIsLoading(false);
       return;
     }
@@ -80,12 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (getAccessToken()) return;
     enterDemoSession();
     setIsDemo(true);
+    setModulesLoaded(true);
     setUser(null);
   }, []);
 
   const exitDemo = useCallback(() => {
     exitDemoSession();
     setIsDemo(false);
+    setModulesLoaded(false);
   }, []);
 
   const login = useCallback(
@@ -105,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiLogout();
     } finally {
       setUser(null);
+      setModulesLoaded(false);
+      setBranchTenantId(null);
       setBranchStoreId(null);
     }
   }, []);
@@ -122,6 +134,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAuthenticated = !!user;
   const hasAppAccess = isAuthenticated || isDemo;
+  const hasModule = useCallback(
+    (module: TenantModuleKey) => (isDemo ? true : modulesLoaded && user?.tenant.modules?.[module] === true),
+    [isDemo, modulesLoaded, user],
+  );
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refreshModules = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        // Keep the current session/UI if a transient /auth/me refresh fails.
+        void refresh().catch(() => undefined);
+      }, 400);
+    };
+    window.addEventListener("inflero:module-disabled", refreshModules);
+    const onFocus = () => refreshModules();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshModules();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("inflero:module-disabled", refreshModules);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [refresh]);
 
   const value = useMemo(
     () => ({
@@ -135,6 +176,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       refresh,
+      modulesLoaded,
+      hasModule,
       hasPermission,
     }),
     [
@@ -148,6 +191,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       refresh,
+      modulesLoaded,
+      hasModule,
       hasPermission,
     ],
   );
