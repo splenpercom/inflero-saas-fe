@@ -130,6 +130,14 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     if (code === "MODULE_DISABLED") {
       window.dispatchEvent(new CustomEvent("inflero:module-disabled"));
     }
+    if (
+      res.status === 403 &&
+      typeof json.message === "string" &&
+      json.message.includes("Cannot access another branch")
+    ) {
+      setBranchStoreId(null);
+      window.dispatchEvent(new CustomEvent("inflero:branch-cleared"));
+    }
     throw new ApiError(
       res.status,
       json.message ?? `Request failed (${res.status})`,

@@ -1,8 +1,7 @@
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useIsDarkMode } from "../../hooks/useIsDarkMode";
 import { cn } from "../ui/utils";
-import { SimpleDropdown, SimpleDropdownItem } from "../ui/simple-dropdown";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation } from "react-router";
 import { preloadRoute } from "../../utils/routePreloader";
 import { usePendingReservationCount } from "../../hooks/usePendingReservationCount";
@@ -76,6 +75,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   } = useBranch();
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false);
+  const branchMenuRef = useRef<HTMLDivElement>(null);
   const { badgeCount: newResCount, acknowledge: acknowledgeReservations } = usePendingReservationCount();
 
   const companyLogo = getCompanyLogoUrl(user?.tenant, isDarkMode);
@@ -173,6 +174,21 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       );
     }
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!branchMenuOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (branchMenuRef.current?.contains(event.target as Node)) return;
+      setBranchMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [branchMenuOpen]);
+
+  const pickBranch = (id: string | null) => {
+    setBranchId(id);
+    setBranchMenuOpen(false);
+  };
 
   // Mock warehouse data - only active/configured warehouses
   const branchLabel = branchesLoading
@@ -465,74 +481,81 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       {/* Branch switcher - fixed below header */}
       {!collapsed && showBranchSwitcher && (
         <div className="border-b border-white/10 dark:border-white/5 p-2 flex-shrink-0">
-          <SimpleDropdown
-            align="start"
-            estimatedHeight={Math.min(320, 56 + branches.length * 52)}
-            trigger={
-              <button
-                type="button"
-                disabled={isBranchLocked && !hasBranches}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl glass smooth-transition hover:bg-white/20 dark:hover:bg-white/5 text-left group shadow-sm disabled:opacity-70"
-              >
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0026f6] to-[#001db8] flex items-center justify-center shadow-lg shadow-[#0026f6]/30">
-                  <Warehouse className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[9px] text-gray-500 dark:text-gray-400 mb-0.5 uppercase tracking-wide">
-                    {st("selectWarehouse")}
-                  </p>
-                  <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
-                    {branchLabel}
-                  </p>
-                </div>
-                {!isBranchLocked && hasBranches && (
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 smooth-transition group-hover:text-[#0026f6]" />
-                )}
-              </button>
-            }
-          >
-            {!isBranchLocked && hasBranches && branchManagementEnabled && (
-              <SimpleDropdownItem
-                onClick={() => setBranchId(null)}
-                className={cn(
-                  isGlobalMode
-                    ? "bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 border border-[#0026f6]/30 dark:border-[#0026f6]/30"
-                    : "",
-                )}
-              >
-                <div>
-                  <p className="font-semibold text-xs text-gray-900 dark:text-white">
-                    {st("allBranches")}
-                  </p>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                    {pickLang(language, "Bütün filiallar və qlobal qeydlər", "All branches and global records")}
-                  </p>
-                </div>
-              </SimpleDropdownItem>
-            )}
-            {branches.map((branch) => (
-              <SimpleDropdownItem
-                key={branch.id}
-                onClick={() => setBranchId(branch.id)}
-                className={cn(
-                  branchId === branch.id
-                    ? "bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 border border-[#0026f6]/30 dark:border-[#0026f6]/30"
-                    : "",
-                )}
-              >
-                <div>
-                  <p className="font-semibold text-xs text-gray-900 dark:text-white">
-                    {branch.name}
-                  </p>
-                  {branch.address && (
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                      {branch.address}
+          <div ref={branchMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                if (isBranchLocked || !hasBranches) return;
+                setBranchMenuOpen((open) => !open);
+              }}
+              disabled={isBranchLocked || !hasBranches}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl glass smooth-transition hover:bg-white/20 dark:hover:bg-white/5 text-left group shadow-sm disabled:opacity-70"
+            >
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0026f6] to-[#001db8] flex items-center justify-center shadow-lg shadow-[#0026f6]/30">
+                <Warehouse className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] text-gray-500 dark:text-gray-400 mb-0.5 uppercase tracking-wide">
+                  {st("selectWarehouse")}
+                </p>
+                <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                  {branchLabel}
+                </p>
+              </div>
+              {!isBranchLocked && hasBranches && (
+                <ChevronDown className={cn(
+                  "w-3.5 h-3.5 text-gray-400 flex-shrink-0 smooth-transition group-hover:text-[#0026f6]",
+                  branchMenuOpen && "rotate-180 text-[#0026f6]",
+                )} />
+              )}
+            </button>
+
+            {branchMenuOpen && !isBranchLocked && (
+              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[100] max-h-64 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1.5 shadow-xl scrollbar-hide">
+                {hasBranches && branchManagementEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => pickBranch(null)}
+                    className={cn(
+                      "w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
+                      isGlobalMode
+                        ? "bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 border border-[#0026f6]/30 dark:border-[#0026f6]/30"
+                        : "",
+                    )}
+                  >
+                    <p className="font-semibold text-xs text-gray-900 dark:text-white">
+                      {st("allBranches")}
                     </p>
-                  )}
-                </div>
-              </SimpleDropdownItem>
-            ))}
-          </SimpleDropdown>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                      {pickLang(language, "Bütün filiallar və qlobal qeydlər", "All branches and global records")}
+                    </p>
+                  </button>
+                )}
+                {branches.map((branch) => (
+                  <button
+                    key={branch.id}
+                    type="button"
+                    onClick={() => pickBranch(branch.id)}
+                    className={cn(
+                      "w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
+                      branchId === branch.id
+                        ? "bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 border border-[#0026f6]/30 dark:border-[#0026f6]/30"
+                        : "",
+                    )}
+                  >
+                    <p className="font-semibold text-xs text-gray-900 dark:text-white">
+                      {branch.name}
+                    </p>
+                    {branch.address && (
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                        {branch.address}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

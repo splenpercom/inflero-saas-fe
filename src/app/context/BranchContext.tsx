@@ -41,7 +41,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [branchesLoaded, setBranchesLoaded] = useState(false);
 
-  const isBranchLocked = branchManagementEnabled && !!user?.storeId;
+  const isBranchLocked = branchManagementEnabled && !!user?.storeId && !user?.isTenantOwner;
 
   const refreshBranches = useCallback(async () => {
     if (!(isAuthenticated || isDemo)) {
@@ -71,6 +71,15 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   }, [authLoading, isDemo, isAuthenticated, refreshBranches, branchManagementEnabled]);
 
   useEffect(() => {
+    const onBranchCleared = () => {
+      setBranchIdState(null);
+      setBranchRevision((n) => n + 1);
+    };
+    window.addEventListener("inflero:branch-cleared", onBranchCleared);
+    return () => window.removeEventListener("inflero:branch-cleared", onBranchCleared);
+  }, []);
+
+  useEffect(() => {
     if (authLoading) {
       setBranchIdState(getBranchStoreId());
       return;
@@ -83,8 +92,6 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
     const stored = getBranchStoreId();
 
-    // Wait until tenant modules are known — hasModule is false for everything until then,
-    // which would incorrectly pin BM-ON tenants to the first branch.
     if (!modulesLoaded && !isDemo) {
       if (stored) setBranchIdState(stored);
       return;
@@ -95,12 +102,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Branch Management off: always pin to the only visible (canonical) store.
-    // Do not keep a stale user.storeId / localStorage id — those cause "Store not found"
-    // toasts on every navigated page that asserts the branch header.
     if (!branchManagementEnabled) {
       if (branches.length === 0) {
-        if (branchId !== null || stored) {
+        if (stored) {
           setBranchStoreId(null);
           setBranchIdState(null);
           setBranchRevision((n) => n + 1);
@@ -108,7 +112,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         return;
       }
       const requiredId = branches[0].id;
-      if (branchId !== requiredId || stored !== requiredId) {
+      if (stored !== requiredId) {
         setBranchStoreId(requiredId);
         setBranchIdState(requiredId);
         setBranchRevision((n) => n + 1);
@@ -116,9 +120,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (user.storeId) {
-      setBranchStoreId(user.storeId);
-      setBranchIdState(user.storeId);
+    if (user.storeId && !user.isTenantOwner) {
+      if (stored !== user.storeId) {
+        setBranchStoreId(user.storeId);
+        setBranchIdState(user.storeId);
+        setBranchRevision((n) => n + 1);
+      }
       return;
     }
 
@@ -142,7 +149,6 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Only clear a stale stored id once we have a real branch list to compare against.
     if (stored && branches.length > 0 && !branches.some((b) => b.id === stored)) {
       setBranchStoreId(null);
       setBranchIdState(null);
@@ -153,11 +159,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     if (!stored) {
       setBranchIdState(null);
     }
-  }, [user, branches, branchesLoaded, authLoading, branchManagementEnabled, branchId, modulesLoaded, isDemo]);
+  }, [user, branches, branchesLoaded, authLoading, branchManagementEnabled, modulesLoaded, isDemo]);
 
   const setBranchId = useCallback(
     (id: string | null) => {
-      if (isBranchLocked || (!branchManagementEnabled && id === null)) return;
+      const locked = branchManagementEnabled && !!user?.storeId && !user?.isTenantOwner;
+      if (locked || (!branchManagementEnabled && id === null)) return;
       const prev = getBranchStoreId();
       setBranchStoreId(id);
       setBranchIdState(id);
@@ -165,7 +172,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         setBranchRevision((n) => n + 1);
       }
     },
-    [isBranchLocked, branchManagementEnabled],
+    [branchManagementEnabled, user?.storeId, user?.isTenantOwner],
   );
 
   const selectedBranch = useMemo(

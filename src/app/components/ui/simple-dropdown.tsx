@@ -1,4 +1,13 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, {
+  cloneElement,
+  createContext,
+  isValidElement,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import { createPortal } from "react-dom";
 import { useFloatingPosition } from "./useFloatingPosition";
 
@@ -24,6 +33,20 @@ export function SimpleDropdown({
   const position = useFloatingPosition(anchorRef, isOpen, estimatedHeight);
   const close = () => setIsOpen(false);
 
+  const triggerElement = isValidElement(trigger)
+    ? cloneElement(trigger as ReactElement<{ onClick?: (e: React.MouseEvent) => void; disabled?: boolean }>, {
+        onClick: (e: React.MouseEvent) => {
+          (trigger as ReactElement<{ onClick?: (e: React.MouseEvent) => void }>).props.onClick?.(e);
+          if (e.defaultPrevented) return;
+          setIsOpen((open) => !open);
+        },
+      })
+    : (
+      <button type="button" onClick={() => setIsOpen((open) => !open)}>
+        {trigger}
+      </button>
+    );
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
@@ -38,7 +61,7 @@ export function SimpleDropdown({
 
   return (
     <div className="relative" ref={anchorRef}>
-      <div onClick={() => setIsOpen((open) => !open)}>{trigger}</div>
+      {triggerElement}
       {isOpen &&
         createPortal(
           <DropdownCtx.Provider value={{ close }}>
@@ -69,16 +92,25 @@ interface DropdownItemProps {
 export function SimpleDropdownItem({ onClick, children, className = "" }: DropdownItemProps) {
   const ctx = useContext(DropdownCtx);
 
+  const handleSelect = () => {
+    onClick?.();
+    ctx?.close();
+  };
+
   return (
     <div
+      role="menuitem"
+      tabIndex={0}
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        handleSelect();
       }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.();
-        ctx?.close();
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleSelect();
+        }
       }}
       className={`relative flex cursor-pointer select-none items-center rounded-lg px-3 py-2.5 text-sm outline-none transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${className}`}
     >
