@@ -147,5 +147,7 @@ export const apiPost = <T>(path: string, body?: unknown, o?: RequestOptions) =>
   apiRequest<T>(path, { ...o, method: "POST", body });
 export const apiPatch = <T>(path: string, body?: unknown, o?: RequestOptions) =>
   apiRequest<T>(path, { ...o, method: "PATCH", body });
+export const apiPut = <T>(path: string, body?: unknown, o?: RequestOptions) =>
+  apiRequest<T>(path, { ...o, method: "PUT", body });
 export const apiDelete = <T>(path: string, o?: RequestOptions) =>
   apiRequest<T>(path, { ...o, method: "DELETE" });

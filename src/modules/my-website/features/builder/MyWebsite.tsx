@@ -23,6 +23,7 @@ import {
   saveWebsiteConfig,
 } from "../../lib/websiteConfigStorage";
 import { storePath, storeUrl } from "../../../../app/lib/bookingLinks";
+import { fetchTenantWebsiteConfig, saveTenantWebsiteConfig } from "../../../../app/api/website";
 
 import type {
   BlockType, ProductSource, Block, ColumnItem, RowItem, ContentItem,
@@ -54,7 +55,7 @@ function PresetIcon({ ratios, active }: { ratios: number[]; active?: boolean }) 
   return (
     <div className="flex gap-0.5 w-full h-6">
       {ratios.map((r, i) => (
-        <div key={i} className={`rounded-sm transition-colors ${active ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} style={{ flex: r }} />
+        <div key={i} className={`rounded-sm transition-colors ${active ? "bg-[#0026f6]" : "bg-gray-300 dark:bg-gray-600"}`} style={{ flex: r }} />
       ))}
     </div>
   );
@@ -80,7 +81,7 @@ function WidthAdjuster({ preset, initialRatios, onConfirm, onBack }: {
 
       <div className="flex gap-0.5 h-10 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
         {ratios.map((r, i) => (
-          <div key={i} className="flex items-center justify-center text-white text-[10px] font-bold bg-green-500 transition-all" style={{ flex: r }}>
+          <div key={i} className="flex items-center justify-center text-white text-[10px] font-bold bg-[#0026f6] transition-all" style={{ flex: r }}>
             {Math.round((r / total) * 100)}%
           </div>
         ))}
@@ -93,7 +94,7 @@ function WidthAdjuster({ preset, initialRatios, onConfirm, onBack }: {
             <input
               type="range" min={1} max={9} step={1} value={r}
               onChange={e => setRatios(prev => prev.map((v, j) => j === i ? Number(e.target.value) : v))}
-              className="flex-1 accent-green-600"
+              className="flex-1 accent-[#0026f6]"
             />
             <span className="text-[10px] font-mono text-gray-600 dark:text-gray-400 w-7 text-right flex-shrink-0">
               {Math.round((r / total) * 100)}%
@@ -104,7 +105,7 @@ function WidthAdjuster({ preset, initialRatios, onConfirm, onBack }: {
 
       <button
         onClick={() => onConfirm(ratios)}
-        className="w-full py-2 text-xs font-semibold bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+        className="w-full py-2 text-xs font-semibold bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg transition-colors"
       >
         {tr("Bölmə Yarat", "Create Section")}
       </button>
@@ -117,7 +118,7 @@ function WidthAdjuster({ preset, initialRatios, onConfirm, onBack }: {
 const TEMPLATES = [
   {
     id: "minimal", name: "Minimal",
-    bg: "bg-gray-50", nav: "bg-white border-b border-gray-200", accent: "#16a34a",
+    bg: "bg-gray-50", nav: "bg-white border-b border-gray-200", accent: "#0026f6",
     // Sharp, clean, Swiss-grid feel
     btnRadius: "rounded-lg", cardRadius: "rounded-xl", imgRadius: "rounded-xl",
     fontHeading: "font-sans", fontBody: "font-sans",
@@ -126,7 +127,7 @@ const TEMPLATES = [
   },
   {
     id: "dark", name: "Dark",
-    bg: "bg-gray-950", nav: "bg-gray-900 border-b border-gray-800", accent: "#22c55e",
+    bg: "bg-gray-950", nav: "bg-gray-900 border-b border-gray-800", accent: "#0026f6",
     // Sleek, tech, angular edges
     btnRadius: "rounded-md", cardRadius: "rounded-lg", imgRadius: "rounded-lg",
     fontHeading: "font-mono", fontBody: "font-sans",
@@ -144,7 +145,7 @@ const TEMPLATES = [
   },
   {
     id: "vibrant", name: "Vibrant",
-    bg: "bg-white", nav: "bg-white border-b-4 border-emerald-400", accent: "#7c3aed",
+    bg: "bg-white", nav: "bg-white border-b-4 border-[#0026f6]", accent: "#7c3aed",
     // Bold, expressive, chunky borders, heavy font weight, square-ish
     btnRadius: "rounded-2xl", cardRadius: "rounded-2xl", imgRadius: "rounded-xl",
     fontHeading: "font-black", fontBody: "font-medium",
@@ -166,6 +167,17 @@ const PRODUCTS = [
   { id: "p7", name: "Linen Shirt",         price: 59.99,  originalPrice: null,   category: "cat-2", badge: "New",         rating: 4.4, reviews: 68,  image: "https://images.unsplash.com/photo-1740711152088-88a009e877bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
   { id: "p8", name: "Desk Lamp",           price: 44.99,  originalPrice: 54.99,  category: "cat-3", badge: "Sale",        rating: 4.6, reviews: 143, image: "https://images.unsplash.com/photo-1667312939978-64cf31718a6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
 ];
+type StorefrontProduct = (typeof PRODUCTS)[number];
+type StorefrontCartLine = { product: StorefrontProduct; qty: number };
+export type StorefrontRuntime = {
+  page: "home" | "product" | "checkout";
+  setPage: (page: "home" | "product" | "checkout") => void;
+  cart: StorefrontCartLine[];
+  addToCart: (product: StorefrontProduct, qty?: number) => void;
+  selectedProduct: StorefrontProduct | null;
+  openProduct: (product: StorefrontProduct) => void;
+  cartCount: number;
+};
 const PAYMENT_METHODS: PaymentMethod[] = [
   { id: "epoint", name: "Epoint",            icon: "💳", enabled: false },
   { id: "cod",    name: "Cash on Delivery",  icon: "💵", enabled: true  },
@@ -245,11 +257,11 @@ const GAP_CLS: Record<string, string> = { sm: "gap-1", md: "gap-3", lg: "gap-5" 
 function makeBlock(type: BlockType): Block {
   const base: Block = { id: uid(), type, label: BLOCK_META[type].label, visible: true };
   if (type === "featured-products") return { ...base, productSource: { mode: "all", categoryId: "", productIds: [], limit: 4, title: "Featured Products" } };
-  if (type === "hero")              return { ...base, heading: "Your Headline", subheading: "Add your subheading here.", ctaText: "Shop Now", ctaColor: "#16a34a", bgColor: "#f0fdf4" };
-  if (type === "banner")            return { ...base, bannerText: "Summer Sale — Up to 40% Off", bannerSubtext: "Limited time offer. Shop now before it ends.", bannerBg: "#0f172a", ctaText: "Shop the Sale", ctaColor: "#16a34a" };
+  if (type === "hero")              return { ...base, heading: "Your Headline", subheading: "Add your subheading here.", ctaText: "Shop Now", ctaColor: "#0026f6", bgColor: "#e8ebff" };
+  if (type === "banner")            return { ...base, bannerText: "Summer Sale — Up to 40% Off", bannerSubtext: "Limited time offer. Shop now before it ends.", bannerBg: "#0f172a", ctaText: "Shop the Sale", ctaColor: "#0026f6" };
   if (type === "newsletter")        return { ...base, newsletterHeading: "Stay in the loop", newsletterPlaceholder: "Enter your email" };
   if (type === "image-block")       return { ...base, imageHeight: "md" };
-  if (type === "image-text")        return { ...base, imageHeight: "md", imagePosition: "left", heading: "Section Title", subheading: "Tell your brand story.", ctaText: "Learn more", ctaColor: "#16a34a" };
+  if (type === "image-text")        return { ...base, imageHeight: "md", imagePosition: "left", heading: "Section Title", subheading: "Tell your brand story.", ctaText: "Learn more", ctaColor: "#0026f6" };
   if (type === "whatsapp-widget")   return { ...base, waNumber: "", waMessage: "Hello! I have a question.", waLabel: "Chat with us" };
   if (type === "socials")           return { ...base, socialLinks: {} };
   if (type === "reservation")       return { ...base, reservationTitle: "Make a Reservation", reservationSubtext: "Book your spot in just a few clicks.", reservationServices: ["Table for 2", "Table for 4", "Private Room"], reservationShowGuests: true, reservationShowNotes: true };
@@ -268,7 +280,7 @@ const DEFAULT_CONTENT: ContentItem[] = [
   {
     id: "b1", type: "hero", label: "Hero", visible: true,
     heading: "Shop the Latest Collection", subheading: "Free shipping on orders over $50. New arrivals every week.",
-    ctaText: "Shop Now", ctaColor: "#16a34a", bgColor: "#0f172a",
+    ctaText: "Shop Now", ctaColor: "#0026f6", bgColor: "#0f172a",
   },
   {
     id: "b2", type: "featured-products", label: "Best Sellers", visible: true,
@@ -278,7 +290,7 @@ const DEFAULT_CONTENT: ContentItem[] = [
     id: "banner1", type: "banner", label: "Promo Banner", visible: true,
     bannerText: "🔥 Summer Sale — Up to 40% Off",
     bannerSubtext: "Limited time offer. Use code SUMMER at checkout.",
-    bannerBg: "#0f172a", ctaText: "Claim Offer", ctaColor: "#16a34a",
+    bannerBg: "#0f172a", ctaText: "Claim Offer", ctaColor: "#0026f6",
   },
   { id: "b3", type: "category-grid", label: "Shop by Category", visible: true },
   { id: "b4", type: "testimonials", label: "Testimonials", visible: true },
@@ -379,7 +391,7 @@ function ImageUploader({ value, onChange, aspectHint }: {
       ) : (
         <button
           onClick={() => inputRef.current?.click()}
-          className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-2 hover:border-green-400 dark:hover:border-green-600 hover:bg-green-50/40 dark:hover:bg-green-900/10 transition-all text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400"
+          className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-2 hover:border-[#0026f6] dark:hover:border-[#0026f6] hover:bg-[#e8ebff]/40 dark:hover:bg-[#0026f6]/10 transition-all text-gray-400 dark:text-gray-500 hover:text-[#0026f6] dark:hover:text-[#99b3ff]"
         >
           <Upload className="w-5 h-5" />
           <span className="text-xs font-medium">Click to upload image</span>
@@ -408,6 +420,7 @@ function PreviewBlock({
   block, config, selected, onClick, viewport, compact,
   onDragStart, onDragOver, onDragEnd, onDelete,
   isDragging, dropBefore, dropAfter,
+  publicMode = false, storefront,
 }: {
   block: Block; config: WebsiteConfig; selected: boolean; onClick: () => void;
   viewport: "desktop" | "mobile"; compact?: boolean;
@@ -418,6 +431,8 @@ function PreviewBlock({
   isDragging?: boolean;
   dropBefore?: boolean;
   dropAfter?: boolean;
+  publicMode?: boolean;
+  storefront?: StorefrontRuntime;
 }) {
   const _baseTmpl = TEMPLATES.find(t => t.id === config.template) ?? TEMPLATES[0];
   const tmpl = { ..._baseTmpl, accent: config.accentColor || _baseTmpl.accent };
@@ -425,7 +440,7 @@ function PreviewBlock({
   const textBase = isDark ? "text-white" : "text-gray-900";
   const textMuted = isDark ? "text-gray-400" : "text-gray-500";
   const cardBg = isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const ring = selected ? "ring-2 ring-green-500 ring-offset-1" : "ring-1 ring-transparent hover:ring-green-300 hover:ring-offset-1";
+  const ring = selected ? "ring-2 ring-[#0026f6] ring-offset-1" : "ring-1 ring-transparent hover:ring-[#99b3ff] hover:ring-offset-1";
   const opacityCls = isDragging ? "opacity-25 scale-95" : "";
   const isElegant = config.template === "elegant";
   const isVibrant = config.template === "vibrant";
@@ -447,9 +462,11 @@ function PreviewBlock({
     onDragEnd,
   } : {};
 
-  const wrap = `relative cursor-pointer ${tmpl.cardRadius} transition-all ${ring} ${opacityCls} group select-none`;
+  const isPublicStore = publicMode && !!storefront;
+  const blockClick = isPublicStore ? undefined : onClick;
+  const wrap = `relative ${isPublicStore ? "" : "cursor-pointer"} ${tmpl.cardRadius} transition-all ${isPublicStore ? "" : ring} ${opacityCls} ${isPublicStore ? "" : "group select-none"}`;
 
-  const Overlay = () => (
+  const Overlay = () => isPublicStore ? null : (
     <>
       {/* Drag handle — left */}
       {onDragStart && (
@@ -468,7 +485,7 @@ function PreviewBlock({
             <X className="w-2.5 h-2.5" />
           </button>
         )}
-        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-500 text-white text-[9px] font-medium shadow-sm pointer-events-none">
+        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#0026f6] text-white text-[9px] font-medium shadow-sm pointer-events-none">
           <Settings2 className="w-2 h-2" /> Edit
         </div>
       </div>
@@ -485,7 +502,7 @@ function PreviewBlock({
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={`${wrap} overflow-hidden`} onClick={onClick} {...dragHandlers} style={!hasHeroImg ? { background: `${heroBg}${overlayAlpha}` } : undefined}>
+          <div className={`${wrap} overflow-hidden`} onClick={blockClick} {...dragHandlers} style={!hasHeroImg ? { background: `${heroBg}${overlayAlpha}` } : undefined}>
             {hasHeroImg && (
               <>
                 <img src={block.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -502,7 +519,12 @@ function PreviewBlock({
                 {block.subheading || "50 ₼-dən yuxarı sifarişlərə pulsuz çatdırılma."}
               </p>
               {isVibrant && !compact && <div className="w-12 h-1 mx-auto mb-4 rounded-full" style={{background:block.ctaColor||tmpl.accent}}/>}
-              <button className={`${tmpl.btnRadius} font-semibold shadow-lg ${compact ? "px-4 py-1.5 text-xs" : isElegant?"px-10 py-3 text-sm tracking-widest uppercase":"px-6 py-2.5 text-sm"}`} style={{ background: block.ctaColor || tmpl.accent, color: block.ctaBtnTextColor || "#ffffff" }}>
+              <button
+                type="button"
+                onClick={isPublicStore ? (e) => { e.stopPropagation(); storefront!.openProduct(PRODUCTS[0]); } : undefined}
+                className={`${tmpl.btnRadius} font-semibold shadow-lg ${compact ? "px-4 py-1.5 text-xs" : isElegant?"px-10 py-3 text-sm tracking-widest uppercase":"px-6 py-2.5 text-sm"}`}
+                style={{ background: block.ctaColor || tmpl.accent, color: block.ctaBtnTextColor || "#ffffff" }}
+              >
                 {block.ctaText || "İndi Al"}
               </button>
             </div>
@@ -521,10 +543,19 @@ function PreviewBlock({
       const colsMap: Record<number,string> = {2:"grid-cols-2",3:"grid-cols-3",4:"grid-cols-4",5:"grid-cols-5",6:"grid-cols-6"};
       const colsClass = compact ? "grid-cols-2" : viewport === "mobile" ? "grid-cols-3" : (colsMap[userCols] ?? "grid-cols-4");
       const visibleProducts = products.slice(0, maxProducts);
+      const handleProductAddToCart = (e: React.MouseEvent, p: StorefrontProduct) => {
+        e.stopPropagation();
+        storefront?.addToCart(p);
+      };
+      const handleProductOpen = (e: React.MouseEvent, p: StorefrontProduct) => {
+        if (!isPublicStore) return;
+        e.stopPropagation();
+        storefront!.openProduct(p);
+      };
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={wrap} onClick={onClick} {...dragHandlers}>
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             <div className={compact ? "py-4 px-3" : viewport === "mobile" ? "py-4 px-3" : "py-8 px-5"}>
               <div className="flex items-center justify-between mb-3">
@@ -535,11 +566,13 @@ function PreviewBlock({
                 {visibleProducts.map(p => {
                   const isHovered = hoveredProductId === p.id;
                   const isMobile = viewport === "mobile";
+                  const showCartCta = !compact && (isPublicStore || isHovered);
                   return (
                   <div key={p.id}
                     onMouseEnter={() => setHoveredProductId(p.id)}
                     onMouseLeave={() => setHoveredProductId(null)}
-                    className={`${tmpl.cardRadius} overflow-hidden border ${isVibrant?"border-2 border-purple-200":"border"} ${isDark ? "border-gray-700/60 bg-gray-800/60" : isElegant?"border-stone-200/60 bg-white":"border-gray-100 bg-white"} ${tmpl.cardShadow} ${isHovered?"shadow-lg":""} transition-all duration-200`}>
+                    onClick={isPublicStore ? (e) => handleProductOpen(e, p) : undefined}
+                    className={`${tmpl.cardRadius} overflow-hidden border ${isVibrant?"border-2 border-purple-200":"border"} ${isDark ? "border-gray-700/60 bg-gray-800/60" : isElegant?"border-stone-200/60 bg-white":"border-gray-100 bg-white"} ${tmpl.cardShadow} ${isHovered?"shadow-lg":""} transition-all duration-200 ${isPublicStore ? "cursor-pointer" : ""}`}>
                     {/* Image — always square */}
                     <div className={`relative overflow-hidden aspect-square ${isDark ? "bg-gray-700" : isElegant?"bg-stone-50":"bg-gray-50"}`}>
                       <img src={p.image} alt={p.name} className={`w-full h-full object-cover transition-transform duration-300 ${isHovered?"scale-105":""}`} loading="lazy" />
@@ -549,14 +582,14 @@ function PreviewBlock({
                         </span>
                       )}
                       {/* Hover CTA — icon-only on mobile, text on desktop */}
-                      {!compact && (
-                        <div className={`absolute inset-0 flex items-end justify-center pb-2 transition-opacity duration-200 ${isHovered?"opacity-100":"opacity-0"}`}>
+                      {showCartCta && (
+                        <div className={`absolute inset-0 flex items-end justify-center pb-2 transition-opacity duration-200 ${isPublicStore || isHovered ? "opacity-100" : "opacity-0"}`}>
                           {isMobile ? (
-                            <button className={`flex items-center justify-center w-7 h-7 ${tmpl.btnRadius} text-white shadow-lg`} style={{ background: tmpl.accent }}>
+                            <button type="button" onClick={(e) => handleProductAddToCart(e, p)} className={`flex items-center justify-center w-7 h-7 ${tmpl.btnRadius} text-white shadow-lg`} style={{ background: tmpl.accent }}>
                               <ShoppingCart className="w-3.5 h-3.5" />
                             </button>
                           ) : (
-                            <button className={`flex items-center gap-1 px-3 py-1.5 ${tmpl.btnRadius} text-white text-[9px] font-semibold shadow-lg`} style={{ background: tmpl.accent }}>
+                            <button type="button" onClick={(e) => handleProductAddToCart(e, p)} className={`flex items-center gap-1 px-3 py-1.5 ${tmpl.btnRadius} text-white text-[9px] font-semibold shadow-lg`} style={{ background: tmpl.accent }}>
                               <ShoppingCart className="w-2.5 h-2.5" /> {isElegant ? "Çantaya Əlavə Et" : "Səbətə Əlavə Et"}
                             </button>
                           )}
@@ -594,11 +627,11 @@ function PreviewBlock({
     }
 
     case "category-grid": {
-      const catAccentPalette = ["#16a34a","#2563eb","#dc2626","#9333ea","#ea580c","#0891b2"];
+      const catAccentPalette = ["#0026f6","#2563eb","#dc2626","#9333ea","#ea580c","#0891b2"];
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={wrap} onClick={onClick} {...dragHandlers}>
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             <div className={compact ? "py-4 px-3" : "py-8 px-4"}>
               <div className="flex items-center justify-between mb-3">
@@ -639,7 +672,7 @@ function PreviewBlock({
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={`${wrap} overflow-hidden`} onClick={onClick} {...dragHandlers} style={!hasBannerImg ? { background: `${bannerBg}${overlayAlpha}` } : undefined}>
+          <div className={`${wrap} overflow-hidden`} onClick={blockClick} {...dragHandlers} style={!hasBannerImg ? { background: `${bannerBg}${overlayAlpha}` } : undefined}>
             {hasBannerImg && (
               <>
                 <img src={block.bannerImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -663,7 +696,7 @@ function PreviewBlock({
               {block.ctaText && (
                 <button
                   className={`mt-1 font-semibold rounded-lg shadow-md ${compact ? "px-3 py-1 text-[10px]" : "px-5 py-2 text-xs"}`}
-                  style={{ background: block.ctaColor || "#16a34a", color: block.ctaBtnTextColor || "#ffffff" }}
+                  style={{ background: block.ctaColor || "#0026f6", color: block.ctaBtnTextColor || "#ffffff" }}
                 >
                   {block.ctaText}
                 </button>
@@ -686,7 +719,7 @@ function PreviewBlock({
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={wrap} onClick={onClick} {...dragHandlers}>
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             <div className={compact ? "py-4 px-3" : "py-8 px-4"}>
               <p className={`font-bold text-xs mb-3 ${textBase}`}>Müştərilərimiz nə deyir</p>
@@ -715,7 +748,7 @@ function PreviewBlock({
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={wrap} onClick={onClick} {...dragHandlers}>
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             <div className="py-5 px-4 text-center">
               <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs ${cardBg} ${textMuted}`}>
@@ -732,7 +765,7 @@ function PreviewBlock({
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={wrap} onClick={onClick} {...dragHandlers}>
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             {block.imageUrl
               ? <img src={block.imageUrl} alt={block.imageAlt || ""} className={`w-full ${h} object-cover rounded-lg`} />
@@ -766,7 +799,7 @@ function PreviewBlock({
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={wrap} onClick={onClick} {...dragHandlers}>
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             <div className={`grid ${compact || viewport === "mobile" ? "grid-cols-1" : "grid-cols-2"} gap-3 p-3`}>
               {isRight ? <>{textEl}{imgEl}</> : <>{imgEl}{textEl}</>}
@@ -784,7 +817,7 @@ function PreviewBlock({
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={wrap} onClick={onClick} {...dragHandlers}>
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             <div className={`text-center ${compact ? "py-3 px-3" : "py-6 px-4"}`}>
               <p className={`text-[10px] font-semibold mb-3 ${textBase}`}>Bizi izləyin</p>
@@ -819,7 +852,7 @@ function PreviewBlock({
       return (
         <>
           <DropLine active={!!dropBefore} />
-          <div className={wrap} onClick={onClick} {...dragHandlers}>
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             <div className={compact ? "py-4 px-3" : "py-8 px-5"}>
               {/* Header */}
@@ -928,7 +961,7 @@ function PreviewColumn({
   onBlockClick, onBlockDragStart, onBlockDragOver, onBlockDragEnd,
   onColumnDragOver, onColumnDrop, onColumnDragLeave,
   onDeleteBlock, onAddBlockClick,
-  publicMode = false,
+  publicMode = false, storefront,
 }: {
   col: ColumnItem; config: WebsiteConfig; rowId: string; viewport: "desktop" | "mobile";
   dropTarget: DropTarget | null; activeDragId: string | null;
@@ -942,6 +975,7 @@ function PreviewColumn({
   onDeleteBlock: (blockId: string) => void;
   onAddBlockClick: () => void;
   publicMode?: boolean;
+  storefront?: StorefrontRuntime;
 }) {
   const isDark = config.template === "dark";
   const isColDropTarget = dropTarget?.rowId === rowId && dropTarget?.colId === col.id;
@@ -963,7 +997,7 @@ function PreviewColumn({
           className={`flex-1 flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed min-h-[80px] transition-all ${
             isColDropTarget
               ? "border-blue-400 bg-blue-50/40 dark:bg-blue-900/10"
-              : isDark ? "border-gray-700 hover:border-gray-500" : "border-gray-200 hover:border-green-400"
+              : isDark ? "border-gray-700 hover:border-gray-500" : "border-gray-200 hover:border-[#0026f6]"
           }`}
         >
           <Plus className={`w-4 h-4 ${isDark ? "text-gray-600" : "text-gray-300"}`} />
@@ -993,6 +1027,8 @@ function PreviewColumn({
                 onDragOver={publicMode ? undefined : (e, pos) => onBlockDragOver(e, block.id, pos)}
                 onDragEnd={publicMode ? undefined : onBlockDragEnd}
                 onDelete={publicMode ? undefined : () => onDeleteBlock(block.id)}
+                publicMode={publicMode}
+                storefront={storefront}
               />
             );
           })}
@@ -1002,7 +1038,7 @@ function PreviewColumn({
           {!publicMode && (
           <button
             onClick={onAddBlockClick}
-            className={`flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed text-[10px] transition-colors mt-0.5 ${isDark ? "border-gray-700 text-gray-600 hover:border-green-500 hover:text-green-400" : "border-gray-200 text-gray-300 hover:border-green-400 hover:text-green-600"}`}
+            className={`flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed text-[10px] transition-colors mt-0.5 ${isDark ? "border-gray-700 text-gray-600 hover:border-[#0026f6] hover:text-[#99b3ff]" : "border-gray-200 text-gray-300 hover:border-[#0026f6] hover:text-[#0026f6]"}`}
           >
             <Plus className="w-3 h-3" /> Add block
           </button>
@@ -1023,6 +1059,7 @@ function PreviewRow({
   onColumnDragOver, onColumnDrop, onColumnDragLeave,
   onDeleteBlock,
   publicMode = false,
+  storefront,
 }: {
   row: RowItem; config: WebsiteConfig; isSelected: boolean;
   viewport: "desktop" | "mobile";
@@ -1037,6 +1074,7 @@ function PreviewRow({
   onColumnDragLeave: (e: React.DragEvent) => void;
   onDeleteBlock: (blockId: string, colId: string) => void;
   publicMode?: boolean;
+  storefront?: StorefrontRuntime;
 }) {
   if (!row.visible) return null;
   const padClass = PAD[row.padding || "md"];
@@ -1079,6 +1117,7 @@ function PreviewRow({
               onDeleteBlock={blockId => onDeleteBlock(blockId, col.id)}
               onAddBlockClick={onSelectRow}
               publicMode={publicMode}
+              storefront={storefront}
             />
           </div>
         ))}
@@ -1089,13 +1128,14 @@ function PreviewRow({
 
 // ─── Product Detail & Checkout Pages ─────────────────────────────────────────
 
-const SAMPLE_PRODUCT = PRODUCTS[0];
+const DEFAULT_PRODUCT = PRODUCTS[0];
 
-function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
+function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
   page: "product" | "checkout";
   config: WebsiteConfig;
   tmpl: { accent: string; bg: string; nav: string; btnRadius: string; cardRadius: string };
   isDark: boolean;
+  storefront?: StorefrontRuntime;
 }) {
   const isElegant = config.template === "elegant";
   const [cartStep, setCartStep] = useState<"bag" | "shipping" | "payment" | "done">("bag");
@@ -1117,14 +1157,29 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
   const txt = isDark ? "text-gray-100" : "text-gray-900";
   const sub = isDark ? "text-gray-400" : "text-gray-500";
   const card = isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const inputCls = `w-full px-3 py-2 text-xs rounded-lg border ${isDark?"border-gray-600 bg-gray-700 text-gray-100":"border-gray-300 bg-white text-gray-800"} outline-none focus:border-green-500 transition-colors`;
+  const inputCls = `w-full px-3 py-2 text-xs rounded-lg border ${isDark?"border-gray-600 bg-gray-700 text-gray-100":"border-gray-300 bg-white text-gray-800"} outline-none focus:border-[#0026f6] transition-colors`;
 
   if (page === "product") {
-    const discPct = SAMPLE_PRODUCT.originalPrice
-      ? Math.round((1 - SAMPLE_PRODUCT.price / SAMPLE_PRODUCT.originalPrice) * 100)
+    const product = storefront?.selectedProduct ?? DEFAULT_PRODUCT;
+    const handleAddToCart = () => {
+      if (storefront) storefront.addToCart(product, qty);
+    };
+    const handleBuyNow = () => {
+      if (storefront) {
+        storefront.addToCart(product, qty);
+        storefront.setPage("checkout");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    };
+    const goHome = () => {
+      storefront?.setPage("home");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    const discPct = product.originalPrice
+      ? Math.round((1 - product.price / product.originalPrice) * 100)
       : 0;
-    const thumbProducts = [SAMPLE_PRODUCT, ...PRODUCTS.slice(1, 5)];
-    const activeImage = thumbProducts[activeThumb]?.image ?? SAMPLE_PRODUCT.image;
+    const thumbProducts = [product, ...PRODUCTS.filter(p => p.id !== product.id).slice(0, 4)];
+    const activeImage = thumbProducts[activeThumb]?.image ?? product.image;
 
 
     return (
@@ -1136,11 +1191,11 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
           <div>
             {/* Breadcrumb */}
             <div className={`flex items-center gap-1.5 px-6 pt-4 pb-3 text-[10px] border-b ${isDark?"border-gray-700 text-gray-400":"border-gray-100 text-gray-500"}`}>
-              <span className="hover:underline cursor-pointer">Ana Səhifə</span>
+              <span className="hover:underline cursor-pointer" onClick={storefront ? goHome : undefined}>Ana Səhifə</span>
               <ChevronRight className="w-2.5 h-2.5 opacity-40"/>
               <span className="hover:underline cursor-pointer">Elektronika</span>
               <ChevronRight className="w-2.5 h-2.5 opacity-40"/>
-              <span style={{color:tmpl.accent}} className="font-medium">{SAMPLE_PRODUCT.name}</span>
+              <span style={{color:tmpl.accent}} className="font-medium">{product.name}</span>
             </div>
 
             {/* 2-col grid */}
@@ -1149,7 +1204,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
               {/* LEFT — image + thumbnails */}
               <div className="w-[45%] flex-shrink-0 space-y-2">
                 <div className={`relative w-full aspect-square rounded-2xl overflow-hidden border ${isDark?"bg-gray-800 border-gray-700":"bg-gray-50 border-gray-200"}`}>
-                  <img src={activeImage} alt={SAMPLE_PRODUCT.name} className="w-full h-full object-cover transition-all duration-300"/>
+                  <img src={activeImage} alt={product.name} className="w-full h-full object-cover transition-all duration-300"/>
                   {discPct > 0 && (
                     <div className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow">
                       -{discPct}% ENDİRİM
@@ -1169,21 +1224,21 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
 
               {/* RIGHT — all product info */}
               <div className="flex-1 min-w-0 space-y-4">
-                <p className={`text-[9px] uppercase tracking-widest font-medium ${sub}`}>SKU: INF-{SAMPLE_PRODUCT.id.toString().padStart(3,"0")}</p>
-                <h1 className={`text-xl font-bold leading-tight ${txt}`}>{SAMPLE_PRODUCT.name}</h1>
+                <p className={`text-[9px] uppercase tracking-widest font-medium ${sub}`}>SKU: INF-{product.id.toString().padStart(3,"0")}</p>
+                <h1 className={`text-xl font-bold leading-tight ${txt}`}>{product.name}</h1>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold" style={{color:tmpl.accent}}>{SAMPLE_PRODUCT.price} ₼</span>
-                  {SAMPLE_PRODUCT.originalPrice && (
-                    <><span className={`text-base line-through ${sub}`}>{SAMPLE_PRODUCT.originalPrice} ₼</span>
+                  <span className="text-2xl font-bold" style={{color:tmpl.accent}}>{product.price} ₼</span>
+                  {product.originalPrice && (
+                    <><span className={`text-base line-through ${sub}`}>{product.originalPrice} ₼</span>
                     <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md">-{discPct}%</span></>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex gap-0.5">
-                    {Array.from({length:5}).map((_,i)=><Star key={i} className={`w-3.5 h-3.5 ${i<Math.floor(SAMPLE_PRODUCT.rating)?"fill-yellow-400 text-yellow-400":"text-gray-300"}`}/>)}
+                    {Array.from({length:5}).map((_,i)=><Star key={i} className={`w-3.5 h-3.5 ${i<Math.floor(product.rating)?"fill-yellow-400 text-yellow-400":"text-gray-300"}`}/>)}
                   </div>
-                  <span className={`text-xs ${sub}`}>({SAMPLE_PRODUCT.reviews} rəy)</span>
-                  <span className="text-xs font-semibold text-emerald-500">· Stokda Var</span>
+                  <span className={`text-xs ${sub}`}>({product.reviews} rəy)</span>
+                  <span className="text-xs font-semibold text-[#0026f6]">· Stokda Var</span>
                 </div>
                 <p className={`text-xs leading-relaxed ${sub}`}>Gündəlik istifadə üçün premium keyfiyyətli məhsul. Qabaqcıl materiallar və dəqiq mühəndislik ilə hazırlanmış.</p>
                 <div className={`h-px ${isDark?"bg-gray-700":"bg-gray-100"}`}/>
@@ -1228,11 +1283,11 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
                     <span className={`w-10 text-center text-sm font-bold ${txt}`}>{qty}</span>
                     <button onClick={()=>setQty(q=>q+1)} className={`w-10 h-10 flex items-center justify-center text-lg ${isDark?"hover:bg-gray-700 text-gray-200":"hover:bg-gray-50 text-gray-700"}`}>+</button>
                   </div>
-                  <button className={`flex-1 flex items-center justify-center gap-2 py-2.5 ${tmpl.btnRadius} text-sm font-bold text-white shadow-md hover:opacity-90 active:scale-95 transition-all`} style={{background:tmpl.accent}}>
+                  <button type="button" onClick={handleAddToCart} className={`flex-1 flex items-center justify-center gap-2 py-2.5 ${tmpl.btnRadius} text-sm font-bold text-white shadow-md hover:opacity-90 active:scale-95 transition-all`} style={{background:tmpl.accent}}>
                     <ShoppingCart className="w-4 h-4"/>{isElegant?"Çantaya Əlavə Et":"Səbətə Əlavə Et"}
                   </button>
                 </div>
-                <button className={`w-full flex items-center justify-center py-2.5 ${tmpl.btnRadius} text-sm font-bold border-2 transition-all hover:opacity-80 active:scale-95`} style={{borderColor:tmpl.accent,color:tmpl.accent}}>İndi Satın Al</button>
+                <button type="button" onClick={handleBuyNow} className={`w-full flex items-center justify-center py-2.5 ${tmpl.btnRadius} text-sm font-bold border-2 transition-all hover:opacity-80 active:scale-95`} style={{borderColor:tmpl.accent,color:tmpl.accent}}>İndi Satın Al</button>
                 {/* Safe checkout */}
                 <div className={`rounded-xl border px-3 py-2.5 ${isDark?"border-gray-700 bg-gray-800":"border-gray-200 bg-gray-50"}`}>
                   <p className={`text-[10px] font-semibold text-center mb-2 ${txt}`}>🔒 Zəmanətli Təhlükəsiz Ödəniş</p>
@@ -1285,7 +1340,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
 
             {/* Hero image */}
             <div className={`relative w-full overflow-hidden ${isDark?"bg-gray-800":"bg-gray-100"}`} style={{aspectRatio:"4/3"}}>
-              <img src={activeImage} alt={SAMPLE_PRODUCT.name} className="w-full h-full object-cover transition-all duration-300"/>
+              <img src={activeImage} alt={product.name} className="w-full h-full object-cover transition-all duration-300"/>
               {discPct > 0 && (
                 <div className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
                   -{discPct}% ENDİRİM
@@ -1295,7 +1350,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
                 <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-medium backdrop-blur-md shadow ${isDark?"bg-black/50 text-gray-200":"bg-white/80 text-gray-700"}`}>
                   <span>Ana Səhifə</span>
                   <ChevronRight className="w-2 h-2 opacity-50"/>
-                  <span style={{color:tmpl.accent}} className="font-semibold truncate max-w-[90px]">{SAMPLE_PRODUCT.name}</span>
+                  <span style={{color:tmpl.accent}} className="font-semibold truncate max-w-[90px]">{product.name}</span>
                 </div>
               </div>
             </div>
@@ -1314,21 +1369,21 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
             {/* Name / brand / rating */}
             <div className="px-4 pt-4 pb-3">
               <p className={`text-[9px] font-semibold uppercase tracking-widest mb-1 ${sub}`}>Inflero</p>
-              <h1 className={`text-lg font-bold leading-snug mb-2 ${txt}`}>{SAMPLE_PRODUCT.name}</h1>
+              <h1 className={`text-lg font-bold leading-snug mb-2 ${txt}`}>{product.name}</h1>
               <div className="flex items-center gap-2">
                 <div className="flex gap-0.5">
-                  {Array.from({length:5}).map((_,i)=><Star key={i} className={`w-3.5 h-3.5 ${i<Math.floor(SAMPLE_PRODUCT.rating)?"fill-yellow-400 text-yellow-400":"text-gray-300"}`}/>)}
+                  {Array.from({length:5}).map((_,i)=><Star key={i} className={`w-3.5 h-3.5 ${i<Math.floor(product.rating)?"fill-yellow-400 text-yellow-400":"text-gray-300"}`}/>)}
                 </div>
-                <span className={`text-xs ${sub}`}>{SAMPLE_PRODUCT.rating} · {SAMPLE_PRODUCT.reviews} rəy</span>
-                <span className="text-xs font-semibold text-emerald-500 ml-auto">✓ Stokda</span>
+                <span className={`text-xs ${sub}`}>{product.rating} · {product.reviews} rəy</span>
+                <span className="text-xs font-semibold text-[#0026f6] ml-auto">✓ Stokda</span>
               </div>
             </div>
 
             {/* Price */}
             <div className={`flex items-center gap-2.5 px-4 py-3 border-t border-b ${isDark?"border-gray-800":"border-gray-100"}`}>
-              <span className="text-2xl font-extrabold" style={{color:tmpl.accent}}>{SAMPLE_PRODUCT.price} ₼</span>
-              {SAMPLE_PRODUCT.originalPrice && (
-                <><span className={`text-sm line-through ${sub}`}>{SAMPLE_PRODUCT.originalPrice} ₼</span>
+              <span className="text-2xl font-extrabold" style={{color:tmpl.accent}}>{product.price} ₼</span>
+              {product.originalPrice && (
+                <><span className={`text-sm line-through ${sub}`}>{product.originalPrice} ₼</span>
                 <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-full">-{discPct}%</span></>
               )}
             </div>
@@ -1393,11 +1448,11 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
 
             {/* CTAs */}
             <div className="px-4 py-4 flex gap-3">
-              <button className={`flex-1 flex items-center justify-center gap-2 py-3.5 ${tmpl.btnRadius} text-sm font-bold border-2 transition-all active:scale-95`}
+              <button type="button" onClick={handleAddToCart} className={`flex-1 flex items-center justify-center gap-2 py-3.5 ${tmpl.btnRadius} text-sm font-bold border-2 transition-all active:scale-95`}
                 style={{borderColor:tmpl.accent,color:tmpl.accent}}>
                 <ShoppingCart className="w-4 h-4"/>{isElegant?"Çantaya Əlavə Et":"Səbətə Əlavə Et"}
               </button>
-              <button className={`flex-1 flex items-center justify-center py-3.5 ${tmpl.btnRadius} text-sm font-bold text-white shadow-lg transition-all active:scale-95`}
+              <button type="button" onClick={handleBuyNow} className={`flex-1 flex items-center justify-center py-3.5 ${tmpl.btnRadius} text-sm font-bold text-white shadow-lg transition-all active:scale-95`}
                 style={{background:tmpl.accent}}>
                 İndi Satın Al
               </button>
@@ -1443,6 +1498,12 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
   // Checkout page
   const steps = ["bag","shipping","payment","done"] as const;
   const stepIdx = steps.indexOf(cartStep);
+  const bagLines: StorefrontCartLine[] = storefront && storefront.cart.length > 0
+    ? storefront.cart
+    : PRODUCTS.slice(0, 2).map(p => ({ product: p, qty: 1 }));
+  const bagSubtotal = bagLines.reduce((sum, line) => sum + line.product.price * line.qty, 0);
+  const bagTotal = bagSubtotal;
+  const bagTotalLabel = bagTotal.toFixed(2);
 
   return (
     <div className={`p-4 space-y-4 ${txt}`}>
@@ -1454,8 +1515,8 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
               style={i<=stepIdx?{background:tmpl.accent}:{}}>
               {i<stepIdx?<Check className="w-3 h-3"/>:i+1}
             </div>
-            <span className={`text-[9px] ml-1 font-medium ${i===stepIdx?"text-green-600":sub}`}>{s}</span>
-            {i<3&&<div className={`flex-1 h-px mx-1 ${i<stepIdx?"bg-green-400":"bg-gray-200 dark:bg-gray-700"}`}/>}
+            <span className={`text-[9px] ml-1 font-medium ${i===stepIdx?"text-[#0026f6]":sub}`}>{s}</span>
+            {i<3&&<div className={`flex-1 h-px mx-1 ${i<stepIdx?"bg-[#0026f6]":"bg-gray-200 dark:bg-gray-700"}`}/>}
           </div>
         ))}
       </div>
@@ -1463,27 +1524,29 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
       {cartStep === "bag" && (
         <div className="space-y-3">
           <h2 className="text-sm font-bold">Səbətiniz</h2>
-          {PRODUCTS.slice(0,2).map(p => (
-            <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border ${card}`}>
+          {bagLines.length === 0 ? (
+            <p className={`text-xs ${sub}`}>Səbətiniz boşdur.</p>
+          ) : bagLines.map(line => (
+            <div key={line.product.id} className={`flex items-center gap-3 p-3 rounded-xl border ${card}`}>
               <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 border border-gray-200 dark:border-gray-700">
-                <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                <img src={line.product.image} alt={line.product.name} className="w-full h-full object-cover" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate">{p.name}</p>
-                <p className={`text-[10px] ${sub} mt-0.5`}>Ölçü: M · Say: 1</p>
+                <p className="text-xs font-semibold truncate">{line.product.name}</p>
+                <p className={`text-[10px] ${sub} mt-0.5`}>Ölçü: M · Say: {line.qty}</p>
               </div>
               <div className="text-right flex-shrink-0">
-                <span className="text-sm font-bold block" style={{color:tmpl.accent}}>{p.price} ₼</span>
-                {p.originalPrice && <span className={`text-[9px] line-through ${sub}`}>{p.originalPrice} ₼</span>}
+                <span className="text-sm font-bold block" style={{color:tmpl.accent}}>{(line.product.price * line.qty).toFixed(2)} ₼</span>
+                {line.product.originalPrice && <span className={`text-[9px] line-through ${sub}`}>{(line.product.originalPrice * line.qty).toFixed(2)} ₼</span>}
               </div>
             </div>
           ))}
           <div className={`rounded-xl border ${card} p-3 space-y-1.5 text-xs`}>
-            <div className={`flex justify-between ${sub}`}><span>Aralıq cəmi</span><span>219.98 ₼</span></div>
-            <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-green-600">Pulsuz</span></div>
-            <div className={`flex justify-between font-bold border-t pt-1.5 ${isDark?"border-gray-700":""}`}><span>Cəmi</span><span style={{color:tmpl.accent}}>219.98 ₼</span></div>
+            <div className={`flex justify-between ${sub}`}><span>Aralıq cəmi</span><span>{bagTotalLabel} ₼</span></div>
+            <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-[#0026f6]">Pulsuz</span></div>
+            <div className={`flex justify-between font-bold border-t pt-1.5 ${isDark?"border-gray-700":""}`}><span>Cəmi</span><span style={{color:tmpl.accent}}>{bagTotalLabel} ₼</span></div>
           </div>
-          <button onClick={()=>setCartStep("shipping")} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-opacity hover:opacity-90" style={{background:tmpl.accent}}>
+          <button onClick={()=>setCartStep("shipping")} disabled={bagLines.length === 0} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-50" style={{background:tmpl.accent}}>
             Çatdırılmaya keçin →
           </button>
         </div>
@@ -1508,36 +1571,36 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
           <div className={`rounded-xl border ${card} p-3 space-y-2`}>
             <p className={`text-[10px] font-semibold ${txt}`}>Çatdırılma üsulu</p>
             {config.shippingMethod === "free" && (
-              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-green-500 bg-green-50/50 dark:bg-green-900/10`}>
+              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full border-2 border-green-500 bg-green-500 flex-shrink-0"/>
+                  <div className="w-3 h-3 rounded-full border-2 border-[#0026f6] bg-[#0026f6] flex-shrink-0"/>
                   <span className="text-[10px]">Pulsuz Çatdırılma</span>
                 </div>
-                <span className="text-[10px] font-medium text-green-600">Pulsuz</span>
+                <span className="text-[10px] font-medium text-[#0026f6]">Pulsuz</span>
               </label>
             )}
             {config.shippingMethod === "standard" && (
-              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-green-500 bg-green-50/50 dark:bg-green-900/10`}>
+              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full border-2 border-green-500 bg-green-500 flex-shrink-0"/>
+                  <div className="w-3 h-3 rounded-full border-2 border-[#0026f6] bg-[#0026f6] flex-shrink-0"/>
                   <span className="text-[10px]">Standart Çatdırılma</span>
                 </div>
-                <span className="text-[10px] font-medium text-green-600">{config.shippingPrice} ₼</span>
+                <span className="text-[10px] font-medium text-[#0026f6]">{config.shippingPrice} ₼</span>
               </label>
             )}
             {config.shippingMethod === "free_above" && (
-              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-green-500 bg-green-50/50 dark:bg-green-900/10`}>
+              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full border-2 border-green-500 bg-green-500 flex-shrink-0"/>
+                  <div className="w-3 h-3 rounded-full border-2 border-[#0026f6] bg-[#0026f6] flex-shrink-0"/>
                   <span className="text-[10px]">{config.shippingFreeAbove} ₼ üzərində pulsuz</span>
                 </div>
-                <span className="text-[10px] font-medium text-green-600">Pulsuz</span>
+                <span className="text-[10px] font-medium text-[#0026f6]">Pulsuz</span>
               </label>
             )}
             {config.shippingMethod === "distance" && (
-              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-green-500 bg-green-50/50 dark:bg-green-900/10`}>
+              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full border-2 border-green-500 bg-green-500 flex-shrink-0"/>
+                  <div className="w-3 h-3 rounded-full border-2 border-[#0026f6] bg-[#0026f6] flex-shrink-0"/>
                   <div>
                     <span className="text-[10px] block">Məsafəyə görə çatdırılma</span>
                     <span className={`text-[9px] ${sub}`}>{config.shippingDistanceBase} ₼/km · max {config.shippingDistanceMaxKm} km</span>
@@ -1560,8 +1623,8 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
           <div className={`rounded-xl border ${card} p-3 space-y-2`}>
             <p className={`text-[10px] font-semibold ${txt} mb-1`}>Ödəniş üsulunu seçin</p>
             {config.paymentMethods.filter(m=>m.enabled).map((m,i)=>(
-              <label key={m.id} className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer border transition-colors ${i===0?"border-green-500 bg-green-50/50 dark:bg-green-900/10":`border-transparent ${isDark?"hover:bg-gray-700":"hover:bg-gray-50"}`}`}>
-                <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${i===0?"border-green-500 bg-green-500":"border-gray-300"}`}/>
+              <label key={m.id} className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer border transition-colors ${i===0?"border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10":`border-transparent ${isDark?"hover:bg-gray-700":"hover:bg-gray-50"}`}`}>
+                <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${i===0?"border-[#0026f6] bg-[#0026f6]":"border-gray-300"}`}/>
                 <span className="text-sm">{m.icon}</span>
                 <span className="text-[10px]">{m.name}</span>
               </label>
@@ -1576,9 +1639,9 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
             <div><label className={`text-[10px] ${sub} block mb-1`}>Kartdakı Ad</label><input className={inputCls} placeholder="Əli Əliyev"/></div>
           </div>
           <div className={`rounded-xl border ${card} p-3 space-y-1 text-xs`}>
-            <div className={`flex justify-between ${sub}`}><span>2 məhsul</span><span>219.98 ₼</span></div>
-            <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-green-600">Pulsuz</span></div>
-            <div className={`flex justify-between font-bold border-t pt-1.5 ${isDark?"border-gray-700":""}`}><span>Cəmi</span><span style={{color:tmpl.accent}}>219.98 ₼</span></div>
+            <div className={`flex justify-between ${sub}`}><span>{bagLines.reduce((s, l) => s + l.qty, 0)} məhsul</span><span>{bagTotalLabel} ₼</span></div>
+            <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-[#0026f6]">Pulsuz</span></div>
+            <div className={`flex justify-between font-bold border-t pt-1.5 ${isDark?"border-gray-700":""}`}><span>Cəmi</span><span style={{color:tmpl.accent}}>{bagTotalLabel} ₼</span></div>
           </div>
           <div className="flex gap-2">
             <button onClick={()=>setCartStep("shipping")} className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-colors ${isDark?"border-gray-600 hover:bg-gray-700":"border-gray-300 hover:bg-gray-50"}`}>← Geri</button>
@@ -1589,8 +1652,8 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
 
       {cartStep === "done" && (
         <div className="py-8 flex flex-col items-center text-center gap-3">
-          <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-            <Check className="w-7 h-7 text-green-600"/>
+          <div className="w-14 h-14 rounded-full bg-[#e8ebff] dark:bg-[#0026f6]/30 flex items-center justify-center">
+            <Check className="w-7 h-7 text-[#0026f6]"/>
           </div>
           <div>
             <h2 className="text-sm font-bold mb-1">Sifariş Təsdiqləndi!</h2>
@@ -1598,10 +1661,10 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark }: {
           </div>
           <div className={`w-full rounded-xl border ${card} p-3 text-left space-y-1 text-xs`}>
             <div className={`flex justify-between ${sub}`}><span>Sifariş #</span><span className="font-mono">INF-{Math.floor(Math.random()*90000+10000)}</span></div>
-            <div className={`flex justify-between ${sub}`}><span>Ödənildi</span><span className="font-semibold" style={{color:tmpl.accent}}>219.98 ₼</span></div>
+            <div className={`flex justify-between ${sub}`}><span>Ödənildi</span><span className="font-semibold" style={{color:tmpl.accent}}>{bagTotalLabel} ₼</span></div>
             <div className={`flex justify-between ${sub}`}><span>Təxmini çatdırılma</span><span>5–7 iş günü</span></div>
           </div>
-          <button onClick={()=>setCartStep("bag")} className="px-6 py-2 rounded-xl text-xs font-semibold text-white shadow-md" style={{background:tmpl.accent}}>Alış-verişə Davam Et</button>
+          <button onClick={() => { setCartStep("bag"); storefront?.setPage("home"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="px-6 py-2 rounded-xl text-xs font-semibold text-white shadow-md" style={{background:tmpl.accent}}>Alış-verişə Davam Et</button>
         </div>
       )}
     </div>
@@ -1619,6 +1682,7 @@ function LivePreview({
   onTopLevelDragOver, onTopLevelDrop,
   onDeleteBlock, onDeleteTopLevelBlock,
   publicMode = false,
+  storefront,
 }: {
   config: WebsiteConfig; selected: SelectedItem; viewport: "desktop" | "mobile";
   dropTarget: DropTarget | null; activeDragId: string | null;
@@ -1636,6 +1700,7 @@ function LivePreview({
   onDeleteBlock: (blockId: string, rowId: string, colId: string) => void;
   onDeleteTopLevelBlock: (blockId: string) => void;
   publicMode?: boolean;
+  storefront?: StorefrontRuntime;
 }) {
   const { language } = useLanguage();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -1644,9 +1709,12 @@ function LivePreview({
   const isDark = config.template === "dark";
   const isElegant = config.template === "elegant";
   const isVibrant = config.template === "vibrant";
-  const headerRing = selected?.kind === "header" ? "ring-2 ring-green-500 ring-offset-1" : "ring-1 ring-transparent hover:ring-green-300";
+  const headerRing = selected?.kind === "header" ? "ring-2 ring-[#0026f6] ring-offset-1" : "ring-1 ring-transparent hover:ring-[#99b3ff]";
   const waBlock = config.content.find(c => !isRow(c) && (c as Block).type === "whatsapp-widget" && c.visible) as Block | undefined;
   const [previewPage, setPreviewPage] = useState<"home" | "product" | "checkout">("home");
+  const isPublicStore = publicMode && !!storefront;
+  const activePage = isPublicStore ? storefront!.page : previewPage;
+  const cartBadge = isPublicStore ? storefront!.cartCount : 2;
 
   const pageLabels = {
     home: tr("🏠 Ana Səhifə", "🏠 Home", "🏠 Главная"),
@@ -1661,7 +1729,7 @@ function LivePreview({
     <div className="flex-shrink-0 flex items-center gap-1 px-1">
       {(["home","product","checkout"] as const).map(pg => (
         <button key={pg} onClick={() => setPreviewPage(pg)}
-          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${previewPage===pg?"bg-green-500 text-white":"bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-green-400"}`}>
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${previewPage===pg?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-[#0026f6]"}`}>
           {pageLabels[pg]}
         </button>
       ))}
@@ -1671,7 +1739,9 @@ function LivePreview({
     <div className={`flex-1 overflow-y-auto ${publicMode ? "rounded-none border-0" : "rounded-xl border"} ${isDark ? "border-gray-700" : "border-gray-200"} ${publicMode ? "" : "shadow-sm"} ${tmpl.bg} relative ${viewport === "mobile" && !publicMode ? "max-w-[375px] mx-auto w-full" : "w-full"}`}>
       {/* Header */}
       <div
-        onClick={publicMode ? undefined : onSelectHeader}
+        onClick={isPublicStore
+          ? () => { storefront!.setPage("home"); window.scrollTo({ top: 0, behavior: "smooth" }); }
+          : publicMode ? undefined : onSelectHeader}
         className={`sticky top-0 z-10 ${tmpl.nav} px-4 h-12 flex items-center justify-between ${publicMode ? "" : "cursor-pointer"} rounded-t-xl transition-all ${publicMode ? "" : headerRing} group`}
         style={config.primaryColor ? { background: config.primaryColor } : undefined}
       >
@@ -1684,21 +1754,28 @@ function LivePreview({
             <span key={n.id} className={`text-xs ${isElegant?"tracking-widest uppercase text-[9px]":""} ${isDark ? "text-gray-400" : "text-gray-500"}`}>{n.label}</span>
           ))}
         </div>
-        <div className="relative">
+        <button
+          type="button"
+          onClick={isPublicStore ? (e) => { e.stopPropagation(); storefront!.setPage("checkout"); window.scrollTo({ top: 0, behavior: "smooth" }); } : undefined}
+          className={`relative ${isPublicStore ? "cursor-pointer" : ""}`}
+          aria-label="Cart"
+        >
           <ShoppingCart className="w-4 h-4" style={{ color: tmpl.accent }} />
-          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full text-white text-[8px] font-bold flex items-center justify-center" style={{ background: tmpl.accent }}>2</span>
-        </div>
+          {cartBadge > 0 && (
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full text-white text-[8px] font-bold flex items-center justify-center" style={{ background: tmpl.accent }}>{cartBadge}</span>
+          )}
+        </button>
         <div className={`absolute top-2 right-10 opacity-0 group-hover:opacity-100 ${selected?.kind === "header" ? "opacity-100" : ""} transition-opacity pointer-events-none ${publicMode ? "hidden" : ""}`}>
-          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-500 text-white text-[9px] font-medium"><Pencil className="w-2 h-2" /> Header</div>
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#0026f6] text-white text-[9px] font-medium"><Pencil className="w-2 h-2" /> Header</div>
         </div>
       </div>
 
       {/* Content — home page */}
-      {previewPage !== "home" && (
-        <ProductOrCheckoutPage page={previewPage} config={config} tmpl={tmpl} isDark={isDark} />
+      {activePage !== "home" && (
+        <ProductOrCheckoutPage page={activePage} config={config} tmpl={tmpl} isDark={isDark} storefront={storefront} />
       )}
       <div
-        className={`p-3 space-y-3 ${previewPage !== "home" ? "hidden" : ""}`}
+        className={`p-3 space-y-3 ${activePage !== "home" ? "hidden" : ""}`}
         onDragOver={e => e.preventDefault()}
         onDrop={onTopLevelDrop}
       >
@@ -1723,6 +1800,7 @@ function LivePreview({
                 onColumnDrop={publicMode ? () => {} : (e, colId) => onColumnDrop(e, item.id, colId)}
                 onColumnDragLeave={publicMode ? () => {} : onColumnDragLeave}
                 onDeleteBlock={publicMode ? () => {} : (blockId, colId) => onDeleteBlock(blockId, item.id, colId)}
+                storefront={storefront}
               />
             );
           }
@@ -1748,6 +1826,8 @@ function LivePreview({
               onDragOver={publicMode ? undefined : (e, pos) => onTopLevelDragOver(e, block.id, pos)}
               onDragEnd={publicMode ? undefined : onBlockDragEnd}
               onDelete={publicMode ? undefined : () => onDeleteTopLevelBlock(block.id)}
+              publicMode={publicMode}
+              storefront={storefront}
             />
           );
         })}
@@ -1760,14 +1840,20 @@ function LivePreview({
         )}
       </div>
 
-      {previewPage === "home" && <div className={`mt-4 px-4 py-6 border-t ${isDark ? "border-gray-800 text-gray-600" : "border-gray-200 text-gray-400"}`}>
+      {activePage === "home" && <div className={`mt-4 px-4 py-6 border-t ${isDark ? "border-gray-800 text-gray-600" : "border-gray-200 text-gray-400"}`}>
         <p className="text-xs text-center">© 2025 {config.storeName}. Powered by Inflero.</p>
       </div>}
 
-      {waBlock && previewPage === "home" && (
+      {waBlock && activePage === "home" && (
         <button
-          onClick={publicMode ? undefined : () => onSelectBlock(waBlock.id)}
-          className={`sticky bottom-4 ml-auto mr-3 flex items-center gap-1.5 px-3 py-2 rounded-full text-white text-xs font-medium shadow-lg hover:scale-105 transition-all ${!publicMode && selected?.kind === "block" && selected.blockId === waBlock.id ? "ring-2 ring-green-300 ring-offset-2" : ""}`}
+          type="button"
+          onClick={isPublicStore && waBlock.waNumber
+            ? () => {
+                const digits = waBlock.waNumber!.replace(/\D/g, "");
+                if (digits) window.open(`https://wa.me/${digits}`, "_blank", "noopener,noreferrer");
+              }
+            : publicMode ? undefined : () => onSelectBlock(waBlock.id)}
+          className={`sticky bottom-4 ml-auto mr-3 flex items-center gap-1.5 px-3 py-2 rounded-full text-white text-xs font-medium shadow-lg hover:scale-105 transition-all ${!publicMode && selected?.kind === "block" && selected.blockId === waBlock.id ? "ring-2 ring-[#99b3ff] ring-offset-2" : ""}`}
           style={{ background: "#25d366", display: "flex", width: "fit-content" }}
         >
           <MessageCircle className="w-3.5 h-3.5" />
@@ -1789,7 +1875,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
-const inputCls = "w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow";
+const inputCls = "w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent transition-shadow";
 const textareaCls = `${inputCls} resize-none font-mono`;
 
 // ─── Block Settings Panel ─────────────────────────────────────────────────────
@@ -1804,7 +1890,7 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
       <Field label={tr("Mənbə", "Source")}>
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {(["all","category","specific"] as const).map(m => (
-            <button key={m} onClick={() => onChange({ ...src, mode: m })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${src.mode===m?"bg-green-500 text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>
+            <button key={m} onClick={() => onChange({ ...src, mode: m })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${src.mode===m?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>
               {m==="all"?tr("Hamısı","All"):m==="category"?tr("Kateqoriya","Category"):tr("Seç","Pick")}
             </button>
           ))}
@@ -1817,8 +1903,8 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
             {filtered.map(p => {
               const on = src.productIds.includes(p.id);
               return (
-                <button key={p.id} onClick={() => onChange({ ...src, productIds: on ? src.productIds.filter(id=>id!==p.id) : [...src.productIds,p.id] })} className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left text-xs transition-colors ${on?"border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20":"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"}`}>
-                  <div className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center ${on?"bg-green-500 border-green-600":"border-gray-300 dark:border-gray-600"}`}>{on&&<Check className="w-2.5 h-2.5 text-white"/>}</div>
+                <button key={p.id} onClick={() => onChange({ ...src, productIds: on ? src.productIds.filter(id=>id!==p.id) : [...src.productIds,p.id] })} className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left text-xs transition-colors ${on?"border-[#99b3ff] dark:border-[#0026f6]/40 bg-[#e8ebff] dark:bg-[#0026f6]/20":"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"}`}>
+                  <div className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center ${on?"bg-[#0026f6] border-[#001fc4]":"border-gray-300 dark:border-gray-600"}`}>{on&&<Check className="w-2.5 h-2.5 text-white"/>}</div>
                   <span className="flex-1 truncate">{p.name}</span>
                   <span className="text-gray-400">{p.price} ₼</span>
                 </button>
@@ -1830,14 +1916,14 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
       <Field label={tr("Sütun sayı","Columns per row")}>
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {[2,3,4,5,6].map(n => (
-            <button key={n} onClick={() => onChange({ ...src, columns: n })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(src.columns??4)===n?"bg-green-500 text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
+            <button key={n} onClick={() => onChange({ ...src, columns: n })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(src.columns??4)===n?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
           ))}
         </div>
       </Field>
       <Field label={tr("Cərgə sayı","Rows")}>
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {[1,2,3,4,5,6].map(n => (
-            <button key={n} onClick={() => onChange({ ...src, rows: n })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(src.rows??1)===n?"bg-green-500 text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
+            <button key={n} onClick={() => onChange({ ...src, rows: n })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(src.rows??1)===n?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
           ))}
         </div>
       </Field>
@@ -1856,7 +1942,7 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">{meta.icon}</div>
+          <div className="w-6 h-6 rounded-md bg-[#e8ebff] dark:bg-[#0026f6]/30 flex items-center justify-center text-[#0026f6] dark:text-[#99b3ff]">{meta.icon}</div>
           <div>
             <p className="text-sm font-semibold text-gray-900 dark:text-white">{pickLang(language, metaAz.label, meta.label)}</p>
             <p className="text-[10px] text-gray-400">{pickLang(language, metaAz.description, meta.description)}</p>
@@ -1880,9 +1966,9 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           <Field label={tr("Alt başlıq", "Subheading")}><textarea className={textareaCls} rows={2} value={block.subheading??""} onChange={e=>set({subheading:e.target.value})}/></Field>
           <Field label={tr("Mətn rəngi", "Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.textColor??"#ffffff"} onChange={e=>set({textColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.textColor??"#ffffff"}</span></div></Field>
           <Field label={tr("Düymə mətni", "Button Text")}><input className={inputCls} value={block.ctaText??""} onChange={e=>set({ctaText:e.target.value})}/></Field>
-          <Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#16a34a"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#16a34a"}</span></div></Field>
+          <Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#0026f6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#0026f6"}</span></div></Field>
           <Field label={tr("Düymə mətn rəngi", "Button Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaBtnTextColor??"#ffffff"} onChange={e=>set({ctaBtnTextColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaBtnTextColor??"#ffffff"}</span></div></Field>
-          <Field label={`${block.imageUrl ? tr("Üst qat", "Overlay") : tr("Arxa fon", "Background")} ${tr("Şəffaflığı", "Opacity")} — ${block.overlayOpacity??70}%`}><input type="range" min={0} max={100} value={block.overlayOpacity??70} onChange={e=>set({overlayOpacity:Number(e.target.value)})} className="w-full accent-green-600"/></Field>
+          <Field label={`${block.imageUrl ? tr("Üst qat", "Overlay") : tr("Arxa fon", "Background")} ${tr("Şəffaflığı", "Opacity")} — ${block.overlayOpacity??70}%`}><input type="range" min={0} max={100} value={block.overlayOpacity??70} onChange={e=>set({overlayOpacity:Number(e.target.value)})} className="w-full accent-[#0026f6]"/></Field>
         </>)}
         {block.type==="featured-products"&&<ProductSourceEditor src={block.productSource??{mode:"all",categoryId:"",productIds:[],limit:4,title:"Featured Products"}} onChange={src=>set({productSource:src})}/>}
         {block.type==="banner"&&(<>
@@ -1899,9 +1985,9 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           <Field label={tr("Alt mətn", "Subtext")}><input className={inputCls} value={block.bannerSubtext??""} onChange={e=>set({bannerSubtext:e.target.value})} placeholder={tr("Məhdud müddətli təklif", "Limited time offer")}/></Field>
           <Field label={tr("Mətn rəngi", "Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.textColor??"#ffffff"} onChange={e=>set({textColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.textColor??"#ffffff"}</span></div></Field>
           <Field label={tr("Düymə mətni", "Button Text")}><input className={inputCls} value={block.ctaText??""} onChange={e=>set({ctaText:e.target.value})} placeholder={tr("Gizlətmək üçün boş buraxın", "Leave empty to hide")}/></Field>
-          {block.ctaText&&<Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#16a34a"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#16a34a"}</span></div></Field>}
+          {block.ctaText&&<Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#0026f6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#0026f6"}</span></div></Field>}
           {block.ctaText&&<Field label={tr("Düymə mətn rəngi", "Button Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaBtnTextColor??"#ffffff"} onChange={e=>set({ctaBtnTextColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaBtnTextColor??"#ffffff"}</span></div></Field>}
-          <Field label={`${block.bannerImageUrl ? tr("Üst qat", "Overlay") : tr("Arxa fon", "Background")} ${tr("Şəffaflığı", "Opacity")} — ${block.overlayOpacity??75}%`}><input type="range" min={0} max={100} value={block.overlayOpacity??75} onChange={e=>set({overlayOpacity:Number(e.target.value)})} className="w-full accent-green-600"/></Field>
+          <Field label={`${block.bannerImageUrl ? tr("Üst qat", "Overlay") : tr("Arxa fon", "Background")} ${tr("Şəffaflığı", "Opacity")} — ${block.overlayOpacity??75}%`}><input type="range" min={0} max={100} value={block.overlayOpacity??75} onChange={e=>set({overlayOpacity:Number(e.target.value)})} className="w-full accent-[#0026f6]"/></Field>
         </>)}
         {block.type==="custom-html"&&<Field label="HTML / Embed"><textarea className={textareaCls} rows={8} value={block.html??""} onChange={e=>set({html:e.target.value})} placeholder="<div>Your HTML</div>"/></Field>}
         {block.type==="image-block"&&(<>
@@ -1910,18 +1996,18 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           </Field>
           <Field label={tr("Alt mətn", "Alt Text")}><input className={inputCls} value={block.imageAlt??""} onChange={e=>set({imageAlt:e.target.value})} placeholder={tr("Şəkili təsvir edin", "Describe the image")}/></Field>
           <Field label={tr("Başlıq", "Caption")}><input className={inputCls} value={block.imageCaption??""} onChange={e=>set({imageCaption:e.target.value})} placeholder={tr("İstəyə bağlı başlıq", "Optional caption below image")}/></Field>
-          <Field label={tr("Hündürlük", "Height")}><div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">{(["sm","md","lg"] as const).map(h=><button key={h} onClick={()=>set({imageHeight:h})} className={`flex-1 py-1.5 text-xs font-medium capitalize transition-colors ${(block.imageHeight||"md")===h?"bg-green-500 text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{h==="sm"?tr("Kiçik","Small"):h==="md"?tr("Orta","Medium"):tr("Böyük","Large")}</button>)}</div></Field>
+          <Field label={tr("Hündürlük", "Height")}><div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">{(["sm","md","lg"] as const).map(h=><button key={h} onClick={()=>set({imageHeight:h})} className={`flex-1 py-1.5 text-xs font-medium capitalize transition-colors ${(block.imageHeight||"md")===h?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{h==="sm"?tr("Kiçik","Small"):h==="md"?tr("Orta","Medium"):tr("Böyük","Large")}</button>)}</div></Field>
         </>)}
         {block.type==="image-text"&&(<>
           <Field label={tr("Şəkil", "Image")}>
             <ImageUploader value={block.imageUrl} onChange={v=>set({imageUrl:v})} aspectHint={tr("Tövsiyə: kare və ya 4:3", "Recommended: square or 4:3")} />
           </Field>
-          <Field label={tr("Şəkil mövqeyi", "Image Position")}><div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">{(["left","right"] as const).map(p=><button key={p} onClick={()=>set({imagePosition:p})} className={`flex-1 py-1.5 text-xs font-medium capitalize transition-colors ${(block.imagePosition||"left")===p?"bg-green-500 text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{tr("Şəkil", "Image")} {p==="left"?tr("solda","left"):tr("sağda","right")}</button>)}</div></Field>
+          <Field label={tr("Şəkil mövqeyi", "Image Position")}><div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">{(["left","right"] as const).map(p=><button key={p} onClick={()=>set({imagePosition:p})} className={`flex-1 py-1.5 text-xs font-medium capitalize transition-colors ${(block.imagePosition||"left")===p?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{tr("Şəkil", "Image")} {p==="left"?tr("solda","left"):tr("sağda","right")}</button>)}</div></Field>
           <Field label={tr("Başlıq", "Headline")}><input className={inputCls} value={block.heading??""} onChange={e=>set({heading:e.target.value})}/></Field>
           <Field label={tr("Alt mətn", "Subtext")}><textarea className={textareaCls} rows={2} value={block.subheading??""} onChange={e=>set({subheading:e.target.value})}/></Field>
           <Field label={tr("Mətn rəngi", "Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.textColor??"#111827"} onChange={e=>set({textColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.textColor??"#111827"}</span></div></Field>
           <Field label={tr("Düymə mətni", "Button Text")}><input className={inputCls} value={block.ctaText??""} onChange={e=>set({ctaText:e.target.value})} placeholder={tr("Gizlətmək üçün boş buraxın", "Leave empty to hide")}/></Field>
-          {block.ctaText&&<Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#16a34a"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#16a34a"}</span></div></Field>}
+          {block.ctaText&&<Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#0026f6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#0026f6"}</span></div></Field>}
           {block.ctaText&&<Field label={tr("Düymə mətn rəngi", "Button Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaBtnTextColor??"#ffffff"} onChange={e=>set({ctaBtnTextColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaBtnTextColor??"#ffffff"}</span></div></Field>}
         </>)}
         {block.type==="whatsapp-widget"&&(<>
@@ -1952,20 +2038,20 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
                   <button onClick={()=>set({reservationServices:(block.reservationServices||[]).filter((_,j)=>j!==i)})} className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"><X className="w-3.5 h-3.5"/></button>
                 </div>
               ))}
-              <button onClick={()=>set({reservationServices:[...(block.reservationServices||[]),""]})} className="flex items-center gap-1 text-[10px] font-medium text-green-600 hover:text-green-700 transition-colors">
+              <button onClick={()=>set({reservationServices:[...(block.reservationServices||[]),""]})} className="flex items-center gap-1 text-[10px] font-medium text-[#0026f6] hover:text-[#001fc4] transition-colors">
                 <Plus className="w-3 h-3"/> {tr("Xidmət əlavə et", "Add service")}
               </button>
             </div>
           </Field>
           <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <span className="text-xs text-gray-700 dark:text-gray-300">{tr("Qonaq sayı sahəsini göstər", "Show Guests field")}</span>
-            <button onClick={()=>set({reservationShowGuests:!(block.reservationShowGuests??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowGuests??true)?"bg-green-500":"bg-gray-200 dark:bg-gray-700"}`}>
+            <button onClick={()=>set({reservationShowGuests:!(block.reservationShowGuests??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowGuests??true)?"bg-[#0026f6]":"bg-gray-200 dark:bg-gray-700"}`}>
               <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${(block.reservationShowGuests??true)?"translate-x-4":"translate-x-0.5"}`}/>
             </button>
           </div>
           <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <span className="text-xs text-gray-700 dark:text-gray-300">{tr("Qeydlər sahəsini göstər", "Show Notes field")}</span>
-            <button onClick={()=>set({reservationShowNotes:!(block.reservationShowNotes??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowNotes??true)?"bg-green-500":"bg-gray-200 dark:bg-gray-700"}`}>
+            <button onClick={()=>set({reservationShowNotes:!(block.reservationShowNotes??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowNotes??true)?"bg-[#0026f6]":"bg-gray-200 dark:bg-gray-700"}`}>
               <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${(block.reservationShowNotes??true)?"translate-x-4":"translate-x-0.5"}`}/>
             </button>
           </div>
@@ -1979,7 +2065,7 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           <Field label={tr("Sütun sayı", "Columns")}>
             <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               {[2,3,4,5,6].map(n=>(
-                <button key={n} onClick={()=>set({categoryColumns:n})} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(block.categoryColumns??3)===n?"bg-green-500 text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
+                <button key={n} onClick={()=>set({categoryColumns:n})} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(block.categoryColumns??3)===n?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
               ))}
             </div>
           </Field>
@@ -1987,7 +2073,7 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
         {block.type==="testimonials"&&(<>
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{tr("Rəylər", "Reviews")}</p>
-            <button onClick={()=>set({testimonialItems:[...(block.testimonialItems||[{name:"Sarah M.",text:"Great quality! Arrived fast.",rating:5},{name:"James K.",text:"Will definitely order again.",rating:5},{name:"Leila A.",text:"Highly recommend this store.",rating:4}]),{name:"",text:"",rating:5}]})} className="flex items-center gap-1 text-[10px] font-medium text-green-600 hover:text-green-700 transition-colors">
+            <button onClick={()=>set({testimonialItems:[...(block.testimonialItems||[{name:"Sarah M.",text:"Great quality! Arrived fast.",rating:5},{name:"James K.",text:"Will definitely order again.",rating:5},{name:"Leila A.",text:"Highly recommend this store.",rating:4}]),{name:"",text:"",rating:5}]})} className="flex items-center gap-1 text-[10px] font-medium text-[#0026f6] hover:text-[#001fc4] transition-colors">
               <Plus className="w-3 h-3"/> {tr("Rəy əlavə et", "Add review")}
             </button>
           </div>
@@ -2079,14 +2165,14 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{tr("Sütun Düzümü", "Column Layout")}</p>
             <div className="flex gap-2">
               <button onClick={() => setAdjustingWidths(true)} className="text-xs text-blue-600 dark:text-blue-400 font-medium hover:underline">{tr("Genişlikləri tənzimlə", "Adjust widths")}</button>
-              <button onClick={() => setChangingLayout(v => !v)} className="text-xs text-green-600 dark:text-green-400 font-medium hover:underline">{changingLayout ? tr("Ləğv et", "Cancel") : tr("Dəyişdir", "Change")}</button>
+              <button onClick={() => setChangingLayout(v => !v)} className="text-xs text-[#0026f6] dark:text-[#99b3ff] font-medium hover:underline">{changingLayout ? tr("Ləğv et", "Cancel") : tr("Dəyişdir", "Change")}</button>
             </div>
           </div>
           {changingLayout ? (
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden max-h-64 overflow-y-auto">
               <div className="grid grid-cols-2 gap-1 p-2">
                 {COLUMN_PRESETS.map(preset => (
-                  <button key={preset.id} onClick={() => changePreset(preset)} className="flex flex-col gap-1.5 p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all text-left">
+                  <button key={preset.id} onClick={() => changePreset(preset)} className="flex flex-col gap-1.5 p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-[#0026f6] hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/20 transition-all text-left">
                     <PresetIcon ratios={preset.ratios}/>
                     <span className="text-[10px] text-gray-400">{preset.label}</span>
                   </button>
@@ -2153,7 +2239,7 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
                             </div>
                             {group.types.map(type => (
                               <button key={type} onClick={() => { onAddBlockToColumn(col.id, type); setPickingForCol(null); }} className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-left border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors">
-                                <div className="text-green-600 dark:text-green-400">{BLOCK_META[type].icon}</div>
+                                <div className="text-[#0026f6] dark:text-[#99b3ff]">{BLOCK_META[type].icon}</div>
                                 <p className="text-xs text-gray-700 dark:text-gray-200">{pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)}</p>
                               </button>
                             ))}
@@ -2164,7 +2250,7 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
                     ) : (
                       <button
                         onClick={() => setPickingForCol(col.id)}
-                        className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-xs text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:border-green-400 dark:hover:border-green-600 transition-colors mt-1"
+                        className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-xs text-gray-400 hover:text-[#0026f6] dark:hover:text-[#99b3ff] hover:border-[#0026f6] dark:hover:border-[#0026f6] transition-colors mt-1"
                       >
                         <Plus className="w-3 h-3"/> {tr(`${ci+1}-ci sütuna blok əlavə et`, `Add block to col ${ci+1}`)}
                       </button>
@@ -2193,7 +2279,7 @@ function HeaderSettingsPanel({ config, onUpdateConfig, onClose }: { config: Webs
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400"><Layout className="w-3.5 h-3.5"/></div>
+          <div className="w-6 h-6 rounded-md bg-[#e8ebff] dark:bg-[#0026f6]/30 flex items-center justify-center text-[#0026f6] dark:text-[#99b3ff]"><Layout className="w-3.5 h-3.5"/></div>
           <div><p className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Başlıq", "Header")}</p><p className="text-[10px] text-gray-400">{tr("Logo, naviqasiya, səbət", "Logo, navigation, cart")}</p></div>
         </div>
         <button onClick={onClose} className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"><X className="w-4 h-4"/></button>
@@ -2212,12 +2298,12 @@ function HeaderSettingsPanel({ config, onUpdateConfig, onClose }: { config: Webs
               </button>
             </div>
           ) : (
-            <label className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-green-400 dark:hover:border-green-600 hover:bg-green-50/30 dark:hover:bg-green-900/10 cursor-pointer transition-colors group">
-              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/30 transition-colors">
-                <Upload className="w-4 h-4 text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors"/>
+            <label className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-[#0026f6] dark:hover:border-[#0026f6] hover:bg-[#e8ebff]/30 dark:hover:bg-[#0026f6]/10 cursor-pointer transition-colors group">
+              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-[#e8ebff] dark:group-hover:bg-[#0026f6]/30 transition-colors">
+                <Upload className="w-4 h-4 text-gray-400 group-hover:text-[#0026f6] dark:group-hover:text-[#99b3ff] transition-colors"/>
               </div>
               <div className="text-center">
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">{tr("Loqo yükləyin", "Upload logo")}</p>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#0026f6] dark:group-hover:text-[#99b3ff] transition-colors">{tr("Loqo yükləyin", "Upload logo")}</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">{tr("PNG, SVG, JPG · maks 2MB", "PNG, SVG, JPG · max 2MB")}</p>
               </div>
               <input
@@ -2238,7 +2324,7 @@ function HeaderSettingsPanel({ config, onUpdateConfig, onClose }: { config: Webs
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{tr("Nav Linkləri", "Nav Links")}</p>
-            <button onClick={addLink} className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors"><Plus className="w-3 h-3"/>{tr("Əlavə et", "Add")}</button>
+            <button onClick={addLink} className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg bg-[#0026f6] hover:bg-[#001fc4] text-white transition-colors"><Plus className="w-3 h-3"/>{tr("Əlavə et", "Add")}</button>
           </div>
           <div className="space-y-1.5">
             {links.map(link=>(
@@ -2268,6 +2354,7 @@ type AddPhase = null | "menu" | "blocks" | { kind: "layout" } | { kind: "widths"
 function PanelTabBar({ active, onChange }: { active: PanelTab; onChange: (t: PanelTab) => void }) {
   const { language } = useLanguage();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const lockedTabs: PanelTab[] = ["email"];
   const tabs: { key: PanelTab; label: string }[] = [
     { key: "blocks",   label: tr("Bloklar", "Blocks") },
     { key: "design",   label: tr("Dizayn",  "Design") },
@@ -2277,7 +2364,31 @@ function PanelTabBar({ active, onChange }: { active: PanelTab; onChange: (t: Pan
   ];
   return (
     <div className="flex border-b border-gray-200 dark:border-gray-800">
-      {tabs.map(t => <button key={t.key} onClick={() => onChange(t.key)} className={`flex-1 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${active===t.key?"border-green-500 text-green-600 dark:text-green-400":"border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>{t.label}</button>)}
+      {tabs.map(t => {
+        const locked = lockedTabs.includes(t.key);
+        return (
+          <button
+            key={t.key}
+            type="button"
+            disabled={locked}
+            onClick={() => { if (!locked) onChange(t.key); }}
+            className={`flex-1 py-2 text-xs font-medium transition-colors border-b-2 -mb-px flex flex-col items-center gap-0.5 ${
+              locked
+                ? "border-transparent text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-70"
+                : active === t.key
+                  ? "border-[#0026f6] text-[#0026f6] dark:text-[#99b3ff]"
+                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            <span>{t.label}</span>
+            {locked && (
+              <span className="text-[8px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {tr("Tezliklə", "Coming soon")}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -2321,7 +2432,7 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
         <p className="text-xs text-gray-500 dark:text-gray-400">{tr("Seçmək və redaktə etmək üçün klikləyin", "Click to select & edit")}</p>
         <button
           onClick={() => setAddPhase(v => v ? null : "menu")}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#0026f6] hover:bg-[#001fc4] text-white transition-colors"
         >
           <Plus className="w-3 h-3"/> {tr("Yeni", "Add")}
         </button>
@@ -2332,8 +2443,8 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
         <div className="mx-4 mb-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden flex-shrink-0">
           {addPhase === "menu" && (
             <div className="flex">
-              <button onClick={() => setAddPhase("blocks")} className="flex-1 flex flex-col items-center gap-1.5 py-3 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors border-r border-gray-100 dark:border-gray-700">
-                <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600"><Layers className="w-4 h-4"/></div>
+              <button onClick={() => setAddPhase("blocks")} className="flex-1 flex flex-col items-center gap-1.5 py-3 hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/20 transition-colors border-r border-gray-100 dark:border-gray-700">
+                <div className="w-8 h-8 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/30 flex items-center justify-center text-[#0026f6]"><Layers className="w-4 h-4"/></div>
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{tr("Blok", "Block")}</span>
                 <span className="text-[10px] text-gray-400">{tr("Tək element", "Single element")}</span>
               </button>
@@ -2361,7 +2472,7 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
                     </div>
                     {group.types.map(type => (
                       <button key={type} onClick={() => addTopLevelBlock(type)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-left border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors">
-                        <div className="w-5 h-5 flex items-center justify-center text-green-600 dark:text-green-400">{BLOCK_META[type].icon}</div>
+                        <div className="w-5 h-5 flex items-center justify-center text-[#0026f6] dark:text-[#99b3ff]">{BLOCK_META[type].icon}</div>
                         <div><p className="text-xs font-medium text-gray-800 dark:text-gray-200">{pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)}</p><p className="text-[10px] text-gray-400">{pickLang(language, BLOCK_META_AZ[type].description, BLOCK_META[type].description)}</p></div>
                       </button>
                     ))}
@@ -2425,7 +2536,7 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
                   <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>moveItem(i,-1)} disabled={i===0} className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20"><ChevronUp className="w-3 h-3"/></button>
                     <button onClick={()=>moveItem(i,1)} disabled={i===config.content.length-1} className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20"><ChevronDown className="w-3 h-3"/></button>
-                    <button onClick={()=>toggleVisible(row.id)} className={`p-1 rounded-md transition-colors ${row.visible?"text-green-600":"text-gray-400"}`}>{row.visible?<Eye className="w-3 h-3"/>:<EyeOff className="w-3 h-3"/>}</button>
+                    <button onClick={()=>toggleVisible(row.id)} className={`p-1 rounded-md transition-colors ${row.visible?"text-[#0026f6]":"text-gray-400"}`}>{row.visible?<Eye className="w-3 h-3"/>:<EyeOff className="w-3 h-3"/>}</button>
                     <button onClick={()=>removeItem(row.id)} className="p-1 rounded-md text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
                   </div>
                 </div>
@@ -2443,8 +2554,8 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
                             {col.blocks.map(block => {
                               const isSB = selected?.kind==="row-block"&&selected.rowId===row.id&&selected.colId===col.id&&selected.blockId===block.id;
                               return (
-                                <div key={block.id} onClick={()=>onSelect({kind:"row-block",rowId:row.id,colId:col.id,blockId:block.id})} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer transition-all group ${isSB?"border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20":"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"}`}>
-                                  <div className={`flex-shrink-0 ${isSB?"text-green-600 dark:text-green-400":"text-gray-400"}`}>{BLOCK_META[block.type].icon}</div>
+                                <div key={block.id} onClick={()=>onSelect({kind:"row-block",rowId:row.id,colId:col.id,blockId:block.id})} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer transition-all group ${isSB?"border-[#99b3ff] dark:border-[#0026f6]/40 bg-[#e8ebff] dark:bg-[#0026f6]/20":"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"}`}>
+                                  <div className={`flex-shrink-0 ${isSB?"text-[#0026f6] dark:text-[#99b3ff]":"text-gray-400"}`}>{BLOCK_META[block.type].icon}</div>
                                   <span className="text-xs text-gray-700 dark:text-gray-300 flex-1 truncate">{block.label}</span>
                                   <button onClick={e=>{e.stopPropagation();const nr={...row,columns:row.columns.map(c=>c.id!==col.id?c:{...c,blocks:c.blocks.filter(b=>b.id!==block.id)})};onUpdate(config.content.map(c=>isRow(c)&&c.id===row.id?nr:c));}} className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex-shrink-0"><Trash2 className="w-3 h-3"/></button>
                                 </div>
@@ -2465,14 +2576,14 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
           const isSel = selected?.kind==="block"&&selected.blockId===block.id;
           const isWa = block.type==="whatsapp-widget";
           return (
-            <div key={block.id} onClick={()=>onSelect({kind:"block",blockId:block.id})} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${isSel?"border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20":block.visible?"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300":"border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50"}`}>
+            <div key={block.id} onClick={()=>onSelect({kind:"block",blockId:block.id})} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${isSel?"border-[#99b3ff] dark:border-[#0026f6]/40 bg-[#e8ebff] dark:bg-[#0026f6]/20":block.visible?"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300":"border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50"}`}>
               <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0"/>
-              <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${isSel?"bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400":isWa?"bg-green-100 dark:bg-green-900/20 text-green-600":"bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"}`}>{meta.icon}</div>
+              <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${isSel?"bg-[#e8ebff] dark:bg-[#0026f6]/40 text-[#0026f6] dark:text-[#99b3ff]":isWa?"bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6]":"bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"}`}>{meta.icon}</div>
               <div className="flex-1 min-w-0"><p className="text-xs font-medium text-gray-900 dark:text-white truncate">{block.label}</p><p className="text-[10px] text-gray-400">{isWa ? tr("Üzən düymə", "Floating widget") : (pickLang(language, BLOCK_META_AZ[block.type].label, meta.label))}</p></div>
               <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e=>e.stopPropagation()}>
                 <button onClick={()=>moveItem(i,-1)} disabled={i===0} className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20"><ChevronUp className="w-3 h-3"/></button>
                 <button onClick={()=>moveItem(i,1)} disabled={i===config.content.length-1} className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20"><ChevronDown className="w-3 h-3"/></button>
-                <button onClick={()=>toggleVisible(block.id)} className={`p-1 rounded-md transition-colors ${block.visible?"text-green-600":"text-gray-400"}`}>{block.visible?<Eye className="w-3 h-3"/>:<EyeOff className="w-3 h-3"/>}</button>
+                <button onClick={()=>toggleVisible(block.id)} className={`p-1 rounded-md transition-colors ${block.visible?"text-[#0026f6]":"text-gray-400"}`}>{block.visible?<Eye className="w-3 h-3"/>:<EyeOff className="w-3 h-3"/>}</button>
                 <button onClick={()=>removeItem(block.id)} className="p-1 rounded-md text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
               </div>
             </div>
@@ -2494,7 +2605,7 @@ function DesignPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: (c
         <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3">{tr("Şablon", "Template")}</p>
         <div className="grid grid-cols-2 gap-2">
           {TEMPLATES.map(t => (
-            <button key={t.id} onClick={() => onUpdate({ template: t.id })} className={`relative overflow-hidden border-2 transition-all text-left ${t.cardRadius} ${config.template===t.id?"border-green-500 shadow-md shadow-green-500/20":"border-gray-200 dark:border-gray-700 hover:border-gray-300"}`}>
+            <button key={t.id} onClick={() => onUpdate({ template: t.id })} className={`relative overflow-hidden border-2 transition-all text-left ${t.cardRadius} ${config.template===t.id?"border-[#0026f6] shadow-md shadow-[#0026f6]/20":"border-gray-200 dark:border-gray-700 hover:border-gray-300"}`}>
               {/* Mini preview of style */}
               <div className={`h-16 ${t.bg} p-2 flex flex-col gap-1.5`}>
                 {/* Nav bar */}
@@ -2518,7 +2629,7 @@ function DesignPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: (c
                   <span className="text-xs font-semibold text-gray-900 dark:text-white block leading-none">{t.name}</span>
                   <span className="text-[9px] text-gray-400 leading-none">{t.id==="minimal"?tr("Kəskin & səliqəli","Sharp & clean"):t.id==="dark"?tr("Hamar & müasir","Sleek & modern"):t.id==="elegant"?tr("Lüks & zərif","Luxury & refined"):tr("Cəsarətli & ifadəli","Bold & expressive")}</span>
                 </div>
-                {config.template===t.id&&<div className="w-4 h-4 rounded-full bg-green-500 flex-shrink-0 flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white"/></div>}
+                {config.template===t.id&&<div className="w-4 h-4 rounded-full bg-[#0026f6] flex-shrink-0 flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white"/></div>}
               </div>
             </button>
           ))}
@@ -2527,7 +2638,7 @@ function DesignPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: (c
       <div>
         <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3">{tr("Marka Rəngləri", "Brand Colors")}</p>
         <div className="space-y-2">
-          {[{label:tr("Əsas (Nav)","Primary (Nav)"),key:"primaryColor" as const,fallback:"#ffffff"},{label:tr("Vurğu (Düymələr/Qiymətlər)","Accent (Buttons/Prices)"),key:"accentColor" as const,fallback:"#16a34a"}].map(({label,key,fallback})=>(
+          {[{label:tr("Əsas (Nav)","Primary (Nav)"),key:"primaryColor" as const,fallback:"#ffffff"},{label:tr("Vurğu (Düymələr/Qiymətlər)","Accent (Buttons/Prices)"),key:"accentColor" as const,fallback:"#0026f6"}].map(({label,key,fallback})=>(
             <div key={key} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               <div className="flex items-center gap-2"><div className="w-6 h-6 rounded-md border border-gray-200 dark:border-gray-600" style={{background:config[key]||fallback}}/><span className="text-xs text-gray-700 dark:text-gray-300">{label}</span></div>
               <div className="flex items-center gap-1.5"><span className="text-[10px] font-mono text-gray-400">{config[key]||fallback}</span><input type="color" value={config[key]||fallback} onChange={e=>onUpdate({[key]:e.target.value})} className="w-7 h-7 rounded cursor-pointer border border-gray-200 dark:border-gray-600 bg-transparent p-0.5"/></div>
@@ -2588,7 +2699,7 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
   const ToggleRow = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) => (
     <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800 last:border-0">
       <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
-      <button onClick={onChange} className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${checked ? "bg-green-500" : "bg-gray-200 dark:bg-gray-700"}`}>
+      <button onClick={onChange} className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${checked ? "bg-[#0026f6]" : "bg-gray-200 dark:bg-gray-700"}`}>
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`}/>
       </button>
     </div>
@@ -2622,8 +2733,8 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
           <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">{tr("Çatdırılma üsulu", "Shipping method")}</p>
           <div className="space-y-1.5">
             {shippingMethods.map(m => (
-              <label key={m.value} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${config.shippingMethod === m.value ? "border-green-500 bg-green-50 dark:bg-green-900/10" : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"}`}>
-                <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${config.shippingMethod === m.value ? "border-green-500 bg-green-500" : "border-gray-300 dark:border-gray-600"}`}/>
+              <label key={m.value} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${config.shippingMethod === m.value ? "border-[#0026f6] bg-[#e8ebff] dark:bg-[#0026f6]/10" : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"}`}>
+                <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${config.shippingMethod === m.value ? "border-[#0026f6] bg-[#0026f6]" : "border-gray-300 dark:border-gray-600"}`}/>
                 <span className="text-xs text-gray-700 dark:text-gray-300 flex-1">{pickLang(language, m.az, m.en)}</span>
                 <input type="radio" className="sr-only" checked={config.shippingMethod === m.value} onChange={() => onUpdate({ shippingMethod: m.value })}/>
               </label>
@@ -2736,13 +2847,13 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
                   {locating ? tr("Axtarılır…", "Locating…") : tr("Cari məkanımı istifadə et", "Use my current location")}
                 </button>
                 {config.shippingOriginLat !== null && config.shippingOriginLng !== null && (
-                  <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                    <MapPin className="w-3 h-3 text-green-600 flex-shrink-0"/>
+                  <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/20 border border-[#0026f6]/20 dark:border-[#0026f6]/40">
+                    <MapPin className="w-3 h-3 text-[#0026f6] flex-shrink-0"/>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] text-green-700 dark:text-green-400 font-medium truncate">{config.shippingOriginAddress || tr("Məkan təyin edildi", "Location set")}</p>
-                      <p className="text-[9px] text-green-600 dark:text-green-500 font-mono">{config.shippingOriginLat?.toFixed(5)}, {config.shippingOriginLng?.toFixed(5)}</p>
+                      <p className="text-[9px] text-[#001db8] dark:text-[#99b3ff] font-medium truncate">{config.shippingOriginAddress || tr("Məkan təyin edildi", "Location set")}</p>
+                      <p className="text-[9px] text-[#0026f6] dark:text-[#99b3ff] font-mono">{config.shippingOriginLat?.toFixed(5)}, {config.shippingOriginLng?.toFixed(5)}</p>
                     </div>
-                    <button onClick={() => onUpdate({ shippingOriginLat: null, shippingOriginLng: null, shippingOriginAddress: "" })} className="text-green-400 hover:text-green-600 transition-colors flex-shrink-0">
+                    <button onClick={() => onUpdate({ shippingOriginLat: null, shippingOriginLng: null, shippingOriginAddress: "" })} className="text-[#0026f6] hover:text-[#0026f6] transition-colors flex-shrink-0">
                       <X className="w-3 h-3"/>
                     </button>
                   </div>
@@ -2762,20 +2873,34 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
       <div className="space-y-3">
         <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{tr("Ödəniş üsulları", "Payment Methods")}</p>
         <p className="text-xs text-gray-400">{tr("Mağazanızda hansı ödəniş üsullarını qəbul edəcəyinizi seçin.", "Choose which payment methods to accept in your store.")}</p>
-        {config.paymentMethods.map(m => (
-          <div key={m.id} className={`rounded-xl border transition-all overflow-hidden ${m.enabled?"border-green-200 dark:border-green-800":"border-gray-200 dark:border-gray-700"}`}>
-            <div className={`flex items-center gap-3 px-3 py-3 ${m.enabled?"bg-green-50 dark:bg-green-900/10":"bg-white dark:bg-gray-800"}`}>
+        {config.paymentMethods.map(m => {
+          const isEpointLocked = m.id === "epoint";
+          return (
+          <div key={m.id} className={`rounded-xl border transition-all overflow-hidden ${m.enabled && !isEpointLocked ? "border-[#0026f6]/20 dark:border-[#0026f6]/40" : "border-gray-200 dark:border-gray-700"} ${isEpointLocked ? "opacity-75" : ""}`}>
+            <div className={`flex items-center gap-3 px-3 py-3 ${m.enabled && !isEpointLocked ? "bg-[#e8ebff] dark:bg-[#0026f6]/10" : "bg-white dark:bg-gray-800"}`}>
               <span className="text-xl">{m.icon}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{m.name}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{m.name}</p>
+                  {isEpointLocked && (
+                    <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                      {tr("Tezliklə", "Coming soon")}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] text-gray-400">{m.id==="epoint" ? tr("Epoint ödəniş şlüzü vasitəsilə onlayn kart ödənişi", "Online card payment via Epoint gateway") : tr("Müştəri çatdırılma zamanı nağd ödəyir", "Customer pays in cash upon delivery")}</p>
               </div>
-              <button onClick={() => toggle(m.id)} className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${m.enabled?"bg-green-500":"bg-gray-200 dark:bg-gray-700"}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${m.enabled?"translate-x-4":"translate-x-0.5"}`}/>
+              <button
+                type="button"
+                disabled={isEpointLocked}
+                onClick={() => { if (!isEpointLocked) toggle(m.id); }}
+                className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${isEpointLocked ? "bg-gray-200 dark:bg-gray-700 cursor-not-allowed" : m.enabled ? "bg-[#0026f6]" : "bg-gray-200 dark:bg-gray-700"}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${m.enabled && !isEpointLocked ? "translate-x-4" : "translate-x-0.5"}`}/>
               </button>
             </div>
-            {m.id==="epoint" && epointEnabled && (
-              <div className="px-3 pb-3 pt-1 bg-white dark:bg-gray-800 border-t border-green-100 dark:border-green-900 space-y-2">
+            {m.id==="epoint" && epointEnabled && !isEpointLocked && (
+              <div className="px-3 pb-3 pt-1 bg-white dark:bg-gray-800 border-t border-[#0026f6]/15 dark:border-[#0026f6]/40 space-y-2">
                 <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{tr("Epoint Şəxsi Açarı", "Epoint Private Key")}</label>
                 <input
                   type="password"
@@ -2788,7 +2913,8 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -2856,7 +2982,7 @@ function EmailPanel() {
       <div className="shrink-0 flex gap-1.5 flex-wrap px-4 pt-4 pb-2 border-b border-gray-200 dark:border-gray-800">
         {templates.map(t => (
           <button key={t.id} onClick={() => setActiveId(t.id)}
-            className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors ${activeId===t.id?"bg-green-500 text-white":"bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"}`}>
+            className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors ${activeId===t.id?"bg-[#0026f6] text-white":"bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"}`}>
             {(EMAIL_TEMPLATE_LABELS[t.id]?.[language as "az"|"en"]) ?? t.label}
           </button>
         ))}
@@ -2885,7 +3011,7 @@ function EmailPanel() {
         {/* Save */}
         <button
           onClick={() => toast.success(tr(`"${EMAIL_TEMPLATE_LABELS[active.id]?.az ?? active.label}" e-poçt şablonu saxlanıldı`, `"${active.label}" email saved`))}
-          className="w-full py-2 text-xs font-semibold bg-green-500 hover:bg-green-600 text-white rounded-xl transition-colors">
+          className="w-full py-2 text-xs font-semibold bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-xl transition-colors">
           {tr("E-poçt Şablonunu Saxla", "Save Email Template")}
         </button>
       </div>
@@ -2929,7 +3055,7 @@ function defaultWebsiteConfig(companySlug?: string | null): WebsiteConfig {
   const slug = (companySlug?.trim() || "mystore").toLowerCase();
   return {
     template: "minimal", storeName: "My Store", tagline: "Quality products, delivered fast.",
-    primaryColor: "", accentColor: "#16a34a", domain: slug, currency: "USD",
+    primaryColor: "", accentColor: "#0026f6", domain: slug, currency: "USD",
     content: DEFAULT_CONTENT, paymentMethods: PAYMENT_METHODS,
     globalShowAllProducts: true, selectedCategories: [], logoUrl: "",
     headerLinks: DEFAULT_HEADER_LINKS,
@@ -2956,11 +3082,22 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
   });
 
   useEffect(() => {
-    if (!tenantId && !companySlug) return;
-    const saved =
-      (tenantId ? loadWebsiteConfigByTenant(tenantId) : null) ||
-      (companySlug ? loadWebsiteConfigBySlug(companySlug) : null);
-    if (saved) setConfig(saved);
+    if (!tenantId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await fetchTenantWebsiteConfig();
+        if (cancelled || !remote.config) return;
+        setConfig(remote.config);
+        saveWebsiteConfig({ config: remote.config, tenantId, companySlug: companySlug ?? remote.config.domain });
+      } catch {
+        const saved =
+          loadWebsiteConfigByTenant(tenantId) ||
+          (companySlug ? loadWebsiteConfigBySlug(companySlug) : null);
+        if (!cancelled && saved) setConfig(saved);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [tenantId, companySlug]);
 
   // Keep path-style domain in sync with company slug
@@ -3157,10 +3294,16 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
     const slug = (companySlug?.trim() || config.domain || "mystore").toLowerCase();
     const toSave = { ...config, domain: slug };
     setConfig(toSave);
-    saveWebsiteConfig({ config: toSave, tenantId, companySlug: slug });
-    await new Promise(r => setTimeout(r, 400));
-    setSaving(false);
-    toast.success(tr("Sayt saxlanıldı!", "Website saved!"));
+    try {
+      await saveTenantWebsiteConfig(toSave);
+      saveWebsiteConfig({ config: toSave, tenantId, companySlug: slug });
+      toast.success(tr("Sayt saxlanıldı və yayımlandı!", "Website saved and published!"));
+    } catch {
+      saveWebsiteConfig({ config: toSave, tenantId, companySlug: slug });
+      toast.error(tr("Serverə saxlanıla bilmədi — yalnız bu brauzerdə saxlanıldı.", "Could not save to server — saved locally in this browser only."));
+    } finally {
+      setSaving(false);
+    }
   };
 
 
@@ -3188,26 +3331,26 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
       {/* Top bar */}
       <div className="flex-shrink-0 h-12 flex items-center justify-between px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0"><Globe className="w-4 h-4 text-white"/></div>
+          <div className="w-7 h-7 rounded-lg bg-[#0026f6] flex items-center justify-center flex-shrink-0"><Globe className="w-4 h-4 text-white"/></div>
           <div><p className="text-sm font-semibold text-gray-900 dark:text-white leading-none">{tr("Mənim Saytım", "My Website", "Мой сайт")}</p><p className="text-[10px] text-gray-400 mt-0.5 leading-none">{tr("Canlı redaktor", "Live editor", "Живой редактор")}</p></div>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
-            <button onClick={() => setViewport("desktop")} className={`px-2.5 py-1.5 transition-colors ${viewport==="desktop"?"bg-green-500 text-white":"text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}><Monitor className="w-3.5 h-3.5"/></button>
-            <button onClick={() => setViewport("mobile")} className={`px-2.5 py-1.5 transition-colors ${viewport==="mobile"?"bg-green-500 text-white":"text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}><Smartphone className="w-3.5 h-3.5"/></button>
+            <button onClick={() => setViewport("desktop")} className={`px-2.5 py-1.5 transition-colors ${viewport==="desktop"?"bg-[#0026f6] text-white":"text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}><Monitor className="w-3.5 h-3.5"/></button>
+            <button onClick={() => setViewport("mobile")} className={`px-2.5 py-1.5 transition-colors ${viewport==="mobile"?"bg-[#0026f6] text-white":"text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}><Smartphone className="w-3.5 h-3.5"/></button>
           </div>
-          <div className="flex items-center gap-1 px-2.5 py-1 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>
-            <span className="text-[10px] text-green-700 dark:text-green-400 font-medium">{publicStorePath}</span>
+          <div className="flex items-center gap-1 px-2.5 py-1 bg-[#e8ebff] dark:bg-[#0026f6]/20 rounded-lg border border-[#0026f6]/20 dark:border-[#0026f6]/40">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#0026f6] animate-pulse"/>
+            <span className="text-[10px] text-[#001db8] dark:text-[#99b3ff] font-medium">{publicStorePath}</span>
             <button onClick={() => {
               const url = publicStoreUrl;
               try {
                 navigator.clipboard.writeText(url).then(() => toast.success("URL copied!")).catch(() => { const el = document.createElement("textarea"); el.value = url; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); toast.success("URL copied!"); });
               } catch { toast.success("URL: " + url); }
-            }}><Copy className="w-3 h-3 text-green-600 ml-0.5"/></button>
+            }}><Copy className="w-3 h-3 text-[#0026f6] ml-0.5"/></button>
           </div>
           <a href={publicStorePath} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"><ExternalLink className="w-3 h-3"/> {tr("Aç", "Open", "Открыть")}</a>
-          <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors disabled:opacity-60">
+          <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg transition-colors disabled:opacity-60">
             {saving ? <RefreshCw className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}
             {saving ? tr("Saxlanılır…", "Saving…") : tr("Saxla", "Save")}
           </button>
@@ -3295,6 +3438,40 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
 /** Read-only storefront canvas (public My Store page). */
 export function StorefrontView({ config }: { config: WebsiteConfig }) {
   const noop = () => {};
+  const [page, setPage] = useState<"home" | "product" | "checkout">("home");
+  const [cart, setCart] = useState<StorefrontCartLine[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<StorefrontProduct | null>(null);
+
+  const addToCart = useCallback((product: StorefrontProduct, qty = 1) => {
+    setCart(prev => {
+      const existing = prev.find(line => line.product.id === product.id);
+      if (existing) {
+        return prev.map(line =>
+          line.product.id === product.id ? { ...line, qty: line.qty + qty } : line,
+        );
+      }
+      return [...prev, { product, qty }];
+    });
+    toast.success("Added to cart");
+  }, []);
+
+  const openProduct = useCallback((product: StorefrontProduct) => {
+    setSelectedProduct(product);
+    setPage("product");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const cartCount = cart.reduce((sum, line) => sum + line.qty, 0);
+  const storefront: StorefrontRuntime = {
+    page,
+    setPage,
+    cart,
+    addToCart,
+    selectedProduct,
+    openProduct,
+    cartCount,
+  };
+
   return (
     <div className="h-full min-h-screen bg-white dark:bg-gray-950">
       <LivePreview
@@ -3304,6 +3481,7 @@ export function StorefrontView({ config }: { config: WebsiteConfig }) {
         dropTarget={null}
         activeDragId={null}
         publicMode
+        storefront={storefront}
         onSelectHeader={noop}
         onSelectBlock={noop}
         onSelectRow={noop}

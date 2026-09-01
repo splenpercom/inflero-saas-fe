@@ -76,6 +76,7 @@ export function Reservations() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user, hasModule } = useAuth();
   const autoEnabled = hasModule("AUTO");
+  const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Reservations");
   const branchRevision = useBranchRevision();
   const { acknowledge: acknowledgeReservations } = usePendingReservationCount();
@@ -1265,6 +1266,7 @@ export function Reservations() {
                 <label className="text-xs font-medium text-gray-700 dark:text-gray-300 block mb-2">
                   {tr("Rezervasiya səhifəsi", "Booking page")}
                 </label>
+                {branchManagementEnabled ? (
                 <div className="flex flex-col gap-2">
                   <label className="flex items-start gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input
@@ -1293,9 +1295,17 @@ export function Reservations() {
                     </span>
                   </label>
                 </div>
+                ) : (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {tr(
+                      "Tək filial rejimində yalnız ümumi rezervasiya səhifəsi istifadə olunur.",
+                      "With a single store, only the shared booking page is available.",
+                    )}
+                  </p>
+                )}
               </div>
 
-              {draftConfig.bookingPageMode === "per_branch" && (
+              {branchManagementEnabled && draftConfig.bookingPageMode === "per_branch" && (
                 <div>
                   <label className="text-xs font-medium text-gray-700 dark:text-gray-300 block mb-2">
                     {tr("Filial səhifələri", "Branch landing pages")}

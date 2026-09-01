@@ -51,6 +51,7 @@ export interface RawTenantUser {
   bankName: string | null;
   accountNo: string | null;
   ifsc: string | null;
+  isTenantOwner?: boolean;
   storeId: string | null;
   store: { id: string; name: string; code: string } | null;
   branchesAsManager?: { id: string; name: string; code: string }[];
@@ -75,6 +76,7 @@ export interface TenantUserRow {
   dateOfBirthIso: string;
   branch: string;
   storeId: string | null;
+  isTenantOwner: boolean;
   about: string;
   bankName: string;
   accountNo: string;
@@ -128,6 +130,7 @@ export function mapTenantUser(raw: RawTenantUser, language?: Language): TenantUs
     dateOfBirthIso: toIsoDateOnly(raw.dateOfBirth),
     branch: raw.store?.name ?? "—",
     storeId: raw.storeId,
+    isTenantOwner: raw.isTenantOwner === true,
     about: raw.about ?? "",
     bankName: raw.bankName ?? "",
     accountNo: raw.accountNo ?? "",

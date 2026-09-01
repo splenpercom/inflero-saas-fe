@@ -19,6 +19,8 @@ export interface BranchContextValue {
   isBranchLocked: boolean;
   /** No branch header sent — tenant-wide view (all branches + global records). */
   isGlobalMode: boolean;
+  /** Hub Branch Management module is enabled for this tenant. */
+  branchManagementEnabled: boolean;
   hasBranches: boolean;
   /** Increments when branch selection changes so pages can refetch. */
   branchRevision: number;
@@ -31,7 +33,7 @@ export interface BranchContextValue {
 const BranchContext = createContext<BranchContextValue | null>(null);
 
 export function BranchProvider({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated, isDemo, isLoading: authLoading, hasModule } = useAuth();
+  const { user, isAuthenticated, isDemo, isLoading: authLoading, hasModule, modulesLoaded } = useAuth();
   const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
   const [branches, setBranches] = useState<BranchSwitcherStore[]>([]);
   const [branchId, setBranchIdState] = useState<string | null>(() => getBranchStoreId());
@@ -39,7 +41,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [branchesLoaded, setBranchesLoaded] = useState(false);
 
-  const isBranchLocked = !!user?.storeId;
+  const isBranchLocked = branchManagementEnabled && !!user?.storeId;
 
   const refreshBranches = useCallback(async () => {
     if (!(isAuthenticated || isDemo)) {
@@ -66,7 +68,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     }
     setBranchesLoaded(false);
     void refreshBranches();
-  }, [authLoading, isDemo, isAuthenticated, refreshBranches]);
+  }, [authLoading, isDemo, isAuthenticated, refreshBranches, branchManagementEnabled]);
 
   useEffect(() => {
     if (authLoading) {
@@ -79,30 +81,44 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (user.storeId) {
-      setBranchStoreId(user.storeId);
-      setBranchIdState(user.storeId);
-      return;
-    }
-
     const stored = getBranchStoreId();
 
-    if (!branchesLoaded) {
-      if (stored) {
-        setBranchIdState(stored);
-      }
+    // Wait until tenant modules are known — hasModule is false for everything until then,
+    // which would incorrectly pin BM-ON tenants to the first branch.
+    if (!modulesLoaded && !isDemo) {
+      if (stored) setBranchIdState(stored);
       return;
     }
 
-    if (!branchManagementEnabled && branches.length > 0) {
-      const requiredId =
-        user.storeId ??
-        (stored && branches.some((b) => b.id === stored) ? stored : branches[0].id);
-      if (branchId !== requiredId) {
+    if (!branchesLoaded) {
+      if (stored) setBranchIdState(stored);
+      return;
+    }
+
+    // Branch Management off: always pin to the only visible (canonical) store.
+    // Do not keep a stale user.storeId / localStorage id — those cause "Store not found"
+    // toasts on every navigated page that asserts the branch header.
+    if (!branchManagementEnabled) {
+      if (branches.length === 0) {
+        if (branchId !== null || stored) {
+          setBranchStoreId(null);
+          setBranchIdState(null);
+          setBranchRevision((n) => n + 1);
+        }
+        return;
+      }
+      const requiredId = branches[0].id;
+      if (branchId !== requiredId || stored !== requiredId) {
         setBranchStoreId(requiredId);
         setBranchIdState(requiredId);
         setBranchRevision((n) => n + 1);
       }
+      return;
+    }
+
+    if (user.storeId) {
+      setBranchStoreId(user.storeId);
+      setBranchIdState(user.storeId);
       return;
     }
 
@@ -137,7 +153,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     if (!stored) {
       setBranchIdState(null);
     }
-  }, [user, branches, branchesLoaded, authLoading, branchManagementEnabled, branchId]);
+  }, [user, branches, branchesLoaded, authLoading, branchManagementEnabled, branchId, modulesLoaded, isDemo]);
 
   const setBranchId = useCallback(
     (id: string | null) => {
@@ -162,9 +178,11 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const ready =
     authLoading || !(isAuthenticated || isDemo)
       ? true
-      : branchManagementEnabled
-        ? true
-        : branchesLoaded && (branches.length === 0 || branchId !== null);
+      : !modulesLoaded && !isDemo
+        ? false
+        : branchManagementEnabled
+          ? true
+          : branchesLoaded && (branches.length === 0 || branchId !== null);
 
   const value = useMemo(
     () => ({
@@ -173,6 +191,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       selectedBranch,
       isBranchLocked,
       isGlobalMode,
+      branchManagementEnabled,
       hasBranches,
       branchRevision,
       isLoading,
@@ -186,6 +205,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       selectedBranch,
       isBranchLocked,
       isGlobalMode,
+      branchManagementEnabled,
       hasBranches,
       branchRevision,
       isLoading,

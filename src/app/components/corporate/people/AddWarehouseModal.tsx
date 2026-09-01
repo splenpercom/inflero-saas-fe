@@ -21,6 +21,8 @@ interface AddWarehouseModalProps {
   store?: StoreRecord | null;
   managers: StoreManagerCandidate[];
   saving?: boolean;
+  /** When false (Branch Management off / first sole store), manager is optional. */
+  requireBranchManager?: boolean;
 }
 
 export function AddWarehouseModal({
@@ -30,6 +32,7 @@ export function AddWarehouseModal({
   store,
   managers,
   saving = false,
+  requireBranchManager = true,
 }: AddWarehouseModalProps) {
   const { language } = useLanguage();
   const [name, setName] = useState("");
@@ -67,7 +70,7 @@ export function AddWarehouseModal({
 
   const handleSave = async () => {
     if (!name.trim() || !status) return;
-    if (!isEdit && !branchManagerUserId) return;
+    if (!isEdit && requireBranchManager && !branchManagerUserId) return;
     await onSave({
       name: name.trim(),
       email: email.trim(),
@@ -117,7 +120,7 @@ export function AddWarehouseModal({
               </select>
             </div>
           </div>
-          {!isEdit && (
+          {!isEdit && requireBranchManager && (
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                 {tr("Filial Meneceri", "Branch Manager")} <span className="text-red-500">*</span>
@@ -136,7 +139,7 @@ export function AddWarehouseModal({
               </select>
               {managers.length === 0 && (
                 <p className="text-[10px] text-amber-600 mt-1">
-                  {tr("Filial meneceri üçün uyğun istifadəçi yoxdur (Manager/Administrator, filialsız).", "No eligible branch manager (Manager/Administrator without a branch).")}
+                  {tr("Filial meneceri üçün uyğun istifadəçi yoxdur (Manager/Administrator, başqa filialı idarə etmir).", "No eligible branch manager (active Manager/Administrator not already managing another branch).")}
                 </p>
               )}
             </div>
@@ -146,7 +149,12 @@ export function AddWarehouseModal({
           <button onClick={onClose} disabled={saving} className="px-4 py-1.5 bg-gray-800 text-white rounded-lg text-xs disabled:opacity-50">{tr("Ləğv Et", "Cancel")}</button>
           <button
             onClick={() => void handleSave()}
-            disabled={!name.trim() || !status || saving || (!isEdit && !branchManagerUserId)}
+            disabled={
+              !name.trim() ||
+              !status ||
+              saving ||
+              (!isEdit && requireBranchManager && !branchManagerUserId)
+            }
             className="px-4 py-1.5 bg-[#0026f6] text-white rounded-lg text-xs disabled:opacity-50"
           >
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq Et", "Submit")}

@@ -308,7 +308,14 @@ function AppShell() {
               <Route path="people/customers" element={<PeopleCustomers />} />
               <Route path="people/customers/:id" element={<CustomerProfile />} />
               <Route path="people/suppliers" element={<Suppliers />} />
-              <Route path="people/warehouses" element={<Warehouses />} />
+              <Route
+                path="people/warehouses"
+                element={
+                  <ModuleRouteGuard module="BRANCH_MANAGEMENT">
+                    <Warehouses />
+                  </ModuleRouteGuard>
+                }
+              />
 
               {/* Reports and User Management */}
               <Route path="reports" element={<Reports />} />

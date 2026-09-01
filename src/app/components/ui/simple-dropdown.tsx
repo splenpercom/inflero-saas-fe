@@ -1,6 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFloatingPosition } from "./useFloatingPosition";
+
+const DropdownCtx = createContext<{ close: () => void } | null>(null);
 
 interface DropdownProps {
   trigger: React.ReactNode;
@@ -20,6 +22,7 @@ export function SimpleDropdown({
   const portalRef = useRef<HTMLDivElement>(null);
 
   const position = useFloatingPosition(anchorRef, isOpen, estimatedHeight);
+  const close = () => setIsOpen(false);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -35,21 +38,22 @@ export function SimpleDropdown({
 
   return (
     <div className="relative" ref={anchorRef}>
-      <div onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
+      <div onClick={() => setIsOpen((open) => !open)}>{trigger}</div>
       {isOpen &&
         createPortal(
-          <div
-            ref={portalRef}
-            className="fixed z-[9999] min-w-[200px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1.5 shadow-xl"
-            style={{
-              top: position.top,
-              left: align === "end" ? position.left + position.width - Math.max(position.width, 200) : position.left,
-              width: Math.max(position.width, 200),
-            }}
-            onClick={() => setIsOpen(false)}
-          >
-            {children}
-          </div>,
+          <DropdownCtx.Provider value={{ close }}>
+            <div
+              ref={portalRef}
+              className="fixed z-[9999] min-w-[200px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1.5 shadow-xl"
+              style={{
+                top: position.top,
+                left: align === "end" ? position.left + position.width - Math.max(position.width, 200) : position.left,
+                width: Math.max(position.width, 200),
+              }}
+            >
+              {children}
+            </div>
+          </DropdownCtx.Provider>,
           document.body,
         )}
     </div>
@@ -63,9 +67,19 @@ interface DropdownItemProps {
 }
 
 export function SimpleDropdownItem({ onClick, children, className = "" }: DropdownItemProps) {
+  const ctx = useContext(DropdownCtx);
+
   return (
     <div
-      onClick={onClick}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+        ctx?.close();
+      }}
       className={`relative flex cursor-pointer select-none items-center rounded-lg px-3 py-2.5 text-sm outline-none transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${className}`}
     >
       {children}

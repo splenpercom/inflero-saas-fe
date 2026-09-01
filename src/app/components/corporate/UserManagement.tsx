@@ -632,7 +632,14 @@ export function UserManagement() {
                           {user.email}
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                          {user.role}
+                          <span className="inline-flex items-center gap-1.5">
+                            {user.role}
+                            {user.isTenantOwner && (
+                              <span className="px-1.5 py-0.5 rounded bg-[#0026f6]/10 text-[#0026f6] text-[10px] font-medium">
+                                {tr("Sahib", "Owner")}
+                              </span>
+                            )}
+                          </span>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">{getStatusBadge(user.status)}</td>
                         <td className="px-3 py-2 whitespace-nowrap">
@@ -664,7 +671,12 @@ export function UserManagement() {
                               <button
                                 type="button"
                                 onClick={() => void handleDelete(user.id)}
-                                disabled={isDemo || saving}
+                                disabled={isDemo || saving || user.isTenantOwner}
+                                title={
+                                  user.isTenantOwner
+                                    ? tr("Şirkət sahibini silmək olmaz", "Cannot delete the company owner")
+                                    : undefined
+                                }
                                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                               >
                                 <Trash2 className="w-3 h-3" />

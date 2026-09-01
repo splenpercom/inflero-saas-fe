@@ -79,7 +79,7 @@ export async function createStore(body: {
   address?: string | null;
   code?: string;
   status?: UiPeopleStatus;
-  branchManagerUserId: string;
+  branchManagerUserId?: string;
 }) {
   const res = await apiPost<{ success: boolean; data: RawStore }>("/tenant/stores", {
     name: body.name,
@@ -88,7 +88,7 @@ export async function createStore(body: {
     address: body.address ?? null,
     code: body.code,
     status: body.status ? uiStatusToGeneral(body.status) : undefined,
-    branchManagerUserId: body.branchManagerUserId,
+    ...(body.branchManagerUserId ? { branchManagerUserId: body.branchManagerUserId } : {}),
   });
   return mapStore(res.data);
 }

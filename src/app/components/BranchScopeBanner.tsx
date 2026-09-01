@@ -7,11 +7,19 @@ import { pickLang } from "../i18n/pickLang";
 export function BranchScopeBanner() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
-  const { hasBranches, isGlobalMode, isBranchLocked, selectedBranch } = useBranch();
+  const {
+    hasBranches,
+    isGlobalMode,
+    isBranchLocked,
+    selectedBranch,
+    branchManagementEnabled,
+  } = useBranch();
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   if (!(isAuthenticated || isDemo)) return null;
+  // Single-store tenants: no branch-scope messaging.
+  if (!branchManagementEnabled) return null;
 
   if (!hasBranches) {
     return (

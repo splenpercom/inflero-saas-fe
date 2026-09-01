@@ -186,7 +186,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
           : selectedBranch?.name ?? (branchId ? "…" : st("globalMode"));
 
   const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
-  const showBranchSwitcher = (isAuthenticated || isDemo) && (branchManagementEnabled || !hasBranches);
+  const showBranchSwitcher = (isAuthenticated || isDemo) && branchManagementEnabled;
   const isOwnerAllBranches = !!user?.isTenantOwner && isGlobalMode;
 
   const allBranchesNavItems: NavItem[] = useMemo(() => {
@@ -366,18 +366,14 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         if (item.labelKey === "stock" && !hasModule("STOCK")) return null;
         if (item.labelKey === "reservations" && !hasModule("RESERVATIONS")) return null;
         if (item.labelKey === "myWebsite" && !hasModule("WEB_EDITOR")) return null;
-        if (item.labelKey === "warehouses" && !branchManagementEnabled && hasBranches) return null;
+        if (item.labelKey === "warehouses" && !branchManagementEnabled) return null;
         const parentModule = item.permissionModule ?? "Dashboard";
         if (item.subItems) {
           const filteredSubItems = item.subItems.filter((sub) => {
             if (["expiredProducts", "lowStocks"].includes(sub.labelKey) && !hasModule("STOCK")) return false;
             if (["pos", "posOrders"].includes(sub.labelKey) && !hasModule("POS")) return false;
             if (sub.labelKey === "stockTransfer" && !branchManagementEnabled) return false;
-            if (
-              sub.labelKey === "warehouses" &&
-              !branchManagementEnabled &&
-              hasBranches
-            ) return false;
+            if (sub.labelKey === "warehouses" && !branchManagementEnabled) return false;
             const perm = getNavPermission(sub.path, parentModule, {
               permissionModule: sub.permissionModule,
               permissionAction: sub.permissionAction,
@@ -471,6 +467,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         <div className="border-b border-white/10 dark:border-white/5 p-2 flex-shrink-0">
           <SimpleDropdown
             align="start"
+            estimatedHeight={Math.min(320, 56 + branches.length * 52)}
             trigger={
               <button
                 type="button"

@@ -66,7 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(me.user);
     setModulesLoaded(true);
     setBranchTenantId(me.user.tenant.id);
-    if (me.user.storeId) {
+    // Only lock the header to the user's assigned store when Branch Management is on.
+    // When BM is off, BranchContext pins to the canonical store (stale storeId toasts otherwise).
+    if (me.user.storeId && me.user.tenant.modules?.BRANCH_MANAGEMENT) {
       setBranchStoreId(me.user.storeId);
     }
   }, [syncDemoFlag]);

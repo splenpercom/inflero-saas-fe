@@ -173,34 +173,68 @@ export function Warehouses() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {stores.map((store) => (
-              <div key={store.id} className="glass-card rounded-xl border border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10">
-                <div className="px-4 py-3 border-b border-green-200 dark:border-green-800/50 flex items-center justify-between">
+              <div
+                key={store.id}
+                className="glass-card rounded-xl border border-[#0026f6]/20 dark:border-[#0026f6]/35 bg-[#f0f3ff]/50 dark:bg-[#0026f6]/10"
+              >
+                <div className="px-4 py-3 border-b border-[#0026f6]/15 dark:border-[#0026f6]/30 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    <div className="w-8 h-8 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/25 flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-[#0026f6] dark:text-[#99b3ff]" />
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-gray-900 dark:text-white">{store.name}</p>
-                      <p className="text-[10px] text-green-600">{store.status}</p>
+                      <p className="text-[10px] text-[#0026f6] dark:text-[#99b3ff]">{store.status}</p>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-medium border border-green-300">{store.code}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-[#e8ebff] dark:bg-[#0026f6]/30 text-[#001db8] dark:text-[#99b3ff] text-[10px] font-medium border border-[#0026f6]/25 dark:border-[#0026f6]/40">
+                    {store.code}
+                  </span>
                 </div>
                 <div className="p-4 space-y-3">
-                  {store.email && <div className="flex items-center gap-2 text-xs text-gray-600"><Mail className="w-3 h-3" /><span>{store.email}</span></div>}
-                  {store.phone && <div className="flex items-center gap-2 text-xs text-gray-600"><Phone className="w-3 h-3" /><span>{store.phone}</span></div>}
-                  {store.address && <div className="flex items-center gap-2 text-xs text-gray-600"><MapPin className="w-3 h-3" /><span>{store.address}</span></div>}
-                  {store.branchManager && (
-                    <p className="text-[10px] text-gray-500">{tr("Menecer", "Manager")}: {store.branchManager.firstName} {store.branchManager.lastName}</p>
+                  {store.email && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                      <Mail className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />
+                      <span>{store.email}</span>
+                    </div>
                   )}
-                  <div className="flex gap-2 pt-2 border-t border-green-200 dark:border-green-800/50">
+                  {store.phone && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                      <Phone className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />
+                      <span>{store.phone}</span>
+                    </div>
+                  )}
+                  {store.address && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                      <MapPin className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />
+                      <span>{store.address}</span>
+                    </div>
+                  )}
+                  {store.branchManager && (
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                      {tr("Menecer", "Manager")}: {store.branchManager.firstName} {store.branchManager.lastName}
+                    </p>
+                  )}
+                  <div className="flex gap-2 pt-2 border-t border-[#0026f6]/15 dark:border-[#0026f6]/30">
                     {canEdit && (
-                    <button onClick={() => { setEditingStore(store); setIsModalOpen(true); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs">
-                      <Settings className="w-3 h-3" /><span>{tr("Tənzimlə", "Configure")}</span>
-                    </button>
+                      <button
+                        onClick={() => {
+                          setEditingStore(store);
+                          setIsModalOpen(true);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-xs text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <Settings className="w-3 h-3" />
+                        <span>{tr("Tənzimlə", "Configure")}</span>
+                      </button>
                     )}
                     {branchManagementEnabled && canDelete && (
-                    <button onClick={() => void handleDelete(store.id)} className="px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs text-red-600"><Trash2 className="w-3 h-3" /></button>
+                      <button
+                        onClick={() => void handleDelete(store.id)}
+                        className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-800/60 rounded-lg text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -211,7 +245,7 @@ export function Warehouses() {
               <div className="glass-card rounded-xl border border-[#0026f6]/20 bg-[#f0f3ff]/50 dark:bg-[#0026f6]/10">
                 <div className="p-4 text-center py-6">
                   <WarehouseIcon className="w-8 h-8 mx-auto mb-2 text-[#0026f6]" />
-                  <p className="text-xs font-medium text-gray-600 mb-3">{tr("Yeni filial əlavə et", "Add a new branch")}</p>
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-3">{tr("Yeni filial əlavə et", "Add a new branch")}</p>
                   <button onClick={() => { setEditingStore(null); setIsModalOpen(true); }} className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white text-xs font-medium rounded-lg flex items-center gap-1.5 mx-auto">
                     <Plus className="w-3 h-3" /><span>{tr("Konfiqurasiya Et", "Configure")}</span>
                   </button>
@@ -220,19 +254,19 @@ export function Warehouses() {
             )}
 
             {branchManagementEnabled && Array.from({ length: lockedCount }).map((_, i) => (
-              <div key={`locked-${i}`} className="glass-card rounded-xl border border-gray-200 bg-gray-50 dark:bg-gray-900/50">
+              <div key={`locked-${i}`} className="glass-card rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                 <div className="p-4 text-center py-6">
-                  <Lock className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                  <p className="text-xs font-medium text-gray-600">{tr("Bu slot bağlıdır", "This slot is locked")}</p>
-                  <p className="text-[10px] text-gray-400 mt-1">{tr("Paket limitinə çatılıb", "Package branch limit reached")}</p>
+                  <Lock className="w-8 h-8 mx-auto mb-2 text-gray-400 dark:text-gray-500" />
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-300">{tr("Bu slot bağlıdır", "This slot is locked")}</p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{tr("Paket limitinə çatılıb", "Package branch limit reached")}</p>
                 </div>
               </div>
             ))}
 
             {!canAdd && stores.length === 0 && (
-              <div className="glass-card rounded-xl border border-gray-200 p-6 text-center col-span-full">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-xs text-gray-500">{tr("Filial əlavə etmək mümkün deyil", "Cannot add branches")}</p>
+              <div className="glass-card rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center col-span-full">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-400 dark:text-gray-500" />
+                <p className="text-xs text-gray-500 dark:text-gray-400">{tr("Filial əlavə etmək mümkün deyil", "Cannot add branches")}</p>
               </div>
             )}
           </div>
@@ -245,6 +279,7 @@ export function Warehouses() {
           store={editingStore}
           managers={managers}
           saving={saving}
+          requireBranchManager={branchManagementEnabled}
         />
       </div>
     </div>
