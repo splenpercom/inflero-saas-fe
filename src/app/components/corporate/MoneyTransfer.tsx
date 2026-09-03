@@ -171,7 +171,7 @@ export function MoneyTransfer() {
 
           <button
             onClick={handleAddTransfer}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{tr("Pul Köçürməsi Əlavə Et", "Add Money Transfer")}</span>
@@ -187,7 +187,7 @@ export function MoneyTransfer() {
               placeholder={tr("Axtar...", "Search...")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
           </div>
         </div>
@@ -231,7 +231,7 @@ export function MoneyTransfer() {
                     <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {transfer.date}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#0026f6] dark:text-[#0026f6] font-medium whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs text-[#14b8a6] dark:text-[#14b8a6] font-medium whitespace-nowrap">
                       {transfer.referenceNumber}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">

@@ -181,7 +181,7 @@ export function ExpenseReport() {
               <select
                 value={selectedExpenseCategory}
                 onChange={(e) => setSelectedExpenseCategory(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[140px]"
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[140px]"
               >
                 <option value="all">Expense Category</option>
                 <option value="repairs">Repairs & Maintenance</option>
@@ -196,7 +196,7 @@ export function ExpenseReport() {
               <select
                 value={selectedPaymentMethod}
                 onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[120px]"
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
               >
                 <option value="all">Payment Method</option>
                 <option value="cash">Cash</option>
@@ -210,7 +210,7 @@ export function ExpenseReport() {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[120px]"
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
               >
                 <option value="all">Status</option>
                 <option value="pending">Pending</option>
@@ -306,7 +306,7 @@ export function ExpenseReport() {
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium  ₼{
                           item.status === "Approved"
                             ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
-                            : "bg-[#e8ebff] dark:bg-[#0026f6]/30 text-[#0026f6] dark:text-[#0026f6]"
+                            : "bg-[#ccfbf1] dark:bg-[#14b8a6]/30 text-[#14b8a6] dark:text-[#14b8a6]"
                         }`}
                       >
                         {item.status}

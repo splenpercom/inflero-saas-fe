@@ -186,7 +186,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
               <button
                 type="button"
                 onClick={() => setLines((prev) => [...prev, emptyLine()])}
-                className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-[#0026f6] dark:text-[#0026f6] border border-gray-300 dark:border-gray-700 rounded-lg"
+                className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-[#14b8a6] dark:text-[#14b8a6] border border-gray-300 dark:border-gray-700 rounded-lg"
               >
                 <Plus className="w-3 h-3" />
                 {tr("Sətir əlavə et", "Add line")}
@@ -321,7 +321,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
             type="button"
             onClick={() => void handleSubmit()}
             disabled={!canSubmit || saving}
-            className="px-4 py-2 text-xs font-medium text-white bg-gradient-to-r from-[#0026f6] to-[#001db8] rounded-lg disabled:opacity-50"
+            className="px-4 py-2 text-xs font-medium text-white bg-[#14b8a6] rounded-lg disabled:opacity-50"
           >
             {saving ? tr("Saxlanılır...", "Saving...") : tr("Qaimə yarat", "Create Invoice")}
           </button>

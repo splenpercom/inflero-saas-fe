@@ -280,7 +280,7 @@ export function POSOrders() {
         ]),
         startY: 28,
         theme: "grid",
-        headStyles: { fillColor: [0, 38, 246], fontSize: 8 },
+        headStyles: { fillColor: [20, 184, 166], fontSize: 8 },
         bodyStyles: { fontSize: 7 },
       });
       doc.save(`pos_orders_${new Date().toISOString().split("T")[0]}.pdf`);
@@ -465,8 +465,8 @@ export function POSOrders() {
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-          .invoice-header { border-bottom: 3px solid #0026f6; padding-bottom: 20px; margin-bottom: 30px; }
-          .invoice-header h1 { color: #0026f6; font-size: 28px; margin-bottom: 5px; }
+          .invoice-header { border-bottom: 3px solid #14b8a6; padding-bottom: 20px; margin-bottom: 30px; }
+          .invoice-header h1 { color: #14b8a6; font-size: 28px; margin-bottom: 5px; }
           .invoice-header p { color: #666; font-size: 14px; }
           .invoice-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
           .info-block { flex: 1; }
@@ -477,7 +477,7 @@ export function POSOrders() {
           .invoice-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
           .totals { margin-left: auto; width: 300px; }
           .totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
-          .totals-row.grand-total { border-top: 2px solid #0026f6; padding-top: 12px; margin-top: 8px; font-size: 18px; font-weight: bold; color: #0026f6; }
+          .totals-row.grand-total { border-top: 2px solid #14b8a6; padding-top: 12px; margin-top: 8px; font-size: 18px; font-weight: bold; color: #14b8a6; }
           .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px; }
         </style>
       </head>
@@ -559,7 +559,7 @@ export function POSOrders() {
                 placeholder={tr("Axtar...", "Search...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -568,7 +568,7 @@ export function POSOrders() {
                 <select
                   value={selectedCustomer}
                   onChange={(e) => setSelectedCustomer(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="all">{tr("Müştəri", "Customer")}</option>
                   {customers.map((c) => (
@@ -584,7 +584,7 @@ export function POSOrders() {
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="all">{tr("Status", "Status")}</option>
                   <option value="completed">{tr("Tamamlandı", "Completed")}</option>
@@ -599,7 +599,7 @@ export function POSOrders() {
                 <select
                   value={selectedPaymentStatus}
                   onChange={(e) => setSelectedPaymentStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="all">{tr("Ödəniş Statusu", "Payment Status")}</option>
                   <option value="paid">{tr("Ödənilib", "Paid")}</option>
@@ -613,7 +613,7 @@ export function POSOrders() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="last7days">{tr("Sırala : Son 7 Gün", "Sort By : Last 7 Days")}</option>
                   <option value="last30days">{tr("Sırala : Son 30 Gün", "Sort By : Last 30 Days")}</option>
@@ -660,7 +660,7 @@ export function POSOrders() {
                   type="button"
                   onClick={handleAddSales}
                   disabled={isDemo}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{tr("Satış Əlavə Et", "Add Sales")}</span>

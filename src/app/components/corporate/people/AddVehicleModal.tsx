@@ -86,7 +86,7 @@ export function AddVehicleModal({
             type="button"
             disabled={saving || (!form.make.trim() && !form.model.trim() && !form.plate.trim())}
             onClick={() => void onSave(form)}
-            className="rounded-lg bg-[#0026f6] px-4 py-2 text-xs text-white disabled:opacity-50"
+            className="rounded-lg bg-[#14b8a6] px-4 py-2 text-xs text-white disabled:opacity-50"
           >
             {saving ? tr("Saxlanılır...", "Saving...") : tr("Yadda saxla", "Save")}
           </button>

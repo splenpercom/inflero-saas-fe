@@ -163,7 +163,7 @@ export function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-[#f0f2ff]/20 to-gray-100 dark:from-gray-950 dark:via-[#001db8]/10 dark:to-gray-900 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-[#f0fdfa]/20 to-gray-100 dark:from-gray-950 dark:via-[#115e59]/10 dark:to-gray-900 p-4">
       <div className="flex items-center gap-2 mb-4">
         <button
           onClick={() => navigate(-1)}
@@ -182,7 +182,7 @@ export function Profile() {
       <div className="glass-card p-4 mb-3">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#0026f6] to-[#001db8] flex items-center justify-center overflow-hidden">
+            <div className="w-14 h-14 rounded-full bg-[#14b8a6] flex items-center justify-center overflow-hidden">
               {user?.avatar ? (
                 <img src={user.avatar} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -196,7 +196,7 @@ export function Profile() {
               {user?.email ?? (isDemo ? "demo@sample.local" : "—")}
             </p>
             <div className="flex gap-1.5 flex-wrap">
-              <span className="px-2 py-0.5 bg-[#e8ebff]0/10 dark:bg-[#e8ebff]0/20 border border-[#0026f6]/20 rounded text-[10px] font-medium text-[#0026f6] dark:text-[#0026f6]">
+              <span className="px-2 py-0.5 bg-[#ccfbf1]0/10 dark:bg-[#ccfbf1]0/20 border border-[#14b8a6]/20 rounded text-[10px] font-medium text-[#14b8a6] dark:text-[#14b8a6]">
                 {roleName}
               </span>
               <span className="px-2 py-0.5 bg-green-500/10 dark:bg-green-500/20 border border-green-500/20 rounded text-[10px] font-medium text-green-600 dark:text-green-400">
@@ -223,7 +223,7 @@ export function Profile() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-0.5">
-              <Image className="w-3 h-3 text-[#0026f6] dark:text-[#0026f6]" />
+              <Image className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6]" />
               <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                 {pt("Company Logo", "Şirkət Loqosu")}
               </h3>
@@ -237,7 +237,7 @@ export function Profile() {
             </p>
             <Link
               to="/dashboard/settings"
-              className="inline-flex mt-2 text-[10px] font-medium text-[#0026f6] dark:text-[#0026f6] hover:underline"
+              className="inline-flex mt-2 text-[10px] font-medium text-[#14b8a6] dark:text-[#14b8a6] hover:underline"
             >
               {pt("Open Settings", "Parametrləri aç")}
             </Link>
@@ -250,7 +250,7 @@ export function Profile() {
           onClick={() => setActiveTab("profile")}
           className={`px-4 py-1.5 rounded-lg font-medium text-xs smooth-transition flex items-center gap-1.5 ${
             activeTab === "profile"
-              ? "bg-[#001db8] text-white shadow-lg shadow-[#0026f6]/20"
+              ? "bg-[#115e59] text-white shadow-lg shadow-[#14b8a6]/20"
               : "glass hover:bg-white/50 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400"
           }`}
         >
@@ -261,7 +261,7 @@ export function Profile() {
           onClick={() => setActiveTab("security")}
           className={`px-4 py-1.5 rounded-lg font-medium text-xs smooth-transition flex items-center gap-1.5 ${
             activeTab === "security"
-              ? "bg-[#001db8] text-white shadow-lg shadow-[#0026f6]/20"
+              ? "bg-[#115e59] text-white shadow-lg shadow-[#14b8a6]/20"
               : "glass hover:bg-white/50 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400"
           }`}
         >
@@ -287,7 +287,7 @@ export function Profile() {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 disabled={isDemo || !isAuthenticated}
-                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
               />
             </div>
             <div>
@@ -300,7 +300,7 @@ export function Profile() {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 disabled={isDemo || !isAuthenticated}
-                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
               />
             </div>
             <div>
@@ -325,7 +325,7 @@ export function Profile() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={isDemo || !isAuthenticated}
-                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
               />
             </div>
             <div>
@@ -362,7 +362,7 @@ export function Profile() {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 disabled={isDemo || !isAuthenticated}
-                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
               />
             </div>
           </div>
@@ -371,7 +371,7 @@ export function Profile() {
             <button
               onClick={handleSaveProfile}
               disabled={profileSaving || !(isAuthenticated || isDemo)}
-              className="px-4 py-1.5 bg-[#001db8] hover:bg-[#001fc4] text-white rounded-lg smooth-transition shadow-lg shadow-[#0026f6]/20 font-medium text-xs disabled:opacity-60"
+              className="px-4 py-1.5 bg-[#115e59] hover:bg-[#0f766e] text-white rounded-lg smooth-transition shadow-lg shadow-[#14b8a6]/20 font-medium text-xs disabled:opacity-60"
             >
               {profileSaving ? pt("Saving…", "Yadda saxlanılır…") : pt("Save Changes", "Dəyişiklikləri Yadda Saxla")}
             </button>
@@ -397,7 +397,7 @@ export function Profile() {
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     disabled={isDemo || !isAuthenticated}
-                    className="w-full px-3 py-1.5 pr-9 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                    className="w-full px-3 py-1.5 pr-9 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
                   />
                   <button
                     type="button"
@@ -421,7 +421,7 @@ export function Profile() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     disabled={isDemo || !isAuthenticated}
-                    className="w-full px-3 py-1.5 pr-9 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                    className="w-full px-3 py-1.5 pr-9 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
                   />
                   <button
                     type="button"
@@ -445,7 +445,7 @@ export function Profile() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={isDemo || !isAuthenticated}
-                    className="w-full px-3 py-1.5 pr-9 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                    className="w-full px-3 py-1.5 pr-9 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
                   />
                   <button
                     type="button"
@@ -463,7 +463,7 @@ export function Profile() {
               <button
                 onClick={handleChangePassword}
                 disabled={passwordSaving || !(isAuthenticated || isDemo)}
-                className="px-4 py-1.5 bg-[#001db8] hover:bg-[#001fc4] text-white rounded-lg smooth-transition shadow-lg shadow-[#0026f6]/20 font-medium text-xs disabled:opacity-60"
+                className="px-4 py-1.5 bg-[#115e59] hover:bg-[#0f766e] text-white rounded-lg smooth-transition shadow-lg shadow-[#14b8a6]/20 font-medium text-xs disabled:opacity-60"
               >
                 {passwordSaving ? pt("Updating…", "Yenilənir…") : pt("Update Password", "Şifrəni Yenilə")}
               </button>
@@ -491,7 +491,7 @@ export function Profile() {
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   disabled={isDemo || !isAuthenticated}
-                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
                 />
               </div>
               {emailCodeSent && (
@@ -506,7 +506,7 @@ export function Profile() {
                     value={emailOtp}
                     onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ""))}
                     disabled={isDemo || !isAuthenticated}
-                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
                   />
                 </div>
               )}
@@ -523,7 +523,7 @@ export function Profile() {
                 <button
                   onClick={handleVerifyEmailChange}
                   disabled={emailSaving || !(isAuthenticated || isDemo)}
-                  className="px-4 py-1.5 bg-[#001db8] hover:bg-[#001fc4] text-white rounded-lg text-xs font-medium disabled:opacity-60"
+                  className="px-4 py-1.5 bg-[#115e59] hover:bg-[#0f766e] text-white rounded-lg text-xs font-medium disabled:opacity-60"
                 >
                   {emailSaving ? pt("Verifying…", "Təsdiqlənir…") : pt("Verify & update email", "Təsdiqlə və yenilə")}
                 </button>

@@ -214,7 +214,7 @@ export function ProductDetails() {
                     row.fullWidth ? "grid-cols-1" : "grid-cols-2",
                   )}
                 >
-                  <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 text-xs font-medium text-[#0026f6] dark:text-[#0026f6] border-r border-gray-200 dark:border-gray-800">
+                  <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 text-xs font-medium text-[#14b8a6] dark:text-[#14b8a6] border-r border-gray-200 dark:border-gray-800">
                     {row.label}
                   </div>
                   <div
@@ -284,7 +284,7 @@ export function ProductDetails() {
                         className={cn(
                           "w-16 h-16 rounded-lg overflow-hidden border-2 transition-all",
                           currentImageIndex === index
-                            ? "border-[#0026f6] dark:border-[#0026f6]"
+                            ? "border-[#14b8a6] dark:border-[#14b8a6]"
                             : "border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100",
                         )}
                       >

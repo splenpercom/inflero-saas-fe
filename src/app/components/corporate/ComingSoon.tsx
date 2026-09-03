@@ -29,7 +29,7 @@ export function ComingSoon({ title, titleAz, description, descriptionAz }: Comin
         <div className="flex items-center gap-3 mb-2">
           <Link
             to="/reports"
-            className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-[#0026f6] dark:hover:text-[#0026f6] transition-colors"
+            className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-[#14b8a6] dark:hover:text-[#14b8a6] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>{t("Hesabatlara qayıt", "Back to Reports")}</span>
@@ -44,8 +44,8 @@ export function ComingSoon({ title, titleAz, description, descriptionAz }: Comin
       <div className="glass-card rounded-2xl p-8 sm:p-12 text-center shadow-glass-lg border border-white/20">
         <div className="max-w-2xl mx-auto">
           {/* Icon */}
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-[#f0f2ff]0/20 to-[#0026f6]/20 flex items-center justify-center backdrop-blur-xl border border-[#0026f6]/20 shadow-lg shadow-[#0026f6]/10">
-            <Sparkles className="w-10 h-10 text-[#0026f6] dark:text-[#0026f6]" />
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-[#f0fdfa]/20 to-[#14b8a6]/20 flex items-center justify-center backdrop-blur-xl border border-[#14b8a6]/20 shadow-lg shadow-[#14b8a6]/10">
+            <Sparkles className="w-10 h-10 text-[#14b8a6] dark:text-[#14b8a6]" />
           </div>
 
           {/* Title */}
@@ -59,9 +59,9 @@ export function ComingSoon({ title, titleAz, description, descriptionAz }: Comin
           </p>
 
           {/* Features Badge */}
-          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 border border-[#0026f6]/20 backdrop-blur-xl">
-            <div className="w-2 h-2 rounded-full bg-[#001db8] animate-pulse"></div>
-            <span className="text-sm font-medium text-[#0026f6] dark:text-[#0026f6]">
+          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#14b8a6]/10 to-[#115e59]/10 border border-[#14b8a6]/20 backdrop-blur-xl">
+            <div className="w-2 h-2 rounded-full bg-[#115e59] animate-pulse"></div>
+            <span className="text-sm font-medium text-[#14b8a6] dark:text-[#14b8a6]">
               {t("Aktiv inkişaf mərhələsində", "In Active Development")}
             </span>
           </div>
@@ -81,8 +81,8 @@ export function ComingSoon({ title, titleAz, description, descriptionAz }: Comin
             </div>
 
             <div className="glass-card rounded-xl p-4 border border-white/10">
-              <div className="w-8 h-8 mx-auto mb-3 rounded-lg bg-gradient-to-br from-[#f0f2ff]0/20 to-[#0026f6]/20 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-[#e8ebff]0 animate-pulse"></div>
+              <div className="w-8 h-8 mx-auto mb-3 rounded-lg bg-gradient-to-br from-[#f0fdfa]/20 to-[#14b8a6]/20 flex items-center justify-center">
+                <div className="w-3 h-3 rounded-full bg-[#ccfbf1]0 animate-pulse"></div>
               </div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
                 {t("İnkişaf", "Development")}

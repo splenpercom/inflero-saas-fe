@@ -1,4 +1,4 @@
-﻿import { pickLang } from "../../i18n/pickLang";
+import { pickLang } from "../../i18n/pickLang";
 import {
   Maximize,
   Minimize,
@@ -49,7 +49,7 @@ interface StatBadgeProps {
 const StatBadge = memo(function StatBadge({ icon: Icon, label, count, variant = "default" }: StatBadgeProps) {
   const variantClasses = {
     default: "glass",
-    primary: "bg-[#e8ebff]0/10 dark:bg-[#e8ebff]0/20 border border-[#0026f6]/30 dark:border-[#0026f6]/30",
+    primary: "bg-[#ccfbf1]0/10 dark:bg-[#ccfbf1]0/20 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30",
     success: "bg-green-500/10 dark:bg-green-500/20 border border-green-200/30 dark:border-green-500/30",
     warning: "bg-yellow-500/10 dark:bg-yellow-500/20 border border-yellow-200/30 dark:border-yellow-500/30",
   };
@@ -271,10 +271,10 @@ export const CorporateHeader = memo(function CorporateHeader({
         {canViewPos && (
           <Link
             to="/dashboard/sales/pos"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition bg-[#0026f6]/10 dark:bg-[#0026f6]/20 border border-[#0026f6]/20 dark:border-[#0026f6]/30"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition bg-[#14b8a6]/10 dark:bg-[#14b8a6]/20 border border-[#14b8a6]/20 dark:border-[#14b8a6]/30"
           >
-            <ShoppingCart className="w-3.5 h-3.5 text-[#0026f6] dark:text-[#0026f6]" />
-            <span className="hidden sm:inline text-xs font-medium text-[#0026f6] dark:text-[#0026f6]">{pt("POS", "POS")}</span>
+            <ShoppingCart className="w-3.5 h-3.5 text-[#14b8a6] dark:text-[#14b8a6]" />
+            <span className="hidden sm:inline text-xs font-medium text-[#14b8a6] dark:text-[#14b8a6]">{pt("POS", "POS")}</span>
           </Link>
         )}
 
@@ -337,7 +337,7 @@ export const CorporateHeader = memo(function CorporateHeader({
         <SimpleDropdown
           trigger={
             <button className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition ml-1">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#0026f6] to-[#001db8] flex items-center justify-center overflow-hidden">
+              <div className="w-7 h-7 rounded-full bg-[#14b8a6] flex items-center justify-center overflow-hidden">
                 {user?.avatar ? (
                   <img src={user.avatar} alt="" className="w-full h-full object-cover" />
                 ) : (

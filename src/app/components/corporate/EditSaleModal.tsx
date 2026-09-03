@@ -298,7 +298,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <select
                   value={customerId}
                   onChange={(e) => handleCustomerChange(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
                 >
                   <option value="">{tr("Müştəri Seç", "Choose Customer")}</option>
                   {customers.map((c) => (
@@ -361,7 +361,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   value={billerId}
                   onChange={(e) => setBillerId(e.target.value)}
                   disabled={billersLoading}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer disabled:opacity-60"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer disabled:opacity-60"
                 >
                   <option value="">{tr("Kassir Seç", "Choose Biller")}</option>
                   {billers.map((b) => (
@@ -390,7 +390,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <DateInput
                   value={date}
                   onChange={setDate}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
 
@@ -402,7 +402,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   type="text"
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
 
@@ -413,7 +413,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as PosUiPaymentMethod)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
                 >
                   <option value="cash">{tr("Nağd", "Cash")}</option>
                   <option value="card">{tr("Kart", "Card")}</option>
@@ -428,7 +428,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
                 >
                   <option value="completed">{tr("Tamamlandı", "Completed")}</option>
                   <option value="pending">{tr("Gözləyir", "Pending")}</option>
@@ -454,7 +454,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   onFocus={() => setShowProductList(true)}
                   disabled={linesLocked}
                   placeholder={tr("Məhsul kodu daxil edin və seçin", "Please type product code and select")}
-                  className="w-full px-2.5 py-1.5 pr-10 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60"
+                  className="w-full px-2.5 py-1.5 pr-10 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
                 />
                 <Scan className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
 
@@ -579,7 +579,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   value={taxPercent}
                   onChange={(e) => setTaxPercent(Number(e.target.value))}
                   min="0"
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
               <div>
@@ -591,7 +591,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
                   min="0"
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
               <div>
@@ -603,7 +603,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   value={shipping}
                   onChange={(e) => setShipping(Number(e.target.value))}
                   min="0"
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
               <div>
@@ -615,7 +615,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   value={serviceFee}
                   onChange={(e) => setServiceFee(Number(e.target.value))}
                   min="0"
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
             </div>
@@ -656,7 +656,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-600 dark:text-gray-400">{tr("Borc", "Due")}</span>
-                  <span className="text-[#0026f6] dark:text-[#0026f6]">
+                  <span className="text-[#14b8a6] dark:text-[#14b8a6]">
                     ₼ {Math.max(0, totals.grandTotal - paidAmount).toFixed(2)}
                   </span>
                 </div>
@@ -677,7 +677,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
             type="button"
             onClick={() => void handleSubmit()}
             disabled={!canSave}
-            className="flex items-center gap-2 px-6 py-3 text-sm bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-3 text-sm bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Yadda saxla", "Save Changes")}

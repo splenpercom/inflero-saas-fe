@@ -199,7 +199,7 @@ export function PaymentStatusGate() {
                 type="button"
                 disabled={paying}
                 onClick={onPay}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-[#0026f6] text-white disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-[#14b8a6] text-white disabled:opacity-60 inline-flex items-center justify-center gap-2"
               >
                 <CreditCard className="w-4 h-4" />
                 {paying ? "…" : t.payNow}
@@ -275,7 +275,7 @@ export function BillingResultPage() {
         <div className="flex flex-col gap-2">
           <a
             href="/dashboard"
-            className="px-4 py-2.5 text-sm font-medium rounded-lg bg-[#0026f6] text-white"
+            className="px-4 py-2.5 text-sm font-medium rounded-lg bg-[#14b8a6] text-white"
           >
             {t.backToDashboard}
           </a>

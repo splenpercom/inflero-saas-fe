@@ -121,7 +121,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0026f6] to-[#001db8] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-[#14b8a6] flex items-center justify-center">
               <FileText className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -186,7 +186,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               >
                 <option value="ordered">{tr("Sifariş Edildi", "Ordered")}</option>
                 <option value="pending">{tr("Gözləyir", "Pending")}</option>
@@ -205,7 +205,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
                   step="0.01"
                   value={orderTax}
                   onChange={(e) => setOrderTax(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
               <div>
@@ -218,7 +218,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
                   step="0.01"
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
               <div>
@@ -231,7 +231,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
                   step="0.01"
                   value={shipping}
                   onChange={(e) => setShipping(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
             </div>
@@ -244,7 +244,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -259,7 +259,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600 dark:text-gray-400">{tr("Borc", "Due")}:</span>
-                <span className="font-medium text-[#0026f6] dark:text-[#0026f6]">₼{due.toFixed(2)}</span>
+                <span className="font-medium text-[#14b8a6] dark:text-[#14b8a6]">₼{due.toFixed(2)}</span>
               </div>
             </div>
           </form>
@@ -277,7 +277,7 @@ export function EditPurchaseModal({ purchaseId, isOpen, onClose, onSaved }: Edit
             type="button"
             onClick={(e) => void handleSubmit(e)}
             disabled={loading || !purchase || saving || isDemo}
-            className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Yadda saxla", "Save Changes")}

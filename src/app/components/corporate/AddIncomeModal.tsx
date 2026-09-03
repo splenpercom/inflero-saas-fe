@@ -136,12 +136,12 @@ export function AddIncomeModal({
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Tarix", "Date")} <span className="text-red-500">*</span></label>
-            <DateInput value={date} onChange={setDate} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+            <DateInput value={date} onChange={setDate} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
           </div>
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Kateqoriya", "Category")} <span className="text-red-500">*</span></label>
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer">
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer">
               <option value="">{tr("Seçin", "Select")}</option>
               {activeCategories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </select>
@@ -169,7 +169,7 @@ export function AddIncomeModal({
           {(isGlobalMode || isEdit) && (
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Mağaza / Filial", "Store / Branch")} <span className="text-red-500">*</span></label>
-              <select value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={isEdit} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer disabled:opacity-60">
+              <select value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={isEdit} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer disabled:opacity-60">
                 <option value="">{tr("Seçin", "Select")}</option>
                 {branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
               </select>
@@ -178,18 +178,18 @@ export function AddIncomeModal({
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("İstinad", "Reference")}</label>
-            <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+            <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Məbləğ", "Amount")} {!isEdit && <span className="text-red-500">*</span>}</label>
-              <input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={isEdit} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] disabled:opacity-60" />
+              <input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={isEdit} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60" />
               {isEdit && <p className="text-[10px] text-gray-500 mt-0.5">{tr("Məbləği dəyişmək olmur", "Amount cannot be changed")}</p>}
             </div>
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Hesab", "Account")} {!isEdit && <span className="text-red-500">*</span>}</label>
-              <select value={accountId} onChange={(e) => setAccountId(e.target.value)} disabled={isEdit} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer disabled:opacity-60">
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)} disabled={isEdit} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer disabled:opacity-60">
                 <option value="">{tr("Seçin", "Select")}</option>
                 {activeAccounts.map((a) => (<option key={a.id} value={a.id}>{a.accountHolderName}</option>))}
               </select>
@@ -198,13 +198,13 @@ export function AddIncomeModal({
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Qeydlər", "Notes")}</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} maxLength={2000} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] resize-none" />
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} maxLength={2000} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none" />
           </div>
         </div>
 
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
           <button onClick={onClose} disabled={saving} className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50">{tr("Ləğv Et", "Cancel")}</button>
-          <button onClick={() => void handleSave()} disabled={saving} className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => void handleSave()} disabled={saving} className="px-3 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? tr("Saxlanılır...", "Saving...") : isEdit ? tr("Yadda Saxla", "Save") : tr("Gəlir Əlavə Et", "Add Income")}
           </button>
         </div>

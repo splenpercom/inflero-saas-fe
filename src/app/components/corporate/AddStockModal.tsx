@@ -81,7 +81,7 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
             <select
               value={warehouse}
               onChange={(e) => setWarehouse(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
             >
               <option value="">{tr("Seçin", "Select")}</option>
               <option value="warehouse1">{tr("Anbar 1", "Warehouse 1")}</option>
@@ -98,7 +98,7 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
             <select
               value={store}
               onChange={(e) => setStore(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
             >
               <option value="">{tr("Seçin", "Select")}</option>
               <option value="store1">{tr("Mağaza 1", "Store 1")}</option>
@@ -115,7 +115,7 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
             <select
               value={responsiblePerson}
               onChange={(e) => setResponsiblePerson(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
             >
               <option value="">{tr("Seçin", "Select")}</option>
               <option value="person1">{tr("Ali Məmmədov", "Ali Mammadov")}</option>
@@ -136,7 +136,7 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
                 value={product}
                 onChange={(e) => setProduct(e.target.value)}
                 placeholder={tr("Məhsul Axtar", "Select Product")}
-                className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
           </div>
@@ -153,7 +153,7 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
           <button
             onClick={handleSave}
             disabled={!warehouse || !store || !responsiblePerson || !product}
-            className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {tr("Stok Əlavə Et", "Add Stock")}
           </button>

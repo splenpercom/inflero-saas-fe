@@ -92,13 +92,13 @@ export function buildHeatmapGrid(points: DashboardHeatmapPoint[]) {
 export function heatColor(value: number, max: number): string {
   if (value <= 0) return "bg-gray-100 dark:bg-gray-800";
   const ratio = max > 0 ? value / max : 0;
-  if (ratio <= 0.25) return "bg-[#0026f6]/15 dark:bg-[#0026f6]/20";
-  if (ratio <= 0.5) return "bg-[#0026f6]/30 dark:bg-[#0026f6]/35";
-  if (ratio <= 0.75) return "bg-[#0026f6]/55 dark:bg-[#0026f6]/60";
-  return "bg-[#0026f6] dark:bg-[#0026f6]";
+  if (ratio <= 0.25) return "bg-[#14b8a6]/15 dark:bg-[#14b8a6]/20";
+  if (ratio <= 0.5) return "bg-[#14b8a6]/30 dark:bg-[#14b8a6]/35";
+  if (ratio <= 0.75) return "bg-[#14b8a6]/55 dark:bg-[#14b8a6]/60";
+  return "bg-[#14b8a6] dark:bg-[#14b8a6]";
 }
 
-const CATEGORY_COLORS = ["#f97316", "#0026f6", "#0ea5e9", "#10b981", "#a78bfa", "#ec4899"];
+const CATEGORY_COLORS = ["#f97316", "#14b8a6", "#0ea5e9", "#10b981", "#a78bfa", "#ec4899"];
 
 export function mapTopCategoriesPie(categories: DashboardSummary["widgets"]["topCategories"]) {
   const total = categories.reduce((s, c) => s + c.value, 0) || 1;

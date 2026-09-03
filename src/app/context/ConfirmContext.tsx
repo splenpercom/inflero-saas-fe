@@ -93,7 +93,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               className={cn(
                 variant === "danger"
                   ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-[#0026f6] hover:bg-[#001fc4] text-white",
+                  : "bg-[#14b8a6] hover:bg-[#0d9488] text-white",
               )}
             >
               {confirmLabel}

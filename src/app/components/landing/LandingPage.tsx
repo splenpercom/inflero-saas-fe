@@ -64,7 +64,7 @@ function FeatureCard({ icon: Icon, title, description, index }: {
       <h3 className="text-sm font-semibold text-white mb-2 leading-snug">{title}</h3>
       <p className="text-xs text-white/50 leading-relaxed">{description}</p>
       {/* subtle glow on hover */}
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#0026f6]/0 to-[#0026f6]/0 group-hover:from-[#0026f6]/5 group-hover:to-transparent transition-all duration-500 pointer-events-none" />
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#14b8a6]/0 to-[#14b8a6]/0 group-hover:from-[#14b8a6]/5 group-hover:to-transparent transition-all duration-500 pointer-events-none" />
     </div>
   );
 }
@@ -116,7 +116,7 @@ export function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#00082e] text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#042f2e] text-white overflow-x-hidden">
 
       {/* ── CSS keyframes ───────────────────────────────────────── */}
       <style>{`
@@ -141,13 +141,13 @@ export function LandingPage() {
         input:-webkit-autofill:hover,
         input:-webkit-autofill:focus,
         input:-webkit-autofill:active {
-          -webkit-box-shadow: 0 0 0 1000px rgba(0, 8, 46, 0.95) inset !important;
+          -webkit-box-shadow: 0 0 0 1000px rgba(4, 47, 46, 0.95) inset !important;
           -webkit-text-fill-color: rgba(255,255,255,0.90) !important;
           caret-color: white;
           transition: background-color 9999s ease-in-out 0s;
         }
         .shimmer-text {
-          background: linear-gradient(90deg, #fff 0%, #8ab4ff 40%, #fff 60%, #8ab4ff 80%, #fff 100%);
+          background: linear-gradient(90deg, #fff 0%, #5eead4 40%, #fff 60%, #5eead4 80%, #fff 100%);
           background-size: 200% auto;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
@@ -161,14 +161,14 @@ export function LandingPage() {
         }
         .mesh-gradient {
           background:
-            radial-gradient(ellipse 80% 60% at 20% 30%, rgba(0,38,246,0.18) 0%, transparent 60%),
-            radial-gradient(ellipse 60% 80% at 80% 70%, rgba(0,38,246,0.5) 0%, transparent 60%),
+            radial-gradient(ellipse 80% 60% at 20% 30%, rgba(20,184,166,0.18) 0%, transparent 60%),
+            radial-gradient(ellipse 60% 80% at 80% 70%, rgba(20,184,166,0.5) 0%, transparent 60%),
             radial-gradient(ellipse 50% 40% at 50% 0%, rgba(100,140,255,0.12) 0%, transparent 55%);
         }
       `}</style>
 
       {/* ── NAVBAR ─────────────────────────────────────────────── */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrollY > 40 ? "bg-[#00082e]/95 backdrop-blur-xl border-b border-white/10 shadow-xl shadow-black/20" : ""}`}>
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrollY > 40 ? "bg-[#042f2e]/95 backdrop-blur-xl border-b border-white/10 shadow-xl shadow-black/20" : ""}`}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
           <AppBrandLogo onDarkBackground size="nav" />
 
@@ -194,7 +194,7 @@ export function LandingPage() {
               {tr("Daxil ol", "Sign in", "Войти")}
             </button>
             <button onClick={() => setIsRegisterOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm bg-white text-[#0026f6] font-bold hover:bg-white/90 transition-all shadow-lg shadow-white/10">
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm bg-white text-[#14b8a6] font-bold hover:bg-white/90 transition-all shadow-lg shadow-white/10">
               {tr("Başla", "Get started")}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
@@ -218,7 +218,7 @@ export function LandingPage() {
                 {tr("Daxil ol", "Sign in")}
               </button>
               <button onClick={() => { setMobileMenuOpen(false); setIsRegisterOpen(true); }}
-                className="w-full py-2.5 text-sm text-center bg-white text-[#0026f6] font-bold rounded-xl">
+                className="w-full py-2.5 text-sm text-center bg-white text-[#14b8a6] font-bold rounded-xl">
                 {tr("Başla", "Get started")}
               </button>
             </div>
@@ -233,12 +233,12 @@ export function LandingPage() {
         <div className="absolute inset-0 mesh-gradient" />
 
         {/* Animated orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-[#0026f6]/12 blur-3xl animate-glow pointer-events-none" />
-        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 rounded-full bg-[#0026f6]/60 blur-3xl animate-glow pointer-events-none" style={{ animationDelay:"2s" }} />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-[#14b8a6]/12 blur-3xl animate-glow pointer-events-none" />
+        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 rounded-full bg-[#14b8a6]/60 blur-3xl animate-glow pointer-events-none" style={{ animationDelay:"2s" }} />
 
         {/* Rotating ring decoration */}
         <div className="absolute top-20 right-12 w-72 h-72 rounded-full border border-white/5 animate-spin-slow pointer-events-none hidden lg:block">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#0026f6]/60" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#14b8a6]/60" />
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white/30" />
         </div>
 
@@ -277,7 +277,7 @@ export function LandingPage() {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 mb-16 animate-slide-up delay-300">
               <button onClick={() => setIsRegisterOpen(true)}
-                className="group flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white text-[#0026f6] text-sm font-bold hover:bg-white/95 transition-all shadow-2xl shadow-white/10 hover:shadow-white/20 hover:scale-[1.02] active:scale-[0.98]">
+                className="group flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white text-[#14b8a6] text-sm font-bold hover:bg-white/95 transition-all shadow-2xl shadow-white/10 hover:shadow-white/20 hover:scale-[1.02] active:scale-[0.98]">
                 {tr("Əlaqə saxlayın", "Get in touch")}
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </button>
@@ -334,7 +334,7 @@ export function LandingPage() {
                 <div className="flex items-end gap-1 h-12">
                   {[40,65,50,80,70,90,75].map((h,i) => (
                     <div key={i} className="flex-1 rounded-t"
-                      style={{ height:`${h}%`, background:`rgba(0,38,246,${0.3 + i*0.07})` }} />
+                      style={{ height:`${h}%`, background:`rgba(20,184,166,${0.3 + i*0.07})` }} />
                   ))}
                 </div>
               </div>
@@ -355,7 +355,7 @@ export function LandingPage() {
         </div>
 
         {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#00082e] to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#042f2e] to-transparent pointer-events-none" />
       </section>
 
       {/* ── STATS ──────────────────────────────────────────────── */}
@@ -370,7 +370,7 @@ export function LandingPage() {
             ].map((s, i) => (
               <div key={i} className="text-center">
                 <p className="text-4xl sm:text-5xl font-black text-white mb-2 tabular-nums">
-                  {s.value.toLocaleString()}<span className="text-[#0026f6]">{s.suffix}</span>
+                  {s.value.toLocaleString()}<span className="text-[#14b8a6]">{s.suffix}</span>
                 </p>
                 <p className="text-sm text-white/40 font-medium">{s.label}</p>
               </div>
@@ -384,7 +384,7 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-card text-xs font-semibold text-white/50 mb-4">
-              <Zap className="w-3 h-3 text-[#0026f6]" />
+              <Zap className="w-3 h-3 text-[#14b8a6]" />
               {tr("Platforma xüsusiyyətləri", "Platform features")}
             </div>
             <h2 className="text-4xl sm:text-5xl font-black text-white leading-tight mb-4">
@@ -411,7 +411,7 @@ export function LandingPage() {
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-card text-xs font-semibold text-white/50 mb-4">
-              <TrendingUp className="w-3 h-3 text-[#0026f6]" />
+              <TrendingUp className="w-3 h-3 text-[#14b8a6]" />
               {tr("Sadə proses", "Simple process")}
             </div>
             <h2 className="text-4xl sm:text-5xl font-black text-white mb-4">
@@ -434,8 +434,8 @@ export function LandingPage() {
                   style={{ transitionDelay: `${i * 120}ms` }}
                   className={`glass-card rounded-3xl p-8 text-center transition-all duration-700 ${inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}>
                   <div className="text-6xl font-black text-white/5 mb-4 leading-none">{s.step}</div>
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0026f6]/20 to-[#0026f6]/30 border border-[#0026f6]/20 flex items-center justify-center mx-auto mb-5">
-                    <s.icon className="w-6 h-6 text-[#6699ff]" />
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#14b8a6]/20 to-[#14b8a6]/30 border border-[#14b8a6]/20 flex items-center justify-center mx-auto mb-5">
+                    <s.icon className="w-6 h-6 text-[#5eead4]" />
                   </div>
                   <h3 className="text-base font-bold text-white mb-3">{s.title}</h3>
                   <p className="text-sm text-white/40 leading-relaxed">{s.desc}</p>
@@ -450,7 +450,7 @@ export function LandingPage() {
       <section id="cta" className="py-24 sm:py-32 relative overflow-hidden">
         <div className="absolute inset-0 mesh-gradient" />
         <div className="absolute inset-0" style={{
-          backgroundImage: "radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,38,246,0.12) 0%, transparent 70%)"
+          backgroundImage: "radial-gradient(ellipse 70% 60% at 50% 50%, rgba(20,184,166,0.12) 0%, transparent 70%)"
         }} />
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-5xl sm:text-6xl font-black text-white leading-tight mb-6">
@@ -463,7 +463,7 @@ export function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button onClick={() => setIsRegisterOpen(true)}
-              className="group flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-white text-[#0026f6] text-sm font-black hover:bg-white/95 transition-all shadow-2xl shadow-white/10 hover:scale-[1.02]">
+              className="group flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-white text-[#14b8a6] text-sm font-black hover:bg-white/95 transition-all shadow-2xl shadow-white/10 hover:scale-[1.02]">
               {tr("İndi əlaqə saxlayın", "Contact us today")}
               <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </button>

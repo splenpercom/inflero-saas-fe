@@ -202,7 +202,7 @@ export function NewDashboard() {
       sub: tr("Sales − purchases − expenses", "Satış − satınalma − xərc"),
       trend: "up" as const,
       icon: TrendingUp,
-      color: "from-[#0026f6] to-[#000E80]",
+      color: "from-[#14b8a6] to-[#0d9488]",
     },
     {
       label: tr("Invoice Due", "Ödəniləcək Faktura"),
@@ -217,7 +217,7 @@ export function NewDashboard() {
   const categoryBreakdown = useMemo(() => {
     const cats = summary?.widgets.topCategories ?? [];
     const total = cats.reduce((s, c) => s + c.value, 0) || 1;
-    const colors = ["#0026f6", "#f97316", "#0ea5e9", "#10b981", "#a78bfa"];
+    const colors = ["#14b8a6", "#f97316", "#0ea5e9", "#10b981", "#a78bfa"];
     return cats.slice(0, 5).map((c, i) => ({
       name: c.name,
       amount: c.value,
@@ -231,7 +231,7 @@ export function NewDashboard() {
   if (loading && !summary) {
     return (
       <div className="flex flex-1 items-center justify-center min-h-[320px] bg-gray-50 dark:bg-gray-950">
-        <Loader2 className="w-8 h-8 animate-spin text-[#0026f6] dark:text-[#0026f6]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#14b8a6] dark:text-[#14b8a6]" />
       </div>
     );
   }
@@ -248,7 +248,7 @@ export function NewDashboard() {
       )}
 
       {/* Welcome */}
-      <div className="relative bg-gradient-to-r from-[#0026f6] to-[#000E80] rounded-2xl p-5 overflow-hidden text-white">
+      <div className="relative bg-[#14b8a6] rounded-2xl p-5 overflow-hidden text-white">
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/4 pointer-events-none" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -281,7 +281,7 @@ export function NewDashboard() {
             {reservationsEnabled && <button
               type="button"
               onClick={() => navigate("/dashboard/reservations")}
-              className="flex items-center gap-1.5 bg-white text-[#0026f6] rounded-xl px-3 py-2 text-xs font-bold hover:bg-white/90 transition-colors"
+              className="flex items-center gap-1.5 bg-white text-[#14b8a6] rounded-xl px-3 py-2 text-xs font-bold hover:bg-white/90 transition-colors"
             >
               <CalendarDays className="w-3.5 h-3.5" />
               {tr("View Reservations", "Rezervasiyalar")}
@@ -298,8 +298,8 @@ export function NewDashboard() {
             value: String(todayRes.length),
             sub: `${todayResPending} ${tr("pending", "gözləyir")}`,
             icon: CalendarDays,
-            iconBg: "bg-[#e8ebff] dark:bg-[#0026f6]/25",
-            iconColor: "text-[#0026f6] dark:text-[#0026f6]",
+            iconBg: "bg-[#ccfbf1] dark:bg-[#14b8a6]/25",
+            iconColor: "text-[#14b8a6] dark:text-[#14b8a6]",
           }] : []),
           {
             label: tr("Total Customers", "Ümumi Müştərilər"),
@@ -355,7 +355,7 @@ export function NewDashboard() {
                   key={p}
                   type="button"
                   onClick={() => setSelectedPeriod(p)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${selectedPeriod === p ? "bg-white dark:bg-gray-900 text-[#0026f6] dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${selectedPeriod === p ? "bg-white dark:bg-gray-900 text-[#14b8a6] dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}`}
                 >
                   {p}
                 </button>
@@ -366,8 +366,8 @@ export function NewDashboard() {
             <AreaChart data={revenueChartData} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
               <defs>
                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0026f6" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#0026f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="purGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f97316" stopOpacity={0.2} />
@@ -384,7 +384,7 @@ export function NewDashboard() {
                   n === "revenue" ? tr("Sales", "Satış") : tr("Purchases", "Satınalma"),
                 ]}
               />
-              <Area type="monotone" dataKey="revenue" stroke="#0026f6" strokeWidth={2} fill="url(#revGrad)" />
+              <Area type="monotone" dataKey="revenue" stroke="#14b8a6" strokeWidth={2} fill="url(#revGrad)" />
               <Area type="monotone" dataKey="purchases" stroke="#f97316" strokeWidth={2} fill="url(#purGrad)" />
             </AreaChart>
           </ResponsiveContainer>
@@ -435,13 +435,13 @@ export function NewDashboard() {
         <div className="lg:col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-[#0026f6]" />
+              <CalendarDays className="w-4 h-4 text-[#14b8a6]" />
               {tr("Today's Schedule", "Bugünkü Cədvəl")}
             </h3>
             <button
               type="button"
               onClick={() => navigate("/dashboard/reservations")}
-              className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline flex items-center gap-1"
+              className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline flex items-center gap-1"
             >
               {tr("View All", "Hamısını Gör")} <ArrowRight className="w-3 h-3" />
             </button>
@@ -453,7 +453,7 @@ export function NewDashboard() {
               {todayRes.map((r) => (
                 <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60">
                   <div className="flex-shrink-0 text-center w-12">
-                    <p className="text-xs font-bold text-[#0026f6] dark:text-[#0026f6]">{r.time}</p>
+                    <p className="text-xs font-bold text-[#14b8a6] dark:text-[#14b8a6]">{r.time}</p>
                   </div>
                   <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -483,7 +483,7 @@ export function NewDashboard() {
             <button
               type="button"
               onClick={() => navigate("/dashboard/people/customers")}
-              className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline flex items-center gap-1"
+              className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline flex items-center gap-1"
             >
               {tr("View All", "Hamısını Gör")} <ArrowRight className="w-3 h-3" />
             </button>
@@ -494,7 +494,7 @@ export function NewDashboard() {
             <div className="space-y-3">
               {topCustomers.map((c) => (
                 <div key={c.name} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0026f6] to-[#000E80] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-[#14b8a6] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
                     {c.initials}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -522,7 +522,7 @@ export function NewDashboard() {
                   key={tab}
                   type="button"
                   onClick={() => setTxTab(tab)}
-                  className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${txTab === tab ? "bg-white dark:bg-gray-900 text-[#0026f6] dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}`}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${txTab === tab ? "bg-white dark:bg-gray-900 text-[#14b8a6] dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}`}
                 >
                   {tab === "all" ? tr("All", "Hamısı") : tab === "completed" ? tr("Done", "Tamamlandı") : tr("Pending", "Gözləyir")}
                 </button>
@@ -579,7 +579,7 @@ export function NewDashboard() {
             <button
               type="button"
               onClick={() => navigate("/dashboard/inventory/products/low-stocks")}
-              className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline flex items-center gap-1"
+              className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline flex items-center gap-1"
             >
               {tr("View All", "Hamısını Gör")} <ArrowRight className="w-3 h-3" />
             </button>
@@ -660,7 +660,7 @@ export function NewDashboard() {
             const Icon = icons[i % icons.length];
             const colors = [
               { color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/20" },
-              { color: "text-[#0026f6] dark:text-[#0026f6]", bg: "bg-[#e8ebff] dark:bg-[#0026f6]/20" },
+              { color: "text-[#14b8a6] dark:text-[#14b8a6]", bg: "bg-[#ccfbf1] dark:bg-[#14b8a6]/20" },
               { color: "text-sky-600", bg: "bg-sky-50 dark:bg-sky-900/20" },
               { color: "text-teal-600", bg: "bg-teal-50 dark:bg-teal-900/20" },
             ][i % 4];
@@ -682,14 +682,14 @@ export function NewDashboard() {
       {/* Finance */}
       <div className="flex items-center gap-3 pt-2">
         <div className="flex items-center gap-2">
-          <div className="w-1 h-5 bg-[#0026f6] rounded-full" />
+          <div className="w-1 h-5 bg-[#14b8a6] rounded-full" />
           <h2 className="text-sm font-bold text-gray-900 dark:text-white">{tr("Financial Overview", "Maliyyə İcmalı")}</h2>
         </div>
         <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800" />
         <button
           type="button"
           onClick={() => navigate("/dashboard/finances/expenses")}
-          className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline flex items-center gap-1"
+          className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline flex items-center gap-1"
         >
           {tr("View Finances", "Maliyyəyə Bax")} <ArrowRight className="w-3 h-3" />
         </button>
@@ -725,7 +725,7 @@ export function NewDashboard() {
                   key={p}
                   type="button"
                   onClick={() => setFinPeriod(p)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${finPeriod === p ? "bg-white dark:bg-gray-900 text-[#0026f6] dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${finPeriod === p ? "bg-white dark:bg-gray-900 text-[#14b8a6] dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}`}
                 >
                   {p}
                 </button>
@@ -744,7 +744,7 @@ export function NewDashboard() {
                   n === "revenue" ? tr("Revenue", "Gəlir") : n === "expenses" ? tr("Expenses", "Xərclər") : tr("Profit", "Mənfəət"),
                 ]}
               />
-              <Bar dataKey="revenue" fill="#0026f6" radius={[5, 5, 0, 0]} />
+              <Bar dataKey="revenue" fill="#14b8a6" radius={[5, 5, 0, 0]} />
               <Bar dataKey="expenses" fill="#f97316" radius={[5, 5, 0, 0]} />
               <Bar dataKey="profit" fill="#10b981" radius={[5, 5, 0, 0]} />
             </BarChart>

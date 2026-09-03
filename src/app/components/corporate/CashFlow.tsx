@@ -215,7 +215,7 @@ export function CashFlow() {
                 placeholder={tr("Axtar...", "Search...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -225,7 +225,7 @@ export function CashFlow() {
                 <select
                   value={selectedPaymentMethod}
                   onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="all">{tr("Ödəniş Üsulu", "Payment Method")}</option>
                   <option value="stripe">Stripe</option>
@@ -320,7 +320,7 @@ export function CashFlow() {
               <button className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <ChevronLeft className="w-4 h-4 text-gray-500 dark:text-gray-400" />
               </button>
-              <button className="w-7 h-7 rounded-lg bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white text-xs font-medium">
+              <button className="w-7 h-7 rounded-lg bg-[#14b8a6] text-white text-xs font-medium">
                 1
               </button>
               <button className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">

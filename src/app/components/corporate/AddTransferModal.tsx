@@ -159,7 +159,7 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
               type="checkbox"
               checked={isDeposited}
               onChange={(e) => setIsDeposited(e.target.checked)}
-              className="accent-[#0026f6]"
+              className="accent-[#14b8a6]"
             />
             {tr("Depozit transfer", "Deposited transfer")}
           </label>
@@ -181,7 +181,7 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
                 <button
                   type="button"
                   onClick={() => setLines((prev) => [...prev, emptyLine()])}
-                  className="flex items-center gap-1 text-xs text-[#0026f6]"
+                  className="flex items-center gap-1 text-xs text-[#14b8a6]"
                 >
                   <Plus className="w-3 h-3" />
                   {tr("Sətir əlavə et", "Add line")}
@@ -298,7 +298,7 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
             type="button"
             onClick={() => void handleSave()}
             disabled={!canSubmit || saving}
-            className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg text-xs disabled:opacity-50"
+            className="px-3 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs disabled:opacity-50"
           >
             {saving ? tr("Yaradılır...", "Creating...") : tr("Yarat", "Create")}
           </button>

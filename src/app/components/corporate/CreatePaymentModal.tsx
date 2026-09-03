@@ -166,7 +166,7 @@ export function CreatePaymentModal({
               </div>
               <div className="flex justify-between text-xs border-t border-gray-200 dark:border-gray-700 pt-2">
                 <span className="text-gray-600 dark:text-gray-400">{tr("Qalan Borc", "Remaining Due")}:</span>
-                <span className="font-bold text-[#0026f6] dark:text-[#0026f6]">₼{due.toFixed(2)}</span>
+                <span className="font-bold text-[#14b8a6] dark:text-[#14b8a6]">₼{due.toFixed(2)}</span>
               </div>
             </div>
 
@@ -178,7 +178,7 @@ export function CreatePaymentModal({
               <DateInput
                 value={formData.date}
                 onChange={(date) => setFormData({ ...formData, date })}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 required
               />
             </div>
@@ -196,7 +196,7 @@ export function CreatePaymentModal({
                   max={due}
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 pr-12 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-3 py-2 pr-12 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                   placeholder="0.00"
                   required
                 />
@@ -233,7 +233,7 @@ export function CreatePaymentModal({
               <select
                 value={formData.paymentMethod}
                 onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 required
               >
                 <option value="Cash">{tr("Nağd", "Cash")}</option>
@@ -251,7 +251,7 @@ export function CreatePaymentModal({
                 type="text"
                 value={formData.reference}
                 onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 placeholder={tr("Ödəniş istinadı", "Payment reference")}
               />
             </div>
@@ -264,7 +264,7 @@ export function CreatePaymentModal({
                 value={formData.note}
                 onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] resize-none"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none"
                 placeholder={tr("Ödəniş haqqında qeyd əlavə edin...", "Add note about payment...")}
               />
             </div>
@@ -283,7 +283,7 @@ export function CreatePaymentModal({
             type="button"
             onClick={(e) => void handleSubmit(e)}
             disabled={loading || !summary || saving || formData.amount <= 0 || formData.amount > due}
-            className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {saving ? tr("Yaradılır...", "Creating...") : tr("Ödənişi Yarat", "Create Payment")}

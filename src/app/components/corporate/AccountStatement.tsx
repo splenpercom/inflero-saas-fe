@@ -221,7 +221,7 @@ export function AccountStatement() {
                   type="text"
                   value={dateRange}
                   onChange={(e) => setDateRange(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                   placeholder={tr("Tarix aralığı seçin", "Select date range")}
                 />
               </div>
@@ -236,7 +236,7 @@ export function AccountStatement() {
                 <select
                   value={selectedAccount}
                   onChange={(e) => setSelectedAccount(e.target.value)}
-                  className="appearance-none w-full pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none w-full pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="">{tr("Seçin", "Select")}</option>
                   <option value="HBSC - 3298784309485">HBSC - 3298784309485</option>
@@ -251,7 +251,7 @@ export function AccountStatement() {
             <div className="flex items-end">
               <button
                 onClick={handleSubmit}
-                className="w-full px-4 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors"
+                className="w-full px-4 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
               >
                 {tr("Təqdim Et", "Submit")}
               </button>
@@ -262,7 +262,7 @@ export function AccountStatement() {
         {/* Statement Header */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 mb-4">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-            {tr("Hesab Çıxarışı", "Statement of Account")} : <span className="text-[#0026f6] dark:text-[#0026f6]">{selectedAccount}</span>
+            {tr("Hesab Çıxarışı", "Statement of Account")} : <span className="text-[#14b8a6] dark:text-[#14b8a6]">{selectedAccount}</span>
           </h2>
         </div>
 

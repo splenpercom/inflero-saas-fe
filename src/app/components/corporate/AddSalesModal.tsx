@@ -185,7 +185,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               <select
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
               >
                 <option value="">{tr("Müştəri Seç", "Choose Customer")}</option>
                 {customers.map((c) => (
@@ -204,7 +204,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 value={billerId}
                 onChange={(e) => setBillerId(e.target.value)}
                 disabled={billersLoading}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer disabled:opacity-60"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer disabled:opacity-60"
               >
                 <option value="">{tr("Kassir Seç", "Choose Biller")}</option>
                 {billers.map((b) => (
@@ -230,7 +230,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               <DateInput
                 value={date}
                 onChange={setDate}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -242,7 +242,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 type="text"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
           </div>
@@ -261,7 +261,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 }}
                 onFocus={() => setShowProductList(true)}
                 placeholder={tr("Məhsul kodu daxil edin və seçin", "Please type product code and select")}
-                className="w-full px-2.5 py-1.5 pr-10 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 pr-10 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
               <Scan className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
 
@@ -381,7 +381,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 value={taxPercent}
                 onChange={(e) => setTaxPercent(Number(e.target.value))}
                 min="0"
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -394,7 +394,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 value={discount}
                 onChange={(e) => setDiscount(Number(e.target.value))}
                 min="0"
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -407,7 +407,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 value={shipping}
                 onChange={(e) => setShipping(Number(e.target.value))}
                 min="0"
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -418,7 +418,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
               >
                 <option value="">{tr("Seç", "Select")}</option>
                 <option value="completed">{tr("Tamamlandı", "Completed")}</option>
@@ -442,7 +442,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
             type="button"
             onClick={() => void handleSave()}
             disabled={!customerId || !date || products.length === 0 || !status || saving || isDemo}
-            className="px-6 py-3 text-sm bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-3 text-sm bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq Et", "Submit")}
           </button>

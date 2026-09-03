@@ -78,7 +78,7 @@ export function UserDetail() {
       amount: "-8 units",
       time: "1 day ago",
       icon: Activity,
-      color: "text-[#0026f6] dark:text-[#0026f6] bg-[#e8ebff] dark:bg-[#0026f6]/20",
+      color: "text-[#14b8a6] dark:text-[#14b8a6] bg-[#ccfbf1] dark:bg-[#14b8a6]/20",
     },
     {
       id: "4",
@@ -132,7 +132,7 @@ export function UserDetail() {
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {/* Avatar and Basic Info */}
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#0026f6] to-[#001db8] flex items-center justify-center text-3xl border-4 border-[#0026f6]/20 dark:border-[#0026f6]/30">
+              <div className="w-20 h-20 rounded-full bg-[#14b8a6] flex items-center justify-center text-3xl border-4 border-[#14b8a6]/20 dark:border-[#14b8a6]/30">
                 {user.avatar}
               </div>
               <div>
@@ -140,7 +140,7 @@ export function UserDetail() {
                   {user.name}
                 </h1>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6] border border-[#0026f6]/20 dark:border-[#0026f6]/30">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6] border border-[#14b8a6]/20 dark:border-[#14b8a6]/30">
                     {user.role}
                   </span>
                   <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -167,7 +167,7 @@ export function UserDetail() {
               <div className="text-center md:text-right">
                 <button
                   onClick={() => navigate(`/user-management/users/${id}/edit`)}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors"
+                  className="px-4 py-2 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors"
                 >
                   {t("editProfile")}
                 </button>
@@ -181,7 +181,7 @@ export function UserDetail() {
           {activityStats.map((stat, index) => {
             const Icon = stat.icon;
             const colorClasses = {
-              brand: "from-[#0026f6] to-[#001db8]",
+              brand: "from-[#14b8a6] to-[#0d9488]",
               blue: "from-blue-400 to-blue-500",
               purple: "from-purple-400 to-purple-500",
               green: "from-green-400 to-green-500",
@@ -216,7 +216,7 @@ export function UserDetail() {
                 className={cn(
                   "flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors",
                   activeTab === "overview"
-                    ? "bg-[#0026f6] text-white"
+                    ? "bg-[#14b8a6] text-white"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 )}
               >
@@ -227,7 +227,7 @@ export function UserDetail() {
                 className={cn(
                   "flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors",
                   activeTab === "activity"
-                    ? "bg-[#0026f6] text-white"
+                    ? "bg-[#14b8a6] text-white"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 )}
               >
@@ -238,7 +238,7 @@ export function UserDetail() {
                 className={cn(
                   "flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors",
                   activeTab === "transactions"
-                    ? "bg-[#0026f6] text-white"
+                    ? "bg-[#14b8a6] text-white"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 )}
               >
@@ -422,7 +422,7 @@ export function UserDetail() {
                               "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium",
                               transaction.type === "Sale" && "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
                               transaction.type === "Purchase" && "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-                              transaction.type === "Adjustment" && "bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6]"
+                              transaction.type === "Adjustment" && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
                             )}
                           >
                             {transaction.type}

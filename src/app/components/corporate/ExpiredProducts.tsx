@@ -163,7 +163,7 @@ export function ExpiredProducts() {
       startY: 35,
       theme: "grid",
       headStyles: {
-        fillColor: [0, 38, 246],
+        fillColor: [20, 184, 166],
         textColor: [255, 255, 255],
         fontSize: 10,
         fontStyle: "bold",
@@ -310,7 +310,7 @@ export function ExpiredProducts() {
                 placeholder={tr("Məhsul/xidmət axtar...", "Search products/services...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -482,7 +482,7 @@ export function ExpiredProducts() {
                   </label>
                   <button
                     onClick={handleDownloadDemo}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#e8ebff] dark:bg-[#0026f6]/20 border border-[#b3c0ff] dark:border-[#0026f6] rounded-lg text-sm font-medium text-[#0026f6] dark:text-[#0026f6] hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/30 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border border-[#b3c0ff] dark:border-[#14b8a6] rounded-lg text-sm font-medium text-[#14b8a6] dark:text-[#14b8a6] hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/30 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     {tr("Demo CSV Yüklə", "Download Demo CSV")}
@@ -526,13 +526,13 @@ export function ExpiredProducts() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-700 dark:text-gray-300">{tr("İdxal edilir...", "Importing...")}</span>
-                      <span className="font-medium text-[#0026f6] dark:text-[#0026f6]">
+                      <span className="font-medium text-[#14b8a6] dark:text-[#14b8a6]">
                         {importProgress.toFixed(0)}%
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
                       <div
-                        className="bg-gradient-to-r from-[#0026f6] to-[#001db8] h-2.5 rounded-full transition-all duration-300 ease-out"
+                        className="bg-[#14b8a6] h-2.5 rounded-full transition-all duration-300 ease-out"
                         style={{ width: `${importProgress}%` }}
                       />
                     </div>

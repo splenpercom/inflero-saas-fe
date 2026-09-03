@@ -408,7 +408,7 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
             type="button"
             onClick={() => void handleSave()}
             disabled={!canSubmit || saving}
-            className="px-4 py-1.5 bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg text-xs font-medium disabled:opacity-50"
+            className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium disabled:opacity-50"
           >
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq et", "Submit")}
           </button>

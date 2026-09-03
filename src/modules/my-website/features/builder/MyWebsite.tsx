@@ -55,7 +55,7 @@ function PresetIcon({ ratios, active }: { ratios: number[]; active?: boolean }) 
   return (
     <div className="flex gap-0.5 w-full h-6">
       {ratios.map((r, i) => (
-        <div key={i} className={`rounded-sm transition-colors ${active ? "bg-[#0026f6]" : "bg-gray-300 dark:bg-gray-600"}`} style={{ flex: r }} />
+        <div key={i} className={`rounded-sm transition-colors ${active ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-600"}`} style={{ flex: r }} />
       ))}
     </div>
   );
@@ -81,7 +81,7 @@ function WidthAdjuster({ preset, initialRatios, onConfirm, onBack }: {
 
       <div className="flex gap-0.5 h-10 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
         {ratios.map((r, i) => (
-          <div key={i} className="flex items-center justify-center text-white text-[10px] font-bold bg-[#0026f6] transition-all" style={{ flex: r }}>
+          <div key={i} className="flex items-center justify-center text-white text-[10px] font-bold bg-[#14b8a6] transition-all" style={{ flex: r }}>
             {Math.round((r / total) * 100)}%
           </div>
         ))}
@@ -94,7 +94,7 @@ function WidthAdjuster({ preset, initialRatios, onConfirm, onBack }: {
             <input
               type="range" min={1} max={9} step={1} value={r}
               onChange={e => setRatios(prev => prev.map((v, j) => j === i ? Number(e.target.value) : v))}
-              className="flex-1 accent-[#0026f6]"
+              className="flex-1 accent-[#14b8a6]"
             />
             <span className="text-[10px] font-mono text-gray-600 dark:text-gray-400 w-7 text-right flex-shrink-0">
               {Math.round((r / total) * 100)}%
@@ -105,7 +105,7 @@ function WidthAdjuster({ preset, initialRatios, onConfirm, onBack }: {
 
       <button
         onClick={() => onConfirm(ratios)}
-        className="w-full py-2 text-xs font-semibold bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg transition-colors"
+        className="w-full py-2 text-xs font-semibold bg-[#14b8a6] hover:bg-[#0f766e] text-white rounded-lg transition-colors"
       >
         {tr("Bölmə Yarat", "Create Section")}
       </button>
@@ -118,7 +118,7 @@ function WidthAdjuster({ preset, initialRatios, onConfirm, onBack }: {
 const TEMPLATES = [
   {
     id: "minimal", name: "Minimal",
-    bg: "bg-gray-50", nav: "bg-white border-b border-gray-200", accent: "#0026f6",
+    bg: "bg-gray-50", nav: "bg-white border-b border-gray-200", accent: "#14b8a6",
     // Sharp, clean, Swiss-grid feel
     btnRadius: "rounded-lg", cardRadius: "rounded-xl", imgRadius: "rounded-xl",
     fontHeading: "font-sans", fontBody: "font-sans",
@@ -127,7 +127,7 @@ const TEMPLATES = [
   },
   {
     id: "dark", name: "Dark",
-    bg: "bg-gray-950", nav: "bg-gray-900 border-b border-gray-800", accent: "#0026f6",
+    bg: "bg-gray-950", nav: "bg-gray-900 border-b border-gray-800", accent: "#14b8a6",
     // Sleek, tech, angular edges
     btnRadius: "rounded-md", cardRadius: "rounded-lg", imgRadius: "rounded-lg",
     fontHeading: "font-mono", fontBody: "font-sans",
@@ -145,7 +145,7 @@ const TEMPLATES = [
   },
   {
     id: "vibrant", name: "Vibrant",
-    bg: "bg-white", nav: "bg-white border-b-4 border-[#0026f6]", accent: "#7c3aed",
+    bg: "bg-white", nav: "bg-white border-b-4 border-[#14b8a6]", accent: "#7c3aed",
     // Bold, expressive, chunky borders, heavy font weight, square-ish
     btnRadius: "rounded-2xl", cardRadius: "rounded-2xl", imgRadius: "rounded-xl",
     fontHeading: "font-black", fontBody: "font-medium",
@@ -257,11 +257,11 @@ const GAP_CLS: Record<string, string> = { sm: "gap-1", md: "gap-3", lg: "gap-5" 
 function makeBlock(type: BlockType): Block {
   const base: Block = { id: uid(), type, label: BLOCK_META[type].label, visible: true };
   if (type === "featured-products") return { ...base, productSource: { mode: "all", categoryId: "", productIds: [], limit: 4, title: "Featured Products" } };
-  if (type === "hero")              return { ...base, heading: "Your Headline", subheading: "Add your subheading here.", ctaText: "Shop Now", ctaColor: "#0026f6", bgColor: "#e8ebff" };
-  if (type === "banner")            return { ...base, bannerText: "Summer Sale — Up to 40% Off", bannerSubtext: "Limited time offer. Shop now before it ends.", bannerBg: "#0f172a", ctaText: "Shop the Sale", ctaColor: "#0026f6" };
+  if (type === "hero")              return { ...base, heading: "Your Headline", subheading: "Add your subheading here.", ctaText: "Shop Now", ctaColor: "#14b8a6", bgColor: "#ccfbf1" };
+  if (type === "banner")            return { ...base, bannerText: "Summer Sale — Up to 40% Off", bannerSubtext: "Limited time offer. Shop now before it ends.", bannerBg: "#0f172a", ctaText: "Shop the Sale", ctaColor: "#14b8a6" };
   if (type === "newsletter")        return { ...base, newsletterHeading: "Stay in the loop", newsletterPlaceholder: "Enter your email" };
   if (type === "image-block")       return { ...base, imageHeight: "md" };
-  if (type === "image-text")        return { ...base, imageHeight: "md", imagePosition: "left", heading: "Section Title", subheading: "Tell your brand story.", ctaText: "Learn more", ctaColor: "#0026f6" };
+  if (type === "image-text")        return { ...base, imageHeight: "md", imagePosition: "left", heading: "Section Title", subheading: "Tell your brand story.", ctaText: "Learn more", ctaColor: "#14b8a6" };
   if (type === "whatsapp-widget")   return { ...base, waNumber: "", waMessage: "Hello! I have a question.", waLabel: "Chat with us" };
   if (type === "socials")           return { ...base, socialLinks: {} };
   if (type === "reservation")       return { ...base, reservationTitle: "Make a Reservation", reservationSubtext: "Book your spot in just a few clicks.", reservationServices: ["Table for 2", "Table for 4", "Private Room"], reservationShowGuests: true, reservationShowNotes: true };
@@ -280,7 +280,7 @@ const DEFAULT_CONTENT: ContentItem[] = [
   {
     id: "b1", type: "hero", label: "Hero", visible: true,
     heading: "Shop the Latest Collection", subheading: "Free shipping on orders over $50. New arrivals every week.",
-    ctaText: "Shop Now", ctaColor: "#0026f6", bgColor: "#0f172a",
+    ctaText: "Shop Now", ctaColor: "#14b8a6", bgColor: "#0f172a",
   },
   {
     id: "b2", type: "featured-products", label: "Best Sellers", visible: true,
@@ -290,7 +290,7 @@ const DEFAULT_CONTENT: ContentItem[] = [
     id: "banner1", type: "banner", label: "Promo Banner", visible: true,
     bannerText: "🔥 Summer Sale — Up to 40% Off",
     bannerSubtext: "Limited time offer. Use code SUMMER at checkout.",
-    bannerBg: "#0f172a", ctaText: "Claim Offer", ctaColor: "#0026f6",
+    bannerBg: "#0f172a", ctaText: "Claim Offer", ctaColor: "#14b8a6",
   },
   { id: "b3", type: "category-grid", label: "Shop by Category", visible: true },
   { id: "b4", type: "testimonials", label: "Testimonials", visible: true },
@@ -391,7 +391,7 @@ function ImageUploader({ value, onChange, aspectHint }: {
       ) : (
         <button
           onClick={() => inputRef.current?.click()}
-          className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-2 hover:border-[#0026f6] dark:hover:border-[#0026f6] hover:bg-[#e8ebff]/40 dark:hover:bg-[#0026f6]/10 transition-all text-gray-400 dark:text-gray-500 hover:text-[#0026f6] dark:hover:text-[#99b3ff]"
+          className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-2 hover:border-[#14b8a6] dark:hover:border-[#14b8a6] hover:bg-[#ccfbf1]/40 dark:hover:bg-[#14b8a6]/10 transition-all text-gray-400 dark:text-gray-500 hover:text-[#14b8a6] dark:hover:text-[#99b3ff]"
         >
           <Upload className="w-5 h-5" />
           <span className="text-xs font-medium">Click to upload image</span>
@@ -440,7 +440,7 @@ function PreviewBlock({
   const textBase = isDark ? "text-white" : "text-gray-900";
   const textMuted = isDark ? "text-gray-400" : "text-gray-500";
   const cardBg = isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const ring = selected ? "ring-2 ring-[#0026f6] ring-offset-1" : "ring-1 ring-transparent hover:ring-[#99b3ff] hover:ring-offset-1";
+  const ring = selected ? "ring-2 ring-[#14b8a6] ring-offset-1" : "ring-1 ring-transparent hover:ring-[#99b3ff] hover:ring-offset-1";
   const opacityCls = isDragging ? "opacity-25 scale-95" : "";
   const isElegant = config.template === "elegant";
   const isVibrant = config.template === "vibrant";
@@ -485,7 +485,7 @@ function PreviewBlock({
             <X className="w-2.5 h-2.5" />
           </button>
         )}
-        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#0026f6] text-white text-[9px] font-medium shadow-sm pointer-events-none">
+        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#14b8a6] text-white text-[9px] font-medium shadow-sm pointer-events-none">
           <Settings2 className="w-2 h-2" /> Edit
         </div>
       </div>
@@ -627,7 +627,7 @@ function PreviewBlock({
     }
 
     case "category-grid": {
-      const catAccentPalette = ["#0026f6","#2563eb","#dc2626","#9333ea","#ea580c","#0891b2"];
+      const catAccentPalette = ["#14b8a6","#0d9488","#dc2626","#9333ea","#ea580c","#0891b2"];
       return (
         <>
           <DropLine active={!!dropBefore} />
@@ -696,7 +696,7 @@ function PreviewBlock({
               {block.ctaText && (
                 <button
                   className={`mt-1 font-semibold rounded-lg shadow-md ${compact ? "px-3 py-1 text-[10px]" : "px-5 py-2 text-xs"}`}
-                  style={{ background: block.ctaColor || "#0026f6", color: block.ctaBtnTextColor || "#ffffff" }}
+                  style={{ background: block.ctaColor || "#14b8a6", color: block.ctaBtnTextColor || "#ffffff" }}
                 >
                   {block.ctaText}
                 </button>
@@ -997,7 +997,7 @@ function PreviewColumn({
           className={`flex-1 flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed min-h-[80px] transition-all ${
             isColDropTarget
               ? "border-blue-400 bg-blue-50/40 dark:bg-blue-900/10"
-              : isDark ? "border-gray-700 hover:border-gray-500" : "border-gray-200 hover:border-[#0026f6]"
+              : isDark ? "border-gray-700 hover:border-gray-500" : "border-gray-200 hover:border-[#14b8a6]"
           }`}
         >
           <Plus className={`w-4 h-4 ${isDark ? "text-gray-600" : "text-gray-300"}`} />
@@ -1038,7 +1038,7 @@ function PreviewColumn({
           {!publicMode && (
           <button
             onClick={onAddBlockClick}
-            className={`flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed text-[10px] transition-colors mt-0.5 ${isDark ? "border-gray-700 text-gray-600 hover:border-[#0026f6] hover:text-[#99b3ff]" : "border-gray-200 text-gray-300 hover:border-[#0026f6] hover:text-[#0026f6]"}`}
+            className={`flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed text-[10px] transition-colors mt-0.5 ${isDark ? "border-gray-700 text-gray-600 hover:border-[#14b8a6] hover:text-[#99b3ff]" : "border-gray-200 text-gray-300 hover:border-[#14b8a6] hover:text-[#14b8a6]"}`}
           >
             <Plus className="w-3 h-3" /> Add block
           </button>
@@ -1157,7 +1157,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
   const txt = isDark ? "text-gray-100" : "text-gray-900";
   const sub = isDark ? "text-gray-400" : "text-gray-500";
   const card = isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const inputCls = `w-full px-3 py-2 text-xs rounded-lg border ${isDark?"border-gray-600 bg-gray-700 text-gray-100":"border-gray-300 bg-white text-gray-800"} outline-none focus:border-[#0026f6] transition-colors`;
+  const inputCls = `w-full px-3 py-2 text-xs rounded-lg border ${isDark?"border-gray-600 bg-gray-700 text-gray-100":"border-gray-300 bg-white text-gray-800"} outline-none focus:border-[#14b8a6] transition-colors`;
 
   if (page === "product") {
     const product = storefront?.selectedProduct ?? DEFAULT_PRODUCT;
@@ -1238,7 +1238,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
                     {Array.from({length:5}).map((_,i)=><Star key={i} className={`w-3.5 h-3.5 ${i<Math.floor(product.rating)?"fill-yellow-400 text-yellow-400":"text-gray-300"}`}/>)}
                   </div>
                   <span className={`text-xs ${sub}`}>({product.reviews} rəy)</span>
-                  <span className="text-xs font-semibold text-[#0026f6]">· Stokda Var</span>
+                  <span className="text-xs font-semibold text-[#14b8a6]">· Stokda Var</span>
                 </div>
                 <p className={`text-xs leading-relaxed ${sub}`}>Gündəlik istifadə üçün premium keyfiyyətli məhsul. Qabaqcıl materiallar və dəqiq mühəndislik ilə hazırlanmış.</p>
                 <div className={`h-px ${isDark?"bg-gray-700":"bg-gray-100"}`}/>
@@ -1375,7 +1375,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
                   {Array.from({length:5}).map((_,i)=><Star key={i} className={`w-3.5 h-3.5 ${i<Math.floor(product.rating)?"fill-yellow-400 text-yellow-400":"text-gray-300"}`}/>)}
                 </div>
                 <span className={`text-xs ${sub}`}>{product.rating} · {product.reviews} rəy</span>
-                <span className="text-xs font-semibold text-[#0026f6] ml-auto">✓ Stokda</span>
+                <span className="text-xs font-semibold text-[#14b8a6] ml-auto">✓ Stokda</span>
               </div>
             </div>
 
@@ -1515,8 +1515,8 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
               style={i<=stepIdx?{background:tmpl.accent}:{}}>
               {i<stepIdx?<Check className="w-3 h-3"/>:i+1}
             </div>
-            <span className={`text-[9px] ml-1 font-medium ${i===stepIdx?"text-[#0026f6]":sub}`}>{s}</span>
-            {i<3&&<div className={`flex-1 h-px mx-1 ${i<stepIdx?"bg-[#0026f6]":"bg-gray-200 dark:bg-gray-700"}`}/>}
+            <span className={`text-[9px] ml-1 font-medium ${i===stepIdx?"text-[#14b8a6]":sub}`}>{s}</span>
+            {i<3&&<div className={`flex-1 h-px mx-1 ${i<stepIdx?"bg-[#14b8a6]":"bg-gray-200 dark:bg-gray-700"}`}/>}
           </div>
         ))}
       </div>
@@ -1543,7 +1543,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
           ))}
           <div className={`rounded-xl border ${card} p-3 space-y-1.5 text-xs`}>
             <div className={`flex justify-between ${sub}`}><span>Aralıq cəmi</span><span>{bagTotalLabel} ₼</span></div>
-            <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-[#0026f6]">Pulsuz</span></div>
+            <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-[#14b8a6]">Pulsuz</span></div>
             <div className={`flex justify-between font-bold border-t pt-1.5 ${isDark?"border-gray-700":""}`}><span>Cəmi</span><span style={{color:tmpl.accent}}>{bagTotalLabel} ₼</span></div>
           </div>
           <button onClick={()=>setCartStep("shipping")} disabled={bagLines.length === 0} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-50" style={{background:tmpl.accent}}>
@@ -1571,36 +1571,36 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
           <div className={`rounded-xl border ${card} p-3 space-y-2`}>
             <p className={`text-[10px] font-semibold ${txt}`}>Çatdırılma üsulu</p>
             {config.shippingMethod === "free" && (
-              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10`}>
+              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#14b8a6] bg-[#14b8a6]/5 dark:bg-[#14b8a6]/10`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full border-2 border-[#0026f6] bg-[#0026f6] flex-shrink-0"/>
+                  <div className="w-3 h-3 rounded-full border-2 border-[#14b8a6] bg-[#14b8a6] flex-shrink-0"/>
                   <span className="text-[10px]">Pulsuz Çatdırılma</span>
                 </div>
-                <span className="text-[10px] font-medium text-[#0026f6]">Pulsuz</span>
+                <span className="text-[10px] font-medium text-[#14b8a6]">Pulsuz</span>
               </label>
             )}
             {config.shippingMethod === "standard" && (
-              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10`}>
+              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#14b8a6] bg-[#14b8a6]/5 dark:bg-[#14b8a6]/10`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full border-2 border-[#0026f6] bg-[#0026f6] flex-shrink-0"/>
+                  <div className="w-3 h-3 rounded-full border-2 border-[#14b8a6] bg-[#14b8a6] flex-shrink-0"/>
                   <span className="text-[10px]">Standart Çatdırılma</span>
                 </div>
-                <span className="text-[10px] font-medium text-[#0026f6]">{config.shippingPrice} ₼</span>
+                <span className="text-[10px] font-medium text-[#14b8a6]">{config.shippingPrice} ₼</span>
               </label>
             )}
             {config.shippingMethod === "free_above" && (
-              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10`}>
+              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#14b8a6] bg-[#14b8a6]/5 dark:bg-[#14b8a6]/10`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full border-2 border-[#0026f6] bg-[#0026f6] flex-shrink-0"/>
+                  <div className="w-3 h-3 rounded-full border-2 border-[#14b8a6] bg-[#14b8a6] flex-shrink-0"/>
                   <span className="text-[10px]">{config.shippingFreeAbove} ₼ üzərində pulsuz</span>
                 </div>
-                <span className="text-[10px] font-medium text-[#0026f6]">Pulsuz</span>
+                <span className="text-[10px] font-medium text-[#14b8a6]">Pulsuz</span>
               </label>
             )}
             {config.shippingMethod === "distance" && (
-              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10`}>
+              <label className={`flex items-center justify-between gap-2 p-2 rounded-lg border border-[#14b8a6] bg-[#14b8a6]/5 dark:bg-[#14b8a6]/10`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full border-2 border-[#0026f6] bg-[#0026f6] flex-shrink-0"/>
+                  <div className="w-3 h-3 rounded-full border-2 border-[#14b8a6] bg-[#14b8a6] flex-shrink-0"/>
                   <div>
                     <span className="text-[10px] block">Məsafəyə görə çatdırılma</span>
                     <span className={`text-[9px] ${sub}`}>{config.shippingDistanceBase} ₼/km · max {config.shippingDistanceMaxKm} km</span>
@@ -1623,8 +1623,8 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
           <div className={`rounded-xl border ${card} p-3 space-y-2`}>
             <p className={`text-[10px] font-semibold ${txt} mb-1`}>Ödəniş üsulunu seçin</p>
             {config.paymentMethods.filter(m=>m.enabled).map((m,i)=>(
-              <label key={m.id} className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer border transition-colors ${i===0?"border-[#0026f6] bg-[#0026f6]/5 dark:bg-[#0026f6]/10":`border-transparent ${isDark?"hover:bg-gray-700":"hover:bg-gray-50"}`}`}>
-                <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${i===0?"border-[#0026f6] bg-[#0026f6]":"border-gray-300"}`}/>
+              <label key={m.id} className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer border transition-colors ${i===0?"border-[#14b8a6] bg-[#14b8a6]/5 dark:bg-[#14b8a6]/10":`border-transparent ${isDark?"hover:bg-gray-700":"hover:bg-gray-50"}`}`}>
+                <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${i===0?"border-[#14b8a6] bg-[#14b8a6]":"border-gray-300"}`}/>
                 <span className="text-sm">{m.icon}</span>
                 <span className="text-[10px]">{m.name}</span>
               </label>
@@ -1640,7 +1640,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
           </div>
           <div className={`rounded-xl border ${card} p-3 space-y-1 text-xs`}>
             <div className={`flex justify-between ${sub}`}><span>{bagLines.reduce((s, l) => s + l.qty, 0)} məhsul</span><span>{bagTotalLabel} ₼</span></div>
-            <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-[#0026f6]">Pulsuz</span></div>
+            <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-[#14b8a6]">Pulsuz</span></div>
             <div className={`flex justify-between font-bold border-t pt-1.5 ${isDark?"border-gray-700":""}`}><span>Cəmi</span><span style={{color:tmpl.accent}}>{bagTotalLabel} ₼</span></div>
           </div>
           <div className="flex gap-2">
@@ -1652,8 +1652,8 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
 
       {cartStep === "done" && (
         <div className="py-8 flex flex-col items-center text-center gap-3">
-          <div className="w-14 h-14 rounded-full bg-[#e8ebff] dark:bg-[#0026f6]/30 flex items-center justify-center">
-            <Check className="w-7 h-7 text-[#0026f6]"/>
+          <div className="w-14 h-14 rounded-full bg-[#ccfbf1] dark:bg-[#14b8a6]/30 flex items-center justify-center">
+            <Check className="w-7 h-7 text-[#14b8a6]"/>
           </div>
           <div>
             <h2 className="text-sm font-bold mb-1">Sifariş Təsdiqləndi!</h2>
@@ -1709,7 +1709,7 @@ function LivePreview({
   const isDark = config.template === "dark";
   const isElegant = config.template === "elegant";
   const isVibrant = config.template === "vibrant";
-  const headerRing = selected?.kind === "header" ? "ring-2 ring-[#0026f6] ring-offset-1" : "ring-1 ring-transparent hover:ring-[#99b3ff]";
+  const headerRing = selected?.kind === "header" ? "ring-2 ring-[#14b8a6] ring-offset-1" : "ring-1 ring-transparent hover:ring-[#99b3ff]";
   const waBlock = config.content.find(c => !isRow(c) && (c as Block).type === "whatsapp-widget" && c.visible) as Block | undefined;
   const [previewPage, setPreviewPage] = useState<"home" | "product" | "checkout">("home");
   const isPublicStore = publicMode && !!storefront;
@@ -1729,7 +1729,7 @@ function LivePreview({
     <div className="flex-shrink-0 flex items-center gap-1 px-1">
       {(["home","product","checkout"] as const).map(pg => (
         <button key={pg} onClick={() => setPreviewPage(pg)}
-          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${previewPage===pg?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-[#0026f6]"}`}>
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${previewPage===pg?"bg-[#14b8a6] text-white":"bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-[#14b8a6]"}`}>
           {pageLabels[pg]}
         </button>
       ))}
@@ -1766,7 +1766,7 @@ function LivePreview({
           )}
         </button>
         <div className={`absolute top-2 right-10 opacity-0 group-hover:opacity-100 ${selected?.kind === "header" ? "opacity-100" : ""} transition-opacity pointer-events-none ${publicMode ? "hidden" : ""}`}>
-          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#0026f6] text-white text-[9px] font-medium"><Pencil className="w-2 h-2" /> Header</div>
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#14b8a6] text-white text-[9px] font-medium"><Pencil className="w-2 h-2" /> Header</div>
         </div>
       </div>
 
@@ -1875,7 +1875,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
-const inputCls = "w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent transition-shadow";
+const inputCls = "w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent transition-shadow";
 const textareaCls = `${inputCls} resize-none font-mono`;
 
 // ─── Block Settings Panel ─────────────────────────────────────────────────────
@@ -1890,7 +1890,7 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
       <Field label={tr("Mənbə", "Source")}>
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {(["all","category","specific"] as const).map(m => (
-            <button key={m} onClick={() => onChange({ ...src, mode: m })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${src.mode===m?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>
+            <button key={m} onClick={() => onChange({ ...src, mode: m })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${src.mode===m?"bg-[#14b8a6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>
               {m==="all"?tr("Hamısı","All"):m==="category"?tr("Kateqoriya","Category"):tr("Seç","Pick")}
             </button>
           ))}
@@ -1903,8 +1903,8 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
             {filtered.map(p => {
               const on = src.productIds.includes(p.id);
               return (
-                <button key={p.id} onClick={() => onChange({ ...src, productIds: on ? src.productIds.filter(id=>id!==p.id) : [...src.productIds,p.id] })} className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left text-xs transition-colors ${on?"border-[#99b3ff] dark:border-[#0026f6]/40 bg-[#e8ebff] dark:bg-[#0026f6]/20":"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"}`}>
-                  <div className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center ${on?"bg-[#0026f6] border-[#001fc4]":"border-gray-300 dark:border-gray-600"}`}>{on&&<Check className="w-2.5 h-2.5 text-white"/>}</div>
+                <button key={p.id} onClick={() => onChange({ ...src, productIds: on ? src.productIds.filter(id=>id!==p.id) : [...src.productIds,p.id] })} className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left text-xs transition-colors ${on?"border-[#99b3ff] dark:border-[#14b8a6]/40 bg-[#ccfbf1] dark:bg-[#14b8a6]/20":"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"}`}>
+                  <div className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center ${on?"bg-[#14b8a6] border-[#0f766e]":"border-gray-300 dark:border-gray-600"}`}>{on&&<Check className="w-2.5 h-2.5 text-white"/>}</div>
                   <span className="flex-1 truncate">{p.name}</span>
                   <span className="text-gray-400">{p.price} ₼</span>
                 </button>
@@ -1916,14 +1916,14 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
       <Field label={tr("Sütun sayı","Columns per row")}>
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {[2,3,4,5,6].map(n => (
-            <button key={n} onClick={() => onChange({ ...src, columns: n })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(src.columns??4)===n?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
+            <button key={n} onClick={() => onChange({ ...src, columns: n })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(src.columns??4)===n?"bg-[#14b8a6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
           ))}
         </div>
       </Field>
       <Field label={tr("Cərgə sayı","Rows")}>
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {[1,2,3,4,5,6].map(n => (
-            <button key={n} onClick={() => onChange({ ...src, rows: n })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(src.rows??1)===n?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
+            <button key={n} onClick={() => onChange({ ...src, rows: n })} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(src.rows??1)===n?"bg-[#14b8a6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
           ))}
         </div>
       </Field>
@@ -1942,7 +1942,7 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-[#e8ebff] dark:bg-[#0026f6]/30 flex items-center justify-center text-[#0026f6] dark:text-[#99b3ff]">{meta.icon}</div>
+          <div className="w-6 h-6 rounded-md bg-[#ccfbf1] dark:bg-[#14b8a6]/30 flex items-center justify-center text-[#14b8a6] dark:text-[#99b3ff]">{meta.icon}</div>
           <div>
             <p className="text-sm font-semibold text-gray-900 dark:text-white">{pickLang(language, metaAz.label, meta.label)}</p>
             <p className="text-[10px] text-gray-400">{pickLang(language, metaAz.description, meta.description)}</p>
@@ -1966,9 +1966,9 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           <Field label={tr("Alt başlıq", "Subheading")}><textarea className={textareaCls} rows={2} value={block.subheading??""} onChange={e=>set({subheading:e.target.value})}/></Field>
           <Field label={tr("Mətn rəngi", "Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.textColor??"#ffffff"} onChange={e=>set({textColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.textColor??"#ffffff"}</span></div></Field>
           <Field label={tr("Düymə mətni", "Button Text")}><input className={inputCls} value={block.ctaText??""} onChange={e=>set({ctaText:e.target.value})}/></Field>
-          <Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#0026f6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#0026f6"}</span></div></Field>
+          <Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#14b8a6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#14b8a6"}</span></div></Field>
           <Field label={tr("Düymə mətn rəngi", "Button Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaBtnTextColor??"#ffffff"} onChange={e=>set({ctaBtnTextColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaBtnTextColor??"#ffffff"}</span></div></Field>
-          <Field label={`${block.imageUrl ? tr("Üst qat", "Overlay") : tr("Arxa fon", "Background")} ${tr("Şəffaflığı", "Opacity")} — ${block.overlayOpacity??70}%`}><input type="range" min={0} max={100} value={block.overlayOpacity??70} onChange={e=>set({overlayOpacity:Number(e.target.value)})} className="w-full accent-[#0026f6]"/></Field>
+          <Field label={`${block.imageUrl ? tr("Üst qat", "Overlay") : tr("Arxa fon", "Background")} ${tr("Şəffaflığı", "Opacity")} — ${block.overlayOpacity??70}%`}><input type="range" min={0} max={100} value={block.overlayOpacity??70} onChange={e=>set({overlayOpacity:Number(e.target.value)})} className="w-full accent-[#14b8a6]"/></Field>
         </>)}
         {block.type==="featured-products"&&<ProductSourceEditor src={block.productSource??{mode:"all",categoryId:"",productIds:[],limit:4,title:"Featured Products"}} onChange={src=>set({productSource:src})}/>}
         {block.type==="banner"&&(<>
@@ -1985,9 +1985,9 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           <Field label={tr("Alt mətn", "Subtext")}><input className={inputCls} value={block.bannerSubtext??""} onChange={e=>set({bannerSubtext:e.target.value})} placeholder={tr("Məhdud müddətli təklif", "Limited time offer")}/></Field>
           <Field label={tr("Mətn rəngi", "Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.textColor??"#ffffff"} onChange={e=>set({textColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.textColor??"#ffffff"}</span></div></Field>
           <Field label={tr("Düymə mətni", "Button Text")}><input className={inputCls} value={block.ctaText??""} onChange={e=>set({ctaText:e.target.value})} placeholder={tr("Gizlətmək üçün boş buraxın", "Leave empty to hide")}/></Field>
-          {block.ctaText&&<Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#0026f6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#0026f6"}</span></div></Field>}
+          {block.ctaText&&<Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#14b8a6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#14b8a6"}</span></div></Field>}
           {block.ctaText&&<Field label={tr("Düymə mətn rəngi", "Button Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaBtnTextColor??"#ffffff"} onChange={e=>set({ctaBtnTextColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaBtnTextColor??"#ffffff"}</span></div></Field>}
-          <Field label={`${block.bannerImageUrl ? tr("Üst qat", "Overlay") : tr("Arxa fon", "Background")} ${tr("Şəffaflığı", "Opacity")} — ${block.overlayOpacity??75}%`}><input type="range" min={0} max={100} value={block.overlayOpacity??75} onChange={e=>set({overlayOpacity:Number(e.target.value)})} className="w-full accent-[#0026f6]"/></Field>
+          <Field label={`${block.bannerImageUrl ? tr("Üst qat", "Overlay") : tr("Arxa fon", "Background")} ${tr("Şəffaflığı", "Opacity")} — ${block.overlayOpacity??75}%`}><input type="range" min={0} max={100} value={block.overlayOpacity??75} onChange={e=>set({overlayOpacity:Number(e.target.value)})} className="w-full accent-[#14b8a6]"/></Field>
         </>)}
         {block.type==="custom-html"&&<Field label="HTML / Embed"><textarea className={textareaCls} rows={8} value={block.html??""} onChange={e=>set({html:e.target.value})} placeholder="<div>Your HTML</div>"/></Field>}
         {block.type==="image-block"&&(<>
@@ -1996,18 +1996,18 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           </Field>
           <Field label={tr("Alt mətn", "Alt Text")}><input className={inputCls} value={block.imageAlt??""} onChange={e=>set({imageAlt:e.target.value})} placeholder={tr("Şəkili təsvir edin", "Describe the image")}/></Field>
           <Field label={tr("Başlıq", "Caption")}><input className={inputCls} value={block.imageCaption??""} onChange={e=>set({imageCaption:e.target.value})} placeholder={tr("İstəyə bağlı başlıq", "Optional caption below image")}/></Field>
-          <Field label={tr("Hündürlük", "Height")}><div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">{(["sm","md","lg"] as const).map(h=><button key={h} onClick={()=>set({imageHeight:h})} className={`flex-1 py-1.5 text-xs font-medium capitalize transition-colors ${(block.imageHeight||"md")===h?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{h==="sm"?tr("Kiçik","Small"):h==="md"?tr("Orta","Medium"):tr("Böyük","Large")}</button>)}</div></Field>
+          <Field label={tr("Hündürlük", "Height")}><div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">{(["sm","md","lg"] as const).map(h=><button key={h} onClick={()=>set({imageHeight:h})} className={`flex-1 py-1.5 text-xs font-medium capitalize transition-colors ${(block.imageHeight||"md")===h?"bg-[#14b8a6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{h==="sm"?tr("Kiçik","Small"):h==="md"?tr("Orta","Medium"):tr("Böyük","Large")}</button>)}</div></Field>
         </>)}
         {block.type==="image-text"&&(<>
           <Field label={tr("Şəkil", "Image")}>
             <ImageUploader value={block.imageUrl} onChange={v=>set({imageUrl:v})} aspectHint={tr("Tövsiyə: kare və ya 4:3", "Recommended: square or 4:3")} />
           </Field>
-          <Field label={tr("Şəkil mövqeyi", "Image Position")}><div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">{(["left","right"] as const).map(p=><button key={p} onClick={()=>set({imagePosition:p})} className={`flex-1 py-1.5 text-xs font-medium capitalize transition-colors ${(block.imagePosition||"left")===p?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{tr("Şəkil", "Image")} {p==="left"?tr("solda","left"):tr("sağda","right")}</button>)}</div></Field>
+          <Field label={tr("Şəkil mövqeyi", "Image Position")}><div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">{(["left","right"] as const).map(p=><button key={p} onClick={()=>set({imagePosition:p})} className={`flex-1 py-1.5 text-xs font-medium capitalize transition-colors ${(block.imagePosition||"left")===p?"bg-[#14b8a6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{tr("Şəkil", "Image")} {p==="left"?tr("solda","left"):tr("sağda","right")}</button>)}</div></Field>
           <Field label={tr("Başlıq", "Headline")}><input className={inputCls} value={block.heading??""} onChange={e=>set({heading:e.target.value})}/></Field>
           <Field label={tr("Alt mətn", "Subtext")}><textarea className={textareaCls} rows={2} value={block.subheading??""} onChange={e=>set({subheading:e.target.value})}/></Field>
           <Field label={tr("Mətn rəngi", "Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.textColor??"#111827"} onChange={e=>set({textColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.textColor??"#111827"}</span></div></Field>
           <Field label={tr("Düymə mətni", "Button Text")}><input className={inputCls} value={block.ctaText??""} onChange={e=>set({ctaText:e.target.value})} placeholder={tr("Gizlətmək üçün boş buraxın", "Leave empty to hide")}/></Field>
-          {block.ctaText&&<Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#0026f6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#0026f6"}</span></div></Field>}
+          {block.ctaText&&<Field label={tr("Düymə rəngi", "Button Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaColor??"#14b8a6"} onChange={e=>set({ctaColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaColor??"#14b8a6"}</span></div></Field>}
           {block.ctaText&&<Field label={tr("Düymə mətn rəngi", "Button Text Color")}><div className="flex items-center gap-2"><input type="color" value={block.ctaBtnTextColor??"#ffffff"} onChange={e=>set({ctaBtnTextColor:e.target.value})} className="w-8 h-8 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer bg-transparent p-0.5"/><span className="text-xs text-gray-400 font-mono">{block.ctaBtnTextColor??"#ffffff"}</span></div></Field>}
         </>)}
         {block.type==="whatsapp-widget"&&(<>
@@ -2038,20 +2038,20 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
                   <button onClick={()=>set({reservationServices:(block.reservationServices||[]).filter((_,j)=>j!==i)})} className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"><X className="w-3.5 h-3.5"/></button>
                 </div>
               ))}
-              <button onClick={()=>set({reservationServices:[...(block.reservationServices||[]),""]})} className="flex items-center gap-1 text-[10px] font-medium text-[#0026f6] hover:text-[#001fc4] transition-colors">
+              <button onClick={()=>set({reservationServices:[...(block.reservationServices||[]),""]})} className="flex items-center gap-1 text-[10px] font-medium text-[#14b8a6] hover:text-[#0f766e] transition-colors">
                 <Plus className="w-3 h-3"/> {tr("Xidmət əlavə et", "Add service")}
               </button>
             </div>
           </Field>
           <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <span className="text-xs text-gray-700 dark:text-gray-300">{tr("Qonaq sayı sahəsini göstər", "Show Guests field")}</span>
-            <button onClick={()=>set({reservationShowGuests:!(block.reservationShowGuests??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowGuests??true)?"bg-[#0026f6]":"bg-gray-200 dark:bg-gray-700"}`}>
+            <button onClick={()=>set({reservationShowGuests:!(block.reservationShowGuests??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowGuests??true)?"bg-[#14b8a6]":"bg-gray-200 dark:bg-gray-700"}`}>
               <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${(block.reservationShowGuests??true)?"translate-x-4":"translate-x-0.5"}`}/>
             </button>
           </div>
           <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <span className="text-xs text-gray-700 dark:text-gray-300">{tr("Qeydlər sahəsini göstər", "Show Notes field")}</span>
-            <button onClick={()=>set({reservationShowNotes:!(block.reservationShowNotes??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowNotes??true)?"bg-[#0026f6]":"bg-gray-200 dark:bg-gray-700"}`}>
+            <button onClick={()=>set({reservationShowNotes:!(block.reservationShowNotes??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowNotes??true)?"bg-[#14b8a6]":"bg-gray-200 dark:bg-gray-700"}`}>
               <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${(block.reservationShowNotes??true)?"translate-x-4":"translate-x-0.5"}`}/>
             </button>
           </div>
@@ -2065,7 +2065,7 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           <Field label={tr("Sütun sayı", "Columns")}>
             <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               {[2,3,4,5,6].map(n=>(
-                <button key={n} onClick={()=>set({categoryColumns:n})} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(block.categoryColumns??3)===n?"bg-[#0026f6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
+                <button key={n} onClick={()=>set({categoryColumns:n})} className={`flex-1 py-1.5 text-xs font-medium transition-colors ${(block.categoryColumns??3)===n?"bg-[#14b8a6] text-white":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>{n}</button>
               ))}
             </div>
           </Field>
@@ -2073,7 +2073,7 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
         {block.type==="testimonials"&&(<>
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{tr("Rəylər", "Reviews")}</p>
-            <button onClick={()=>set({testimonialItems:[...(block.testimonialItems||[{name:"Sarah M.",text:"Great quality! Arrived fast.",rating:5},{name:"James K.",text:"Will definitely order again.",rating:5},{name:"Leila A.",text:"Highly recommend this store.",rating:4}]),{name:"",text:"",rating:5}]})} className="flex items-center gap-1 text-[10px] font-medium text-[#0026f6] hover:text-[#001fc4] transition-colors">
+            <button onClick={()=>set({testimonialItems:[...(block.testimonialItems||[{name:"Sarah M.",text:"Great quality! Arrived fast.",rating:5},{name:"James K.",text:"Will definitely order again.",rating:5},{name:"Leila A.",text:"Highly recommend this store.",rating:4}]),{name:"",text:"",rating:5}]})} className="flex items-center gap-1 text-[10px] font-medium text-[#14b8a6] hover:text-[#0f766e] transition-colors">
               <Plus className="w-3 h-3"/> {tr("Rəy əlavə et", "Add review")}
             </button>
           </div>
@@ -2165,14 +2165,14 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{tr("Sütun Düzümü", "Column Layout")}</p>
             <div className="flex gap-2">
               <button onClick={() => setAdjustingWidths(true)} className="text-xs text-blue-600 dark:text-blue-400 font-medium hover:underline">{tr("Genişlikləri tənzimlə", "Adjust widths")}</button>
-              <button onClick={() => setChangingLayout(v => !v)} className="text-xs text-[#0026f6] dark:text-[#99b3ff] font-medium hover:underline">{changingLayout ? tr("Ləğv et", "Cancel") : tr("Dəyişdir", "Change")}</button>
+              <button onClick={() => setChangingLayout(v => !v)} className="text-xs text-[#14b8a6] dark:text-[#99b3ff] font-medium hover:underline">{changingLayout ? tr("Ləğv et", "Cancel") : tr("Dəyişdir", "Change")}</button>
             </div>
           </div>
           {changingLayout ? (
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden max-h-64 overflow-y-auto">
               <div className="grid grid-cols-2 gap-1 p-2">
                 {COLUMN_PRESETS.map(preset => (
-                  <button key={preset.id} onClick={() => changePreset(preset)} className="flex flex-col gap-1.5 p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-[#0026f6] hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/20 transition-all text-left">
+                  <button key={preset.id} onClick={() => changePreset(preset)} className="flex flex-col gap-1.5 p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-[#14b8a6] hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-all text-left">
                     <PresetIcon ratios={preset.ratios}/>
                     <span className="text-[10px] text-gray-400">{preset.label}</span>
                   </button>
@@ -2239,7 +2239,7 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
                             </div>
                             {group.types.map(type => (
                               <button key={type} onClick={() => { onAddBlockToColumn(col.id, type); setPickingForCol(null); }} className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-left border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors">
-                                <div className="text-[#0026f6] dark:text-[#99b3ff]">{BLOCK_META[type].icon}</div>
+                                <div className="text-[#14b8a6] dark:text-[#99b3ff]">{BLOCK_META[type].icon}</div>
                                 <p className="text-xs text-gray-700 dark:text-gray-200">{pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)}</p>
                               </button>
                             ))}
@@ -2250,7 +2250,7 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
                     ) : (
                       <button
                         onClick={() => setPickingForCol(col.id)}
-                        className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-xs text-gray-400 hover:text-[#0026f6] dark:hover:text-[#99b3ff] hover:border-[#0026f6] dark:hover:border-[#0026f6] transition-colors mt-1"
+                        className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 text-xs text-gray-400 hover:text-[#14b8a6] dark:hover:text-[#99b3ff] hover:border-[#14b8a6] dark:hover:border-[#14b8a6] transition-colors mt-1"
                       >
                         <Plus className="w-3 h-3"/> {tr(`${ci+1}-ci sütuna blok əlavə et`, `Add block to col ${ci+1}`)}
                       </button>
@@ -2279,7 +2279,7 @@ function HeaderSettingsPanel({ config, onUpdateConfig, onClose }: { config: Webs
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-[#e8ebff] dark:bg-[#0026f6]/30 flex items-center justify-center text-[#0026f6] dark:text-[#99b3ff]"><Layout className="w-3.5 h-3.5"/></div>
+          <div className="w-6 h-6 rounded-md bg-[#ccfbf1] dark:bg-[#14b8a6]/30 flex items-center justify-center text-[#14b8a6] dark:text-[#99b3ff]"><Layout className="w-3.5 h-3.5"/></div>
           <div><p className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Başlıq", "Header")}</p><p className="text-[10px] text-gray-400">{tr("Logo, naviqasiya, səbət", "Logo, navigation, cart")}</p></div>
         </div>
         <button onClick={onClose} className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"><X className="w-4 h-4"/></button>
@@ -2298,12 +2298,12 @@ function HeaderSettingsPanel({ config, onUpdateConfig, onClose }: { config: Webs
               </button>
             </div>
           ) : (
-            <label className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-[#0026f6] dark:hover:border-[#0026f6] hover:bg-[#e8ebff]/30 dark:hover:bg-[#0026f6]/10 cursor-pointer transition-colors group">
-              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-[#e8ebff] dark:group-hover:bg-[#0026f6]/30 transition-colors">
-                <Upload className="w-4 h-4 text-gray-400 group-hover:text-[#0026f6] dark:group-hover:text-[#99b3ff] transition-colors"/>
+            <label className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-[#14b8a6] dark:hover:border-[#14b8a6] hover:bg-[#ccfbf1]/30 dark:hover:bg-[#14b8a6]/10 cursor-pointer transition-colors group">
+              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-[#ccfbf1] dark:group-hover:bg-[#14b8a6]/30 transition-colors">
+                <Upload className="w-4 h-4 text-gray-400 group-hover:text-[#14b8a6] dark:group-hover:text-[#99b3ff] transition-colors"/>
               </div>
               <div className="text-center">
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#0026f6] dark:group-hover:text-[#99b3ff] transition-colors">{tr("Loqo yükləyin", "Upload logo")}</p>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 group-hover:text-[#14b8a6] dark:group-hover:text-[#99b3ff] transition-colors">{tr("Loqo yükləyin", "Upload logo")}</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">{tr("PNG, SVG, JPG · maks 2MB", "PNG, SVG, JPG · max 2MB")}</p>
               </div>
               <input
@@ -2324,7 +2324,7 @@ function HeaderSettingsPanel({ config, onUpdateConfig, onClose }: { config: Webs
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{tr("Nav Linkləri", "Nav Links")}</p>
-            <button onClick={addLink} className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg bg-[#0026f6] hover:bg-[#001fc4] text-white transition-colors"><Plus className="w-3 h-3"/>{tr("Əlavə et", "Add")}</button>
+            <button onClick={addLink} className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg bg-[#14b8a6] hover:bg-[#0f766e] text-white transition-colors"><Plus className="w-3 h-3"/>{tr("Əlavə et", "Add")}</button>
           </div>
           <div className="space-y-1.5">
             {links.map(link=>(
@@ -2376,7 +2376,7 @@ function PanelTabBar({ active, onChange }: { active: PanelTab; onChange: (t: Pan
               locked
                 ? "border-transparent text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-70"
                 : active === t.key
-                  ? "border-[#0026f6] text-[#0026f6] dark:text-[#99b3ff]"
+                  ? "border-[#14b8a6] text-[#14b8a6] dark:text-[#99b3ff]"
                   : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
@@ -2432,7 +2432,7 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
         <p className="text-xs text-gray-500 dark:text-gray-400">{tr("Seçmək və redaktə etmək üçün klikləyin", "Click to select & edit")}</p>
         <button
           onClick={() => setAddPhase(v => v ? null : "menu")}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#0026f6] hover:bg-[#001fc4] text-white transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[#14b8a6] hover:bg-[#0f766e] text-white transition-colors"
         >
           <Plus className="w-3 h-3"/> {tr("Yeni", "Add")}
         </button>
@@ -2443,8 +2443,8 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
         <div className="mx-4 mb-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden flex-shrink-0">
           {addPhase === "menu" && (
             <div className="flex">
-              <button onClick={() => setAddPhase("blocks")} className="flex-1 flex flex-col items-center gap-1.5 py-3 hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/20 transition-colors border-r border-gray-100 dark:border-gray-700">
-                <div className="w-8 h-8 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/30 flex items-center justify-center text-[#0026f6]"><Layers className="w-4 h-4"/></div>
+              <button onClick={() => setAddPhase("blocks")} className="flex-1 flex flex-col items-center gap-1.5 py-3 hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors border-r border-gray-100 dark:border-gray-700">
+                <div className="w-8 h-8 rounded-lg bg-[#ccfbf1] dark:bg-[#14b8a6]/30 flex items-center justify-center text-[#14b8a6]"><Layers className="w-4 h-4"/></div>
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{tr("Blok", "Block")}</span>
                 <span className="text-[10px] text-gray-400">{tr("Tək element", "Single element")}</span>
               </button>
@@ -2472,7 +2472,7 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
                     </div>
                     {group.types.map(type => (
                       <button key={type} onClick={() => addTopLevelBlock(type)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-left border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors">
-                        <div className="w-5 h-5 flex items-center justify-center text-[#0026f6] dark:text-[#99b3ff]">{BLOCK_META[type].icon}</div>
+                        <div className="w-5 h-5 flex items-center justify-center text-[#14b8a6] dark:text-[#99b3ff]">{BLOCK_META[type].icon}</div>
                         <div><p className="text-xs font-medium text-gray-800 dark:text-gray-200">{pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)}</p><p className="text-[10px] text-gray-400">{pickLang(language, BLOCK_META_AZ[type].description, BLOCK_META[type].description)}</p></div>
                       </button>
                     ))}
@@ -2536,7 +2536,7 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
                   <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>moveItem(i,-1)} disabled={i===0} className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20"><ChevronUp className="w-3 h-3"/></button>
                     <button onClick={()=>moveItem(i,1)} disabled={i===config.content.length-1} className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20"><ChevronDown className="w-3 h-3"/></button>
-                    <button onClick={()=>toggleVisible(row.id)} className={`p-1 rounded-md transition-colors ${row.visible?"text-[#0026f6]":"text-gray-400"}`}>{row.visible?<Eye className="w-3 h-3"/>:<EyeOff className="w-3 h-3"/>}</button>
+                    <button onClick={()=>toggleVisible(row.id)} className={`p-1 rounded-md transition-colors ${row.visible?"text-[#14b8a6]":"text-gray-400"}`}>{row.visible?<Eye className="w-3 h-3"/>:<EyeOff className="w-3 h-3"/>}</button>
                     <button onClick={()=>removeItem(row.id)} className="p-1 rounded-md text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
                   </div>
                 </div>
@@ -2554,8 +2554,8 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
                             {col.blocks.map(block => {
                               const isSB = selected?.kind==="row-block"&&selected.rowId===row.id&&selected.colId===col.id&&selected.blockId===block.id;
                               return (
-                                <div key={block.id} onClick={()=>onSelect({kind:"row-block",rowId:row.id,colId:col.id,blockId:block.id})} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer transition-all group ${isSB?"border-[#99b3ff] dark:border-[#0026f6]/40 bg-[#e8ebff] dark:bg-[#0026f6]/20":"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"}`}>
-                                  <div className={`flex-shrink-0 ${isSB?"text-[#0026f6] dark:text-[#99b3ff]":"text-gray-400"}`}>{BLOCK_META[block.type].icon}</div>
+                                <div key={block.id} onClick={()=>onSelect({kind:"row-block",rowId:row.id,colId:col.id,blockId:block.id})} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer transition-all group ${isSB?"border-[#99b3ff] dark:border-[#14b8a6]/40 bg-[#ccfbf1] dark:bg-[#14b8a6]/20":"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"}`}>
+                                  <div className={`flex-shrink-0 ${isSB?"text-[#14b8a6] dark:text-[#99b3ff]":"text-gray-400"}`}>{BLOCK_META[block.type].icon}</div>
                                   <span className="text-xs text-gray-700 dark:text-gray-300 flex-1 truncate">{block.label}</span>
                                   <button onClick={e=>{e.stopPropagation();const nr={...row,columns:row.columns.map(c=>c.id!==col.id?c:{...c,blocks:c.blocks.filter(b=>b.id!==block.id)})};onUpdate(config.content.map(c=>isRow(c)&&c.id===row.id?nr:c));}} className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex-shrink-0"><Trash2 className="w-3 h-3"/></button>
                                 </div>
@@ -2576,14 +2576,14 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
           const isSel = selected?.kind==="block"&&selected.blockId===block.id;
           const isWa = block.type==="whatsapp-widget";
           return (
-            <div key={block.id} onClick={()=>onSelect({kind:"block",blockId:block.id})} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${isSel?"border-[#99b3ff] dark:border-[#0026f6]/40 bg-[#e8ebff] dark:bg-[#0026f6]/20":block.visible?"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300":"border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50"}`}>
+            <div key={block.id} onClick={()=>onSelect({kind:"block",blockId:block.id})} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${isSel?"border-[#99b3ff] dark:border-[#14b8a6]/40 bg-[#ccfbf1] dark:bg-[#14b8a6]/20":block.visible?"border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300":"border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50"}`}>
               <GripVertical className="w-3.5 h-3.5 text-gray-300 flex-shrink-0"/>
-              <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${isSel?"bg-[#e8ebff] dark:bg-[#0026f6]/40 text-[#0026f6] dark:text-[#99b3ff]":isWa?"bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6]":"bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"}`}>{meta.icon}</div>
+              <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${isSel?"bg-[#ccfbf1] dark:bg-[#14b8a6]/40 text-[#14b8a6] dark:text-[#99b3ff]":isWa?"bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6]":"bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"}`}>{meta.icon}</div>
               <div className="flex-1 min-w-0"><p className="text-xs font-medium text-gray-900 dark:text-white truncate">{block.label}</p><p className="text-[10px] text-gray-400">{isWa ? tr("Üzən düymə", "Floating widget") : (pickLang(language, BLOCK_META_AZ[block.type].label, meta.label))}</p></div>
               <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e=>e.stopPropagation()}>
                 <button onClick={()=>moveItem(i,-1)} disabled={i===0} className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20"><ChevronUp className="w-3 h-3"/></button>
                 <button onClick={()=>moveItem(i,1)} disabled={i===config.content.length-1} className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20"><ChevronDown className="w-3 h-3"/></button>
-                <button onClick={()=>toggleVisible(block.id)} className={`p-1 rounded-md transition-colors ${block.visible?"text-[#0026f6]":"text-gray-400"}`}>{block.visible?<Eye className="w-3 h-3"/>:<EyeOff className="w-3 h-3"/>}</button>
+                <button onClick={()=>toggleVisible(block.id)} className={`p-1 rounded-md transition-colors ${block.visible?"text-[#14b8a6]":"text-gray-400"}`}>{block.visible?<Eye className="w-3 h-3"/>:<EyeOff className="w-3 h-3"/>}</button>
                 <button onClick={()=>removeItem(block.id)} className="p-1 rounded-md text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
               </div>
             </div>
@@ -2605,7 +2605,7 @@ function DesignPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: (c
         <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3">{tr("Şablon", "Template")}</p>
         <div className="grid grid-cols-2 gap-2">
           {TEMPLATES.map(t => (
-            <button key={t.id} onClick={() => onUpdate({ template: t.id })} className={`relative overflow-hidden border-2 transition-all text-left ${t.cardRadius} ${config.template===t.id?"border-[#0026f6] shadow-md shadow-[#0026f6]/20":"border-gray-200 dark:border-gray-700 hover:border-gray-300"}`}>
+            <button key={t.id} onClick={() => onUpdate({ template: t.id })} className={`relative overflow-hidden border-2 transition-all text-left ${t.cardRadius} ${config.template===t.id?"border-[#14b8a6] shadow-md shadow-[#14b8a6]/20":"border-gray-200 dark:border-gray-700 hover:border-gray-300"}`}>
               {/* Mini preview of style */}
               <div className={`h-16 ${t.bg} p-2 flex flex-col gap-1.5`}>
                 {/* Nav bar */}
@@ -2629,7 +2629,7 @@ function DesignPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: (c
                   <span className="text-xs font-semibold text-gray-900 dark:text-white block leading-none">{t.name}</span>
                   <span className="text-[9px] text-gray-400 leading-none">{t.id==="minimal"?tr("Kəskin & səliqəli","Sharp & clean"):t.id==="dark"?tr("Hamar & müasir","Sleek & modern"):t.id==="elegant"?tr("Lüks & zərif","Luxury & refined"):tr("Cəsarətli & ifadəli","Bold & expressive")}</span>
                 </div>
-                {config.template===t.id&&<div className="w-4 h-4 rounded-full bg-[#0026f6] flex-shrink-0 flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white"/></div>}
+                {config.template===t.id&&<div className="w-4 h-4 rounded-full bg-[#14b8a6] flex-shrink-0 flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white"/></div>}
               </div>
             </button>
           ))}
@@ -2638,7 +2638,7 @@ function DesignPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: (c
       <div>
         <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3">{tr("Marka Rəngləri", "Brand Colors")}</p>
         <div className="space-y-2">
-          {[{label:tr("Əsas (Nav)","Primary (Nav)"),key:"primaryColor" as const,fallback:"#ffffff"},{label:tr("Vurğu (Düymələr/Qiymətlər)","Accent (Buttons/Prices)"),key:"accentColor" as const,fallback:"#0026f6"}].map(({label,key,fallback})=>(
+          {[{label:tr("Əsas (Nav)","Primary (Nav)"),key:"primaryColor" as const,fallback:"#ffffff"},{label:tr("Vurğu (Düymələr/Qiymətlər)","Accent (Buttons/Prices)"),key:"accentColor" as const,fallback:"#14b8a6"}].map(({label,key,fallback})=>(
             <div key={key} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               <div className="flex items-center gap-2"><div className="w-6 h-6 rounded-md border border-gray-200 dark:border-gray-600" style={{background:config[key]||fallback}}/><span className="text-xs text-gray-700 dark:text-gray-300">{label}</span></div>
               <div className="flex items-center gap-1.5"><span className="text-[10px] font-mono text-gray-400">{config[key]||fallback}</span><input type="color" value={config[key]||fallback} onChange={e=>onUpdate({[key]:e.target.value})} className="w-7 h-7 rounded cursor-pointer border border-gray-200 dark:border-gray-600 bg-transparent p-0.5"/></div>
@@ -2699,7 +2699,7 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
   const ToggleRow = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) => (
     <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800 last:border-0">
       <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
-      <button onClick={onChange} className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${checked ? "bg-[#0026f6]" : "bg-gray-200 dark:bg-gray-700"}`}>
+      <button onClick={onChange} className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${checked ? "bg-[#14b8a6]" : "bg-gray-200 dark:bg-gray-700"}`}>
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`}/>
       </button>
     </div>
@@ -2733,8 +2733,8 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
           <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">{tr("Çatdırılma üsulu", "Shipping method")}</p>
           <div className="space-y-1.5">
             {shippingMethods.map(m => (
-              <label key={m.value} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${config.shippingMethod === m.value ? "border-[#0026f6] bg-[#e8ebff] dark:bg-[#0026f6]/10" : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"}`}>
-                <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${config.shippingMethod === m.value ? "border-[#0026f6] bg-[#0026f6]" : "border-gray-300 dark:border-gray-600"}`}/>
+              <label key={m.value} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${config.shippingMethod === m.value ? "border-[#14b8a6] bg-[#ccfbf1] dark:bg-[#14b8a6]/10" : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"}`}>
+                <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${config.shippingMethod === m.value ? "border-[#14b8a6] bg-[#14b8a6]" : "border-gray-300 dark:border-gray-600"}`}/>
                 <span className="text-xs text-gray-700 dark:text-gray-300 flex-1">{pickLang(language, m.az, m.en)}</span>
                 <input type="radio" className="sr-only" checked={config.shippingMethod === m.value} onChange={() => onUpdate({ shippingMethod: m.value })}/>
               </label>
@@ -2847,13 +2847,13 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
                   {locating ? tr("Axtarılır…", "Locating…") : tr("Cari məkanımı istifadə et", "Use my current location")}
                 </button>
                 {config.shippingOriginLat !== null && config.shippingOriginLng !== null && (
-                  <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/20 border border-[#0026f6]/20 dark:border-[#0026f6]/40">
-                    <MapPin className="w-3 h-3 text-[#0026f6] flex-shrink-0"/>
+                  <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border border-[#14b8a6]/20 dark:border-[#14b8a6]/40">
+                    <MapPin className="w-3 h-3 text-[#14b8a6] flex-shrink-0"/>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] text-[#001db8] dark:text-[#99b3ff] font-medium truncate">{config.shippingOriginAddress || tr("Məkan təyin edildi", "Location set")}</p>
-                      <p className="text-[9px] text-[#0026f6] dark:text-[#99b3ff] font-mono">{config.shippingOriginLat?.toFixed(5)}, {config.shippingOriginLng?.toFixed(5)}</p>
+                      <p className="text-[9px] text-[#115e59] dark:text-[#99b3ff] font-medium truncate">{config.shippingOriginAddress || tr("Məkan təyin edildi", "Location set")}</p>
+                      <p className="text-[9px] text-[#14b8a6] dark:text-[#99b3ff] font-mono">{config.shippingOriginLat?.toFixed(5)}, {config.shippingOriginLng?.toFixed(5)}</p>
                     </div>
-                    <button onClick={() => onUpdate({ shippingOriginLat: null, shippingOriginLng: null, shippingOriginAddress: "" })} className="text-[#0026f6] hover:text-[#0026f6] transition-colors flex-shrink-0">
+                    <button onClick={() => onUpdate({ shippingOriginLat: null, shippingOriginLng: null, shippingOriginAddress: "" })} className="text-[#14b8a6] hover:text-[#14b8a6] transition-colors flex-shrink-0">
                       <X className="w-3 h-3"/>
                     </button>
                   </div>
@@ -2876,8 +2876,8 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
         {config.paymentMethods.map(m => {
           const isEpointLocked = m.id === "epoint";
           return (
-          <div key={m.id} className={`rounded-xl border transition-all overflow-hidden ${m.enabled && !isEpointLocked ? "border-[#0026f6]/20 dark:border-[#0026f6]/40" : "border-gray-200 dark:border-gray-700"} ${isEpointLocked ? "opacity-75" : ""}`}>
-            <div className={`flex items-center gap-3 px-3 py-3 ${m.enabled && !isEpointLocked ? "bg-[#e8ebff] dark:bg-[#0026f6]/10" : "bg-white dark:bg-gray-800"}`}>
+          <div key={m.id} className={`rounded-xl border transition-all overflow-hidden ${m.enabled && !isEpointLocked ? "border-[#14b8a6]/20 dark:border-[#14b8a6]/40" : "border-gray-200 dark:border-gray-700"} ${isEpointLocked ? "opacity-75" : ""}`}>
+            <div className={`flex items-center gap-3 px-3 py-3 ${m.enabled && !isEpointLocked ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/10" : "bg-white dark:bg-gray-800"}`}>
               <span className="text-xl">{m.icon}</span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -2894,13 +2894,13 @@ function PaymentsPanel({ config, onUpdate }: { config: WebsiteConfig; onUpdate: 
                 type="button"
                 disabled={isEpointLocked}
                 onClick={() => { if (!isEpointLocked) toggle(m.id); }}
-                className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${isEpointLocked ? "bg-gray-200 dark:bg-gray-700 cursor-not-allowed" : m.enabled ? "bg-[#0026f6]" : "bg-gray-200 dark:bg-gray-700"}`}
+                className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${isEpointLocked ? "bg-gray-200 dark:bg-gray-700 cursor-not-allowed" : m.enabled ? "bg-[#14b8a6]" : "bg-gray-200 dark:bg-gray-700"}`}
               >
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${m.enabled && !isEpointLocked ? "translate-x-4" : "translate-x-0.5"}`}/>
               </button>
             </div>
             {m.id==="epoint" && epointEnabled && !isEpointLocked && (
-              <div className="px-3 pb-3 pt-1 bg-white dark:bg-gray-800 border-t border-[#0026f6]/15 dark:border-[#0026f6]/40 space-y-2">
+              <div className="px-3 pb-3 pt-1 bg-white dark:bg-gray-800 border-t border-[#14b8a6]/15 dark:border-[#14b8a6]/40 space-y-2">
                 <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{tr("Epoint Şəxsi Açarı", "Epoint Private Key")}</label>
                 <input
                   type="password"
@@ -2982,7 +2982,7 @@ function EmailPanel() {
       <div className="shrink-0 flex gap-1.5 flex-wrap px-4 pt-4 pb-2 border-b border-gray-200 dark:border-gray-800">
         {templates.map(t => (
           <button key={t.id} onClick={() => setActiveId(t.id)}
-            className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors ${activeId===t.id?"bg-[#0026f6] text-white":"bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"}`}>
+            className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors ${activeId===t.id?"bg-[#14b8a6] text-white":"bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"}`}>
             {(EMAIL_TEMPLATE_LABELS[t.id]?.[language as "az"|"en"]) ?? t.label}
           </button>
         ))}
@@ -3011,7 +3011,7 @@ function EmailPanel() {
         {/* Save */}
         <button
           onClick={() => toast.success(tr(`"${EMAIL_TEMPLATE_LABELS[active.id]?.az ?? active.label}" e-poçt şablonu saxlanıldı`, `"${active.label}" email saved`))}
-          className="w-full py-2 text-xs font-semibold bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-xl transition-colors">
+          className="w-full py-2 text-xs font-semibold bg-[#14b8a6] hover:bg-[#0f766e] text-white rounded-xl transition-colors">
           {tr("E-poçt Şablonunu Saxla", "Save Email Template")}
         </button>
       </div>
@@ -3055,7 +3055,7 @@ function defaultWebsiteConfig(companySlug?: string | null): WebsiteConfig {
   const slug = (companySlug?.trim() || "mystore").toLowerCase();
   return {
     template: "minimal", storeName: "My Store", tagline: "Quality products, delivered fast.",
-    primaryColor: "", accentColor: "#0026f6", domain: slug, currency: "USD",
+    primaryColor: "", accentColor: "#14b8a6", domain: slug, currency: "USD",
     content: DEFAULT_CONTENT, paymentMethods: PAYMENT_METHODS,
     globalShowAllProducts: true, selectedCategories: [], logoUrl: "",
     headerLinks: DEFAULT_HEADER_LINKS,
@@ -3331,26 +3331,26 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
       {/* Top bar */}
       <div className="flex-shrink-0 h-12 flex items-center justify-between px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[#0026f6] flex items-center justify-center flex-shrink-0"><Globe className="w-4 h-4 text-white"/></div>
+          <div className="w-7 h-7 rounded-lg bg-[#14b8a6] flex items-center justify-center flex-shrink-0"><Globe className="w-4 h-4 text-white"/></div>
           <div><p className="text-sm font-semibold text-gray-900 dark:text-white leading-none">{tr("Mənim Saytım", "My Website", "Мой сайт")}</p><p className="text-[10px] text-gray-400 mt-0.5 leading-none">{tr("Canlı redaktor", "Live editor", "Живой редактор")}</p></div>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
-            <button onClick={() => setViewport("desktop")} className={`px-2.5 py-1.5 transition-colors ${viewport==="desktop"?"bg-[#0026f6] text-white":"text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}><Monitor className="w-3.5 h-3.5"/></button>
-            <button onClick={() => setViewport("mobile")} className={`px-2.5 py-1.5 transition-colors ${viewport==="mobile"?"bg-[#0026f6] text-white":"text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}><Smartphone className="w-3.5 h-3.5"/></button>
+            <button onClick={() => setViewport("desktop")} className={`px-2.5 py-1.5 transition-colors ${viewport==="desktop"?"bg-[#14b8a6] text-white":"text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}><Monitor className="w-3.5 h-3.5"/></button>
+            <button onClick={() => setViewport("mobile")} className={`px-2.5 py-1.5 transition-colors ${viewport==="mobile"?"bg-[#14b8a6] text-white":"text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}><Smartphone className="w-3.5 h-3.5"/></button>
           </div>
-          <div className="flex items-center gap-1 px-2.5 py-1 bg-[#e8ebff] dark:bg-[#0026f6]/20 rounded-lg border border-[#0026f6]/20 dark:border-[#0026f6]/40">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#0026f6] animate-pulse"/>
-            <span className="text-[10px] text-[#001db8] dark:text-[#99b3ff] font-medium">{publicStorePath}</span>
+          <div className="flex items-center gap-1 px-2.5 py-1 bg-[#ccfbf1] dark:bg-[#14b8a6]/20 rounded-lg border border-[#14b8a6]/20 dark:border-[#14b8a6]/40">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#14b8a6] animate-pulse"/>
+            <span className="text-[10px] text-[#115e59] dark:text-[#99b3ff] font-medium">{publicStorePath}</span>
             <button onClick={() => {
               const url = publicStoreUrl;
               try {
                 navigator.clipboard.writeText(url).then(() => toast.success("URL copied!")).catch(() => { const el = document.createElement("textarea"); el.value = url; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); toast.success("URL copied!"); });
               } catch { toast.success("URL: " + url); }
-            }}><Copy className="w-3 h-3 text-[#0026f6] ml-0.5"/></button>
+            }}><Copy className="w-3 h-3 text-[#14b8a6] ml-0.5"/></button>
           </div>
           <a href={publicStorePath} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"><ExternalLink className="w-3 h-3"/> {tr("Aç", "Open", "Открыть")}</a>
-          <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg transition-colors disabled:opacity-60">
+          <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#14b8a6] hover:bg-[#0f766e] text-white rounded-lg transition-colors disabled:opacity-60">
             {saving ? <RefreshCw className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3"/>}
             {saving ? tr("Saxlanılır…", "Saving…") : tr("Saxla", "Save")}
           </button>

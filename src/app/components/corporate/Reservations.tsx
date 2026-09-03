@@ -471,7 +471,7 @@ export function Reservations() {
           className={cn(
             "flex-1 py-1.5 text-xs rounded-lg border font-medium transition-colors",
             formMode === "registered"
-              ? "bg-[#0026f6] text-white border-[#0026f6]"
+              ? "bg-[#14b8a6] text-white border-[#14b8a6]"
               : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300",
           )}
         >
@@ -483,7 +483,7 @@ export function Reservations() {
           className={cn(
             "flex-1 py-1.5 text-xs rounded-lg border font-medium transition-colors",
             formMode === "guest"
-              ? "bg-[#0026f6] text-white border-[#0026f6]"
+              ? "bg-[#14b8a6] text-white border-[#14b8a6]"
               : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300",
           )}
         >
@@ -502,7 +502,7 @@ export function Reservations() {
           <button
             type="button"
             onClick={() => { setCustomerDropdownOpen(!customerDropdownOpen); setServiceDropdownOpen(false); }}
-            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-left flex items-center justify-between text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-left flex items-center justify-between text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
           >
             <span className={formCustomerId ? "" : "text-gray-400"}>
               {formCustomerId ? customers.find((c) => c.id === formCustomerId)?.name : tr("Müştəri seçin", "Select customer")}
@@ -525,7 +525,7 @@ export function Reservations() {
                       setFormCustomerId(c.id);
                       setCustomerDropdownOpen(false);
                     }}
-                    className={cn("w-full px-2.5 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", formCustomerId === c.id && "bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6]")}
+                    className={cn("w-full px-2.5 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", formCustomerId === c.id && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]")}
                   >
                     <div className="flex items-center gap-2">
                       <User className="w-3 h-3 text-gray-400" />
@@ -587,7 +587,7 @@ export function Reservations() {
               type="text"
               value={formGuestName}
               onChange={(e) => setFormGuestName(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
           </div>
           <div>
@@ -598,7 +598,7 @@ export function Reservations() {
               type="tel"
               value={formGuestPhone}
               onChange={(e) => setFormGuestPhone(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
           </div>
         </div>
@@ -623,7 +623,7 @@ export function Reservations() {
                 setCustomerDropdownOpen(false);
               }}
               placeholder={tr("Xidmət seçin və ya yazın", "Select or type service")}
-              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
             <button
               type="button"
@@ -659,7 +659,7 @@ export function Reservations() {
                         className={cn(
                           "w-full px-2.5 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
                           formService.trim().toLowerCase() === label.toLowerCase() &&
-                            "bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6]",
+                            "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]",
                         )}
                       >
                         {label}
@@ -682,7 +682,7 @@ export function Reservations() {
           <DateInput
             value={formDate}
             onChange={setFormDate}
-            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
           />
         </div>
         <div>
@@ -692,7 +692,7 @@ export function Reservations() {
           <select
             value={formTime}
             onChange={(e) => setFormTime(e.target.value)}
-            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
           >
             <option value="">{tr("Saat seçin", "Select time")}</option>
             {generateTimeSlots(resConfig).map((slot) => (
@@ -712,7 +712,7 @@ export function Reservations() {
             <button
               type="button"
               onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-left flex items-center justify-between text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-left flex items-center justify-between text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             >
               <span>{STATUS_CONFIG[formStatus].label}</span>
               <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
@@ -726,7 +726,7 @@ export function Reservations() {
                       key={s}
                       type="button"
                       onClick={() => { setFormStatus(s); setStatusDropdownOpen(false); }}
-                      className={cn("w-full px-2.5 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", formStatus === s && "bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6]")}
+                      className={cn("w-full px-2.5 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", formStatus === s && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]")}
                     >
                       {STATUS_CONFIG[s].label}
                     </button>
@@ -748,7 +748,7 @@ export function Reservations() {
           onChange={(e) => setFormNotes(e.target.value)}
           placeholder={tr("Əlavə qeydlər...", "Additional notes...")}
           rows={2}
-          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] resize-none"
+          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none"
         />
       </div>
     </div>
@@ -768,7 +768,7 @@ export function Reservations() {
         </div>
 
         {tenantSlug && !isDemo && (
-          <div className="mb-4 flex flex-col gap-2 p-3 rounded-lg border border-[#0026f6]/20 bg-[#0026f6]/5 dark:bg-[#0026f6]/10">
+          <div className="mb-4 flex flex-col gap-2 p-3 rounded-lg border border-[#14b8a6]/20 bg-[#14b8a6]/5 dark:bg-[#14b8a6]/10">
             <div>
               <p className="text-xs font-semibold text-gray-900 dark:text-white">
                 {tr("Müştəri rezervasiya linki", "Customer booking link")}
@@ -809,7 +809,7 @@ export function Reservations() {
                             to={customerBookingPath(tenantSlug, page.slug)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#0026f6] text-white rounded-lg"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             {tr("Aç", "Open")}
@@ -835,7 +835,7 @@ export function Reservations() {
                     to={customerBookingPath(tenantSlug)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#0026f6] text-white rounded-lg font-medium hover:bg-[#001fc4]"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg font-medium hover:bg-[#0d9488]"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     {tr("Aç", "Open")}
@@ -891,7 +891,7 @@ export function Reservations() {
           {canCreate && (
           <button
             onClick={openAddModal}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{tr("Rezervasiya Əlavə Et", "Add Reservation")}</span>
@@ -910,7 +910,7 @@ export function Reservations() {
                 placeholder={tr("Axtar...", "Search...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -929,7 +929,7 @@ export function Reservations() {
                     className={cn(
                       "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
                       viewMode === mode
-                        ? "bg-white dark:bg-gray-900 text-[#0026f6] dark:text-white shadow-sm"
+                        ? "bg-white dark:bg-gray-900 text-[#14b8a6] dark:text-white shadow-sm"
                         : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                     )}
                   >
@@ -947,7 +947,7 @@ export function Reservations() {
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="all">{tr("Bütün statuslar", "All Statuses")}</option>
                   <option value="pending">{tr("Gözləyir", "Pending")}</option>
@@ -1032,12 +1032,12 @@ export function Reservations() {
                 return (
                   <div
                     key={i}
-                    className={cn("px-2 py-2.5 text-center border-r last:border-r-0 border-gray-100 dark:border-gray-800", isToday && "bg-[#e8ebff] dark:bg-[#0026f6]/20")}
+                    className={cn("px-2 py-2.5 text-center border-r last:border-r-0 border-gray-100 dark:border-gray-800", isToday && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20")}
                   >
                     <p className="text-[10px] text-gray-400 font-medium">{DAY_HEADERS[d.getDay()]}</p>
-                    <p className={cn("text-sm font-semibold mt-0.5", isToday ? "text-[#0026f6] dark:text-white" : "text-gray-700 dark:text-gray-300")}>{d.getDate()}</p>
+                    <p className={cn("text-sm font-semibold mt-0.5", isToday ? "text-[#14b8a6] dark:text-white" : "text-gray-700 dark:text-gray-300")}>{d.getDate()}</p>
                     {count > 0 && (
-                      <span className="inline-block mt-0.5 w-4 h-4 rounded-full bg-[#0026f6] dark:bg-white text-white dark:text-[#0026f6] text-[9px] font-bold leading-4">{count}</span>
+                      <span className="inline-block mt-0.5 w-4 h-4 rounded-full bg-[#14b8a6] dark:bg-white text-white dark:text-[#14b8a6] text-[9px] font-bold leading-4">{count}</span>
                     )}
                   </div>
                 );
@@ -1049,7 +1049,7 @@ export function Reservations() {
                 const dayRes = resForDate(fmtDate(d));
                 const isToday = fmtDate(d) === todayStr;
                 return (
-                  <div key={i} className={cn("px-1.5 py-2 border-r last:border-r-0 border-gray-100 dark:border-gray-800 flex flex-col gap-1", isToday && "bg-[#f5f6ff] dark:bg-[#0026f6]/10")}>
+                  <div key={i} className={cn("px-1.5 py-2 border-r last:border-r-0 border-gray-100 dark:border-gray-800 flex flex-col gap-1", isToday && "bg-[#f5f6ff] dark:bg-[#14b8a6]/10")}>
                     {dayRes.length === 0 ? (
                       <span className="text-[9px] text-gray-300 dark:text-gray-700 px-1">—</span>
                     ) : (
@@ -1094,8 +1094,8 @@ export function Reservations() {
                 const dayRes = resForDate(dateStr);
                 const isToday = dateStr === todayStr;
                 return (
-                  <div key={i} className={cn("border-r last:border-r-0 border-b border-gray-100 dark:border-gray-800 min-h-[80px] p-1.5", isToday && "bg-[#f5f6ff] dark:bg-[#0026f6]/10")}>
-                    <div className={cn("w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold mb-1", isToday ? "bg-[#0026f6] text-white" : "text-gray-600 dark:text-gray-400")}>
+                  <div key={i} className={cn("border-r last:border-r-0 border-b border-gray-100 dark:border-gray-800 min-h-[80px] p-1.5", isToday && "bg-[#f5f6ff] dark:bg-[#14b8a6]/10")}>
+                    <div className={cn("w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold mb-1", isToday ? "bg-[#14b8a6] text-white" : "text-gray-600 dark:text-gray-400")}>
                       {d.getDate()}
                     </div>
                     <div className="flex flex-col gap-0.5">
@@ -1328,7 +1328,7 @@ export function Reservations() {
                   {[15, 20, 30, 45, 60].map(min => (
                     <button key={min} type="button"
                       onClick={() => setDraftConfig(d => ({ ...d, slotIntervalMinutes: min }))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${draftConfig.slotIntervalMinutes === min ? "bg-[#0026f6] text-white border-[#0026f6]" : "border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-[#0026f6]/50"}`}>
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${draftConfig.slotIntervalMinutes === min ? "bg-[#14b8a6] text-white border-[#14b8a6]" : "border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-[#14b8a6]/50"}`}>
                       {min} {tr("dəq", "min")}
                     </button>
                   ))}
@@ -1362,7 +1362,7 @@ export function Reservations() {
                       const [h, m] = e.target.value.split(":").map(Number);
                       setDraftConfig(d => ({ ...d, startHour: h, startMinute: m }));
                     }}
-                    className="w-full px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+                    className="w-full px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-700 dark:text-gray-300 block mb-1.5">{tr("Bitmə Saatı", "End Time")}</label>
@@ -1372,7 +1372,7 @@ export function Reservations() {
                       const [h, m] = e.target.value.split(":").map(Number);
                       setDraftConfig(d => ({ ...d, endHour: h, endMinute: m }));
                     }}
-                    className="w-full px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+                    className="w-full px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
                 </div>
               </div>
 
@@ -1398,7 +1398,7 @@ export function Reservations() {
                             ? prev.workingDays.filter(x => x !== d)
                             : [...prev.workingDays, d],
                         }))}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${active ? "bg-[#0026f6] text-white border-[#0026f6]" : "border-gray-300 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-[#0026f6]/40"}`}>
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${active ? "bg-[#14b8a6] text-white border-[#14b8a6]" : "border-gray-300 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-[#14b8a6]/40"}`}>
                         {pickLang(language, az, en)}
                       </button>
                     );
@@ -1450,7 +1450,7 @@ export function Reservations() {
                   }
                 })()}
                 disabled={saving}
-                className="px-4 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                className="px-4 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
               >
                 {tr("Yadda Saxla", "Save")}
               </button>
@@ -1483,7 +1483,7 @@ export function Reservations() {
               <button
                 onClick={handleSave}
                 disabled={!isFormValid || saving}
-                className="px-4 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {tr("Təsdiq Et", "Submit")}
               </button>
@@ -1515,7 +1515,7 @@ export function Reservations() {
               <button
                 onClick={handleSave}
                 disabled={!isFormValid || saving}
-                className="px-4 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {tr("Yadda Saxla", "Save Changes")}
               </button>
@@ -1616,7 +1616,7 @@ export function Reservations() {
               )}
               <button
                 onClick={() => setViewReservation(null)}
-                className="px-4 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg text-xs font-medium transition-colors"
+                className="px-4 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs font-medium transition-colors"
               >
                 {tr("Bağla", "Close")}
               </button>

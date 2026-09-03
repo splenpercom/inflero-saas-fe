@@ -140,7 +140,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
                 value={product}
                 onChange={(e) => setProduct(e.target.value)}
                 placeholder={tr("Məhsul Axtar", "Search Product")}
-                className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
           </div>
@@ -153,7 +153,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
             <select
               value={warehouse}
               onChange={(e) => setWarehouse(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
             >
               <option value="">{tr("Seçin", "Select")}</option>
               <option value="Lavish Warehouse">Lavish Warehouse</option>
@@ -173,7 +173,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
             <select
               value={store}
               onChange={(e) => setStore(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
             >
               <option value="">{tr("Seçin", "Select")}</option>
               <option value="Electro Mart">Electro Mart</option>
@@ -196,7 +196,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
               value={adjustmentQty}
               onChange={(e) => setAdjustmentQty(e.target.value)}
               placeholder={tr("+50 və ya -30", "+50 or -30")}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
           </div>
 
@@ -208,7 +208,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
             >
               <option value="">{tr("Seçin", "Select")}</option>
               <option value="Stock replenishment">{tr("Ehtiyat Doldurulması", "Stock Replenishment")}</option>
@@ -232,7 +232,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
               value={referenceNumber}
               onChange={(e) => setReferenceNumber(e.target.value)}
               placeholder={tr("REF-2024-001", "REF-2024-001")}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
           </div>
 
@@ -244,7 +244,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
             <select
               value={responsiblePerson}
               onChange={(e) => setResponsiblePerson(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
             >
               <option value="">{tr("Seçin", "Select")}</option>
               <option value="James Kirwin">James Kirwin</option>
@@ -267,7 +267,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
               onChange={(e) => setNotes(e.target.value)}
               placeholder={tr("Əlavə qeydlər...", "Additional notes...")}
               rows={3}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] resize-none"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none"
             />
           </div>
         </div>
@@ -283,7 +283,7 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
           <button
             onClick={handleSave}
             disabled={!product || !warehouse || !store || !adjustmentQty || parseInt(adjustmentQty) === 0 || isNaN(parseInt(adjustmentQty)) || !reason || !referenceNumber || !responsiblePerson}
-            className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {tr("Dəyişiklikləri Yadda Saxla", "Save Changes")}
           </button>

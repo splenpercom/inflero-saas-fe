@@ -108,9 +108,9 @@ export function ShowPaymentsModal({
                   <p className="text-lg font-bold text-green-600 dark:text-green-400">₼{paid.toFixed(2)}</p>
                 </div>
 
-                <div className="glass-card p-4 rounded-xl border border-[#0026f6]/20 dark:border-[#0026f6]/30 bg-[#f0f3ff]/50 dark:bg-[#0026f6]/10">
+                <div className="glass-card p-4 rounded-xl border border-[#14b8a6]/20 dark:border-[#14b8a6]/30 bg-[#f0f3ff]/50 dark:bg-[#14b8a6]/10">
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{tr("Borc", "Due")}</p>
-                  <p className="text-lg font-bold text-[#0026f6] dark:text-[#0026f6]">₼{due.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-[#14b8a6] dark:text-[#14b8a6]">₼{due.toFixed(2)}</p>
                 </div>
               </div>
 
@@ -188,7 +188,7 @@ export function ShowPaymentsModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] rounded-lg transition-colors"
+            className="px-6 py-3 text-sm font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors"
           >
             {tr("Bağla", "Close")}
           </button>

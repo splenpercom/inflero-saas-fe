@@ -24,7 +24,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeColor, setThemeColorState] = useState<string>(() => {
-    return getStorageItem(localStorage, STORAGE_KEYS.themeColor) ?? "#0026f6";
+    return getStorageItem(localStorage, STORAGE_KEYS.themeColor) ?? "#14b8a6";
   });
 
   const [logoUrl, setLogoUrlState] = useState<string | null>(() => {

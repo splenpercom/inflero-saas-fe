@@ -523,7 +523,7 @@ export function CreateProduct() {
                       type="text"
                       value={productName}
                       onChange={(e) => setProductName(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
 
@@ -546,7 +546,7 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddCategoryModalOpen(true)}
                         title="Add new category"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg transition-colors"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -573,7 +573,7 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddSubCategoryModalOpen(true)}
                         title="Add new sub category"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg transition-colors"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -600,7 +600,7 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddBrandModalOpen(true)}
                         title="Add new brand"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg transition-colors"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -627,7 +627,7 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddUnitModalOpen(true)}
                         title="Add new unit"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg transition-colors"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -647,13 +647,13 @@ export function CreateProduct() {
                         type="text"
                         value={itemBarcode}
                         onChange={(e) => setItemBarcode(e.target.value)}
-                        className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                        className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                         placeholder={pickLang(language, "Barkodu daxil edin və ya yaradın", "Enter barcode or click generate")}
                       />
                       <button
                         type="button"
                         onClick={generateBarcode}
-                        className="px-3 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors"
+                        className="px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
                       >
                         {pt("generate")}
                       </button>
@@ -765,7 +765,7 @@ export function CreateProduct() {
                       type="number"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>}
 
@@ -778,7 +778,7 @@ export function CreateProduct() {
                       type="number"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
 
@@ -808,7 +808,7 @@ export function CreateProduct() {
                       type="number"
                       value={discountValue}
                       onChange={(e) => setDiscountValue(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
                 </div>
@@ -822,7 +822,7 @@ export function CreateProduct() {
                     type="number"
                     value={quantityAlert}
                     onChange={(e) => setQuantityAlert(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                   />
                 </div>}
               </div>
@@ -852,7 +852,7 @@ export function CreateProduct() {
               <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800">
                 <div className="flex flex-wrap gap-3 mt-4">
                   {/* Upload Box */}
-                  <label className="w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#0026f6] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <label className="w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#14b8a6] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                     <Upload className="w-5 h-5 text-gray-400 mb-1" />
                     <span className="text-[10px] text-gray-400">{pt("uploadImages")}</span>
                     <input
@@ -924,7 +924,7 @@ export function CreateProduct() {
                       <DateInput
                         value={manufacturedDate}
                         onChange={setManufacturedDate}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                         placeholder={pt("datePlaceholder")}
                       />
                     </div>
@@ -935,7 +935,7 @@ export function CreateProduct() {
                       <DateInput
                         value={expiryDate}
                         onChange={setExpiryDate}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                         placeholder={pt("datePlaceholder")}
                       />
                     </div>
@@ -990,7 +990,7 @@ export function CreateProduct() {
                   value={categoryFormData.name}
                   onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
                   autoFocus
-                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${categoryFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]`}
+                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${categoryFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
                 />
                 {categoryFormErrors.name && <p className="text-[10px] text-red-500 mt-1">{categoryFormErrors.name}</p>}
               </div>
@@ -1017,7 +1017,7 @@ export function CreateProduct() {
               </button>
               <button
                 onClick={handleAddCategory}
-                className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors"
+                className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors"
               >
                 {pickLang(language, "Kateqoriya Əlavə Et", "Add Category")}
               </button>
@@ -1052,7 +1052,7 @@ export function CreateProduct() {
                   value={subCatFormData.name}
                   onChange={(e) => setSubCatFormData({ ...subCatFormData, name: e.target.value })}
                   autoFocus
-                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${subCatFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]`}
+                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${subCatFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
                 />
                 {subCatFormErrors.name && <p className="text-[10px] text-red-500 mt-1">{subCatFormErrors.name}</p>}
               </div>
@@ -1063,7 +1063,7 @@ export function CreateProduct() {
                 <select
                   value={subCatFormData.categoryId}
                   onChange={(e) => setSubCatFormData({ ...subCatFormData, categoryId: e.target.value })}
-                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${subCatFormErrors.categoryId ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer`}
+                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${subCatFormErrors.categoryId ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer`}
                 >
                   <option value="">{pickLang(language, "Seç", "Select")}</option>
                   {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -1093,7 +1093,7 @@ export function CreateProduct() {
               </button>
               <button
                 onClick={handleAddSubCategory}
-                className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors"
+                className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors"
               >
                 {pickLang(language, "Alt Kateqoriya Əlavə Et", "Add Sub Category")}
               </button>
@@ -1128,7 +1128,7 @@ export function CreateProduct() {
                   value={brandFormData.name}
                   onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })}
                   autoFocus
-                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${brandFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]`}
+                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${brandFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
                 />
                 {brandFormErrors.name && <p className="text-[10px] text-red-500 mt-1">{brandFormErrors.name}</p>}
               </div>
@@ -1155,7 +1155,7 @@ export function CreateProduct() {
               </button>
               <button
                 onClick={handleAddBrand}
-                className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors"
+                className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors"
               >
                 {pickLang(language, "Brend Əlavə Et", "Add Brand")}
               </button>
@@ -1190,7 +1190,7 @@ export function CreateProduct() {
                   value={unitFormData.name}
                   onChange={(e) => setUnitFormData({ ...unitFormData, name: e.target.value })}
                   autoFocus
-                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${unitFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]`}
+                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${unitFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
                 />
                 {unitFormErrors.name && <p className="text-[10px] text-red-500 mt-1">{unitFormErrors.name}</p>}
               </div>
@@ -1203,7 +1203,7 @@ export function CreateProduct() {
                   placeholder={pickLang(language, "məs., kg", "e.g., kg")}
                   value={unitFormData.shortName}
                   onChange={(e) => setUnitFormData({ ...unitFormData, shortName: e.target.value })}
-                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${unitFormErrors.shortName ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]`}
+                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${unitFormErrors.shortName ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
                 />
                 {unitFormErrors.shortName && <p className="text-[10px] text-red-500 mt-1">{unitFormErrors.shortName}</p>}
               </div>
@@ -1230,7 +1230,7 @@ export function CreateProduct() {
               </button>
               <button
                 onClick={handleAddUnit}
-                className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors"
+                className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors"
               >
                 {pickLang(language, "Vahid Əlavə Et", "Add Unit")}
               </button>

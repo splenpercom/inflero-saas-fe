@@ -103,7 +103,7 @@ export function AddCustomerModal({
         </div>
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-2 sticky bottom-0 bg-white dark:bg-gray-900">
           <button onClick={onClose} disabled={saving} className="px-4 py-1.5 bg-gray-800 text-white rounded-lg text-xs disabled:opacity-50">{tr("Ləğv Et", "Cancel")}</button>
-          <button onClick={() => void handleSave()} disabled={!name.trim() || saving} className="px-4 py-1.5 bg-[#0026f6] text-white rounded-lg text-xs disabled:opacity-50">{saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq Et", "Submit")}</button>
+          <button onClick={() => void handleSave()} disabled={!name.trim() || saving} className="px-4 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs disabled:opacity-50">{saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq Et", "Submit")}</button>
         </div>
       </div>
     </div>

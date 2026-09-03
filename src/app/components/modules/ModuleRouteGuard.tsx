@@ -28,7 +28,7 @@ export function ModuleRouteGuard({
   if (!modulesLoaded) {
     return (
       <div className="flex min-h-[320px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#0026f6] border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#14b8a6] border-t-transparent" />
       </div>
     );
   }

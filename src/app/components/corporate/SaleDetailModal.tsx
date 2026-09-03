@@ -51,7 +51,7 @@ export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalPro
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0026f6] to-[#001db8] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-[#14b8a6] flex items-center justify-center">
               <FileText className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -222,7 +222,7 @@ export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalPro
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2" />
                     <div className="flex justify-between text-sm">
                       <span className="font-semibold text-gray-900 dark:text-white">{tr("Ümumi Cəmi", "Grand Total")}:</span>
-                      <span className="font-bold text-lg text-[#0026f6] dark:text-[#0026f6]">₼{grandTotal.toFixed(2)}</span>
+                      <span className="font-bold text-lg text-[#14b8a6] dark:text-[#14b8a6]">₼{grandTotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600 dark:text-gray-400">{tr("Ödənilib", "Paid")}:</span>
@@ -230,7 +230,7 @@ export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalPro
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600 dark:text-gray-400">{tr("Borc", "Due")}:</span>
-                      <span className="font-medium text-[#0026f6] dark:text-[#0026f6]">₼{due.toFixed(2)}</span>
+                      <span className="font-medium text-[#14b8a6] dark:text-[#14b8a6]">₼{due.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

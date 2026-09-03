@@ -224,7 +224,7 @@ export function BankAccounts() {
         ]],
         body,
         styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [0, 38, 246], textColor: [255, 255, 255], fontStyle: "bold" },
+        headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255], fontStyle: "bold" },
       });
       doc.save(`bank-accounts-${Date.now()}.pdf`);
     } catch (err) {
@@ -263,7 +263,7 @@ export function BankAccounts() {
               className={cn(
                 "px-4 py-1.5 text-xs font-medium rounded-lg transition-colors",
                 activeTab === "bank"
-                  ? "bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white"
+                  ? "bg-[#14b8a6] text-white"
                   : "bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300",
               )}
             >
@@ -297,7 +297,7 @@ export function BankAccounts() {
                 setEditAccount(null);
                 setIsModalOpen(true);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{tr("Hesab Əlavə Et", "Add Account")}</span>
@@ -314,7 +314,7 @@ export function BankAccounts() {
                 placeholder={tr("Axtar...", "Search...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
             <div className="flex gap-2 ml-auto">
@@ -322,7 +322,7 @@ export function BankAccounts() {
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="all">{tr("Status", "Status")}</option>
                   <option value="active">{tr("Aktiv", "Active")}</option>
@@ -338,7 +338,7 @@ export function BankAccounts() {
                   onChange={(e) =>
                     setSelectedSort(e.target.value as "latest" | "oldest" | "name")
                   }
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
                 >
                   <option value="latest">{tr("Sırala : Ən Yeni", "Sort By : Latest")}</option>
                   <option value="oldest">{tr("Sırala : Ən Köhnə", "Sort By : Oldest")}</option>

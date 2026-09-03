@@ -121,8 +121,8 @@ export function PublicStorefront() {
   if (notFound || !config) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 px-6 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-[#0026f6]/10 flex items-center justify-center">
-          <Globe className="w-6 h-6 text-[#0026f6]" />
+        <div className="w-12 h-12 rounded-2xl bg-[#14b8a6]/10 flex items-center justify-center">
+          <Globe className="w-6 h-6 text-[#14b8a6]" />
         </div>
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Store not published yet</h1>
@@ -133,7 +133,7 @@ export function PublicStorefront() {
         </div>
         <Link
           to="/"
-          className="text-sm font-medium text-[#0026f6] hover:text-[#001db8] underline-offset-2 hover:underline"
+          className="text-sm font-medium text-[#14b8a6] hover:text-[#0f766e] underline-offset-2 hover:underline"
         >
           Go to Inflero
         </Link>

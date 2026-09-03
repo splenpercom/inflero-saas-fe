@@ -198,7 +198,7 @@ export function StockHistory() {
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[120px]"
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
               >
                 <option value="all">Category</option>
                 <option value="electronics">Electronics</option>
@@ -212,7 +212,7 @@ export function StockHistory() {
               <select
                 value={selectedProduct}
                 onChange={(e) => setSelectedProduct(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[120px]"
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
               >
                 <option value="all">Products</option>
                 <option value="electronics">Electronics</option>
@@ -307,7 +307,7 @@ export function StockHistory() {
                     <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
                       {item.initialQty}
                     </td>
-                    <td className="px-3 py-2 text-xs text-[#0026f6] dark:text-[#0026f6] font-medium whitespace-nowrap">
+                    <td className="px-3 py-2 text-xs text-[#14b8a6] dark:text-[#14b8a6] font-medium whitespace-nowrap">
                       {item.addedQty}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">

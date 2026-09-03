@@ -25,10 +25,10 @@ export function LanguageSwitcherDropdown({ variant = "dark" }: Props) {
         trigger={
           <button
             type="button"
-            className="px-2 py-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition flex items-center gap-1.5 bg-[#0026f6]/10 dark:bg-[#0026f6]/20 border border-[#0026f6]/20 dark:border-[#0026f6]/30"
+            className="px-2 py-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition flex items-center gap-1.5 bg-[#14b8a6]/10 dark:bg-[#14b8a6]/20 border border-[#14b8a6]/20 dark:border-[#14b8a6]/30"
           >
-            <Globe className="w-3.5 h-3.5 text-[#0026f6] dark:text-[#0026f6]" />
-            <span className="text-xs font-medium text-[#0026f6] dark:text-[#0026f6]">{current.short}</span>
+            <Globe className="w-3.5 h-3.5 text-[#14b8a6] dark:text-[#14b8a6]" />
+            <span className="text-xs font-medium text-[#14b8a6] dark:text-[#14b8a6]">{current.short}</span>
           </button>
         }
       >
@@ -36,7 +36,7 @@ export function LanguageSwitcherDropdown({ variant = "dark" }: Props) {
           <SimpleDropdownItem
             key={o.code}
             onClick={() => setLanguage(o.code)}
-            className={language === o.code ? "bg-[#0026f6]/20 dark:bg-[#0026f6]/30" : ""}
+            className={language === o.code ? "bg-[#14b8a6]/20 dark:bg-[#14b8a6]/30" : ""}
           >
             <span className="text-xs">{o.label}</span>
           </SimpleDropdownItem>

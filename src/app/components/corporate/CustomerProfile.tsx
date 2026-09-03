@@ -143,7 +143,7 @@ export function CustomerProfile() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center">
           <p className="text-sm text-gray-500">{tr("Müştəri tapılmadı", "Customer not found")}</p>
-          <button onClick={() => navigate("/dashboard/people/customers")} className="mt-3 text-xs text-[#0026f6] hover:underline">{tr("Geri qayıt", "Go back")}</button>
+          <button onClick={() => navigate("/dashboard/people/customers")} className="mt-3 text-xs text-[#14b8a6] hover:underline">{tr("Geri qayıt", "Go back")}</button>
         </div>
       </div>
     );
@@ -179,7 +179,7 @@ export function CustomerProfile() {
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-5">
           <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#0026f6] to-[#0026f6] flex items-center justify-center shrink-0">
+            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#14b8a6] to-[#14b8a6] flex items-center justify-center shrink-0">
               <span className="text-2xl font-bold text-white">{customer.name.charAt(0)}</span>
             </div>
             <div className="flex-1 min-w-0">
@@ -203,7 +203,7 @@ export function CustomerProfile() {
           </div>
           <div className="grid grid-cols-1 gap-3 mt-5 pt-5 border-t border-gray-100 dark:border-gray-800">
             <div className="text-center">
-              <p className="text-lg font-bold text-[#0026f6] dark:text-[#0026f6]">{purchases.length}</p>
+              <p className="text-lg font-bold text-[#14b8a6] dark:text-[#14b8a6]">{purchases.length}</p>
               <p className="text-[10px] text-gray-400">{tr("Satınalma", "Purchases")}</p>
             </div>
           </div>
@@ -218,7 +218,7 @@ export function CustomerProfile() {
           <div className="mb-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                <Car className="h-4 w-4 text-[#0026f6]" />
+                <Car className="h-4 w-4 text-[#14b8a6]" />
                 {tr("Avtomobillər", "Vehicles")}
               </h2>
               <button
@@ -258,7 +258,7 @@ export function CustomerProfile() {
 
         <div>
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
-            <Receipt className="w-4 h-4 text-[#0026f6]" />
+            <Receipt className="w-4 h-4 text-[#14b8a6]" />
             {tr("Satınalma Tarixçəsi", "Purchase History")}
           </h2>
           {purchasesLoading ? (

@@ -321,7 +321,7 @@ export function CarServiceCustomerSite({
         <p className="mt-3 text-sm text-gray-500">
           {t("Booking is currently unavailable.", "Rezervasiya hazırda əlçatan deyil.", "Rezervasyon şu anda kullanılamıyor.")}
         </p>
-        {company.phone && <a className="mt-4 text-sm font-semibold text-[#0026f6]" href={`tel:${company.phone}`}>{company.phone}</a>}
+        {company.phone && <a className="mt-4 text-sm font-semibold text-[#14b8a6]" href={`tel:${company.phone}`}>{company.phone}</a>}
         <a className="mt-1 text-sm text-gray-500" href={`mailto:${company.companyEmail}`}>{company.companyEmail}</a>
       </div>
     );
@@ -329,7 +329,7 @@ export function CarServiceCustomerSite({
 
   if (bookingMode === "per_branch" && !branchSlug) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#0026f6] to-[#001570] text-white">
+      <div className="min-h-screen bg-gradient-to-b from-[#14b8a6] to-[#134e4a] text-white">
         <div className="max-w-2xl mx-auto px-4 py-16 text-center">
           <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-4">
             <Car className="w-7 h-7" />
@@ -350,7 +350,7 @@ export function CarServiceCustomerSite({
                   to={customerBookingPath(tenantSlug, branch.slug)}
                   className="block bg-white text-gray-900 rounded-xl p-4 hover:shadow-lg transition-shadow"
                 >
-                  <p className="font-semibold text-[#0026f6]">{branch.name}</p>
+                  <p className="font-semibold text-[#14b8a6]">{branch.name}</p>
                   {branch.address && (
                     <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                       <MapPin className="w-3 h-3 shrink-0" />
@@ -378,7 +378,7 @@ export function CarServiceCustomerSite({
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
         <div className="max-w-4xl mx-auto px-4 flex items-center justify-between h-14">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#0026f6] flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-[#14b8a6] flex items-center justify-center flex-shrink-0 overflow-hidden">
               {company.companyLogoUrl ? (
                 <img src={company.companyLogoUrl} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -386,7 +386,7 @@ export function CarServiceCustomerSite({
               )}
             </div>
             <div className="leading-none">
-              <p className="text-sm font-bold text-[#0026f6]">{company.name}</p>
+              <p className="text-sm font-bold text-[#14b8a6]">{company.name}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">{landingPath}</p>
             </div>
           </div>
@@ -394,7 +394,7 @@ export function CarServiceCustomerSite({
           <nav className="hidden md:flex items-center gap-0.5">
             {NAV.map(n => (
               <button key={n.id} onClick={() => scrollTo(n.id)}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-[#0026f6] hover:bg-gray-50 rounded-lg transition-colors font-medium">
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-[#14b8a6] hover:bg-gray-50 rounded-lg transition-colors font-medium">
                 {n.label}
               </button>
             ))}
@@ -420,7 +420,7 @@ export function CarServiceCustomerSite({
         )}
       </header>
 
-      <section id="booking" className="bg-gradient-to-b from-[#0026f6] to-[#001570] pt-10 pb-16 sm:pt-14 sm:pb-20">
+      <section id="booking" className="bg-gradient-to-b from-[#14b8a6] to-[#134e4a] pt-10 pb-16 sm:pt-14 sm:pb-20">
         <div className="max-w-4xl mx-auto px-4">
 
           <div className="text-center mb-8">
@@ -446,10 +446,10 @@ export function CarServiceCustomerSite({
                       onClick={() => { if (done) setStep(s.key); }}
                       disabled={!done}
                       className={`flex-1 py-3 flex flex-col items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors
-                        ${active ? "text-[#0026f6] border-b-2 border-[#0026f6]" : done ? "text-green-600 cursor-pointer" : "text-gray-300"}`}
+                        ${active ? "text-[#14b8a6] border-b-2 border-[#14b8a6]" : done ? "text-green-600 cursor-pointer" : "text-gray-300"}`}
                     >
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
-                        ${active ? "bg-[#0026f6] text-white" : done ? "bg-green-500 text-white" : "bg-gray-100 text-gray-400"}`}>
+                        ${active ? "bg-[#14b8a6] text-white" : done ? "bg-green-500 text-white" : "bg-gray-100 text-gray-400"}`}>
                         {done ? <Check className="w-3 h-3" /> : i + 1}
                       </span>
                       <span className="hidden sm:block">{pickText(lang, s.label, s.labelAz, s.labelTr ?? s.label)}</span>
@@ -492,8 +492,8 @@ export function CarServiceCustomerSite({
                       <button key={i} onClick={() => selectDate(d)} disabled={disabled}
                         className={`aspect-square w-full rounded-xl text-sm font-medium transition-all flex items-center justify-center
                           ${disabled ? "text-gray-200 cursor-not-allowed"
-                          : sel   ? "bg-[#0026f6] text-white shadow-md shadow-[#0026f6]/30 scale-105"
-                          : tod   ? "border-2 border-[#0026f6] text-[#0026f6] hover:bg-[#f0f3ff]"
+                          : sel   ? "bg-[#14b8a6] text-white shadow-md shadow-[#14b8a6]/30 scale-105"
+                          : tod   ? "border-2 border-[#14b8a6] text-[#14b8a6] hover:bg-[#f0f3ff]"
                           :         "text-gray-700 hover:bg-gray-100"}`}>
                         {d}
                       </button>
@@ -547,8 +547,8 @@ export function CarServiceCustomerSite({
                       className={`py-2.5 rounded-xl text-sm font-semibold border transition-all
                         ${full ? "border-gray-100 text-gray-300 cursor-not-allowed"
                         : selTime === slot.time
-                          ? "bg-[#0026f6] text-white border-[#0026f6] shadow-md shadow-[#0026f6]/20"
-                          : "border-gray-200 text-gray-700 hover:border-[#0026f6]/40 hover:text-[#0026f6] hover:bg-[#f0f3ff]"}`}
+                          ? "bg-[#14b8a6] text-white border-[#14b8a6] shadow-md shadow-[#14b8a6]/20"
+                          : "border-gray-200 text-gray-700 hover:border-[#14b8a6]/40 hover:text-[#14b8a6] hover:bg-[#f0f3ff]"}`}
                     >
                       {slot.time}
                     </button>
@@ -581,8 +581,8 @@ export function CarServiceCustomerSite({
                       onClick={() => selectService(s.value)}
                       className={`py-3 px-4 rounded-xl text-sm font-semibold border text-left transition-all
                         ${selService === s.value
-                          ? "bg-[#0026f6] text-white border-[#0026f6]"
-                          : "border-gray-200 text-gray-700 hover:border-[#0026f6]/40 hover:bg-[#f0f3ff]"}`}
+                          ? "bg-[#14b8a6] text-white border-[#14b8a6]"
+                          : "border-gray-200 text-gray-700 hover:border-[#14b8a6]/40 hover:bg-[#f0f3ff]"}`}
                     >
                       {serviceOptionLabel(s, lang)}
                     </button>
@@ -600,13 +600,13 @@ export function CarServiceCustomerSite({
                         value={customService}
                         onChange={(e) => setCustomService(e.target.value)}
                         placeholder={t("e.g. Wheel alignment, battery replacement", "məs. Təkər balansı, akkumulyator dəyişimi", "örn. Rot ayarı, akü değişimi")}
-                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent placeholder-gray-300"
+                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent placeholder-gray-300"
                       />
                     </div>
                     <button
                       onClick={() => customService.trim() && setStep("contact")}
                       disabled={!customService.trim()}
-                      className="w-full py-3 rounded-xl bg-[#0026f6] text-white text-sm font-bold hover:bg-[#001fc4] transition-colors shadow-lg shadow-[#0026f6]/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-full py-3 rounded-xl bg-[#14b8a6] text-white text-sm font-bold hover:bg-[#0f766e] transition-colors shadow-lg shadow-[#14b8a6]/20 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {t("Continue", "Davam Et", "Devam Et")} →
                     </button>
@@ -638,7 +638,7 @@ export function CarServiceCustomerSite({
                     </label>
                     <input type="text" value={custName} onChange={e => setCustName(e.target.value)} required
                       placeholder={t("Full name", "Ad Soyad", "Ad Soyad")}
-                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent placeholder-gray-300" />
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent placeholder-gray-300" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -646,7 +646,7 @@ export function CarServiceCustomerSite({
                     </label>
                     <input type="tel" value={custPhone} onChange={e => setCustPhone(e.target.value)} required
                       placeholder="+994 50 000 00 00"
-                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent placeholder-gray-300" />
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent placeholder-gray-300" />
                   </div>
                 </div>
 
@@ -668,7 +668,7 @@ export function CarServiceCustomerSite({
                 )}
 
                 <button onClick={handleSubmit} disabled={!custName || !custPhone || submitting}
-                  className="w-full mt-4 py-3 rounded-xl bg-[#0026f6] text-white text-sm font-bold hover:bg-[#001fc4] transition-colors shadow-lg shadow-[#0026f6]/20 disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="w-full mt-4 py-3 rounded-xl bg-[#14b8a6] text-white text-sm font-bold hover:bg-[#0f766e] transition-colors shadow-lg shadow-[#14b8a6]/20 disabled:opacity-40 disabled:cursor-not-allowed">
                   {submitting ? t("Submitting...", "Göndərilir...", "Gönderiliyor...") : t("Confirm Booking", "Rezervasiyanı Təsdiqlə", "Rezervasyonu Onayla")}
                 </button>
                 <p className="text-[10px] text-center text-gray-400 mt-2">
@@ -690,7 +690,7 @@ export function CarServiceCustomerSite({
                   <p className="text-xs text-gray-500">{custName} · {custPhone}</p>
                 </div>
                 <button onClick={resetAll}
-                  className="px-6 py-2.5 rounded-xl text-sm font-semibold text-[#0026f6] border border-[#0026f6]/30 hover:bg-[#f0f3ff] transition-colors">
+                  className="px-6 py-2.5 rounded-xl text-sm font-semibold text-[#14b8a6] border border-[#14b8a6]/30 hover:bg-[#f0f3ff] transition-colors">
                   {t("New Booking", "Yeni Rezervasiya", "Yeni Rezervasyon")}
                 </button>
               </div>
@@ -729,9 +729,9 @@ export function CarServiceCustomerSite({
 
               <div className="space-y-2">
                 <a href={`tel:${company.phone ?? ""}`}
-                  className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 hover:border-[#0026f6]/20 hover:bg-[#f8f9ff] transition-all group">
-                  <div className="w-9 h-9 rounded-lg bg-[#0026f6]/8 flex items-center justify-center flex-shrink-0 group-hover:bg-[#0026f6] transition-colors">
-                    <Phone className="w-4 h-4 text-[#0026f6] group-hover:text-white transition-colors" />
+                  className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 hover:border-[#14b8a6]/20 hover:bg-[#f8f9ff] transition-all group">
+                  <div className="w-9 h-9 rounded-lg bg-[#14b8a6]/8 flex items-center justify-center flex-shrink-0 group-hover:bg-[#14b8a6] transition-colors">
+                    <Phone className="w-4 h-4 text-[#14b8a6] group-hover:text-white transition-colors" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] text-gray-400 uppercase tracking-wide">{t("Phone", "Telefon", "Telefon")}</p>
@@ -740,9 +740,9 @@ export function CarServiceCustomerSite({
                 </a>
 
                 <a href={`mailto:${company.companyEmail}`}
-                  className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 hover:border-[#0026f6]/20 hover:bg-[#f8f9ff] transition-all group">
-                  <div className="w-9 h-9 rounded-lg bg-[#0026f6]/8 flex items-center justify-center flex-shrink-0 group-hover:bg-[#0026f6] transition-colors">
-                    <Mail className="w-4 h-4 text-[#0026f6] group-hover:text-white transition-colors" />
+                  className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 hover:border-[#14b8a6]/20 hover:bg-[#f8f9ff] transition-all group">
+                  <div className="w-9 h-9 rounded-lg bg-[#14b8a6]/8 flex items-center justify-center flex-shrink-0 group-hover:bg-[#14b8a6] transition-colors">
+                    <Mail className="w-4 h-4 text-[#14b8a6] group-hover:text-white transition-colors" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] text-gray-400 uppercase tracking-wide">{t("Email", "E-poçt", "E-posta")}</p>
@@ -751,8 +751,8 @@ export function CarServiceCustomerSite({
                 </a>
 
                 <div className="flex items-start gap-3 p-3.5 rounded-xl border border-gray-100">
-                  <div className="w-9 h-9 rounded-lg bg-[#0026f6]/8 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-4 h-4 text-[#0026f6]" />
+                  <div className="w-9 h-9 rounded-lg bg-[#14b8a6]/8 flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-4 h-4 text-[#14b8a6]" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] text-gray-400 uppercase tracking-wide">{t("Address", "Ünvan", "Adres")}</p>
@@ -760,7 +760,7 @@ export function CarServiceCustomerSite({
                     {company.address && (
                     <a href={`https://maps.google.com/?q=${encodeURIComponent(company.address)}`}
                       target="_blank" rel="noopener noreferrer"
-                      className="text-[10px] text-[#0026f6] hover:underline mt-0.5 inline-block">
+                      className="text-[10px] text-[#14b8a6] hover:underline mt-0.5 inline-block">
                       {t("Get directions →", "Marşrut al →", "Yol tarifi al →")}
                     </a>
                     )}
@@ -770,7 +770,7 @@ export function CarServiceCustomerSite({
 
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                  <Clock className="w-3.5 h-3.5 text-[#0026f6]" />
+                  <Clock className="w-3.5 h-3.5 text-[#14b8a6]" />
                   <span className="text-xs font-bold text-gray-700">{t("Working Hours", "İş Saatları", "Çalışma Saatleri")}</span>
                   <span className="ml-auto flex items-center gap-1 text-[10px] text-green-600 font-medium">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -785,7 +785,7 @@ export function CarServiceCustomerSite({
                   return (
                     <div key={day} className="flex justify-between items-center px-4 py-2.5 border-b border-gray-50 last:border-0">
                       <span className="text-xs text-gray-600">{WEEKDAYS[lang][i]}</span>
-                      <span className={`text-xs font-bold ${isOpen ? "text-[#0026f6]" : "text-gray-300"}`}>
+                      <span className={`text-xs font-bold ${isOpen ? "text-[#14b8a6]" : "text-gray-300"}`}>
                         {isOpen ? `${startStr} – ${endStr}` : t("Closed", "Qapalı", "Kapalı")}
                       </span>
                     </div>
@@ -814,7 +814,7 @@ export function CarServiceCustomerSite({
         </div>
       </section>
 
-      <footer className="bg-[#0026f6] py-7">
+      <footer className="bg-[#14b8a6] py-7">
         <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center">

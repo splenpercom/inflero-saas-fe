@@ -117,7 +117,7 @@ export function CorporateOrders() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search orders..."
-            className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent"
+            className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
           />
         </div>
 
@@ -126,7 +126,7 @@ export function CorporateOrders() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent"
+            className="appearance-none pl-3 pr-8 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
           >
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
@@ -138,7 +138,7 @@ export function CorporateOrders() {
         </div>
 
         {/* Add Button */}
-        <button className="px-2.5 py-1.5 text-xs bg-[#001db8] hover:bg-[#001fc4] text-white rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap">
+        <button className="px-2.5 py-1.5 text-xs bg-[#0f766e] hover:bg-[#0d9488] text-white rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap">
           <Plus className="w-3.5 h-3.5" />
           New Order
         </button>
@@ -150,7 +150,7 @@ export function CorporateOrders() {
           onClick={() => setStatusFilter("all")}
           className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
             statusFilter === "all"
-              ? "bg-[#001db8] text-white"
+              ? "bg-[#0f766e] text-white"
               : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
           }`}
         >
@@ -170,7 +170,7 @@ export function CorporateOrders() {
           onClick={() => setStatusFilter("processing")}
           className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
             statusFilter === "processing"
-              ? "bg-[#001db8] text-white"
+              ? "bg-[#0f766e] text-white"
               : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
           }`}
         >
@@ -261,7 +261,7 @@ export function CorporateOrders() {
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
                       {order.items}
                     </td>
-                    <td className="px-3 py-2 text-xs font-semibold text-[#0026f6] dark:text-[#0026f6]">
+                    <td className="px-3 py-2 text-xs font-semibold text-[#14b8a6] dark:text-[#14b8a6]">
                       {order.amount}
                     </td>
                     <td className="px-3 py-2">
@@ -269,7 +269,7 @@ export function CorporateOrders() {
                         order.status === "Completed"
                           ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
                           : order.status === "Processing"
-                          ? "bg-[#e8ebff] dark:bg-[#0026f6]/30 text-[#0026f6] dark:text-[#0026f6]"
+                          ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/30 text-[#14b8a6] dark:text-[#14b8a6]"
                           : order.status === "Pending"
                           ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
                           : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
@@ -279,7 +279,7 @@ export function CorporateOrders() {
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-center gap-1">
-                        <button className="p-1.5 text-[#0026f6] dark:text-[#0026f6] hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/20 rounded-lg transition-colors">
+                        <button className="p-1.5 text-[#14b8a6] dark:text-[#14b8a6] hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 rounded-lg transition-colors">
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">

@@ -108,14 +108,14 @@ export function CorporateClients() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search clients..."
-            className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent"
+            className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
           />
         </div>
 
         {/* Add Button */}
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-2.5 py-1.5 text-xs bg-[#001db8] hover:bg-[#001fc4] text-white rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap"
+          className="px-2.5 py-1.5 text-xs bg-[#0f766e] hover:bg-[#0d9488] text-white rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Client
@@ -172,7 +172,7 @@ export function CorporateClients() {
                   >
                     <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium">
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-3.5 h-3.5 text-[#0026f6] dark:text-[#0026f6]" />
+                        <Building2 className="w-3.5 h-3.5 text-[#14b8a6] dark:text-[#14b8a6]" />
                         {client.companyName}
                       </div>
                     </td>
@@ -188,7 +188,7 @@ export function CorporateClients() {
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
                       {client.totalOrders}
                     </td>
-                    <td className="px-3 py-2 text-xs font-semibold text-[#0026f6] dark:text-[#0026f6]">
+                    <td className="px-3 py-2 text-xs font-semibold text-[#14b8a6] dark:text-[#14b8a6]">
                       {client.totalSpent}
                     </td>
                     <td className="px-3 py-2">
@@ -206,7 +206,7 @@ export function CorporateClients() {
                           <Edit2 className="w-3 h-3" />
                           Edit
                         </button>
-                        <button className="p-1.5 text-[#0026f6] dark:text-[#0026f6] hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/20 rounded-lg transition-colors">
+                        <button className="p-1.5 text-[#14b8a6] dark:text-[#14b8a6] hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 rounded-lg transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -240,7 +240,7 @@ export function CorporateClients() {
                   value={formData.companyName}
                   onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
                   placeholder="e.g. Tech Solutions LLC"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
                 />
               </div>
 
@@ -254,7 +254,7 @@ export function CorporateClients() {
                   value={formData.contactPerson}
                   onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
                   placeholder="e.g. John Smith"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
                 />
               </div>
 
@@ -269,7 +269,7 @@ export function CorporateClients() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="email@company.com"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
                   />
                 </div>
 
@@ -283,7 +283,7 @@ export function CorporateClients() {
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+994 50 123 4567"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
                   />
                 </div>
               </div>
@@ -298,7 +298,7 @@ export function CorporateClients() {
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="Full address"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
                 />
               </div>
             </div>
@@ -307,7 +307,7 @@ export function CorporateClients() {
             <div className="flex items-center gap-3 mt-6">
               <button
                 onClick={handleAddClient}
-                className="px-4 py-2 text-sm font-semibold bg-[#001db8] hover:bg-[#001fc4] text-white rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold bg-[#0f766e] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
               >
                 Save Client
               </button>

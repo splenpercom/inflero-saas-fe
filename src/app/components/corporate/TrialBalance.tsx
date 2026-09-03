@@ -95,7 +95,7 @@ export function TrialBalance() {
       body: exportRows,
       foot: [[tr("Cəmi", "Total"), "", parseFinanceMoney(totalDebit).toFixed(2), parseFinanceMoney(totalCredit).toFixed(2)]],
       styles: { fontSize: 9, cellPadding: 2 },
-      headStyles: { fillColor: [0, 38, 246], textColor: [255, 255, 255], fontStyle: "bold" },
+      headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255], fontStyle: "bold" },
       footStyles: { fillColor: [240, 240, 240], fontStyle: "bold" },
     });
     doc.save(`trial-balance-${Date.now()}.pdf`);
@@ -132,14 +132,14 @@ export function TrialBalance() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{tr("Tarixdən", "Date From")}</label>
-              <DateInput value={dateFrom} onChange={setDateFrom} className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+              <DateInput value={dateFrom} onChange={setDateFrom} className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{tr("Tarixə", "Date To")}</label>
-              <DateInput value={dateTo} onChange={setDateTo} className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+              <DateInput value={dateTo} onChange={setDateTo} className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
             </div>
             <div className="flex items-end lg:col-span-2">
-              <button onClick={() => void loadReport()} disabled={loading || !dateFrom || !dateTo} className="w-full px-4 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
+              <button onClick={() => void loadReport()} disabled={loading || !dateFrom || !dateTo} className="w-full px-4 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
                 {loading ? tr("Yüklənir...", "Loading...") : tr("Hesabatı Göstər", "Run Report")}
               </button>
             </div>

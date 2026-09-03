@@ -171,7 +171,7 @@ export function LowStocks() {
       startY: 35,
       theme: "grid",
       headStyles: {
-        fillColor: [0, 38, 246],
+        fillColor: [20, 184, 166],
         textColor: [255, 255, 255],
         fontSize: 10,
         fontStyle: "bold",
@@ -272,7 +272,7 @@ export function LowStocks() {
                 placeholder={tr("Məhsul axtar...", "Search products...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 

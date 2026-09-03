@@ -90,7 +90,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#00082e] flex overflow-hidden">
+    <div className="min-h-screen bg-[#042f2e] flex overflow-hidden">
       <style>{`
         @keyframes lp-glow  { 0%,100%{opacity:0.35} 50%{opacity:0.7} }
         @keyframes lp-slide { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
@@ -112,15 +112,15 @@ export function Login() {
         }
         .glass-field:focus {
           background: rgba(255,255,255,0.09);
-          border-color: rgba(0,38,246,0.55);
-          box-shadow: 0 0 0 3px rgba(0,38,246,0.12);
+          border-color: rgba(20,184,166,0.55);
+          box-shadow: 0 0 0 3px rgba(20,184,166,0.12);
           outline: none;
         }
         .glass-field:-webkit-autofill,
         .glass-field:-webkit-autofill:hover,
         .glass-field:-webkit-autofill:focus,
         .glass-field:-webkit-autofill:active {
-          -webkit-box-shadow: 0 0 0 1000px rgba(0, 8, 46, 0.95) inset !important;
+          -webkit-box-shadow: 0 0 0 1000px rgba(4, 47, 46, 0.95) inset !important;
           -webkit-text-fill-color: rgba(255,255,255,0.90) !important;
           caret-color: white;
           border-color: rgba(255,255,255,0.10) !important;
@@ -130,9 +130,9 @@ export function Login() {
 
       <div className="hidden lg:flex flex-col justify-between w-[480px] flex-shrink-0 relative overflow-hidden p-12">
         <div className="absolute inset-0 lp-grid" />
-        <div className="absolute top-1/4 -left-20 w-96 h-96 rounded-full bg-[#0026f6]/14 blur-3xl lp-glow pointer-events-none" />
-        <div className="absolute bottom-1/4 right-0 w-80 h-80 rounded-full bg-[#001878]/60 blur-3xl lp-glow2 pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0026f6]/60 to-transparent" />
+        <div className="absolute top-1/4 -left-20 w-96 h-96 rounded-full bg-[#14b8a6]/14 blur-3xl lp-glow pointer-events-none" />
+        <div className="absolute bottom-1/4 right-0 w-80 h-80 rounded-full bg-[#0f766e]/60 blur-3xl lp-glow2 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#14b8a6]/60 to-transparent" />
 
         <div className="relative z-10">
           <AppBrandLogo onDarkBackground size="auth" />
@@ -205,7 +205,7 @@ export function Login() {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-[#0026f6]/6 blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-[#14b8a6]/6 blur-3xl pointer-events-none" />
 
         <div className="absolute top-6 left-0 right-0 px-6 flex items-center justify-between lg:justify-end">
           <AppBrandLogo onDarkBackground size="nav" className="lg:hidden" />
@@ -273,7 +273,7 @@ export function Login() {
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <div
                     onClick={() => setRemember(!remember)}
-                    className={`w-4 h-4 rounded flex items-center justify-center border transition-all cursor-pointer ${remember ? "bg-[#0026f6] border-[#0026f6]" : "border-white/20 bg-white/5"}`}
+                    className={`w-4 h-4 rounded flex items-center justify-center border transition-all cursor-pointer ${remember ? "bg-[#14b8a6] border-[#14b8a6]" : "border-white/20 bg-white/5"}`}
                   >
                     {remember && <CheckCircle className="w-3 h-3 text-white fill-current" />}
                   </div>
@@ -287,7 +287,7 @@ export function Login() {
                     setView("forgot");
                     setForgotEmail(email);
                   }}
-                  className="text-xs text-white/40 hover:text-[#6699ff] transition-colors font-medium"
+                  className="text-xs text-white/40 hover:text-[#5eead4] transition-colors font-medium"
                 >
                   {t("Forgot password?", "Şifrəni unutmusunuz?", "Забыли пароль?")}
                 </button>
@@ -296,10 +296,10 @@ export function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#0026f6] text-sm font-bold hover:bg-white/95 transition-all shadow-lg shadow-white/8 disabled:opacity-60 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99] mt-2"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#14b8a6] text-sm font-bold hover:bg-white/95 transition-all shadow-lg shadow-white/8 disabled:opacity-60 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99] mt-2"
               >
                 {loading ? (
-                  <svg className="animate-spin w-4 h-4 text-[#0026f6]" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin w-4 h-4 text-[#14b8a6]" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path
                       className="opacity-75"
@@ -323,7 +323,7 @@ export function Login() {
               <button
                 type="button"
                 onClick={() => setIsRegisterOpen(true)}
-                className="text-sm font-semibold text-[#6699ff] hover:text-white transition-colors"
+                className="text-sm font-semibold text-[#5eead4] hover:text-white transition-colors"
               >
                 {t(
                   "Get started — submit registration",
@@ -346,8 +346,8 @@ export function Login() {
             </button>
 
             <div className="mb-8">
-              <div className="w-12 h-12 rounded-2xl bg-[#0026f6]/15 border border-[#0026f6]/20 flex items-center justify-center mb-5">
-                <Lock className="w-5 h-5 text-[#6699ff]" />
+              <div className="w-12 h-12 rounded-2xl bg-[#14b8a6]/15 border border-[#14b8a6]/20 flex items-center justify-center mb-5">
+                <Lock className="w-5 h-5 text-[#5eead4]" />
               </div>
               <h1 className="text-3xl font-black text-white mb-2">
                 {t("Forgot password?", "Şifrəni unutdunuz?", "Забыли пароль?")}
@@ -383,10 +383,10 @@ export function Login() {
               <button
                 type="submit"
                 disabled={forgotLoading || !forgotEmail}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#0026f6] text-sm font-bold hover:bg-white/95 transition-all shadow-lg shadow-white/8 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#14b8a6] text-sm font-bold hover:bg-white/95 transition-all shadow-lg shadow-white/8 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]"
               >
                 {forgotLoading ? (
-                  <svg className="animate-spin w-4 h-4 text-[#0026f6]" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin w-4 h-4 text-[#14b8a6]" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path
                       className="opacity-75"

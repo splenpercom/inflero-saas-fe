@@ -197,9 +197,9 @@ export function Reports() {
   const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; text: string; border: string }> = {
       blue: {
-        bg: "bg-[#e8ebff] dark:bg-[#0026f6]/20",
-        text: "text-[#0026f6] dark:text-[#0026f6]",
-        border: "border-[#b3c0ff] dark:border-[#0026f6]",
+        bg: "bg-[#ccfbf1] dark:bg-[#14b8a6]/20",
+        text: "text-[#14b8a6] dark:text-[#14b8a6]",
+        border: "border-[#b3c0ff] dark:border-[#14b8a6]",
       },
       purple: {
         bg: "bg-purple-50 dark:bg-purple-900/20",
@@ -274,13 +274,13 @@ export function Reports() {
                       <Link
                         key={reportIdx}
                         to={report.path}
-                        className="group flex items-center justify-between px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-[#b3c0ff] dark:hover:border-[#0026f6] bg-white dark:bg-gray-900 hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/10 transition-all"
+                        className="group flex items-center justify-between px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-[#b3c0ff] dark:hover:border-[#14b8a6] bg-white dark:bg-gray-900 hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/10 transition-all"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center group-hover:from-[#e8ebff] group-hover:to-[#d9e0ff] dark:group-hover:from-[#0026f6]/30 dark:group-hover:to-[#0026f6]/30 transition-all shrink-0">
-                            <ReportIcon className="w-4 h-4 text-gray-600 dark:text-gray-400 group-hover:text-[#0026f6] dark:group-hover:text-[#0026f6] transition-colors" />
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center group-hover:from-[#ccfbf1] group-hover:to-[#ccfbf1] dark:group-hover:from-[#14b8a6]/30 dark:group-hover:to-[#14b8a6]/30 transition-all shrink-0">
+                            <ReportIcon className="w-4 h-4 text-gray-600 dark:text-gray-400 group-hover:text-[#14b8a6] dark:group-hover:text-[#14b8a6] transition-colors" />
                           </div>
-                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 group-hover:text-[#0026f6] dark:group-hover:text-[#0026f6] transition-colors truncate">
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 group-hover:text-[#14b8a6] dark:group-hover:text-[#14b8a6] transition-colors truncate">
                             {report.name}
                           </span>
                           {!(report as { live?: boolean }).live && (
@@ -289,7 +289,7 @@ export function Reports() {
                             </span>
                           )}
                         </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#0026f6] transition-colors" />
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#14b8a6] transition-colors" />
                       </Link>
                     );
                   })}

@@ -191,7 +191,7 @@ export function DateInput({
         <select
           value={viewMonth}
           onChange={(e) => setViewMonth(Number(e.target.value))}
-          className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+          className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
           aria-label={pickLang(language, "Ay", "Month")}
         >
           {monthNames.map((name, i) => (
@@ -203,7 +203,7 @@ export function DateInput({
         <select
           value={viewYear}
           onChange={(e) => setViewYear(Number(e.target.value))}
-          className="w-[88px] shrink-0 px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+          className="w-[88px] shrink-0 px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
           aria-label={pickLang(language, "İl", "Year")}
         >
           {yearOptions.map((y) => (
@@ -234,7 +234,7 @@ export function DateInput({
                   isDayDisabled(day)
                     ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
                     : isDaySelected(day)
-                      ? "bg-[#0026f6] text-white hover:bg-[#0026f6]/90"
+                      ? "bg-[#14b8a6] text-white hover:bg-[#14b8a6]/90"
                       : "text-gray-900 dark:text-white hover:bg-orange-100 dark:hover:bg-orange-900/30"
                 }`}
               >
@@ -254,7 +254,7 @@ export function DateInput({
             onChange(format(today, "yyyy-MM-dd"));
             setShowCalendar(false);
           }}
-          className="flex-1 text-xs py-1.5 text-[#0026f6] dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+          className="flex-1 text-xs py-1.5 text-[#14b8a6] dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
         >
           {pickLang(language, "Bu gün", "Today")}
         </button>
@@ -285,7 +285,7 @@ export function DateInput({
           onChange={handleInputChange}
           placeholder={placeholder || formatPlaceholder}
           required={required}
-          className={`w-full px-3 py-1.5 pr-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] ${className}`}
+          className={`w-full px-3 py-1.5 pr-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] ${className}`}
           maxLength={10}
         />
         <button

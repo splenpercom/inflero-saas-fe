@@ -453,7 +453,7 @@ export function Settings() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-        <Loader2 className="w-6 h-6 animate-spin text-[#0026f6]" />
+        <Loader2 className="w-6 h-6 animate-spin text-[#14b8a6]" />
       </div>
     );
   }
@@ -487,8 +487,8 @@ export function Settings() {
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-[#e8ebff] dark:bg-[#0026f6]/20 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-[#0026f6] dark:text-[#0026f6]" viewBox="0 0 24 24" fill="none">
+                  <div className="w-5 h-5 rounded-full bg-[#ccfbf1] dark:bg-[#14b8a6]/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6]" viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                       <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
@@ -516,7 +516,7 @@ export function Settings() {
                         type="text"
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
 
@@ -529,7 +529,7 @@ export function Settings() {
                         type="email"
                         value={companyEmail}
                         onChange={(e) => setCompanyEmail(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
 
@@ -542,7 +542,7 @@ export function Settings() {
                         type="tel"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
                   </div>
@@ -557,8 +557,8 @@ export function Settings() {
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-[#e8ebff] dark:bg-[#0026f6]/20 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-[#0026f6] dark:text-[#0026f6]" viewBox="0 0 24 24" fill="none">
+                  <div className="w-5 h-5 rounded-full bg-[#ccfbf1] dark:bg-[#14b8a6]/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6]" viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                       <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
@@ -607,7 +607,7 @@ export function Settings() {
                             )}
                           </div>
                         ) : canEdit ? (
-                          <label className="px-3 py-1.5 bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 shadow-lg shadow-[#0026f6]/20">
+                          <label className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 shadow-lg shadow-[#14b8a6]/20">
                             <Upload className="w-3 h-3" />
                             {pt("Upload Image", "Şəkil Yüklə")}
                             <input
@@ -635,8 +635,8 @@ export function Settings() {
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-[#e8ebff] dark:bg-[#0026f6]/20 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-[#0026f6] dark:text-[#0026f6]" viewBox="0 0 24 24" fill="none">
+                  <div className="w-5 h-5 rounded-full bg-[#ccfbf1] dark:bg-[#14b8a6]/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6]" viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                       <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
@@ -664,7 +664,7 @@ export function Settings() {
                         type="text"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
 
@@ -679,7 +679,7 @@ export function Settings() {
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
                           placeholder={pt("Enter city", "Şəhəri daxil edin")}
-                          className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                          className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                         />
                       </div>
 
@@ -693,7 +693,7 @@ export function Settings() {
                           value={postalCode}
                           onChange={(e) => setPostalCode(e.target.value)}
                           placeholder={pt("Enter postal code", "Poçt kodunu daxil edin")}
-                          className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                          className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                         />
                       </div>
                     </div>
@@ -808,7 +808,7 @@ export function Settings() {
                           <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                         </svg>
                       ),
-                      color: "text-[#0026f6]",
+                      color: "text-[#14b8a6]",
                     },
                   ].map(({ label, placeholder, value, setter, icon, color }) => (
                     <div key={label}>
@@ -821,7 +821,7 @@ export function Settings() {
                         value={value}
                         onChange={e => setter(e.target.value)}
                         placeholder={placeholder}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
                   ))}
@@ -866,7 +866,7 @@ export function Settings() {
                     disabled={!canEdit}
                     onClick={() => setEmployeeCommissionEnabled((v) => !v)}
                     className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
-                      employeeCommissionEnabled ? "bg-[#0026f6]" : "bg-gray-300 dark:bg-gray-700"
+                      employeeCommissionEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
                     } disabled:opacity-50`}
                     aria-pressed={employeeCommissionEnabled}
                   >
@@ -979,7 +979,7 @@ export function Settings() {
                     disabled={!canEdit}
                     onClick={() => setPosServiceFeeEnabled((v) => !v)}
                     className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
-                      posServiceFeeEnabled ? "bg-[#0026f6]" : "bg-gray-300 dark:bg-gray-700"
+                      posServiceFeeEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
                     } disabled:opacity-50`}
                     aria-pressed={posServiceFeeEnabled}
                   >
@@ -1009,7 +1009,7 @@ export function Settings() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-1.5 bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg text-xs font-medium transition-colors shadow-lg shadow-[#0026f6]/20 disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors shadow-lg shadow-[#14b8a6]/20 disabled:opacity-50 flex items-center gap-1.5"
             >
               {saving && <Loader2 className="w-3 h-3 animate-spin" />}
               {pt("Save Changes", "Dəyişiklikləri Yadda Saxla")}

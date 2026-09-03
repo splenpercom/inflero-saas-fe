@@ -175,19 +175,19 @@ export function Warehouses() {
             {stores.map((store) => (
               <div
                 key={store.id}
-                className="glass-card rounded-xl border border-[#0026f6]/20 dark:border-[#0026f6]/35 bg-[#f0f3ff]/50 dark:bg-[#0026f6]/10"
+                className="glass-card rounded-xl border border-[#14b8a6]/20 dark:border-[#14b8a6]/35 bg-[#f0f3ff]/50 dark:bg-[#14b8a6]/10"
               >
-                <div className="px-4 py-3 border-b border-[#0026f6]/15 dark:border-[#0026f6]/30 flex items-center justify-between">
+                <div className="px-4 py-3 border-b border-[#14b8a6]/15 dark:border-[#14b8a6]/30 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/25 flex items-center justify-center">
-                      <CheckCircle className="w-4 h-4 text-[#0026f6] dark:text-[#99b3ff]" />
+                    <div className="w-8 h-8 rounded-lg bg-[#ccfbf1] dark:bg-[#14b8a6]/25 flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-[#14b8a6] dark:text-[#5eead4]" />
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-gray-900 dark:text-white">{store.name}</p>
-                      <p className="text-[10px] text-[#0026f6] dark:text-[#99b3ff]">{store.status}</p>
+                      <p className="text-[10px] text-[#14b8a6] dark:text-[#5eead4]">{store.status}</p>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-[#e8ebff] dark:bg-[#0026f6]/30 text-[#001db8] dark:text-[#99b3ff] text-[10px] font-medium border border-[#0026f6]/25 dark:border-[#0026f6]/40">
+                  <span className="px-2 py-0.5 rounded-full bg-[#ccfbf1] dark:bg-[#14b8a6]/30 text-[#0f766e] dark:text-[#5eead4] text-[10px] font-medium border border-[#14b8a6]/25 dark:border-[#14b8a6]/40">
                     {store.code}
                   </span>
                 </div>
@@ -215,7 +215,7 @@ export function Warehouses() {
                       {tr("Menecer", "Manager")}: {store.branchManager.firstName} {store.branchManager.lastName}
                     </p>
                   )}
-                  <div className="flex gap-2 pt-2 border-t border-[#0026f6]/15 dark:border-[#0026f6]/30">
+                  <div className="flex gap-2 pt-2 border-t border-[#14b8a6]/15 dark:border-[#14b8a6]/30">
                     {canEdit && (
                       <button
                         onClick={() => {
@@ -242,11 +242,11 @@ export function Warehouses() {
             ))}
 
             {canCreate && (branchManagementEnabled ? canAdd : stores.length === 0) && (
-              <div className="glass-card rounded-xl border border-[#0026f6]/20 bg-[#f0f3ff]/50 dark:bg-[#0026f6]/10">
+              <div className="glass-card rounded-xl border border-[#14b8a6]/20 bg-[#f0f3ff]/50 dark:bg-[#14b8a6]/10">
                 <div className="p-4 text-center py-6">
-                  <WarehouseIcon className="w-8 h-8 mx-auto mb-2 text-[#0026f6]" />
+                  <WarehouseIcon className="w-8 h-8 mx-auto mb-2 text-[#14b8a6]" />
                   <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-3">{tr("Yeni filial əlavə et", "Add a new branch")}</p>
-                  <button onClick={() => { setEditingStore(null); setIsModalOpen(true); }} className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white text-xs font-medium rounded-lg flex items-center gap-1.5 mx-auto">
+                  <button onClick={() => { setEditingStore(null); setIsModalOpen(true); }} className="px-3 py-1.5 bg-[#14b8a6] text-white text-xs font-medium rounded-lg flex items-center gap-1.5 mx-auto">
                     <Plus className="w-3 h-3" /><span>{tr("Konfiqurasiya Et", "Configure")}</span>
                   </button>
                 </div>

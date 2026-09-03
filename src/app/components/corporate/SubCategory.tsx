@@ -186,7 +186,7 @@ export function SubCategory() {
       startY: 35,
       theme: "grid",
       headStyles: {
-        fillColor: [0, 38, 246],
+        fillColor: [20, 184, 166],
         textColor: [255, 255, 255],
         fontSize: 10,
         fontStyle: "bold",
@@ -448,7 +448,7 @@ export function SubCategory() {
                 placeholder={tr("Alt kateqoriya axtar...", "Search sub categories...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -498,7 +498,7 @@ export function SubCategory() {
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 title={tr("CSV İdxal Et", "Import CSV")}
               >
-                <Upload className="w-3.5 h-3.5 text-[#0026f6]" />
+                <Upload className="w-3.5 h-3.5 text-[#14b8a6]" />
               </button>
               )}
 
@@ -514,7 +514,7 @@ export function SubCategory() {
               {canCreate && (
               <button
                 onClick={handleAddSubCategory}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>{tr("Alt Kateqoriya Əlavə Et", "Add Sub Category")}</span>
@@ -598,7 +598,7 @@ export function SubCategory() {
                     }`}
                   >
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <div className="w-8 h-8 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/20 flex items-center justify-center text-xs font-bold text-[#0026f6] dark:text-[#0026f6]">{subCategory.name.charAt(0).toUpperCase()}</div>
+                      <div className="w-8 h-8 rounded-lg bg-[#ccfbf1] dark:bg-[#14b8a6]/20 flex items-center justify-center text-xs font-bold text-[#14b8a6] dark:text-[#14b8a6]">{subCategory.name.charAt(0).toUpperCase()}</div>
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-900 dark:text-white whitespace-nowrap">
                       {subCategory.name}
@@ -684,7 +684,7 @@ export function SubCategory() {
                   </label>
                   <button
                     onClick={handleDownloadDemo}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#e8ebff] dark:bg-[#0026f6]/20 border border-[#b3c0ff] dark:border-[#0026f6] rounded-lg text-sm font-medium text-[#0026f6] dark:text-[#0026f6] hover:bg-[#e8ebff] dark:hover:bg-[#0026f6]/30 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border border-[#b3c0ff] dark:border-[#14b8a6] rounded-lg text-sm font-medium text-[#14b8a6] dark:text-[#14b8a6] hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/30 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     {tr("Demo CSV Yüklə", "Download Demo CSV")}
@@ -722,13 +722,13 @@ export function SubCategory() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-700 dark:text-gray-300">{tr("İdxal edilir...", "Importing...")}</span>
-                      <span className="font-medium text-[#0026f6] dark:text-[#0026f6]">
+                      <span className="font-medium text-[#14b8a6] dark:text-[#14b8a6]">
                         {importProgress.toFixed(0)}%
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
                       <div
-                        className="bg-gradient-to-r from-[#0026f6] to-[#001db8] h-2.5 rounded-full transition-all duration-300 ease-out"
+                        className="bg-[#14b8a6] h-2.5 rounded-full transition-all duration-300 ease-out"
                         style={{ width: `${importProgress}%` }}
                       />
                     </div>
@@ -779,7 +779,7 @@ export function SubCategory() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${
                       formErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"
-                    } rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]`}
+                    } rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
                   />
                   {formErrors.name && <p className="text-[10px] text-red-500 mt-1">{formErrors.name}</p>}
                 </div>
@@ -791,7 +791,7 @@ export function SubCategory() {
                   <select
                     value={formData.categoryId}
                     onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                    className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${formErrors.categoryId ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer`}
+                    className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${formErrors.categoryId ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer`}
                   >
                     <option value="">{tr("Seç", "Select")}</option>
                     {categories.map((c) => (
@@ -829,7 +829,7 @@ export function SubCategory() {
                 <button
                   onClick={handleSubmitSubCategory}
                   disabled={saving}
-                  className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
                 >
                   {saving
                     ? tr("Yadda saxlanılır...", "Saving...")

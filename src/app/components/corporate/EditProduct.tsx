@@ -504,7 +504,7 @@ export function EditProduct() {
                         <ModernSelect value={category} onChange={setCategory} placeholder={pt("select")} options={categories} />
                       </div>
                       {canCreate && (
-                        <button type="button" onClick={() => setIsAddCategoryModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#0026f6] text-white rounded-lg">
+                        <button type="button" onClick={() => setIsAddCategoryModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#14b8a6] text-white rounded-lg">
                           <Plus className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -522,7 +522,7 @@ export function EditProduct() {
                         />
                       </div>
                       {canCreate && (
-                        <button type="button" onClick={() => setIsAddSubCategoryModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#0026f6] text-white rounded-lg">
+                        <button type="button" onClick={() => setIsAddSubCategoryModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#14b8a6] text-white rounded-lg">
                           <Plus className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -535,7 +535,7 @@ export function EditProduct() {
                         <ModernSelect value={brand} onChange={setBrand} placeholder={pt("select")} options={brands} />
                       </div>
                       {canCreate && (
-                        <button type="button" onClick={() => setIsAddBrandModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#0026f6] text-white rounded-lg">
+                        <button type="button" onClick={() => setIsAddBrandModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#14b8a6] text-white rounded-lg">
                           <Plus className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -548,7 +548,7 @@ export function EditProduct() {
                         <ModernSelect value={unit} onChange={setUnit} placeholder={pt("select")} options={units} />
                       </div>
                       {canCreate && (
-                        <button type="button" onClick={() => setIsAddUnitModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#0026f6] text-white rounded-lg">
+                        <button type="button" onClick={() => setIsAddUnitModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#14b8a6] text-white rounded-lg">
                           <Plus className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -563,7 +563,7 @@ export function EditProduct() {
                         onChange={(e) => setItemBarcode(e.target.value)}
                         className="flex-1 px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
                       />
-                      <button type="button" onClick={generateBarcode} className="px-3 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg">
+                      <button type="button" onClick={generateBarcode} className="px-3 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg">
                         {pt("generate")}
                       </button>
                     </div>
@@ -719,7 +719,7 @@ export function EditProduct() {
             <input value={categoryFormData.name} onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })} className="w-full px-3 py-1.5 text-xs border rounded-lg" placeholder={tr("Kateqoriya adı", "Category name")} />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setIsAddCategoryModalOpen(false)} className="px-3 py-1.5 text-xs">{pt("cancel")}</button>
-              <button type="button" onClick={() => void handleAddCategory()} className="px-3 py-1.5 text-xs bg-[#0026f6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>
+              <button type="button" onClick={() => void handleAddCategory()} className="px-3 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>
             </div>
           </div>
         </div>
@@ -734,7 +734,7 @@ export function EditProduct() {
             <ModernSelect value={subCatFormData.categoryId} onChange={(v) => setSubCatFormData({ ...subCatFormData, categoryId: v })} placeholder={pt("select")} options={categories} />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setIsAddSubCategoryModalOpen(false)} className="px-3 py-1.5 text-xs">{pt("cancel")}</button>
-              <button type="button" onClick={() => void handleAddSubCategory()} className="px-3 py-1.5 text-xs bg-[#0026f6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>
+              <button type="button" onClick={() => void handleAddSubCategory()} className="px-3 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>
             </div>
           </div>
         </div>
@@ -748,7 +748,7 @@ export function EditProduct() {
             <input value={brandFormData.name} onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })} className="w-full px-3 py-1.5 text-xs border rounded-lg" />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setIsAddBrandModalOpen(false)} className="px-3 py-1.5 text-xs">{pt("cancel")}</button>
-              <button type="button" onClick={() => void handleAddBrand()} className="px-3 py-1.5 text-xs bg-[#0026f6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>
+              <button type="button" onClick={() => void handleAddBrand()} className="px-3 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>
             </div>
           </div>
         </div>
@@ -763,7 +763,7 @@ export function EditProduct() {
             <input value={unitFormData.shortName} onChange={(e) => setUnitFormData({ ...unitFormData, shortName: e.target.value })} className="w-full px-3 py-1.5 text-xs border rounded-lg" placeholder={tr("Qısa ad", "Short name")} />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setIsAddUnitModalOpen(false)} className="px-3 py-1.5 text-xs">{pt("cancel")}</button>
-              <button type="button" onClick={() => void handleAddUnit()} className="px-3 py-1.5 text-xs bg-[#0026f6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>
+              <button type="button" onClick={() => void handleAddUnit()} className="px-3 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>
             </div>
           </div>
         </div>

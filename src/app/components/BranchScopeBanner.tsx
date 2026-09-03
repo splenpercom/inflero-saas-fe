@@ -61,7 +61,7 @@ export function BranchScopeBanner() {
 
   if (selectedBranch) {
     return (
-      <div className="bg-[#0026f6]/5 dark:bg-[#0026f6]/20 border-b border-[#0026f6]/15 dark:border-[#0026f6]/30 px-3 py-1.5 text-center text-[11px] text-[#0026f6] dark:text-[#99b3ff]">
+      <div className="bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20 border-b border-[#14b8a6]/15 dark:border-[#14b8a6]/30 px-3 py-1.5 text-center text-[11px] text-[#14b8a6] dark:text-[#5eead4]">
         <span className="font-semibold">{selectedBranch.name}</span>
         <span className="opacity-80">
           {" "}

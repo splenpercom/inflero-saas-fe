@@ -104,8 +104,8 @@ export function InvoiceReport() {
 
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#e8ebff] dark:bg-[#0026f6]/20 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-[#0026f6] dark:text-[#0026f6]" />
+              <div className="w-10 h-10 rounded-lg bg-[#ccfbf1] dark:bg-[#14b8a6]/20 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-[#14b8a6] dark:text-[#14b8a6]" />
               </div>
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Total Paid</p>
@@ -157,7 +157,7 @@ export function InvoiceReport() {
               <select
                 value={selectedCustomer}
                 onChange={(e) => setSelectedCustomer(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[120px]"
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
               >
                 <option value="all">Customer</option>
                 <option value="customer1">Customer 1</option>
@@ -171,7 +171,7 @@ export function InvoiceReport() {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] cursor-pointer min-w-[120px]"
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
               >
                 <option value="all">Status</option>
                 <option value="paid">Paid</option>

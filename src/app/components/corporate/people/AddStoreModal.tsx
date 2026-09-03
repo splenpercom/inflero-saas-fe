@@ -104,7 +104,7 @@ export function AddStoreModal({ isOpen, onClose, onSave }: AddStoreModalProps) {
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder={tr("Məsələn: STR001", "e.g., STR001")}
-                  className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
                 <button
                   type="button"
@@ -126,7 +126,7 @@ export function AddStoreModal({ isOpen, onClose, onSave }: AddStoreModalProps) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={tr("Mağaza adı daxil edin", "Enter store name")}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -140,7 +140,7 @@ export function AddStoreModal({ isOpen, onClose, onSave }: AddStoreModalProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={tr("E-poçt daxil edin", "Enter email")}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
           </div>
@@ -157,7 +157,7 @@ export function AddStoreModal({ isOpen, onClose, onSave }: AddStoreModalProps) {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder={tr("Telefon nömrəsi daxil edin", "Enter phone number")}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -171,7 +171,7 @@ export function AddStoreModal({ isOpen, onClose, onSave }: AddStoreModalProps) {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder={tr("Ünvan daxil edin", "Enter address")}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -183,7 +183,7 @@ export function AddStoreModal({ isOpen, onClose, onSave }: AddStoreModalProps) {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer"
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
               >
                 <option value="">{tr("Seç", "Select")}</option>
                 <option value="Active">{tr("Aktiv", "Active")}</option>
@@ -204,7 +204,7 @@ export function AddStoreModal({ isOpen, onClose, onSave }: AddStoreModalProps) {
           <button
             onClick={handleSave}
             disabled={!code || !name || !email || !phone || !address || !status}
-            className="px-4 py-1.5 bg-[#0026f6] hover:bg-[#001fc4] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {tr("Təsdiq Et", "Submit")}
           </button>

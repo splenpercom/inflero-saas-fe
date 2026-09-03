@@ -128,23 +128,23 @@ export function AddExpenseModal({
         <div className="p-4 space-y-3 overflow-y-auto flex-1 min-h-0">
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Xərc", "Expense")} <span className="text-red-500">*</span></label>
-            <input type="text" value={expense} onChange={(e) => setExpense(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+            <input type="text" value={expense} onChange={(e) => setExpense(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
           </div>
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("İstinad", "Reference")}</label>
-            <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+            <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
           </div>
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Təsvir", "Description")}</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] resize-none" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Kateqoriya", "Category")} <span className="text-red-500">*</span></label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer">
+              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer">
                 <option value="">{tr("Seçin", "Select")}</option>
                 {activeCategories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -172,14 +172,14 @@ export function AddExpenseModal({
             </div>
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Tarix", "Date")} <span className="text-red-500">*</span></label>
-              <DateInput value={date} onChange={setDate} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+              <DateInput value={date} onChange={setDate} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Məbləğ", "Amount")} <span className="text-red-500">*</span></label>
-              <input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+              <input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Status", "Status")} <span className="text-red-500">*</span></label>
@@ -204,7 +204,7 @@ export function AddExpenseModal({
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Bank Hesabı", "Bank Account")}</label>
-            <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] appearance-none cursor-pointer">
+            <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer">
               <option value="">{tr("Seçin (opsional)", "Select (optional)")}</option>
               {bankAccounts.filter((a) => a.status === "ACTIVE").map((a) => (
                 <option key={a.id} value={a.id}>{a.accountHolderName} ({a.accountNo})</option>
@@ -223,7 +223,7 @@ export function AddExpenseModal({
 
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2 shrink-0">
           <button onClick={onClose} disabled={saving} className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50">{tr("Ləğv Et", "Cancel")}</button>
-          <button onClick={() => void handleSave()} disabled={saving || !expense || !categoryId || !date || !amount} className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => void handleSave()} disabled={saving || !expense || !categoryId || !date || !amount} className="px-3 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? tr("Saxlanılır...", "Saving...") : isEdit ? tr("Yadda Saxla", "Save") : tr("Xərc Əlavə Et", "Add Expense")}
           </button>
         </div>

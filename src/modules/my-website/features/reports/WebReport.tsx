@@ -336,7 +336,7 @@ export function WebReport() {
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} width={28} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="orders" name={chartOrdersName} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="orders" name={chartOrdersName} fill="#14b8a6" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

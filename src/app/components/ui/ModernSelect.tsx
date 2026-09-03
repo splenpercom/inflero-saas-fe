@@ -55,7 +55,7 @@ export function ModernSelect({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] flex items-center justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-colors",
+          "w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] flex items-center justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-colors",
           buttonClassName,
         )}
         style={{ minWidth }}
@@ -94,13 +94,13 @@ export function ModernSelect({
                   className={cn(
                     "w-full px-3 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-between gap-2",
                     value === option.value
-                      ? "bg-[#e8ebff] dark:bg-[#0026f6]/20 text-[#0026f6] dark:text-[#0026f6]"
+                      ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
                       : "text-gray-900 dark:text-white",
                   )}
                 >
                   <span className="flex-1 truncate">{option.label}</span>
                   {value === option.value && (
-                    <Check className="w-3.5 h-3.5 text-[#0026f6] dark:text-[#0026f6] flex-shrink-0" />
+                    <Check className="w-3.5 h-3.5 text-[#14b8a6] dark:text-[#14b8a6] flex-shrink-0" />
                   )}
                 </button>
               ))}

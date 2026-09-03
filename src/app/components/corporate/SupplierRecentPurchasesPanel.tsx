@@ -64,7 +64,7 @@ export function SupplierRecentPurchasesPanel({
         onClick={() => setExpanded((value) => !value)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-colors"
       >
-        <History className="w-3.5 h-3.5 text-[#0026f6] dark:text-blue-300 shrink-0" />
+        <History className="w-3.5 h-3.5 text-[#14b8a6] dark:text-blue-300 shrink-0" />
         <span className="flex-1 text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{title}</span>
         {loading ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
@@ -119,7 +119,7 @@ export function SupplierRecentPurchasesPanel({
                     <button
                       type="button"
                       onClick={() => onView(purchase.id)}
-                      className="text-[10px] font-medium text-[#0026f6] dark:text-blue-300 hover:underline"
+                      className="text-[10px] font-medium text-[#14b8a6] dark:text-blue-300 hover:underline"
                     >
                       {tr("Bax", "View")}
                     </button>

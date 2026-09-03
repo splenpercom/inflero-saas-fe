@@ -43,7 +43,7 @@ import { pickLang } from "../../../i18n/pickLang";
 import { DataPagination } from "../../ui/DataPagination";
 import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
 
-const PIE_COLORS = ["#0026f6", "#0026f6", "#f97316", "#10b981", "#a78bfa", "#ec4899", "#0ea5e9", "#64748b"];
+const PIE_COLORS = ["#14b8a6", "#14b8a6", "#f97316", "#10b981", "#a78bfa", "#ec4899", "#0ea5e9", "#64748b"];
 
 export function EmployeeSalesReport() {
   const { language } = useLanguage();
@@ -174,8 +174,8 @@ export function EmployeeSalesReport() {
       title: pt("Total Orders", "Ümumi Sifarişlər"),
       value: totals.totalOrders.toLocaleString(),
       icon: ShoppingBag,
-      color: "text-[#0026f6] dark:text-[#0026f6]",
-      bgColor: "bg-[#0026f6]/5 dark:bg-[#0026f6]/20",
+      color: "text-[#14b8a6] dark:text-[#14b8a6]",
+      bgColor: "bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20",
     },
     {
       title: pt("Products Sold", "Satılan Məhsullar"),
@@ -291,7 +291,7 @@ export function EmployeeSalesReport() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={pt("Search employee...", "İşçi axtar...")}
-              className="pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] w-40"
+              className="pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] w-40"
             />
           </div>
           <ReportDateRangeFilter
@@ -315,7 +315,7 @@ export function EmployeeSalesReport() {
             type="button"
             onClick={handleExport}
             disabled={!items.length}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0026f6] hover:bg-[#001db8] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0f766e] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{pt("Export", "İxrac")}</span>
@@ -358,7 +358,7 @@ export function EmployeeSalesReport() {
                   <YAxis stroke="#6b7280" tick={{ fontSize: 10 }} tickFormatter={formatChartCurrency} />
                   <Tooltip formatter={(value: number, name: string) => [name === "revenue" ? formatCurrency(value) : value, name === "revenue" ? pt("Revenue", "Gəlir") : pt("Orders", "Sifariş")]} />
                   <Legend />
-                  <Bar dataKey="revenue" fill="#0026f6" name={pt("Revenue", "Gəlir")} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" fill="#14b8a6" name={pt("Revenue", "Gəlir")} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

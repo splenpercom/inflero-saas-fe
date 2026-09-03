@@ -143,7 +143,7 @@ export function StockTransfer() {
       ]),
       startY: 22,
       theme: "grid",
-      headStyles: { fillColor: [0, 38, 246], fontSize: 9 },
+      headStyles: { fillColor: [20, 184, 166], fontSize: 9 },
       bodyStyles: { fontSize: 8 },
     });
     doc.save(`stock_transfers_${new Date().toISOString().split("T")[0]}.pdf`);
@@ -240,7 +240,7 @@ export function StockTransfer() {
                 placeholder={tr("Axtar...", "Search...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -286,7 +286,7 @@ export function StockTransfer() {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{tr("Transfer Əlavə Et", "Add Transfer")}</span>

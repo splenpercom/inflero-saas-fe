@@ -491,7 +491,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
               disabled={isBranchLocked || !hasBranches}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-xl glass smooth-transition hover:bg-white/20 dark:hover:bg-white/5 text-left group shadow-sm disabled:opacity-70"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0026f6] to-[#001db8] flex items-center justify-center shadow-lg shadow-[#0026f6]/30">
+              <div className="w-8 h-8 rounded-lg bg-[#14b8a6] flex items-center justify-center shadow-lg shadow-[#14b8a6]/30">
                 <Warehouse className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">
@@ -504,8 +504,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
               </div>
               {!isBranchLocked && hasBranches && (
                 <ChevronDown className={cn(
-                  "w-3.5 h-3.5 text-gray-400 flex-shrink-0 smooth-transition group-hover:text-[#0026f6]",
-                  branchMenuOpen && "rotate-180 text-[#0026f6]",
+                  "w-3.5 h-3.5 text-gray-400 flex-shrink-0 smooth-transition group-hover:text-[#14b8a6]",
+                  branchMenuOpen && "rotate-180 text-[#14b8a6]",
                 )} />
               )}
             </button>
@@ -519,7 +519,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     className={cn(
                       "w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
                       isGlobalMode
-                        ? "bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 border border-[#0026f6]/30 dark:border-[#0026f6]/30"
+                        ? "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30"
                         : "",
                     )}
                   >
@@ -539,7 +539,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     className={cn(
                       "w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
                       branchId === branch.id
-                        ? "bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 border border-[#0026f6]/30 dark:border-[#0026f6]/30"
+                        ? "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30"
                         : "",
                     )}
                   >
@@ -594,7 +594,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                       </span>
                     )}
                     {item.badge && !showRedDot && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white text-[10px] font-semibold shadow-lg shadow-[#0026f6]/30 animate-pulse">
+                      <span className="px-1.5 py-0.5 rounded-full bg-[#14b8a6] text-white text-[10px] font-semibold shadow-lg shadow-[#14b8a6]/30 animate-pulse">
                         {item.badge}
                       </span>
                     )}
@@ -630,13 +630,13 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     className={cn(
                       "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs smooth-transition font-medium relative overflow-hidden group",
                       isActive
-                        ? "bg-gradient-to-r from-[#0026f6]/15 to-[#001db8]/15 text-[#0026f6] dark:text-[#0026f6] shadow-sm shadow-[#0026f6]/10 border border-[#0026f6]/30 dark:border-[#0026f6]/30"
+                        ? "bg-gradient-to-r from-[#14b8a6]/15 to-[#0f766e]/15 text-[#14b8a6] dark:text-[#14b8a6] shadow-sm shadow-[#14b8a6]/10 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30"
                         : "text-gray-700 dark:text-gray-300 hover:bg-white/10 dark:hover:bg-white/5 hover:shadow-sm",
                       collapsed && "lg:justify-center"
                     )}
                   >
                     {isActive && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#0026f6]/5 to-[#001db8]/5 animate-pulse" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#14b8a6]/5 to-[#0f766e]/5 animate-pulse" />
                     )}
                     <div className={cn(
                       "relative z-10 flex items-center gap-2.5 w-full",
@@ -651,13 +651,13 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     className={cn(
                       "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs smooth-transition font-medium relative overflow-hidden group",
                       hasActiveSubItem || item.active
-                        ? "bg-gradient-to-r from-[#0026f6]/15 to-[#001db8]/15 text-[#0026f6] dark:text-[#0026f6] shadow-sm shadow-[#0026f6]/10 border border-[#0026f6]/30 dark:border-[#0026f6]/30"
+                        ? "bg-gradient-to-r from-[#14b8a6]/15 to-[#0f766e]/15 text-[#14b8a6] dark:text-[#14b8a6] shadow-sm shadow-[#14b8a6]/10 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30"
                         : "text-gray-700 dark:text-gray-300 hover:bg-white/10 dark:hover:bg-white/5 hover:shadow-sm",
                       collapsed && "lg:justify-center"
                     )}
                   >
                     {(hasActiveSubItem || item.active) && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#0026f6]/5 to-[#001db8]/5 animate-pulse" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#14b8a6]/5 to-[#0f766e]/5 animate-pulse" />
                     )}
                     <div className={cn(
                       "relative z-10 flex items-center gap-2.5 w-full",
@@ -694,7 +694,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                             className={cn(
                               "block w-full text-left px-3 py-1.5 rounded-lg text-xs smooth-transition font-medium",
                               isSubActive
-                                ? "bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 text-[#0026f6] dark:text-[#0026f6] shadow-sm border-l-2 border-[#0026f6]"
+                                ? "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 text-[#14b8a6] dark:text-[#14b8a6] shadow-sm border-l-2 border-[#14b8a6]"
                                 : "text-gray-600 dark:text-gray-400 hover:bg-white/5 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200"
                             )}
                           >
@@ -720,9 +720,9 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
             onClick={onClose}
             className={cn(
               "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium smooth-transition",
-              "bg-gradient-to-r from-[#0026f6]/10 to-[#001db8]/10 text-[#0026f6] dark:text-[#0026f6]",
-              "border border-[#0026f6]/25 dark:border-[#0026f6]/30",
-              "hover:from-[#0026f6]/15 hover:to-[#001db8]/15 hover:shadow-sm",
+              "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 text-[#14b8a6] dark:text-[#14b8a6]",
+              "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
+              "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
               collapsed && "lg:justify-center lg:px-2",
             )}
           >

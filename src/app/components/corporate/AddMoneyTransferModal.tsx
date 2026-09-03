@@ -124,7 +124,7 @@ export function AddMoneyTransferModal({
               onChange={(date) =>
                 setFormData({ ...formData, date })
               }
-              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               required
             />
           </div>
@@ -144,7 +144,7 @@ export function AddMoneyTransferModal({
                 setFormData({ ...formData, referenceNumber: e.target.value })
               }
               placeholder={tr("Avtomatik yaradılacaq", "Will be auto-generated")}
-              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
           </div>
 
@@ -159,7 +159,7 @@ export function AddMoneyTransferModal({
               onChange={(e) =>
                 setFormData({ ...formData, fromAccount: e.target.value })
               }
-              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               required
             >
               <option value="">
@@ -184,7 +184,7 @@ export function AddMoneyTransferModal({
               onChange={(e) =>
                 setFormData({ ...formData, toAccount: e.target.value })
               }
-              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               required
             >
               <option value="">
@@ -213,7 +213,7 @@ export function AddMoneyTransferModal({
                 setFormData({ ...formData, amount: e.target.value })
               }
               placeholder="0.00"
-              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               required
             />
           </div>
@@ -230,7 +230,7 @@ export function AddMoneyTransferModal({
               }
               placeholder={tr("Qeyd əlavə edin...", "Add a note...")}
               rows={3}
-              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6] resize-none"
+              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none"
             />
           </div>
 
@@ -245,7 +245,7 @@ export function AddMoneyTransferModal({
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 text-xs font-medium text-white bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] rounded-lg transition-colors"
+              className="flex-1 px-4 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors"
             >
               {tr("Əlavə Et", "Add Transfer")}
             </button>

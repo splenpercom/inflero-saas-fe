@@ -97,7 +97,7 @@ export function CustomerVehiclesModal({
             {vehicles.length === 0 && <p className="py-8 text-center text-xs text-gray-500">No vehicles added.</p>}
             {vehicles.map((vehicle) => (
               <div key={vehicle.id} className="flex items-center gap-3 rounded-lg border p-3 dark:border-gray-800">
-                <Car className="h-5 w-5 text-[#0026f6]" />
+                <Car className="h-5 w-5 text-[#14b8a6]" />
                 <div className="flex-1">
                   <p className="text-sm font-medium">{[vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}</p>
                   <p className="text-xs text-gray-500">{vehicle.plate || "—"}{vehicle.mileage != null ? ` · ${vehicle.mileage} km` : ""}</p>
@@ -108,7 +108,7 @@ export function CustomerVehiclesModal({
             ))}
           </div>
           {!isDemo && canCreate && <div className="flex justify-end border-t p-4 dark:border-gray-800">
-            <button type="button" onClick={() => { setEditing(null); setEditorOpen(true); }} className="flex items-center gap-1 rounded-lg bg-[#0026f6] px-4 py-2 text-xs text-white"><Plus className="h-3.5 w-3.5" /> Add vehicle</button>
+            <button type="button" onClick={() => { setEditing(null); setEditorOpen(true); }} className="flex items-center gap-1 rounded-lg bg-[#14b8a6] px-4 py-2 text-xs text-white"><Plus className="h-3.5 w-3.5" /> Add vehicle</button>
           </div>}
         </div>
       </div>

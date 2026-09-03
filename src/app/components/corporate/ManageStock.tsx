@@ -132,7 +132,7 @@ export function ManageStock() {
       ]),
       startY: 28,
       theme: "grid",
-      headStyles: { fillColor: [0, 38, 246], fontSize: 9 },
+      headStyles: { fillColor: [20, 184, 166], fontSize: 9 },
       bodyStyles: { fontSize: 8 },
     });
     doc.save(`stock_${new Date().toISOString().split("T")[0]}.pdf`);
@@ -208,7 +208,7 @@ export function ManageStock() {
                 placeholder={tr("Axtar...", "Search...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -250,7 +250,7 @@ export function ManageStock() {
                 <button
                   type="button"
                   onClick={handleRecordAdjustment}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{tr("Tənzimləmə qeyd et", "Record adjustment")}</span>
@@ -318,7 +318,7 @@ export function ManageStock() {
                         <button
                           type="button"
                           onClick={() => navigate(`/dashboard/inventory/products/${item.productId}`)}
-                          className="text-xs text-[#0026f6] dark:text-blue-400 hover:underline"
+                          className="text-xs text-[#14b8a6] dark:text-blue-400 hover:underline"
                         >
                           {item.productName}
                         </button>

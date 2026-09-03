@@ -242,7 +242,7 @@ export function CorporateDashboard() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-[#0026f6] to-[#001db8] rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer">
+        <div className="bg-[#14b8a6] rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer">
           <div className="flex items-center justify-between mb-3">
             <div className="bg-white/20 rounded-lg p-2.5 backdrop-blur-sm">
               <RotateCcw className="w-5 h-5" />
@@ -276,7 +276,7 @@ export function CorporateDashboard() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-[#0026f6] to-[#001db8] rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer">
+        <div className="bg-[#14b8a6] rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer">
           <div className="flex items-center justify-between mb-3">
             <div className="bg-white/20 rounded-lg p-2.5 backdrop-blur-sm">
               <RotateCcw className="w-5 h-5" />
@@ -312,8 +312,8 @@ export function CorporateDashboard() {
                 </span>
               </div>
             </div>
-            <div className="bg-[#e8ebff] dark:bg-[#0026f6]/20 rounded-lg p-3">
-              <DollarSign className="w-6 h-6 text-[#0026f6] dark:text-[#0026f6]" />
+            <div className="bg-[#ccfbf1] dark:bg-[#14b8a6]/20 rounded-lg p-3">
+              <DollarSign className="w-6 h-6 text-[#14b8a6] dark:text-[#14b8a6]" />
             </div>
           </div>
         </div>
@@ -418,7 +418,7 @@ export function CorporateDashboard() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-[#0026f6] to-[#001db8] rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer">
+        <div className="bg-[#14b8a6] rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <p className="text-3xl font-bold mb-1">150</p>
@@ -541,8 +541,8 @@ export function CorporateDashboard() {
               onClick={() => navigate("/people/suppliers")}
               className="text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2 transition-colors"
             >
-              <div className="bg-[#e8ebff] dark:bg-[#0026f6]/20 rounded-lg p-3 mb-2 inline-flex">
-                <ShoppingBag className="w-5 h-5 text-[#0026f6] dark:text-[#0026f6]" />
+              <div className="bg-[#ccfbf1] dark:bg-[#14b8a6]/20 rounded-lg p-3 mb-2 inline-flex">
+                <ShoppingBag className="w-5 h-5 text-[#14b8a6] dark:text-[#14b8a6]" />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                 {pickLang(language, "Təchizatçılar", "Suppliers")}
@@ -616,7 +616,7 @@ export function CorporateDashboard() {
                     {pickLang(language, "İlk Dəfə", "First Time")}
                   </p>
                   <div className="flex items-center gap-1 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-[#001db8]"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#115e59]"></div>
                     <span className="text-xs text-green-600 font-medium">
                       +{customerSummary.firstTimeGrowth}%
                     </span>
@@ -714,7 +714,7 @@ export function CorporateDashboard() {
             </button>
           </div>
 
-          <div className="flex items-center justify-center mb-4 h-32 bg-gradient-to-r from-[#f0f2ff] to-indigo-50 dark:from-[#001db8]/10 dark:to-indigo-950/10 rounded-lg">
+          <div className="flex items-center justify-center mb-4 h-32 bg-gradient-to-r from-[#f0fdfa] to-indigo-50 dark:from-[#115e59]/10 dark:to-indigo-950/10 rounded-lg">
             <p className="text-gray-400 text-xs">
               {pickLang(language, "[Dünya Xərit��si Vizuallaşdırması]", "[World Map Visualization]")}
             </p>
@@ -759,7 +759,7 @@ export function CorporateDashboard() {
             </h3>
             <button 
               onClick={() => navigate("/products")}
-              className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline"
+              className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline"
             >
               {pickLang(language, "Hamısını Gör", "View All")}
             </button>
@@ -795,7 +795,7 @@ export function CorporateDashboard() {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
               {pickLang(language, "Son Əməliyyatlar", "Recent Transactions")}
             </h3>
-            <button className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline">
+            <button className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline">
               {pickLang(language, "Hamısını Gör", "View All")}
             </button>
           </div>
@@ -845,7 +845,7 @@ export function CorporateDashboard() {
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">
             {pickLang(language, "Vaxtı Keçmiş Məhsullar", "Expired Products")}
           </h3>
-          <button className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline">
+          <button className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline">
             {pickLang(language, "Hamısını Gör", "View All")}
           </button>
         </div>
@@ -1042,7 +1042,7 @@ export function CorporateDashboard() {
             </h3>
             <button 
               onClick={() => navigate("/products")}
-              className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline cursor-pointer"
+              className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline cursor-pointer"
             >
               {pickLang(language, "Hamısını Gör", "View All")}
             </button>
@@ -1084,7 +1084,7 @@ export function CorporateDashboard() {
             </h3>
             <button 
               onClick={() => navigate("/clients")}
-              className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline cursor-pointer"
+              className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline cursor-pointer"
             >
               {pickLang(language, "Hamısını Gör", "View All")}
             </button>
@@ -1318,7 +1318,7 @@ export function CorporateDashboard() {
             </h3>
             <button 
               onClick={() => navigate("/products")}
-              className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline cursor-pointer"
+              className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline cursor-pointer"
             >
               {pickLang(language, "Hamısını Gör", "View All")}
             </button>
@@ -1352,7 +1352,7 @@ export function CorporateDashboard() {
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4 text-[#0026f6]" />
+              <ShoppingCart className="w-4 h-4 text-[#14b8a6]" />
               {pickLang(language, "Son Satışlar", "Recent Sales")}
             </h3>
             <button className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
@@ -1482,7 +1482,7 @@ export function CorporateDashboard() {
             </h3>
             <button 
               onClick={() => navigate("/orders")}
-              className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline cursor-pointer"
+              className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline cursor-pointer"
             >
               {pickLang(language, "Hamısını Gör", "View All")}
             </button>

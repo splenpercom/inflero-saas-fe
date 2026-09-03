@@ -468,7 +468,7 @@ export function UserManagement() {
                 placeholder={ut("search")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
 
@@ -516,7 +516,7 @@ export function UserManagement() {
                     type="button"
                     onClick={() => setAddUserModalOpen(true)}
                     disabled={isDemo}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
                     <span>{ut("addUser")}</span>
@@ -530,7 +530,7 @@ export function UserManagement() {
                     type="button"
                     onClick={() => setAddRoleModalOpen(true)}
                     disabled={isDemo}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                   >
                     <Shield className="w-3.5 h-3.5" />
                     <span>{ut("addRole")}</span>
@@ -548,7 +548,7 @@ export function UserManagement() {
             className={cn(
               "px-4 py-2 text-xs font-medium rounded-lg transition-colors",
               activeTab === "users"
-                ? "bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white shadow-sm"
+                ? "bg-[#14b8a6] text-white shadow-sm"
                 : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800",
             )}
           >
@@ -560,7 +560,7 @@ export function UserManagement() {
             className={cn(
               "px-4 py-2 text-xs font-medium rounded-lg transition-colors",
               activeTab === "roles"
-                ? "bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white shadow-sm"
+                ? "bg-[#14b8a6] text-white shadow-sm"
                 : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800",
             )}
           >
@@ -635,7 +635,7 @@ export function UserManagement() {
                           <span className="inline-flex items-center gap-1.5">
                             {user.role}
                             {user.isTenantOwner && (
-                              <span className="px-1.5 py-0.5 rounded bg-[#0026f6]/10 text-[#0026f6] text-[10px] font-medium">
+                              <span className="px-1.5 py-0.5 rounded bg-[#14b8a6]/10 text-[#14b8a6] text-[10px] font-medium">
                                 {tr("Sahib", "Owner")}
                               </span>
                             )}

@@ -134,7 +134,7 @@ export function InvoiceView() {
     const invCustomer = invoice.customer;
 
     doc.setFontSize(18);
-    doc.setTextColor(0, 38, 246);
+    doc.setTextColor(20, 184, 166);
     doc.text("Inflero", 14, 18);
     doc.setFontSize(10);
     doc.setTextColor(80, 80, 80);
@@ -142,7 +142,7 @@ export function InvoiceView() {
     doc.text("noreply@inflero.com", 14, 30);
 
     doc.setFontSize(16);
-    doc.setTextColor(0, 38, 246);
+    doc.setTextColor(20, 184, 166);
     doc.text(tr("QAİMƏ", "INVOICE"), 140, 18, { align: "right" });
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
@@ -197,7 +197,7 @@ export function InvoiceView() {
         formatPdfMoney(item.total),
       ]),
       theme: "grid",
-      headStyles: { fillColor: [0, 38, 246], fontSize: 9 },
+      headStyles: { fillColor: [20, 184, 166], fontSize: 9 },
       bodyStyles: { fontSize: 9 },
       columnStyles: {
         1: { halign: "right" },
@@ -245,7 +245,7 @@ export function InvoiceView() {
           payment.reference || payment.note || "-",
         ]),
         theme: "striped",
-        headStyles: { fillColor: [0, 38, 246], fontSize: 8 },
+        headStyles: { fillColor: [20, 184, 166], fontSize: 8 },
         bodyStyles: { fontSize: 8 },
       });
     }
@@ -281,7 +281,7 @@ export function InvoiceView() {
         </p>
         <button
           onClick={() => navigate("/dashboard/sales/invoices")}
-          className="text-xs text-[#0026f6] dark:text-[#0026f6] hover:underline"
+          className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline"
         >
           {tr("Qaimələrə qayıt", "Back to invoices")}
         </button>
@@ -353,7 +353,7 @@ export function InvoiceView() {
             </button>
             <button
               onClick={handleDownloadPDF}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{tr("Yüklə", "Download")}</span>

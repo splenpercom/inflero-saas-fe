@@ -121,7 +121,7 @@ export function mapProfitLossToFinanceUI(items: ProfitLossItem[]): FinanceMonthl
   }));
 }
 
-const PIE_COLORS = ["#0026f6", "#0026f6", "#5c85ff", "#85a3ff", "#adc2ff", "#94a3b8", "#64748b"];
+const PIE_COLORS = ["#14b8a6", "#14b8a6", "#5c85ff", "#85a3ff", "#adc2ff", "#94a3b8", "#64748b"];
 
 export function aggregateExpensesByCategory(items: ExpenseReportItem[]) {
   const approved = items.filter((i) => i.status === "APPROVED");

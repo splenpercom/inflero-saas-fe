@@ -129,8 +129,8 @@ export function AnnualReport() {
       value: formatCurrency(totalProfit),
       sub: profitMargin !== "—" ? `${profitMargin}% ${pt("margin", "marja")}` : undefined,
       icon: Award,
-      color: "text-[#0026f6] dark:text-[#0026f6]",
-      bgColor: "bg-[#0026f6]/5 dark:bg-[#0026f6]/20",
+      color: "text-[#14b8a6] dark:text-[#14b8a6]",
+      bgColor: "bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20",
     },
     {
       title: pt("Avg Monthly Revenue", "Orta Aylıq Gəlir"),
@@ -201,7 +201,7 @@ export function AnnualReport() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             >
               {years.map((y) => (
                 <option key={y} value={y}>
@@ -213,7 +213,7 @@ export function AnnualReport() {
           <button type="button" onClick={() => void loadReport()} disabled={loading} className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button type="button" onClick={handleExport} disabled={!monthlyData.length} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0026f6] hover:bg-[#001db8] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
+          <button type="button" onClick={handleExport} disabled={!monthlyData.length} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0f766e] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{pt("Export", "İxrac")}</span>
           </button>
@@ -250,8 +250,8 @@ export function AnnualReport() {
               <AreaChart data={monthlyData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0026f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#0026f6" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -263,7 +263,7 @@ export function AnnualReport() {
                 <YAxis stroke="#6b7280" tick={{ fontSize: 10 }} tickFormatter={formatChartCurrency} />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Legend wrapperStyle={{ fontSize: "11px" }} />
-                <Area type="monotone" dataKey="revenue" stroke="#0026f6" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" name={pt("Revenue", "Gəlir")} />
+                <Area type="monotone" dataKey="revenue" stroke="#14b8a6" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" name={pt("Revenue", "Gəlir")} />
                 <Area type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorProfit)" name={pt("Profit", "Mənfəət")} />
               </AreaChart>
             </ResponsiveContainer>
@@ -279,7 +279,7 @@ export function AnnualReport() {
                   <YAxis stroke="#6b7280" tick={{ fontSize: 10 }} tickFormatter={formatChartCurrency} />
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Legend wrapperStyle={{ fontSize: "11px" }} />
-                  <Bar dataKey="revenue" fill="#0026f6" name={pt("Revenue", "Gəlir")} radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="revenue" fill="#14b8a6" name={pt("Revenue", "Gəlir")} radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

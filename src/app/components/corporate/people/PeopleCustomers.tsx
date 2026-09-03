@@ -159,7 +159,7 @@ export function PeopleCustomers() {
           <button onClick={() => alert(tr("Excel ixrac funksiyası tezliklə əlavə olunacaq", "Export Excel coming soon"))} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg"><FileSpreadsheet className="w-3.5 h-3.5 text-green-500" /></button>
           <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg disabled:opacity-50"><RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} /></button>
           {canCreate && (
-          <button onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg"><Plus className="w-3.5 h-3.5" /><span>{tr("Müştəri Əlavə Et", "Add Customer")}</span></button>
+          <button onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg"><Plus className="w-3.5 h-3.5" /><span>{tr("Müştəri Əlavə Et", "Add Customer")}</span></button>
           )}
         </div>
 

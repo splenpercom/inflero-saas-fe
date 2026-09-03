@@ -252,7 +252,7 @@ export function AddAdjustmentModal({ isOpen, onClose, onSaved }: AddAdjustmentMo
             type="button"
             onClick={() => void handleSave()}
             disabled={!canSubmit || saving}
-            className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg text-xs font-medium disabled:opacity-50"
+            className="px-3 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs font-medium disabled:opacity-50"
           >
             {saving ? tr("Yaradılır...", "Creating...") : tr("Tənzimləmə yarat", "Create adjustment")}
           </button>

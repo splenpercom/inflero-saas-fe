@@ -155,7 +155,7 @@ export function AddWarehouseModal({
               saving ||
               (!isEdit && requireBranchManager && !branchManagerUserId)
             }
-            className="px-4 py-1.5 bg-[#0026f6] text-white rounded-lg text-xs disabled:opacity-50"
+            className="px-4 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs disabled:opacity-50"
           >
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq Et", "Submit")}
           </button>

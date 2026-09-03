@@ -26,7 +26,7 @@
 }
 .mw-input:focus {
   outline: none;
-  box-shadow: 0 0 0 2px #0026f6;
+  box-shadow: 0 0 0 2px #14b8a6;
   border-color: transparent;
 }
 .dark .mw-input {

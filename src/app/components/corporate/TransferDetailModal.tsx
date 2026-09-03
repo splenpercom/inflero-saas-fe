@@ -331,7 +331,7 @@ export function TransferDetailModal({ transfer, onClose, onChanged }: TransferDe
                         type="button"
                         disabled={actionLoading}
                         onClick={() => void handleSell()}
-                        className="px-3 py-1.5 text-xs bg-[#0026f6] text-white rounded-lg disabled:opacity-50"
+                        className="px-3 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg disabled:opacity-50"
                       >
                         {tr("Satışı qeyd et", "Record sale")}
                       </button>

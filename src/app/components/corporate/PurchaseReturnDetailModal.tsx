@@ -246,7 +246,7 @@ export function PurchaseReturnDetailModal({
                         type="button"
                         disabled={savingStatus}
                         onClick={() => void handleSaveStatus()}
-                        className="px-2 py-1 text-xs bg-[#0026f6] text-white rounded-lg disabled:opacity-50"
+                        className="px-2 py-1 text-xs bg-[#14b8a6] text-white rounded-lg disabled:opacity-50"
                       >
                         {tr("Yadda saxla", "Save")}
                       </button>

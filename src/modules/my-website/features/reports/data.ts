@@ -64,7 +64,7 @@ export const STATUS_BREAKDOWN_AZ = [
   { name: "Tamamlandı", value: 61, color: "#22c55e" },
   { name: "Göndərildi",  value: 18, color: "#a855f7" },
   { name: "Gözləyir",   value: 12, color: "#eab308" },
-  { name: "Təsdiqləndi",value: 6,  color: "#3b82f6" },
+  { name: "Təsdiqləndi",value: 6,  color: "#14b8a6" },
   { name: "Ləğv edildi",value: 3,  color: "#ef4444" },
 ];
 
@@ -72,7 +72,7 @@ export const STATUS_BREAKDOWN_EN = [
   { name: "Completed", value: 61, color: "#22c55e" },
   { name: "Shipped",   value: 18, color: "#a855f7" },
   { name: "Pending",   value: 12, color: "#eab308" },
-  { name: "Confirmed", value: 6,  color: "#3b82f6" },
+  { name: "Confirmed", value: 6,  color: "#14b8a6" },
   { name: "Cancelled", value: 3,  color: "#ef4444" },
 ];
 
@@ -80,7 +80,7 @@ export const STATUS_BREAKDOWN_EN = [
 export const STATUS_BREAKDOWN = STATUS_BREAKDOWN_AZ;
 
 export const PAYMENT_BREAKDOWN = [
-  { name: "Epoint",          value: 68, color: "#3b82f6" },
+  { name: "Epoint",          value: 68, color: "#14b8a6" },
   { name: "Cash on Delivery",value: 32, color: "#f97316" },
 ];
 

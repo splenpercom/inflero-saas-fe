@@ -251,7 +251,7 @@ export function ServiceTypes() {
             <button
               type="button"
               onClick={openAdd}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{tr("Əlavə et", "Add Service Type")}</span>
@@ -391,7 +391,7 @@ export function ServiceTypes() {
                   type="text"
                   value={formData.label}
                   onChange={(e) => setFormData((prev) => ({ ...prev, label: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
                 {formErrors.label && (
                   <p className="text-[10px] text-red-500 mt-1">{formErrors.label}</p>
@@ -406,7 +406,7 @@ export function ServiceTypes() {
                   type="text"
                   value={formData.labelAz}
                   onChange={(e) => setFormData((prev) => ({ ...prev, labelAz: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
                 {formErrors.labelAz && (
                   <p className="text-[10px] text-red-500 mt-1">{formErrors.labelAz}</p>
@@ -421,7 +421,7 @@ export function ServiceTypes() {
                   type="text"
                   value={formData.labelTr}
                   onChange={(e) => setFormData((prev) => ({ ...prev, labelTr: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
               </div>
             </div>
@@ -438,7 +438,7 @@ export function ServiceTypes() {
                 type="button"
                 onClick={() => void handleSubmit()}
                 disabled={saving || isDemo}
-                className="px-4 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg disabled:opacity-50"
+                className="px-4 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg disabled:opacity-50"
               >
                 {saving
                   ? tr("Saxlanılır...", "Saving...")

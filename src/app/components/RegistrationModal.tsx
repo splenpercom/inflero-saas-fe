@@ -104,7 +104,7 @@ export function RegistrationModal({
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="bg-[#00082e] border border-white/15 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+      <div className="bg-[#042f2e] border border-white/15 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
         <div className="p-6 border-b border-white/10 flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-white">{tr("Hesab yaradın", "Create your account")}</h2>
@@ -141,14 +141,14 @@ export function RegistrationModal({
                   handleClose();
                   onSuccessAction();
                 }}
-                className="w-full py-3 rounded-2xl bg-white text-[#0026f6] text-sm font-bold hover:bg-white/95 transition-colors"
+                className="w-full py-3 rounded-2xl bg-white text-[#14b8a6] text-sm font-bold hover:bg-white/95 transition-colors"
               >
                 {successActionLabel ?? tr("Bağla", "Close")}
               </button>
             ) : (
               <button
                 onClick={handleClose}
-                className="w-full py-3 rounded-2xl bg-white text-[#0026f6] text-sm font-bold hover:bg-white/95 transition-colors"
+                className="w-full py-3 rounded-2xl bg-white text-[#14b8a6] text-sm font-bold hover:bg-white/95 transition-colors"
               >
                 {tr("Bağla", "Close")}
               </button>
@@ -193,7 +193,7 @@ export function RegistrationModal({
                   value={f.value}
                   onChange={(e) => f.setter(e.target.value)}
                   placeholder={f.placeholder}
-                  className="w-full px-4 py-2.5 text-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#0026f6]/50 focus:ring-1 focus:ring-[#0026f6]/30 transition-colors"
+                  className="w-full px-4 py-2.5 text-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#14b8a6]/50 focus:ring-1 focus:ring-[#14b8a6]/30 transition-colors"
                 />
               </div>
             ))}
@@ -201,7 +201,7 @@ export function RegistrationModal({
             <button
               onClick={handleSubmit}
               disabled={loading || !ownerName || !email || !phone || !businessName}
-              className="w-full py-3 mt-2 rounded-2xl bg-white text-[#0026f6] text-sm font-bold hover:bg-white/95 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-white/10"
+              className="w-full py-3 mt-2 rounded-2xl bg-white text-[#14b8a6] text-sm font-bold hover:bg-white/95 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-white/10"
             >
               {loading ? tr("Göndərilir…", "Submitting…") : tr("Sorğu göndər", "Submit request")}
             </button>

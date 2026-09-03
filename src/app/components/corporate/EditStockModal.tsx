@@ -127,7 +127,7 @@ export function EditStockModal({ isOpen, onClose, onSaved, stockItem }: EditStoc
               min={0}
               value={qty}
               onChange={(e) => setQty(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
           </div>
         </div>
@@ -144,7 +144,7 @@ export function EditStockModal({ isOpen, onClose, onSaved, stockItem }: EditStoc
             type="button"
             onClick={() => void handleSave()}
             disabled={saving || !qty}
-            className="px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg text-xs font-medium disabled:opacity-50"
+            className="px-3 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs font-medium disabled:opacity-50"
           >
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Yenilə", "Update")}
           </button>

@@ -94,7 +94,7 @@ export function ViewUserModal({ isOpen, onClose, user }: ViewUserModalProps) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column - Profile Card */}
               <div className="lg:col-span-1">
-                <div className="bg-gradient-to-br from-[#0026f6] to-[#001db8] rounded-xl p-6 text-white">
+                <div className="bg-[#14b8a6] rounded-xl p-6 text-white">
                   <div className="flex flex-col items-center text-center">
                     <div className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-4xl mb-4 border-4 border-white/30">
                       {user.avatar}
@@ -103,7 +103,7 @@ export function ViewUserModal({ isOpen, onClose, user }: ViewUserModalProps) {
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/20 backdrop-blur-sm border border-white/30">
                       {user.role}
                     </span>
-                    <button className="mt-4 px-4 py-2 bg-white text-[#0026f6] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+                    <button className="mt-4 px-4 py-2 bg-white text-[#14b8a6] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
                       {t("editProfile")}
                     </button>
                   </div>
@@ -218,7 +218,7 @@ export function ViewUserModal({ isOpen, onClose, user }: ViewUserModalProps) {
                             <label className="text-xs text-gray-500 dark:text-gray-400">
                               {t("totalCommission")}
                             </label>
-                            <div className="text-sm font-semibold text-[#0026f6] dark:text-[#0026f6] mt-1">
+                            <div className="text-sm font-semibold text-[#14b8a6] dark:text-[#14b8a6] mt-1">
                               {formatMoney(commission.totals.totalCommission)}
                             </div>
                             <div className="text-[10px] text-gray-400 mt-0.5">

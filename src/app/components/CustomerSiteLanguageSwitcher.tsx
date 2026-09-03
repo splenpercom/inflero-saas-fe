@@ -58,7 +58,7 @@ export function CustomerSiteLanguageSwitcher({
               }}
               className={`w-full text-left px-3 py-2 text-xs transition-colors ${
                 lang === option.code
-                  ? "bg-[#f0f3ff] text-[#0026f6] font-semibold"
+                  ? "bg-[#f0f3ff] text-[#14b8a6] font-semibold"
                   : "text-gray-700 hover:bg-gray-50"
               }`}
             >

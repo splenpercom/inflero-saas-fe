@@ -94,7 +94,7 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-[#0026f6]" />
+            <Shield className="w-4 h-4 text-[#14b8a6]" />
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("addNewRole")}</h2>
           </div>
           <button
@@ -116,7 +116,7 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
                 type="text"
                 value={roleName}
                 onChange={(e) => setRoleName(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 placeholder={t("enterRoleName")}
                 required
               />
@@ -202,7 +202,7 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
                               onClick={() => togglePermission(index, "edit")}
                               className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
                                 permission.edit
-                                  ? "bg-[#0026f6] text-white"
+                                  ? "bg-[#14b8a6] text-white"
                                   : "bg-gray-200 dark:bg-gray-700 text-gray-400"
                               }`}
                             >
@@ -261,7 +261,7 @@ export function AddRoleModal({ isOpen, onClose, onSave, saving }: AddRoleModalPr
             <button
               type="submit"
               disabled={saving}
-              className="px-3 py-1.5 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
             >
               {t("createRole")}
             </button>

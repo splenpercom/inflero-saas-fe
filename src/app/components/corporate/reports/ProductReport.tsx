@@ -142,8 +142,8 @@ export function ProductReport() {
       title: pt("Total Products", "Ümumi Məhsullar"),
       value: items.length.toLocaleString(),
       icon: Package,
-      color: "text-[#0026f6] dark:text-[#0026f6]",
-      bgColor: "bg-[#0026f6]/5 dark:bg-[#0026f6]/20",
+      color: "text-[#14b8a6] dark:text-[#14b8a6]",
+      bgColor: "bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20",
     },
     {
       title: pt("Total Units Sold", "Satılan Vahidlər"),
@@ -245,7 +245,7 @@ export function ProductReport() {
           <button type="button" onClick={() => void loadReport()} disabled={loading} className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button type="button" onClick={handleExport} disabled={!filteredProducts.length} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0026f6] hover:bg-[#001db8] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
+          <button type="button" onClick={handleExport} disabled={!filteredProducts.length} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0f766e] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{pt("Export", "İxrac")}</span>
           </button>
@@ -283,7 +283,7 @@ export function ProductReport() {
                 <XAxis type="number" stroke="#6b7280" tick={{ fontSize: 10 }} />
                 <YAxis type="category" dataKey="name" stroke="#6b7280" tick={{ fontSize: 9 }} width={90} />
                 <Tooltip />
-                <Bar dataKey="sold" fill="#0026f6" name={pt("Units Sold", "Satılan")} radius={[0, 4, 4, 0]} />
+                <Bar dataKey="sold" fill="#14b8a6" name={pt("Units Sold", "Satılan")} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -310,13 +310,13 @@ export function ProductReport() {
                 placeholder={pt("Search products...", "Məhsul axtar...")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] w-48"
+                className="pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] w-48"
               />
             </div>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]"
+              className="px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             >
               <option value="all">{pt("All Categories", "Bütün Kateqoriyalar")}</option>
               {categories.map((cat) => (

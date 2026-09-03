@@ -111,8 +111,8 @@ export function SalesReport() {
       title: pt("Paid", "Ödənilib"),
       value: formatCurrency(totals.totalPaid),
       icon: DollarSign,
-      color: "text-[#0026f6] dark:text-[#0026f6]",
-      bgColor: "bg-[#0026f6]/5 dark:bg-[#0026f6]/20",
+      color: "text-[#14b8a6] dark:text-[#14b8a6]",
+      bgColor: "bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20",
     },
     {
       title: pt("Partial Due", "Qismən Borc"),
@@ -191,7 +191,7 @@ export function SalesReport() {
             type="button"
             onClick={handleExport}
             disabled={!items.length}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0026f6] hover:bg-[#001db8] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0f766e] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{pt("Export", "İxrac")}</span>
@@ -230,15 +230,15 @@ export function SalesReport() {
               <AreaChart data={topByAmount}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0026f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#0026f6" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
                 <XAxis dataKey="name" stroke="#6b7280" tick={{ fontSize: 10 }} />
                 <YAxis stroke="#6b7280" tick={{ fontSize: 10 }} tickFormatter={formatChartCurrency} />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Area type="monotone" dataKey="sales" stroke="#0026f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" name={pt("Sales", "Satış")} />
+                <Area type="monotone" dataKey="sales" stroke="#14b8a6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" name={pt("Sales", "Satış")} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -254,7 +254,7 @@ export function SalesReport() {
                   <XAxis dataKey="category" stroke="#6b7280" tick={{ fontSize: 10 }} />
                   <YAxis stroke="#6b7280" tick={{ fontSize: 10 }} tickFormatter={formatChartCurrency} />
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Bar dataKey="sales" fill="#0026f6" name={pt("Sales", "Satış")} radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="sales" fill="#14b8a6" name={pt("Sales", "Satış")} radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -287,11 +287,11 @@ export function SalesReport() {
                     <span className="font-medium text-gray-900 dark:text-white">{category.category}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-gray-600 dark:text-gray-400">{formatCurrency(category.value)}</span>
-                      <span className="text-[#0026f6] dark:text-[#0026f6] font-semibold w-10 text-right">{category.percentage}%</span>
+                      <span className="text-[#14b8a6] dark:text-[#14b8a6] font-semibold w-10 text-right">{category.percentage}%</span>
                     </div>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-[#0026f6] to-[#0026f6] rounded-full transition-all duration-500" style={{ width: `${category.percentage}%` }} />
+                    <div className="h-full bg-gradient-to-r from-[#14b8a6] to-[#14b8a6] rounded-full transition-all duration-500" style={{ width: `${category.percentage}%` }} />
                   </div>
                 </div>
               ))}

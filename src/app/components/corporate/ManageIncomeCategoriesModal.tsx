@@ -136,7 +136,7 @@ export function ManageIncomeCategoriesModal({
 
         <div className="flex-1 overflow-y-auto p-4">
           {!isDemo && !isAddCategoryOpen && (
-            <button onClick={() => setIsAddCategoryOpen(true)} className="w-full mb-4 flex items-center justify-center gap-2 px-3 py-2 text-xs bg-gradient-to-r from-[#0026f6] to-[#001db8] hover:from-[#001fc4] hover:to-[#0018a0] text-white rounded-lg font-medium transition-colors">
+            <button onClick={() => setIsAddCategoryOpen(true)} className="w-full mb-4 flex items-center justify-center gap-2 px-3 py-2 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors">
               <Plus className="w-3.5 h-3.5" />
               <span>{tr("Yeni Kateqoriya Əlavə Et", "Add New Category")}</span>
             </button>
@@ -150,11 +150,11 @@ export function ManageIncomeCategoriesModal({
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Kateqoriya", "Category")} <span className="text-red-500">*</span></label>
-                  <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6]" />
+                  <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Təsvir", "Description")}</label>
-                  <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={2} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0026f6] resize-none" />
+                  <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={2} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none" />
                 </div>
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-medium text-gray-900 dark:text-white">{tr("Status", "Status")}</label>
@@ -164,7 +164,7 @@ export function ManageIncomeCategoriesModal({
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button onClick={() => { setIsAddCategoryOpen(false); setIsEditMode(false); setEditingId(null); setNewCategory(""); setNewDescription(""); setNewStatus(true); }} className="flex-1 px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xs font-medium transition-colors">{tr("Ləğv Et", "Cancel")}</button>
-                  <button onClick={() => void handleAddCategory()} disabled={saving || !newCategory.trim()} className="flex-1 px-3 py-1.5 bg-gradient-to-r from-[#0026f6] to-[#001db8] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50">{saving ? tr("Saxlanılır...", "Saving...") : tr("Yadda Saxla", "Save")}</button>
+                  <button onClick={() => void handleAddCategory()} disabled={saving || !newCategory.trim()} className="flex-1 px-3 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50">{saving ? tr("Saxlanılır...", "Saving...") : tr("Yadda Saxla", "Save")}</button>
                 </div>
               </div>
             </div>
