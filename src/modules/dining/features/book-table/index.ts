@@ -1,0 +1,1 @@
+export { BookTablePage } from "./BookTablePage";

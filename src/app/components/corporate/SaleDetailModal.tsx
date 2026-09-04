@@ -1,22 +1,47 @@
 import { useEffect, useState } from "react";
 import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { fetchPosOrder, type PosOrderDetail } from "../../api/sales";
-import { formatSalesDate } from "../../lib/salesMappers";
-import { notifyFromError } from "../../lib/toast";
+import {
+  fetchPosOrder,
+  recordPosOrderPayment,
+  updatePosOrder,
+  type PosOrderDetail,
+} from "../../api/sales";
+import {
+  formatSalesDate,
+  isDraftOrderStatus,
+  mapPaymentMethodFromApi,
+  mapPaymentMethodToApi,
+  type PosUiPaymentMethod,
+} from "../../lib/salesMappers";
+import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 
 import { pickLang } from "../../i18n/pickLang";
+
 interface SaleDetailModalProps {
   orderId: string | null;
   isOpen: boolean;
   onClose: () => void;
+  canFinalize?: boolean;
+  isDemo?: boolean;
+  onFinalized?: () => void;
 }
 
-export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalProps) {
+export function SaleDetailModal({
+  orderId,
+  isOpen,
+  onClose,
+  canFinalize = false,
+  isDemo = false,
+  onFinalized,
+}: SaleDetailModalProps) {
   const { language } = useLanguage();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizePaymentMethod, setFinalizePaymentMethod] = useState<PosUiPaymentMethod>("cash");
+  const [finalizePaid, setFinalizePaid] = useState(true);
 
   useEffect(() => {
     if (!isOpen || !orderId) {
@@ -25,7 +50,11 @@ export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalPro
     }
     setLoading(true);
     fetchPosOrder(orderId)
-      .then(setOrder)
+      .then((detail) => {
+        setOrder(detail);
+        setFinalizePaymentMethod(mapPaymentMethodFromApi(detail.paymentMethod));
+        setFinalizePaid(true);
+      })
       .catch((err) => {
         notifyFromError(err, tr("Satış detalları yüklənə bilmədi", "Failed to load sale details"));
         setOrder(null);
@@ -45,6 +74,37 @@ export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalPro
   const taxPercent = order?.taxPercent ? parseFloat(order.taxPercent) : 0;
   const itemsSubtotal = order?.items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0) ?? 0;
   const taxAmount = (itemsSubtotal * taxPercent) / 100;
+  const isDraft = order ? isDraftOrderStatus(order.status) || isDraftOrderStatus(order.statusLabel) : false;
+
+  const handleFinalize = async () => {
+    if (!order || !canFinalize || isDemo) return;
+    if (order.items.length === 0) {
+      notifyWarning(tr("Sifarişdə məhsul yoxdur", "This order has no items"));
+      return;
+    }
+    setFinalizing(true);
+    try {
+      const updated = await updatePosOrder(order.id, {
+        status: "COMPLETED",
+        paymentMethod: mapPaymentMethodToApi(finalizePaymentMethod),
+      });
+      const remaining = parseFloat(updated.due);
+      if (finalizePaid && remaining > 0) {
+        await recordPosOrderPayment(order.id, {
+          amount: remaining,
+          method: mapPaymentMethodToApi(finalizePaymentMethod),
+          note: "Payment on draft finalize",
+        });
+      }
+      notifySuccess(tr("Sifariş tamamlandı", "Order finalized"));
+      onFinalized?.();
+      onClose();
+    } catch (err) {
+      notifyFromError(err, tr("Sifarişi tamamlamaq alınmadı", "Failed to finalize order"));
+    } finally {
+      setFinalizing(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -102,6 +162,18 @@ export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalPro
                     <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Kassir", "Biller")}</span>
                   </div>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.billerName ?? "—"}</p>
+                </div>
+
+                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
+                      <FileText className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Status", "Status")}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {isDraft ? tr("Qaralama", "Draft") : order.statusLabel}
+                  </p>
                 </div>
 
                 <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
@@ -235,6 +307,81 @@ export function SaleDetailModal({ orderId, isOpen, onClose }: SaleDetailModalPro
                   </div>
                 </div>
               </div>
+
+              {isDraft && canFinalize && (
+                <div className="rounded-xl border border-[#14b8a6]/25 dark:border-[#14b8a6]/30 bg-[#f0fdfa] dark:bg-[#14b8a6]/10 p-4 space-y-3">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {tr("Sifarişi tamamla", "Finalize order")}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {tr(
+                      "Stok silinəcək və satış hesab-faktura yaradılacaq.",
+                      "This deducts stock and creates the sale invoice.",
+                    )}
+                  </p>
+                  <div>
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {tr("Ödəniş üsulu", "Payment method")}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          { id: "cash" as const, name: tr("Nağd", "Cash") },
+                          { id: "card" as const, name: tr("Kart", "Card") },
+                          { id: "bank" as const, name: tr("Bank", "Bank") },
+                        ] as const
+                      ).map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setFinalizePaymentMethod(m.id)}
+                          className={`px-2 py-1.5 rounded-lg border text-xs font-medium ${
+                            finalizePaymentMethod === m.id
+                              ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border-[#14b8a6] text-[#0f766e] dark:text-[#5eead4]"
+                              : "border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                          }`}
+                        >
+                          {m.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFinalizePaid(true)}
+                      className={`px-2 py-1.5 rounded-lg border text-xs font-medium ${
+                        finalizePaid
+                          ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border-[#14b8a6] text-[#0f766e] dark:text-[#5eead4]"
+                          : "border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {tr("Ödənilib", "Paid")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFinalizePaid(false)}
+                      className={`px-2 py-1.5 rounded-lg border text-xs font-medium ${
+                        !finalizePaid
+                          ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border-[#14b8a6] text-[#0f766e] dark:text-[#5eead4]"
+                          : "border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {tr("Gözləyir", "Pending")}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleFinalize()}
+                    disabled={finalizing || isDemo}
+                    className="w-full px-3 py-2.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg disabled:opacity-50"
+                  >
+                    {finalizing
+                      ? tr("Tamamlanır...", "Finalizing...")
+                      : tr("Tamamla və göndər", "Finalize & submit")}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

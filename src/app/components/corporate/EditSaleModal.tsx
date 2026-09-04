@@ -431,10 +431,16 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
                 >
                   <option value="completed">{tr("Tamamlandı", "Completed")}</option>
-                  <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                  <option value="processing">{tr("İşlənir", "Processing")}</option>
+                  {status === "held" || status === "draft" ? null : (
+                    <>
+                      <option value="pending">{tr("Gözləyir", "Pending")}</option>
+                      <option value="processing">{tr("İşlənir", "Processing")}</option>
+                    </>
+                  )}
                   <option value="cancelled">{tr("Ləğv Edildi", "Cancelled")}</option>
-                  <option value="held">{tr("Saxlanılıb", "Held")}</option>
+                  {(status === "held" || status === "draft" || status === "pending") && (
+                    <option value="held">{tr("Qaralama", "Draft")}</option>
+                  )}
                 </select>
               </div>
             </div>

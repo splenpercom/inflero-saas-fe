@@ -21,6 +21,7 @@ const ROUTE_RULES: { test: (path: string) => boolean; module: TenantRbacModule; 
   { test: (p) => p.startsWith("/dashboard/people"), module: "People", action: "view" },
   { test: (p) => p.startsWith("/dashboard/reports"), module: "Reports", action: "view" },
   { test: (p) => p.startsWith("/dashboard/reservations"), module: "Reservations", action: "view" },
+  { test: (p) => p.startsWith("/dashboard/restaurant"), module: "Dining", action: "view" },
   { test: (p) => p.startsWith("/dashboard/my-website"), module: "My Website", action: "view" },
   { test: (p) => p.startsWith("/dashboard/settings"), module: "Settings", action: "view" },
   { test: (p) => p === "/dashboard/orders", module: "Sales", action: "view" },

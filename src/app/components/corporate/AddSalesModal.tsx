@@ -424,7 +424,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 <option value="completed">{tr("Tamamlandı", "Completed")}</option>
                 <option value="pending">{tr("Gözləyir", "Pending")}</option>
                 <option value="cancelled">{tr("Ləğv Edildi", "Cancelled")}</option>
-                <option value="held">{tr("Saxlanılıb", "Held")}</option>
+                <option value="held">{tr("Qaralama", "Draft")}</option>
               </select>
             </div>
           </div>

@@ -35,8 +35,13 @@ export function mapOrderStatusToApi(ui: string): OrderStatusApi {
   if (s === "pending") return "PENDING";
   if (s === "processing") return "PROCESSING";
   if (s === "cancelled" || s === "canceled") return "CANCELLED";
-  if (s === "held") return "HELD";
+  if (s === "held" || s === "draft") return "HELD";
   return "COMPLETED";
+}
+
+export function isDraftOrderStatus(status: string | null | undefined): boolean {
+  const s = (status ?? "").toLowerCase();
+  return s === "held" || s === "draft";
 }
 
 export function mapPurchaseStatusToApi(ui: string): PurchaseStatusApi {
@@ -55,6 +60,8 @@ export type SalesListQuery = {
   page?: number;
   pageSize?: number;
   limit?: number;
+  source?: string;
+  kotStatus?: string;
 };
 
 export function salesListQueryString(q: SalesListQuery = {}): string {
@@ -64,6 +71,8 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   if (q.status && q.status !== "all") params.set("status", q.status);
   if (q.paymentStatus && q.paymentStatus !== "all") params.set("paymentStatus", q.paymentStatus);
   if (q.sortBy && q.sortBy !== "all") params.set("sortBy", q.sortBy);
+  if (q.source && q.source !== "all") params.set("source", q.source);
+  if (q.kotStatus && q.kotStatus !== "all") params.set("kotStatus", q.kotStatus);
   if (q.page) params.set("page", String(q.page));
   if (q.pageSize) params.set("pageSize", String(q.pageSize));
   if (q.limit) params.set("limit", String(q.limit));

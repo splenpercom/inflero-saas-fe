@@ -19,6 +19,8 @@ import {
   ArrowLeft,
   Home,
   Car,
+  ChefHat,
+  Armchair,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -33,12 +35,13 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { posCheckout } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToKot } from "../../api/sales";
+import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
 import { parsePrice } from "../../lib/inventoryMappers";
 import { formatDateTime } from "../../lib/dateFormat";
-import { notifyFromError, notifyWarning } from "../../lib/toast";
+import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { mapPaymentMethodToApi } from "../../lib/salesMappers";
 import { APP_LOGO_LIGHT, getBrandLogoUrl } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
@@ -372,6 +375,7 @@ export function CorporatePOS() {
   const { user, isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
   const autoEnabled = hasModule("AUTO");
+  const diningEnabled = hasModule("DINING");
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const { canCreate } = useModulePermissions("Sales");
@@ -387,6 +391,8 @@ export function CorporatePOS() {
   const [mileageInput, setMileageInput] = useState("");
   const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([]);
   const [selectedBillerId, setSelectedBillerId] = useState("");
+  const [selectedTableId, setSelectedTableId] = useState("");
+  const [diningTables, setDiningTables] = useState<DiningTable[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoice>("paid");
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
@@ -401,6 +407,8 @@ export function CorporatePOS() {
   const [productsLoading, setProductsLoading] = useState(true);
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [sendingToKot, setSendingToKot] = useState(false);
   const { billers, defaultBillerId } = useSalesBillers((isAuthenticated || isDemo));
   const isEmployee = !isDemo && user?.role?.name.trim().toLowerCase() === "employee";
   const currentUserBillerId = useMemo(
@@ -468,6 +476,25 @@ export function CorporatePOS() {
   }, [loadCustomers]);
 
   useEffect(() => {
+    if (!diningEnabled || !(isAuthenticated || isDemo) || isGlobalMode || !branchId) {
+      setDiningTables([]);
+      setSelectedTableId("");
+      return;
+    }
+    let cancelled = false;
+    fetchDiningTables()
+      .then((rows) => {
+        if (!cancelled) setDiningTables(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setDiningTables([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [diningEnabled, isAuthenticated, isDemo, isGlobalMode, branchId, branchRevision]);
+
+  useEffect(() => {
     if (!autoEnabled || !selectedCustomerId) {
       setCustomerVehicles([]);
       return;
@@ -508,6 +535,11 @@ export function CorporatePOS() {
 
   const customerOptions = customers.map((c) => ({ id: c.id, label: c.name, sub: c.phone }));
   const billerOptions = billers.map((b) => ({ id: b.id, label: b.name, sub: b.code }));
+  const tableOptions = diningTables.map((t) => ({
+    id: t.id,
+    label: `#${t.number} ${t.name}`,
+    sub: `${t.status}${t.area ? ` · ${t.area}` : ""}`,
+  }));
 
   const handleCustomerChange = (id: string) => {
     if (autoEnabled && id !== selectedCustomerId) {
@@ -654,6 +686,64 @@ export function CorporatePOS() {
     setDiscountValue("");
   };
 
+  const resetCartAfterSave = () => {
+    setCart([]);
+    setShippingInput("0");
+    setServiceFeeInput("0");
+    setSelectedCustomerId("");
+    setSelectedVehicleId("");
+    setMileageInput("");
+    setSelectedBillerId(defaultBillerId || "");
+    setSelectedTableId("");
+    setSelectedPaymentMethod(null);
+    setPaymentStatusChoice("paid");
+    setAppliedDiscount(null);
+    void loadProducts();
+  };
+
+  const handleSaveDraft = async () => {
+    if (!canCreate || isDemo || !isAuthenticated) return;
+    if (cart.length === 0) {
+      notifyWarning(tr("Səbəti doldurun", "Please add items to cart"));
+      return;
+    }
+    if (isGlobalMode || !branchId) {
+      notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
+      return;
+    }
+
+    setSavingDraft(true);
+    try {
+      const detail = await createPosOrder({
+        status: "HELD",
+        customerId: selectedCustomerId || null,
+        billerId: selectedBillerId || null,
+        ...(selectedPaymentMethod ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) } : {}),
+        shipping,
+        ...(serviceFee > 0 ? { serviceFee } : {}),
+        discount: discountAmount > 0 ? discountAmount : undefined,
+        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+        initialPaymentAmount: 0,
+        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+          ? { mileageAtService: Number(mileageInput) }
+          : {}),
+        ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
+      });
+      notifySuccess(
+        tr(
+          `Qaralama saxlanıldı (${detail.reference})`,
+          `Draft saved (${detail.reference})`,
+        ),
+      );
+      resetCartAfterSave();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (!canCreate || isDemo || !isAuthenticated) return;
     if (cart.length === 0) { alert(tr("Səbəti doldurun", "Please add items to cart")); return; }
@@ -706,6 +796,7 @@ export function CorporatePOS() {
         // Pending: explicit 0 so collectFullPaymentIfMethodSet does not auto-charge.
         ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
         ...(isGlobalMode ? { storeId: branchId ?? null } : {}),
+        ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
       });
 
       const orderDate = new Date(detail.date);
@@ -756,19 +847,149 @@ export function CorporatePOS() {
         paymentStatusLabel: serverPaymentStatusLabel,
       });
 
-      setCart([]);
-      setShippingInput("0");
-      setServiceFeeInput("0");
-      setSelectedCustomerId("");
-      setSelectedBillerId(defaultBillerId || "");
-      setSelectedPaymentMethod(null);
-      setPaymentStatusChoice("paid");
-      setAppliedDiscount(null);
-      void loadProducts();
+      resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
     } finally {
       setPlacingOrder(false);
+    }
+  };
+
+  const buildReceiptFromDetail = (
+    detail: Awaited<ReturnType<typeof posCheckout>>,
+    pmLabel: Record<PaymentMethod, string>,
+    receiptCustomer: string,
+    receiptPhone: string,
+    receiptBiller: string,
+  ) => {
+    const orderDate = new Date(detail.date);
+    const dateStr = Number.isNaN(orderDate.getTime())
+      ? detail.date
+      : formatDateTime(orderDate, language);
+
+    const apiSubtotal = detail.items.reduce(
+      (sum, item) => sum + parsePrice(item.price) * item.quantity,
+      0,
+    );
+    const apiShipping = parsePrice(detail.shipping);
+    const apiServiceFee = parsePrice(detail.serviceFee);
+    const apiDiscount = parsePrice(detail.discount);
+    const apiTotal = parsePrice(detail.grandTotal);
+    const apiPaid = parsePrice(detail.paid);
+    const serverPaymentStatusLabel =
+      detail.paymentStatus.toLowerCase() === "paid" || (apiTotal > 0 && apiPaid >= apiTotal)
+        ? tr("Ödənilib", "Paid")
+        : paymentStatusChoice === "pending" || detail.paymentStatus.toLowerCase() === "unpaid"
+          ? tr("Gözləyir", "Pending")
+          : detail.paymentStatus;
+
+    return {
+      orderNo: detail.reference,
+      date: dateStr,
+      customer: detail.customerName ?? receiptCustomer,
+      customerPhone: receiptPhone,
+      vehicle: detail.vehicleLabel ?? undefined,
+      mileage: detail.mileageAtService ?? undefined,
+      employee: detail.billerName ?? receiptBiller,
+      items: detail.items.map((item) => ({
+        name: item.productName,
+        qty: item.quantity,
+        price: parsePrice(item.price),
+      })),
+      subtotal: apiSubtotal,
+      shipping: apiShipping,
+      serviceFee: apiServiceFee,
+      discount: apiDiscount,
+      discountLabel: appliedDiscount
+        ? appliedDiscount.type === "percent"
+          ? `Endirim (${appliedDiscount.value}%)`
+          : "Endirim"
+        : "Endirim",
+      total: apiTotal,
+      paymentMethod: selectedPaymentMethod ? pmLabel[selectedPaymentMethod] : "—",
+      paymentStatusLabel: serverPaymentStatusLabel,
+    };
+  };
+
+  const handleSendToKot = async () => {
+    if (!canCreate || isDemo || !isAuthenticated || !diningEnabled) return;
+    if (cart.length === 0) {
+      alert(tr("Səbəti doldurun", "Please add items to cart"));
+      return;
+    }
+    if (!selectedTableId) {
+      alert(tr("Masa seçin", "Please select a table"));
+      return;
+    }
+    if (!selectedPaymentMethod) {
+      alert(tr("Ödəniş üsulunu seçin", "Please select a payment method"));
+      return;
+    }
+    if (!selectedBillerId) {
+      alert(tr("Kassir seçin", "Please select an employee / biller"));
+      return;
+    }
+    if (isGlobalMode || !branchId) {
+      notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
+      return;
+    }
+
+    const stockIssue = stockEnabled && cart.find((item) => {
+      const product = products.find((p) => p.id === item.id);
+      return !product || product.stock <= 0 || item.quantity > product.stock;
+    });
+    if (stockIssue) {
+      const product = products.find((p) => p.id === stockIssue.id);
+      if (product && product.stock <= 0) warnOutOfStock(product);
+      else if (product) warnInsufficientStock(product, product.stock);
+      else {
+        notifyWarning(
+          tr(
+            "Səbətdə stokda olmayan məhsullar var",
+            "Some items in the cart are out of stock or exceed available quantity",
+          ),
+        );
+      }
+      return;
+    }
+
+    const pmLabel: Record<PaymentMethod, string> = {
+      cash: tr("Nağd", "Cash"),
+      card: tr("Kart", "Card"),
+      bank: tr("Bank Transferi", "Bank Transfer"),
+    };
+    const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
+    const receiptPhone = selectedCustomer?.phone ?? "—";
+    const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
+
+    setSendingToKot(true);
+    try {
+      const detail = await sendPosOrderToKot({
+        status: "COMPLETED",
+        customerId: selectedCustomerId || null,
+        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+          ? { mileageAtService: Number(mileageInput) }
+          : {}),
+        billerId: selectedBillerId || null,
+        paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod),
+        shipping,
+        ...(serviceFee > 0 ? { serviceFee } : {}),
+        discount: discountAmount > 0 ? discountAmount : undefined,
+        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+        ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
+        tableId: selectedTableId,
+      });
+
+      setReceipt(
+        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller),
+      );
+      notifySuccess(tr("KOT-a göndərildi", "Sent to KOT"));
+      resetCartAfterSave();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setSendingToKot(false);
     }
   };
 
@@ -995,6 +1216,16 @@ export function CorporatePOS() {
                   icon={UserCheck}
                   disabled={isEmployee}
                 />
+
+                {diningEnabled && (
+                  <SelectDropdown
+                    value={selectedTableId}
+                    onChange={setSelectedTableId}
+                    options={tableOptions}
+                    placeholder={tr("Masa seçin...", "Select table...")}
+                    icon={Armchair}
+                  />
+                )}
                 </div>
 
                 <div className="space-y-2 mb-3">
@@ -1218,22 +1449,49 @@ export function CorporatePOS() {
 
               {/* Action Buttons */}
               {canCreate && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <button
-                  onClick={() => cart.length === 0 ? alert(tr("Səbəti doldurun", "Cart is empty")) : alert(tr("Sifariş saxlanıldı!", "Order held!"))}
-                  disabled={cart.length === 0}
-                  className="px-3 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {tr("Sifarişi Saxla", "Hold Order")}
-                </button>
-                <button
-                  onClick={() => void handlePlaceOrder()}
-                  disabled={cart.length === 0 || placingOrder}
-                  className="px-3 py-2.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  {placingOrder ? tr("Göndərilir...", "Processing...") : tr("Ödənişi Tamamla", "Complete & Print")}
-                </button>
+              <div className="mt-2 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveDraft()}
+                    disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || isGlobalMode || !branchId}
+                    className="px-3 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingDraft
+                      ? tr("Saxlanılır...", "Saving...")
+                      : tr("Qaralama olaraq saxla", "Save as Draft")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handlePlaceOrder()}
+                    disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || isGlobalMode || !branchId}
+                    className="px-3 py-2.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    {placingOrder ? tr("Göndərilir...", "Processing...") : tr("Ödənişi Tamamla", "Complete & Print")}
+                  </button>
+                </div>
+                {diningEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSendToKot()}
+                    disabled={
+                      cart.length === 0 ||
+                      placingOrder ||
+                      savingDraft ||
+                      sendingToKot ||
+                      isGlobalMode ||
+                      !branchId ||
+                      !selectedTableId
+                    }
+                    className="w-full px-3 py-2.5 text-xs font-medium text-white bg-[#0f766e] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    <ChefHat className="w-3.5 h-3.5" />
+                    {sendingToKot
+                      ? tr("KOT-a göndərilir...", "Sending to KOT...")
+                      : tr("KOT-a göndər", "Send to KOT")}
+                  </button>
+                )}
               </div>
               )}
               </div>

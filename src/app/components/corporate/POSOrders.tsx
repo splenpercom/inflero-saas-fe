@@ -15,6 +15,8 @@ import {
   MoreVertical,
   DollarSign,
   Download,
+  CheckCircle2,
+  ChefHat,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -32,9 +34,10 @@ import {
   deletePosOrder,
   recordPosOrderPayment,
   fetchPosOrder,
+  sendHeldPosOrderToKot,
   type PosOrderListRow,
 } from "../../api/sales";
-import { formatSalesDate, mapPaymentMethodToApi, type PosUiPaymentMethod } from "../../lib/salesMappers";
+import { formatSalesDate, mapPaymentMethodToApi, isDraftOrderStatus, type PosUiPaymentMethod } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
@@ -47,6 +50,7 @@ export function POSOrders() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const posEnabled = hasModule("POS");
+  const diningEnabled = hasModule("DINING");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Sales");
   const branchRevision = useBranchRevision();
   const { customers } = useSalesCustomers("", true);
@@ -58,6 +62,8 @@ export function POSOrders() {
   const [selectedCustomer, setSelectedCustomer] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("all");
+  const [selectedSource, setSelectedSource] = useState("all");
+  const [selectedKotStatus, setSelectedKotStatus] = useState("all");
   const [sortBy, setSortBy] = useState("last7days");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
@@ -86,9 +92,9 @@ export function POSOrders() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, selectedCustomer, selectedStatus, selectedPaymentStatus, sortBy]);
+  }, [debouncedSearch, selectedCustomer, selectedStatus, selectedPaymentStatus, selectedSource, selectedKotStatus, sortBy]);
 
-  const loadItems = useCallback(async () => {
+  const loadItems = useCallback(async (opts?: { silent?: boolean }) => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setOrders([]);
       setTotalItems(0);
@@ -96,7 +102,7 @@ export function POSOrders() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     try {
       const data = await fetchPosOrders({
         search: debouncedSearch.trim() || undefined,
@@ -106,6 +112,12 @@ export function POSOrders() {
         sortBy,
         page: currentPage,
         pageSize: itemsPerPage,
+        ...(diningEnabled
+          ? {
+              source: selectedSource,
+              kotStatus: selectedKotStatus,
+            }
+          : {}),
       });
       setOrders(data.items ?? []);
       setTotalItems(data.total ?? 0);
@@ -113,9 +125,11 @@ export function POSOrders() {
       setTotalPages(pages);
       if (pages > 0 && currentPage > pages) setCurrentPage(pages);
     } catch (err) {
-      notifyFromError(err, tr("Sifarişləri yükləmək alınmadı", "Failed to load orders"));
+      if (!opts?.silent) {
+        notifyFromError(err, tr("Sifarişləri yükləmək alınmadı", "Failed to load orders"));
+      }
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [
     isDemo,
@@ -125,6 +139,9 @@ export function POSOrders() {
     selectedCustomer,
     selectedStatus,
     selectedPaymentStatus,
+    selectedSource,
+    selectedKotStatus,
+    diningEnabled,
     sortBy,
     branchRevision,
     currentPage,
@@ -134,6 +151,14 @@ export function POSOrders() {
   useEffect(() => {
     void loadItems();
   }, [loadItems]);
+
+  useEffect(() => {
+    if (!diningEnabled || !(isAuthenticated || isDemo) || !canView) return;
+    const id = window.setInterval(() => {
+      void loadItems({ silent: true });
+    }, 8000);
+    return () => window.clearInterval(id);
+  }, [diningEnabled, isAuthenticated, isDemo, canView, loadItems]);
 
   useEffect(() => {
     const orderId = searchParams.get("orderId");
@@ -163,7 +188,8 @@ export function POSOrders() {
       case "canceled":
         return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400";
       case "held":
-        return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
+      case "draft":
+        return "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400";
       default:
         return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400";
     }
@@ -191,7 +217,8 @@ export function POSOrders() {
       pending: tr("Gözləyir", "Pending"),
       cancelled: tr("Ləğv Edildi", "Cancelled"),
       canceled: tr("Ləğv Edildi", "Cancelled"),
-      held: tr("Saxlanılıb", "Held"),
+      held: tr("Qaralama", "Draft"),
+      draft: tr("Qaralama", "Draft"),
       processing: tr("İşlənir", "Processing"),
     };
     return statusMap[key] || status;
@@ -367,6 +394,13 @@ export function POSOrders() {
 
   const handleCreatePayment = (orderId: string) => {
     if (!canCreate || isDemo) return;
+    const row = orders.find((o) => o.id === orderId);
+    if (row && isDraftOrderStatus(row.status)) {
+      notifyFromError(
+        new Error(tr("Əvvəlcə qaralamanı tamamlayın", "Finalize the draft before recording a payment")),
+      );
+      return;
+    }
     setSelectedOrderId(orderId);
     setIsCreatePaymentModalOpen(true);
   };
@@ -590,7 +624,7 @@ export function POSOrders() {
                   <option value="completed">{tr("Tamamlandı", "Completed")}</option>
                   <option value="pending">{tr("Gözləyir", "Pending")}</option>
                   <option value="cancelled">{tr("Ləğv Edildi", "Cancelled")}</option>
-                  <option value="held">{tr("Saxlanılıb", "Held")}</option>
+                  <option value="held">{tr("Qaralama", "Draft")}</option>
                 </select>
                 <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
@@ -608,6 +642,38 @@ export function POSOrders() {
                 </select>
                 <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
+
+              {diningEnabled && (
+                <>
+                  <div className="relative">
+                    <select
+                      value={selectedSource}
+                      onChange={(e) => setSelectedSource(e.target.value)}
+                      className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
+                    >
+                      <option value="all">{tr("Mənbə", "Source")}</option>
+                      <option value="POS">POS</option>
+                      <option value="QR_MENU">{tr("QR Menyü", "QR Menu")}</option>
+                    </select>
+                    <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={selectedKotStatus}
+                      onChange={(e) => setSelectedKotStatus(e.target.value)}
+                      className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
+                    >
+                      <option value="all">{tr("KOT Status", "KOT Status")}</option>
+                      <option value="none">{tr("KOT yox", "No KOT")}</option>
+                      <option value="PENDING">PENDING</option>
+                      <option value="PREPARING">PREPARING</option>
+                      <option value="READY">READY</option>
+                      <option value="SERVED">SERVED</option>
+                    </select>
+                    <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </>
+              )}
 
               <div className="relative">
                 <select
@@ -684,6 +750,19 @@ export function POSOrders() {
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
                     {tr("TARİX", "DATE")}
                   </th>
+                  {diningEnabled && (
+                    <>
+                      <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                        {tr("MƏNBƏ", "SOURCE")}
+                      </th>
+                      <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                        {tr("MASA", "TABLE")}
+                      </th>
+                      <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                        KOT
+                      </th>
+                    </>
+                  )}
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
                     {tr("STATUS", "STATUS")}
                   </th>
@@ -708,13 +787,13 @@ export function POSOrders() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-xs text-gray-500">
+                    <td colSpan={diningEnabled ? 13 : 10} className="px-4 py-8 text-center text-xs text-gray-500">
                       {tr("Yüklənir...", "Loading...")}
                     </td>
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-xs text-gray-500">
+                    <td colSpan={diningEnabled ? 13 : 10} className="px-4 py-8 text-center text-xs text-gray-500">
                       {emptyMessage}
                     </td>
                   </tr>
@@ -737,6 +816,23 @@ export function POSOrders() {
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         {formatSalesDate(order.date)}
                       </td>
+                      {diningEnabled && (
+                        <>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                              {order.source === "QR_MENU" ? tr("QR Menyü", "QR Menu") : "POS"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {order.table ? `#${order.table.number}` : "—"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                              {order.kotStatus ?? "—"}
+                            </span>
+                          </td>
+                        </>
+                      )}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
                           className={cn(
@@ -807,6 +903,9 @@ export function POSOrders() {
         orderId={selectedOrderId}
         isOpen={isSaleDetailModalOpen}
         onClose={closeSaleDetailModal}
+        canFinalize={canEdit}
+        isDemo={isDemo}
+        onFinalized={() => void loadItems()}
       />
 
       <EditSaleModal
@@ -856,6 +955,48 @@ export function POSOrders() {
                 <span>{tr("Satış Detalları", "Sale Detail")}</span>
               </button>
 
+              {posEnabled && canEdit && isDraftOrderStatus(openMenuOrder.status) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeActionMenu();
+                    handleViewSaleDetail(openMenuOrder.id);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#0f766e] dark:text-[#5eead4] hover:bg-[#f0fdfa] dark:hover:bg-[#14b8a6]/10 transition-all duration-75 text-left font-medium"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{tr("Tamamla", "Finalize")}</span>
+                </button>
+              )}
+
+              {diningEnabled &&
+                posEnabled &&
+                canEdit &&
+                isDraftOrderStatus(openMenuOrder.status) &&
+                !openMenuOrder.kotStatus && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeActionMenu();
+                      void (async () => {
+                        try {
+                          await sendHeldPosOrderToKot(openMenuOrder.id, {
+                            tableId: openMenuOrder.table?.id ?? null,
+                          });
+                          notifySuccess(tr("KOT-a göndərildi", "Sent to KOT"));
+                          await loadItems();
+                        } catch (err) {
+                          notifyFromError(err);
+                        }
+                      })();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#0f766e] dark:text-[#5eead4] hover:bg-[#f0fdfa] dark:hover:bg-[#14b8a6]/10 transition-all duration-75 text-left font-medium"
+                  >
+                    <ChefHat className="w-3.5 h-3.5" />
+                    <span>{tr("KOT-a göndər", "Send to KOT")}</span>
+                  </button>
+                )}
+
               {posEnabled && canEdit && (
                 <button
                   type="button"
@@ -882,7 +1023,7 @@ export function POSOrders() {
                 <span>{tr("Ödənişləri Göstər", "Show Payments")}</span>
               </button>
 
-              {canCreate && (
+              {canCreate && !isDraftOrderStatus(openMenuOrder.status) && (
                 <button
                   type="button"
                   onClick={() => {

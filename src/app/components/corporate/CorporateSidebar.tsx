@@ -20,6 +20,9 @@ import {
   CalendarDays,
   Globe,
   Users,
+  UtensilsCrossed,
+  BookOpen,
+  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -102,6 +105,13 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       myWebsite: { en: "My Website", az: "Mənim Saytım" },
       webOrders: { en: "Web Orders", az: "Veb Sifarişlər" },
       webReports: { en: "Web Report", az: "Veb Hesabat" },
+      dining: { en: "Dining", az: "Restoran" },
+      restaurantMenu: { en: "Menu", az: "Menyu" },
+      tables: { en: "Tables", az: "Masalar" },
+      kot: { en: "KOT", az: "KOT" },
+      tableBookings: { en: "Booking", az: "Rezervasiya" },
+      qrMenu: { en: "QR Menu", az: "QR Menyu" },
+      bookATable: { en: "Book a Table", az: "Masa Rezervasiya" },
       
       // Inventory Sub-items
       products: { en: "Products/Services", az: "Məhsullar/Xidmətlər" },
@@ -160,18 +170,12 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   };
 
   const toggleExpand = (labelKey: string) => {
-    setExpandedItems((prev) =>
-      prev.includes(labelKey)
-        ? prev.filter((item) => item !== labelKey)
-        : [...prev, labelKey]
-    );
+    setExpandedItems((prev) => (prev.includes(labelKey) ? [] : [labelKey]));
   };
 
   useEffect(() => {
     if (location.pathname.startsWith("/dashboard/reservations")) {
-      setExpandedItems((prev) =>
-        prev.includes("reservations") ? prev : [...prev, "reservations"],
-      );
+      setExpandedItems(["reservations"]);
     }
   }, [location.pathname]);
 
@@ -363,6 +367,18 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       ],
     },
     {
+      icon: UtensilsCrossed,
+      labelKey: "dining",
+      label: st("dining"),
+      permissionModule: "Dining",
+      subItems: [
+        { labelKey: "restaurantMenu", label: st("restaurantMenu"), path: "/dashboard/restaurant/menu" },
+        { labelKey: "tables", label: st("tables"), path: "/dashboard/restaurant/tables" },
+        { labelKey: "kot", label: st("kot"), path: "/dashboard/restaurant/kot" },
+        { labelKey: "tableBookings", label: st("tableBookings"), path: "/dashboard/restaurant/bookings" },
+      ],
+    },
+    {
       icon: Settings,
       labelKey: "settings",
       label: st("settings"),
@@ -382,6 +398,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         if (item.labelKey === "stock" && !hasModule("STOCK")) return null;
         if (item.labelKey === "reservations" && !hasModule("RESERVATIONS")) return null;
         if (item.labelKey === "myWebsite" && !hasModule("WEB_EDITOR")) return null;
+        if (item.labelKey === "dining" && !hasModule("DINING")) return null;
         if (item.labelKey === "warehouses" && !branchManagementEnabled) return null;
         const parentModule = item.permissionModule ?? "Dashboard";
         if (item.subItems) {
@@ -710,27 +727,97 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         </div>
       </div>
 
-      {myStorePath && !isDemo && (
-        <div className="flex-shrink-0 border-t border-white/10 dark:border-white/5 p-2">
-          <Link
-            to={myStorePath}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={st("myStore")}
-            onClick={onClose}
-            className={cn(
-              "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium smooth-transition",
-              "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 text-[#14b8a6] dark:text-[#14b8a6]",
-              "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
-              "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
-              collapsed && "lg:justify-center lg:px-2",
-            )}
-          >
-            <Globe className="w-4 h-4 flex-shrink-0" />
-            {!collapsed && (
-              <span className="flex-1 text-left leading-tight">{st("myStore")}</span>
-            )}
-          </Link>
+      {(hasModule("DINING") || (myStorePath && !isDemo)) && (
+        <div className="flex-shrink-0 border-t border-white/10 dark:border-white/5 p-2 space-y-1">
+          {hasModule("DINING") && tenantSlug && (
+            <>
+              <Link
+                to={
+                  selectedBranch?.code
+                    ? `/menu/${tenantSlug}?branch=${encodeURIComponent(selectedBranch.code)}`
+                    : `/menu/${tenantSlug}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-xl smooth-transition group w-full",
+                  "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10",
+                  "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
+                  "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
+                  collapsed && "lg:justify-center",
+                )}
+              >
+                <div className="w-7 h-7 rounded-lg bg-[#14b8a6] flex items-center justify-center flex-shrink-0">
+                  <UtensilsCrossed className="w-3.5 h-3.5 text-white" />
+                </div>
+                {!collapsed && (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
+                      {pickLang(language, "Müştəri", "Customer")}
+                    </p>
+                    <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
+                      {st("qrMenu")}
+                    </p>
+                  </div>
+                )}
+                {!collapsed && <ExternalLink className="w-3 h-3 text-[#14b8a6]/50 flex-shrink-0" />}
+              </Link>
+              <Link
+                to={
+                  selectedBranch?.code
+                    ? `/book/${tenantSlug}?branch=${encodeURIComponent(selectedBranch.code)}`
+                    : `/book/${tenantSlug}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-xl smooth-transition group w-full",
+                  "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10",
+                  "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
+                  "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
+                  collapsed && "lg:justify-center",
+                )}
+              >
+                <div className="w-7 h-7 rounded-lg bg-[#0f766e] flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-3.5 h-3.5 text-white" />
+                </div>
+                {!collapsed && (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
+                      {pickLang(language, "Müştəri", "Customer")}
+                    </p>
+                    <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
+                      {st("bookATable")}
+                    </p>
+                  </div>
+                )}
+                {!collapsed && <ExternalLink className="w-3 h-3 text-[#14b8a6]/50 flex-shrink-0" />}
+              </Link>
+            </>
+          )}
+          {myStorePath && !isDemo && (
+            <Link
+              to={myStorePath}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={st("myStore")}
+              onClick={onClose}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium smooth-transition",
+                "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 text-[#14b8a6] dark:text-[#14b8a6]",
+                "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
+                "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
+                collapsed && "lg:justify-center lg:px-2",
+              )}
+            >
+              <Globe className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && (
+                <span className="flex-1 text-left leading-tight">{st("myStore")}</span>
+              )}
+            </Link>
+          )}
         </div>
       )}
     </aside>

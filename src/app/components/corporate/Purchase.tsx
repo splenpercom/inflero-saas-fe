@@ -10,6 +10,7 @@ import {
   Edit2,
   Trash2,
   ChevronDown,
+  CreditCard,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -20,6 +21,7 @@ import { useBranch } from "../../context/BranchContext";
 import { AddPurchaseModal } from "./AddPurchaseModal";
 import { PurchaseDetailModal } from "./PurchaseDetailModal";
 import { EditPurchaseModal } from "./EditPurchaseModal";
+import { RecordPurchasePaymentModal } from "./RecordPurchasePaymentModal";
 import { fetchPurchases, deletePurchase, type PurchaseListRow } from "../../api/purchases";
 import { formatPurchaseDate } from "../../lib/purchaseMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
@@ -47,7 +49,13 @@ export function Purchase() {
   const [isAddPurchaseModalOpen, setIsAddPurchaseModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+  const [paymentTarget, setPaymentTarget] = useState<{
+    id: string;
+    reference: string;
+    due: number;
+  } | null>(null);
   const [purchases, setPurchases] = useState<PurchaseListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -523,6 +531,24 @@ export function Purchase() {
                           >
                             <Eye className="w-3 h-3" />
                           </button>
+                          {canEdit && !isDemo && purchase.due > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPaymentTarget({
+                                  id: purchase.id,
+                                  reference: purchase.reference,
+                                  due: purchase.due,
+                                });
+                                setIsPaymentModalOpen(true);
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg font-medium hover:bg-[#0d9488] transition-colors"
+                              title={tr("Ödəniş qeyd et", "Record payment")}
+                            >
+                              <CreditCard className="w-3 h-3" />
+                              <span className="hidden xl:inline">{tr("Ödəniş", "Pay")}</span>
+                            </button>
+                          )}
                           {canEdit && (
                             <button
                               onClick={() => {
@@ -574,10 +600,24 @@ export function Purchase() {
       <PurchaseDetailModal
         purchaseId={selectedPurchaseId}
         isOpen={isDetailModalOpen}
+        canEdit={canEdit}
         onClose={() => {
           setIsDetailModalOpen(false);
           setSelectedPurchaseId(null);
         }}
+        onChanged={() => void loadPurchases()}
+      />
+
+      <RecordPurchasePaymentModal
+        purchaseId={paymentTarget?.id ?? null}
+        reference={paymentTarget?.reference ?? null}
+        due={paymentTarget?.due ?? 0}
+        isOpen={isPaymentModalOpen}
+        onClose={() => {
+          setIsPaymentModalOpen(false);
+          setPaymentTarget(null);
+        }}
+        onSaved={() => void loadPurchases()}
       />
 
       <EditPurchaseModal

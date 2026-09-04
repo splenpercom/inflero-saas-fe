@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { X, DollarSign, Plus } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { fetchPosOrder, type PosOrderDetail } from "../../api/sales";
-import { formatSalesDate } from "../../lib/salesMappers";
+import { formatSalesDate, isDraftOrderStatus } from "../../lib/salesMappers";
 import { notifyFromError } from "../../lib/toast";
 
 import { pickLang } from "../../i18n/pickLang";
@@ -67,6 +67,7 @@ export function ShowPaymentsModal({
   const paid = order ? parseFloat(order.paid) : 0;
   const due = order ? parseFloat(order.due) : 0;
   const payments = order?.payments ?? [];
+  const isDraft = order ? isDraftOrderStatus(order.status) || isDraftOrderStatus(order.statusLabel) : false;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -125,7 +126,13 @@ export function ShowPaymentsModal({
                       onClose();
                       onCreatePayment();
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-lg transition-colors"
+                    disabled={isDraft}
+                    title={
+                      isDraft
+                        ? tr("Əvvəlcə qaralamanı tamamlayın", "Finalize the draft first")
+                        : undefined
+                    }
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     {tr("Ödəniş Əlavə Et", "Add Payment")}

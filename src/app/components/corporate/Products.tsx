@@ -434,7 +434,7 @@ export function Products() {
   const paginatedProducts = products;
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
+    <div className="bg-gray-50 dark:bg-gray-950">
       <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
         {/* Header */}
         <div className="mb-4">

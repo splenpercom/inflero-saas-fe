@@ -13,6 +13,7 @@ export interface RolePermission {
 const RBAC_MODULE_TENANT_GATE: Partial<Record<(typeof TENANT_RBAC_MODULES)[number], TenantModuleKey>> = {
   Stock: "STOCK",
   Reservations: "RESERVATIONS",
+  Dining: "DINING",
   "My Website": "WEB_EDITOR",
 };
 

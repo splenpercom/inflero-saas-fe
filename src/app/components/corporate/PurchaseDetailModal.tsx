@@ -1,15 +1,27 @@
 import { useEffect, useState } from "react";
 import { X, User, Calendar, Package, FileText, CreditCard } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { fetchPurchase, type PurchaseDetail } from "../../api/purchases";
-import { formatPurchaseDate, parsePurchaseAmount } from "../../lib/purchaseMappers";
-import { notifyFromError } from "../../lib/toast";
+import { useAuth } from "../../context/AuthContext";
+import {
+  fetchPurchase,
+  recordPurchasePayment,
+  type PurchaseDetail,
+} from "../../api/purchases";
+import {
+  formatPurchaseDate,
+  parsePurchaseAmount,
+  mapPaymentMethodToApi,
+} from "../../lib/purchaseMappers";
+import type { PosUiPaymentMethod } from "../../lib/salesMappers";
+import { notifyFromError, notifySuccess } from "../../lib/toast";
 
 import { pickLang } from "../../i18n/pickLang";
 interface PurchaseDetailModalProps {
   purchaseId: string | null;
   isOpen: boolean;
   onClose: () => void;
+  canEdit?: boolean;
+  onChanged?: () => void;
   overlayZIndexClass?: string;
 }
 
@@ -17,26 +29,45 @@ export function PurchaseDetailModal({
   purchaseId,
   isOpen,
   onClose,
+  canEdit = false,
+  onChanged,
   overlayZIndexClass = "z-50",
 }: PurchaseDetailModalProps) {
   const { language } = useLanguage();
+  const { isDemo } = useAuth();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [purchase, setPurchase] = useState<PurchaseDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PosUiPaymentMethod>("cash");
+  const [paymentNote, setPaymentNote] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [recordingPayment, setRecordingPayment] = useState(false);
+
+  const loadPurchase = async (id: string) => {
+    setLoading(true);
+    try {
+      const data = await fetchPurchase(id);
+      setPurchase(data);
+      const due = parsePurchaseAmount(data.due);
+      setPaymentAmount(due > 0 ? String(due) : "");
+      setPaymentNote("");
+      setPaymentReference("");
+      setPaymentMethod("cash");
+    } catch (err) {
+      notifyFromError(err, tr("Satınalma detalları yüklənə bilmədi", "Failed to load purchase details"));
+      setPurchase(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !purchaseId) {
       setPurchase(null);
       return;
     }
-    setLoading(true);
-    fetchPurchase(purchaseId)
-      .then(setPurchase)
-      .catch((err) => {
-        notifyFromError(err, tr("Satınalma detalları yüklənə bilmədi", "Failed to load purchase details"));
-        setPurchase(null);
-      })
-      .finally(() => setLoading(false));
+    void loadPurchase(purchaseId);
   }, [isOpen, purchaseId, language]);
 
   if (!isOpen || !purchaseId) return null;
@@ -49,6 +80,32 @@ export function PurchaseDetailModal({
   const orderTax = purchase?.orderTax ? parsePurchaseAmount(purchase.orderTax) : 0;
   const itemsSubtotal =
     purchase?.items.reduce((sum, item) => sum + parsePurchaseAmount(item.totalCost), 0) ?? 0;
+
+  const handleRecordPayment = async () => {
+    if (!purchase || isDemo || !canEdit) return;
+    const amount = parseFloat(paymentAmount);
+    if (!amount || amount <= 0 || amount > due) return;
+    setRecordingPayment(true);
+    try {
+      const updated = await recordPurchasePayment(purchase.id, {
+        amount,
+        method: mapPaymentMethodToApi(paymentMethod),
+        note: paymentNote.trim() || null,
+        reference: paymentReference.trim() || null,
+      });
+      setPurchase(updated);
+      const newDue = parsePurchaseAmount(updated.due);
+      setPaymentAmount(newDue > 0 ? String(newDue) : "");
+      setPaymentNote("");
+      setPaymentReference("");
+      notifySuccess(tr("Ödəniş qeydə alındı", "Payment recorded"));
+      onChanged?.();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setRecordingPayment(false);
+    }
+  };
 
   return (
     <div className={`fixed inset-0 ${overlayZIndexClass} flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`}>
@@ -236,6 +293,64 @@ export function PurchaseDetailModal({
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {due > 0 && !isDemo && canEdit && (
+                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10 space-y-2">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {tr("Ödəniş qeyd et", "Record payment")}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={due}
+                      step="0.01"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder={tr("Məbləğ", "Amount")}
+                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value as PosUiPaymentMethod)}
+                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="cash">{tr("Nağd", "Cash")}</option>
+                      <option value="card">{tr("Kart", "Card")}</option>
+                      <option value="bank">{tr("Bank köçürməsi", "Bank transfer")}</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      placeholder={tr("İstinad (istəyə bağlı)", "Reference (optional)")}
+                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="text"
+                      value={paymentNote}
+                      onChange={(e) => setPaymentNote(e.target.value)}
+                      placeholder={tr("Qeyd (istəyə bağlı)", "Note (optional)")}
+                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={
+                      recordingPayment ||
+                      !paymentAmount ||
+                      parseFloat(paymentAmount) <= 0 ||
+                      parseFloat(paymentAmount) > due
+                    }
+                    onClick={() => void handleRecordPayment()}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#14b8a6] text-white disabled:opacity-50"
+                  >
+                    {recordingPayment
+                      ? tr("Qeyd edilir...", "Recording...")
+                      : tr("Ödənişi qeyd et", "Record payment")}
+                  </button>
                 </div>
               )}
             </>

@@ -8,6 +8,8 @@ const RESERVED_STORE_SLUGS = new Set([
   "static",
   "favicon.ico",
   "customer-landing",
+  "menu",
+  "book",
   "reset-password",
   "forgot-password",
 ]);

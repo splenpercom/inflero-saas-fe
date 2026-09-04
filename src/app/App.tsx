@@ -60,6 +60,10 @@ import {
   WebOrdersPage,
   WebReportPage,
 } from "../modules/my-website";
+import {
+  diningDashboardRouteElements,
+  diningPublicRouteElements,
+} from "../modules/dining";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DemoBanner } from "./components/DemoBanner";
 import { PaymentStatusGate, BillingResultPage } from "./components/billing/PaymentStatusGate";
@@ -218,6 +222,7 @@ function AppShell() {
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/customer-landing/:slug" element={<CustomerLandingPage />} />
             <Route path="/customer-landing/:slug/:branchSlug" element={<CustomerLandingPage />} />
+            {diningPublicRouteElements}
 
             {/* POS Route - Full screen without sidebar/header */}
             <Route
@@ -364,6 +369,8 @@ function AppShell() {
               />
               <Route path="settings" element={<CorporateSettings />} />
               <Route path="billing/result" element={<BillingResultPage />} />
+
+              {diningDashboardRouteElements}
 
               {/* Catch all - redirect to dashboard home */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -16,6 +16,9 @@ export interface PosOrderListRow {
   paymentStatus: string;
   biller: string;
   storeId: string | null;
+  source?: string;
+  kotStatus?: string | null;
+  table?: { id: string; number: number; name: string } | null;
 }
 
 export interface SalesBillerRow {
@@ -213,6 +216,8 @@ export type CreatePosOrderBody = {
   storeId?: string | null;
   vehicleId?: string | null;
   mileageAtService?: number | null;
+  /** Dining: optional table (requires DINING module). */
+  tableId?: string | null;
 };
 
 export type CreateInvoiceBody = {
@@ -306,6 +311,21 @@ export async function createPosOrder(body: CreatePosOrderBody) {
 
 export async function posCheckout(body: CreatePosOrderBody) {
   const res = await apiPost<{ success: boolean; data: PosOrderDetail }>("/tenant/sales/pos/checkout", body);
+  return res.data;
+}
+
+/** Complete sale + kitchen ticket (DINING). */
+export async function sendPosOrderToKot(body: CreatePosOrderBody) {
+  const res = await apiPost<{ success: boolean; data: PosOrderDetail }>("/tenant/sales/pos/send-to-kot", body);
+  return res.data;
+}
+
+/** Finalize a HELD draft onto the kitchen board. */
+export async function sendHeldPosOrderToKot(id: string, body?: { tableId?: string | null }) {
+  const res = await apiPost<{ success: boolean; data: PosOrderDetail }>(
+    `/tenant/sales/pos-orders/${id}/send-to-kot`,
+    body ?? {},
+  );
   return res.data;
 }
 

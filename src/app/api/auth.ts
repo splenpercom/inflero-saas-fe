@@ -7,6 +7,7 @@ export const TENANT_MODULE_KEYS = [
   "STOCK",
   "BRANCH_MANAGEMENT",
   "WEB_EDITOR",
+  "DINING",
 ] as const;
 
 export type TenantModuleKey = (typeof TENANT_MODULE_KEYS)[number];

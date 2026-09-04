@@ -38,6 +38,10 @@ const routeImports: Record<string, () => Promise<any>> = {
   '/reports/annual': () => import('../components/corporate/reports/AnnualReport'),
   '/user-management': () => import('../components/corporate/UserManagement'),
   '/settings': () => import('../components/corporate/Settings'),
+  '/dashboard/restaurant/menu': () => import('../../modules/dining/pages/MenuPage'),
+  '/dashboard/restaurant/tables': () => import('../../modules/dining/pages/TablesPage'),
+  '/dashboard/restaurant/kot': () => import('../../modules/dining/pages/KotPage'),
+  '/dashboard/restaurant/bookings': () => import('../../modules/dining/pages/BookingsPage'),
 };
 
 export function preloadRoute(path: string) {
