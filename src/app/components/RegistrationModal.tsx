@@ -100,9 +100,6 @@ export function RegistrationModal({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) handleClose();
-      }}
     >
       <div className="bg-[#042f2e] border border-white/15 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
         <div className="p-6 border-b border-white/10 flex items-center justify-between">

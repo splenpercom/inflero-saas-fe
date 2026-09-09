@@ -22,6 +22,7 @@ import {
   Users,
   UtensilsCrossed,
   BookOpen,
+  Puzzle,
   ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -29,7 +30,8 @@ import { useBranch } from "../../context/BranchContext";
 import { getBrandLogoUrl } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { BrandLogo } from "../ui/BrandLogo";
-import { storePath } from "../../lib/bookingLinks";
+import { storePath, customerBookingPath } from "../../lib/bookingLinks";
+import { slugifyBranchPage } from "../../lib/branchBooking";
 import type { TenantRbacModule } from "../../lib/rbacModules";
 import { getNavPermission, type PermissionAction } from "../../lib/permissions";
 import { ALL_BRANCHES_NAV_ENTRIES } from "../../lib/allBranchesNav";
@@ -53,6 +55,8 @@ interface NavItem {
   comingSoon?: boolean;
   path?: string;
   permissionModule?: TenantRbacModule;
+  /** Only company owners (superadmin) see this nav entry. */
+  ownerOnly?: boolean;
   subItems?: NavSubItem[];
 }
 
@@ -100,8 +104,11 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       reports: { en: "Reports", az: "Hesabatlar" },
       userManagement: { en: "User Management", az: "İstifadəçi İdarəetməsi" },
       settings: { en: "Settings", az: "Parametrlər" },
-      reservations: { en: "Reservations", az: "Rezervasiyalar" },
+      plugins: { en: "Plugins", az: "Plaginlər" },
+      reservations: { en: "Bookings", az: "Rezervasiyalar" },
+      reservationsList: { en: "Bookings", az: "Rezervasiyalar" },
       serviceTypes: { en: "Service Types", az: "Xidmət Növləri" },
+      customerBookingSite: { en: "Booking site", az: "Rezervasiya saytı" },
       myWebsite: { en: "My Website", az: "Mənim Saytım" },
       webOrders: { en: "Web Orders", az: "Veb Sifarişlər" },
       webReports: { en: "Web Report", az: "Veb Hesabat" },
@@ -162,6 +169,11 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       // Other
       selectWarehouse: { en: "Active Branch", az: "AKTİV FİLİAL" },
       allBranches: { en: "All branches", az: "Bütün filiallar" },
+      superadmin: { en: "Superadmin", az: "Superadmin" },
+      superadminModeHint: {
+        en: "Company-wide view across all branches and global records",
+        az: "Bütün filiallar və qlobal qeydlər üzrə şirkət görünüşü",
+      },
       globalMode: { en: "Global", az: "Qlobal" },
       noBranchesYet: { en: "No branches yet", az: "Filial yoxdur" },
       myStore: { en: "My Store", az: "Mənim Mağazam" },
@@ -195,6 +207,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   };
 
   // Mock warehouse data - only active/configured warehouses
+  const globalScopeLabel = user?.isTenantOwner ? st("superadmin") : st("allBranches");
   const branchLabel = branchesLoading
     ? "…"
     : isBranchLocked && selectedBranch
@@ -202,7 +215,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       : !hasBranches
         ? st("noBranchesYet")
         : isGlobalMode
-          ? st("allBranches")
+          ? globalScopeLabel
           : selectedBranch?.name ?? (branchId ? "…" : st("globalMode"));
 
   const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
@@ -214,6 +227,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       dashboard: LayoutDashboard,
       userManagement: Users,
       warehouses: Building2,
+      plugins: Puzzle,
       settings: Settings,
       myWebsite: Globe,
     };
@@ -379,6 +393,14 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       ],
     },
     {
+      icon: Puzzle,
+      labelKey: "plugins",
+      label: st("plugins"),
+      path: "/dashboard/plugins",
+      permissionModule: "Settings",
+      ownerOnly: true,
+    },
+    {
       icon: Settings,
       labelKey: "settings",
       label: st("settings"),
@@ -395,6 +417,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
 
     return itemsToFilter
       .map((item) => {
+        if (item.ownerOnly && !user?.isTenantOwner && !isDemo) return null;
+        if (item.labelKey === "plugins" && !user?.isTenantOwner && !isDemo) return null;
         if (item.labelKey === "stock" && !hasModule("STOCK")) return null;
         if (item.labelKey === "reservations" && !hasModule("RESERVATIONS")) return null;
         if (item.labelKey === "myWebsite" && !hasModule("WEB_EDITOR")) return null;
@@ -404,9 +428,18 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         if (item.subItems) {
           const filteredSubItems = item.subItems.filter((sub) => {
             if (["expiredProducts", "lowStocks"].includes(sub.labelKey) && !hasModule("STOCK")) return false;
+            if (sub.labelKey === "suppliers" && !hasModule("STOCK")) return false;
             if (["pos", "posOrders"].includes(sub.labelKey) && !hasModule("POS")) return false;
             if (sub.labelKey === "stockTransfer" && !branchManagementEnabled) return false;
             if (sub.labelKey === "warehouses" && !branchManagementEnabled) return false;
+            // Branch users cannot open the website editor when BRANCH_MANAGEMENT is on.
+            if (
+              sub.path === "/dashboard/my-website" &&
+              hasModule("BRANCH_MANAGEMENT") &&
+              !user?.isTenantOwner
+            ) {
+              return false;
+            }
             const perm = getNavPermission(sub.path, parentModule, {
               permissionModule: sub.permissionModule,
               permissionAction: sub.permissionAction,
@@ -423,7 +456,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         return item;
       })
       .filter((item): item is NavItem => item !== null);
-  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches]);
+  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo]);
 
   const tenantSlug = user?.tenant?.slug ?? null;
   const myStorePath = tenantSlug ? storePath(tenantSlug) : null;
@@ -541,10 +574,12 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     )}
                   >
                     <p className="font-semibold text-xs text-gray-900 dark:text-white">
-                      {st("allBranches")}
+                      {globalScopeLabel}
                     </p>
                     <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                      {pickLang(language, "Bütün filiallar və qlobal qeydlər", "All branches and global records")}
+                      {user?.isTenantOwner
+                        ? st("superadminModeHint")
+                        : pickLang(language, "Bütün filiallar və qlobal qeydlər", "All branches and global records")}
                     </p>
                   </button>
                 )}
@@ -727,8 +762,45 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         </div>
       </div>
 
-      {(hasModule("DINING") || (myStorePath && !isDemo)) && (
+      {(hasModule("DINING") || hasModule("RESERVATIONS") || (myStorePath && !isDemo)) && (
         <div className="flex-shrink-0 border-t border-white/10 dark:border-white/5 p-2 space-y-1">
+          {hasModule("RESERVATIONS") && tenantSlug && (
+            <Link
+              to={
+                selectedBranch
+                  ? customerBookingPath(
+                      tenantSlug,
+                      slugifyBranchPage(selectedBranch.code || selectedBranch.name),
+                    )
+                  : customerBookingPath(tenantSlug)
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onClose}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-xl smooth-transition group w-full",
+                "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10",
+                "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
+                "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
+                collapsed && "lg:justify-center",
+              )}
+            >
+              <div className="w-7 h-7 rounded-lg bg-[#14b8a6] flex items-center justify-center flex-shrink-0">
+                <CalendarDays className="w-3.5 h-3.5 text-white" />
+              </div>
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
+                    {pickLang(language, "Müştəri", "Customer")}
+                  </p>
+                  <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
+                    {st("customerBookingSite")}
+                  </p>
+                </div>
+              )}
+              {!collapsed && <ExternalLink className="w-3 h-3 text-[#14b8a6]/50 flex-shrink-0" />}
+            </Link>
+          )}
           {hasModule("DINING") && tenantSlug && (
             <>
               <Link

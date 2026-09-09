@@ -173,7 +173,7 @@ export function RegistrationFlow({ onClose }: RegistrationFlowProps) {
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseSuccess}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
           <div className="relative z-10 max-w-md w-full backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-2 border-blue-400/50 rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="text-center">
               <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/50">

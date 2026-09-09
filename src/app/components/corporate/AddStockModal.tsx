@@ -41,18 +41,12 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
     }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
 
   if (!isOpen) return null;
 
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      onClick={handleBackdropClick}
     >
       <div
         className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800"

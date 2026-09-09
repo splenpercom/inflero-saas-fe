@@ -145,7 +145,7 @@ export function Reservations() {
       const rows = await fetchReservations({ limit: viewMode === "list" ? 200 : 500 });
       setReservations(rows.map(apiReservationToUi));
     } catch (err) {
-      notifyFromError(err, tr("Rezervasiyaları yükləmək alınmadı", "Failed to load reservations"));
+      notifyFromError(err, tr("Rezervasiyaları yükləmək alınmadı", "Failed to load bookings"));
     } finally {
       setLoading(false);
     }
@@ -268,7 +268,7 @@ export function Reservations() {
           prev.map((r) => (r.id === editReservation.id ? apiReservationToUi(updated) : r)),
         );
         setEditReservation(null);
-        notifySuccess(tr("Rezervasiya yeniləndi", "Reservation updated"));
+        notifySuccess(tr("Rezervasiya yeniləndi", "Booking updated"));
       } else {
         const created = await createReservation({
           customerId: formMode === "registered" ? formCustomerId : null,
@@ -288,7 +288,7 @@ export function Reservations() {
         });
         setReservations((prev) => [apiReservationToUi(created), ...prev]);
         setIsAddModalOpen(false);
-        notifySuccess(tr("Rezervasiya əlavə edildi", "Reservation created"));
+        notifySuccess(tr("Rezervasiya əlavə edildi", "Booking created"));
       }
       resetForm();
     } catch (err) {
@@ -305,7 +305,7 @@ export function Reservations() {
       await deleteReservation(deleteId);
       setReservations((prev) => prev.filter((r) => r.id !== deleteId));
       setDeleteId(null);
-      notifySuccess(tr("Rezervasiya ləğv edildi", "Reservation cancelled"));
+      notifySuccess(tr("Rezervasiya ləğv edildi", "Booking cancelled"));
     } catch (err) {
       notifyFromError(err);
     } finally {
@@ -760,10 +760,10 @@ export function Reservations() {
         {/* Header */}
         <div className="mb-4">
           <h1 className="text-lg sm:text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 dark:text-white">
-            {tr("Rezervasiyalar", "Reservations")}
+            {tr("Rezervasiyalar", "Bookings")}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {tr("Avtomobil servis rezervasiyalarını idarə edin", "Manage car service reservations")}
+            {tr("Avtomobil servis rezervasiyalarını idarə edin", "Manage car service bookings")}
           </p>
         </div>
 
@@ -777,7 +777,7 @@ export function Reservations() {
                 {resConfig.bookingPageMode === "per_branch"
                   ? tr(
                       "Hər filialın öz rezervasiya səhifəsi var. Linkləri Rezervasiya Parametrlərindən idarə edin.",
-                      "Each branch has its own booking page. Manage links in Reservation Settings.",
+                      "Each branch has its own booking page. Manage links in Booking Settings.",
                     )
                   : tr(
                       "Bütün filiallar üçün tək ümumi rezervasiya səhifəsi.",
@@ -894,7 +894,7 @@ export function Reservations() {
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{tr("Rezervasiya Əlavə Et", "Add Reservation")}</span>
+            <span>{tr("Rezervasiya Əlavə Et", "Add Booking")}</span>
           </button>
           )}
         </div>
@@ -1149,7 +1149,7 @@ export function Reservations() {
                 ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={autoEnabled ? 7 : 6} className="px-3 py-8 text-center text-xs text-gray-400">
-                      {tr("Rezervasiya tapılmadı", "No reservations found")}
+                      {tr("Rezervasiya tapılmadı", "No bookings found")}
                     </td>
                   </tr>
                 ) : (
@@ -1254,7 +1254,7 @@ export function Reservations() {
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 shrink-0">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                {tr("Rezervasiya Parametrləri", "Reservation Settings")}
+                {tr("Rezervasiya Parametrləri", "Booking Settings")}
               </h2>
               <button onClick={() => setShowSettings(false)} className="text-white bg-red-500 hover:bg-red-600 rounded-full p-1 transition-colors">
                 <X className="w-4 h-4" />
@@ -1338,7 +1338,7 @@ export function Reservations() {
               {/* Capacity per slot */}
               <div>
                 <label className="text-xs font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
-                  {tr("Hər Slot üçün Maks. Rezervasiya", "Max Reservations per Slot")}
+                  {tr("Hər Slot üçün Maks. Rezervasiya", "Max Bookings per Slot")}
                 </label>
                 <div className="flex items-center gap-3">
                   <button type="button"
@@ -1466,7 +1466,7 @@ export function Reservations() {
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                {tr("Rezervasiya Əlavə Et", "Add Reservation")}
+                {tr("Rezervasiya Əlavə Et", "Add Booking")}
               </h2>
               <button onClick={() => setIsAddModalOpen(false)} className="text-white bg-red-500 hover:bg-red-600 rounded-full p-1 transition-colors">
                 <X className="w-4 h-4" />
@@ -1498,7 +1498,7 @@ export function Reservations() {
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                {tr("Rezervasiyanı Redaktə Et", "Edit Reservation")}
+                {tr("Rezervasiyanı Redaktə Et", "Edit Booking")}
               </h2>
               <button onClick={() => { setEditReservation(null); resetForm(); }} className="text-white bg-red-500 hover:bg-red-600 rounded-full p-1 transition-colors">
                 <X className="w-4 h-4" />
@@ -1530,7 +1530,7 @@ export function Reservations() {
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                {tr("Rezervasiya Detalları", "Reservation Details")}
+                {tr("Rezervasiya Detalları", "Booking Details")}
               </h2>
               <button onClick={() => setViewReservation(null)} className="text-white bg-red-500 hover:bg-red-600 rounded-full p-1 transition-colors">
                 <X className="w-4 h-4" />
@@ -1538,7 +1538,7 @@ export function Reservations() {
             </div>
             <div className="p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Rezervasiya ID", "Reservation ID")}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Rezervasiya ID", "Booking ID")}</span>
                 <span className="text-xs font-medium text-gray-900 dark:text-white">{viewReservation.id}</span>
               </div>
               <div className="flex items-center justify-between">
@@ -1631,7 +1631,7 @@ export function Reservations() {
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {tr("Rezervasiyanı Sil", "Delete Reservation")}
+                {tr("Rezervasiyanı Sil", "Delete Booking")}
               </h2>
               <button onClick={() => setDeleteId(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                 <X className="w-5 h-5" />
@@ -1645,7 +1645,7 @@ export function Reservations() {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">{tr("Əminsiniz?", "Are you sure?")}</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {tr("Bu rezervasiya həmişəlik silinəcək.", "This reservation will be permanently deleted.")}
+                    {tr("Bu rezervasiya həmişəlik silinəcək.", "This booking will be permanently deleted.")}
                   </p>
                 </div>
               </div>

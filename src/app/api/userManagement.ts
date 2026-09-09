@@ -39,6 +39,7 @@ export async function updateTenantUser(
   body: {
     firstName?: string;
     lastName?: string;
+    email?: string;
     phone?: string | null;
     roleId?: string;
     storeId?: string | null;

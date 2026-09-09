@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router";
 import { getStorageItem } from "./lib/storageMigration";
 import { STORAGE_KEYS } from "./lib/storageKeys";
 import { LanguageProvider } from "./i18n/LanguageContext";
@@ -10,6 +10,7 @@ import { CorporateDashboard } from "./components/corporate/CorporateDashboard";
 import { NewDashboard } from "./components/corporate/NewDashboard";
 import { CorporateOrders } from "./components/corporate/CorporateOrders";
 import { Settings as CorporateSettings } from "./components/corporate/Settings";
+import { Plugins } from "./components/corporate/Plugins";
 import { Profile } from "./components/corporate/Profile";
 import { Products } from "./components/corporate/Products";
 import { ProductDetails } from "./components/corporate/ProductDetails";
@@ -77,6 +78,17 @@ import { Toaster } from "sonner";
 import { useTheme } from "./i18n/ThemeContext";
 import { AppBrandingEffects } from "./components/AppBrandingEffects";
 import { ModuleRouteGuard } from "./components/modules/ModuleRouteGuard";
+import { WebsiteEditorRouteGuard } from "./components/modules/WebsiteEditorRouteGuard";
+
+/** Old `/customer-landing/...` URLs redirect to short `/res/...` paths. */
+function LegacyCustomerLandingRedirect() {
+  const { slug, branchSlug } = useParams<{ slug: string; branchSlug?: string }>();
+  if (!slug) return <Navigate to="/" replace />;
+  const to = branchSlug
+    ? `/res/${encodeURIComponent(slug)}/${encodeURIComponent(branchSlug)}`
+    : `/res/${encodeURIComponent(slug)}`;
+  return <Navigate to={to} replace />;
+}
 
 // Suppress recharts internal duplicate key warnings (library issue, not our code)
 const originalWarn = console.warn;
@@ -122,7 +134,7 @@ const LayoutWrapper = React.memo(function LayoutWrapper({
   toggleDarkMode: () => void;
 }) {
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-100 dark:from-gray-950 dark:via-blue-950/10 dark:to-gray-900">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-100 dark:from-[#042f2e] dark:via-[#0a3d38] dark:to-[#042f2e]">
       {/* Mobile Overlay */}
       {mobileMenuOpen && (
         <div
@@ -145,9 +157,6 @@ const LayoutWrapper = React.memo(function LayoutWrapper({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden w-full lg:w-auto">
-        <DemoBanner />
-        <PaymentStatusGate />
-        <BranchScopeBanner />
         {/* Header */}
         <CorporateHeader
           onToggleSidebar={toggleSidebar}
@@ -156,9 +165,12 @@ const LayoutWrapper = React.memo(function LayoutWrapper({
           onToggleDarkMode={toggleDarkMode}
           sidebarCollapsed={sidebarCollapsed}
         />
+        <DemoBanner />
+        <PaymentStatusGate />
+        <BranchScopeBanner />
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 scrollbar-hide">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-background scrollbar-hide">
           <AllBranchesScopeGuard>
             <DashboardPermissionGuard>{children}</DashboardPermissionGuard>
           </AllBranchesScopeGuard>
@@ -220,8 +232,10 @@ function AppShell() {
       <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
-            <Route path="/customer-landing/:slug" element={<CustomerLandingPage />} />
-            <Route path="/customer-landing/:slug/:branchSlug" element={<CustomerLandingPage />} />
+            <Route path="/res/:slug" element={<CustomerLandingPage />} />
+            <Route path="/res/:slug/:branchSlug" element={<CustomerLandingPage />} />
+            <Route path="/customer-landing/:slug" element={<LegacyCustomerLandingRedirect />} />
+            <Route path="/customer-landing/:slug/:branchSlug" element={<LegacyCustomerLandingRedirect />} />
             {diningPublicRouteElements}
 
             {/* POS Route - Full screen without sidebar/header */}
@@ -312,7 +326,14 @@ function AppShell() {
               {/* People Routes */}
               <Route path="people/customers" element={<PeopleCustomers />} />
               <Route path="people/customers/:id" element={<CustomerProfile />} />
-              <Route path="people/suppliers" element={<Suppliers />} />
+              <Route
+                path="people/suppliers"
+                element={
+                  <ModuleRouteGuard module="STOCK">
+                    <Suppliers />
+                  </ModuleRouteGuard>
+                }
+              />
               <Route
                 path="people/warehouses"
                 element={
@@ -340,11 +361,11 @@ function AppShell() {
               <Route
                 path="my-website"
                 element={
-                  <ModuleRouteGuard module="WEB_EDITOR">
+                  <WebsiteEditorRouteGuard>
                     <MyWebsiteProvider>
                       <MyWebsitePage />
                     </MyWebsiteProvider>
-                  </ModuleRouteGuard>
+                  </WebsiteEditorRouteGuard>
                 }
               />
               <Route
@@ -367,6 +388,7 @@ function AppShell() {
                   </ModuleRouteGuard>
                 }
               />
+              <Route path="plugins" element={<Plugins />} />
               <Route path="settings" element={<CorporateSettings />} />
               <Route path="billing/result" element={<BillingResultPage />} />
 

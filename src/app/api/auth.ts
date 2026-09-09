@@ -50,6 +50,8 @@ export interface PlatformUser {
     companyDarkLogoUrl: string | null;
     modules: TenantModuleMap;
     modulesVersion: number;
+    /** Store IDs allowed per feature module (BRANCH_MANAGEMENT is tenant-wide). */
+    moduleStores?: Partial<Record<Exclude<TenantModuleKey, "BRANCH_MANAGEMENT">, string[]>>;
     subscription: {
       cycle: "monthly" | "annual";
       expiringOn: string;

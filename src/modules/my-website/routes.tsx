@@ -10,11 +10,12 @@
 import { Route } from "react-router";
 import { MyWebsitePage, WebOrdersPage, WebReportPage } from "./pages";
 import { ModuleRouteGuard } from "../../app/components/modules/ModuleRouteGuard";
+import { WebsiteEditorRouteGuard } from "../../app/components/modules/WebsiteEditorRouteGuard";
 
 /** JSX route elements — nest under your layout Route */
 export const myWebsiteRouteElements = (
   <>
-    <Route path="my-website" element={<ModuleRouteGuard module="WEB_EDITOR"><MyWebsitePage /></ModuleRouteGuard>} />
+    <Route path="my-website" element={<WebsiteEditorRouteGuard><MyWebsitePage /></WebsiteEditorRouteGuard>} />
     <Route path="my-website/orders" element={<ModuleRouteGuard module="WEB_EDITOR"><WebOrdersPage /></ModuleRouteGuard>} />
     <Route path="my-website/reports" element={<ModuleRouteGuard module="WEB_EDITOR"><WebReportPage /></ModuleRouteGuard>} />
   </>
@@ -22,7 +23,7 @@ export const myWebsiteRouteElements = (
 
 /** Flat config if you prefer data routers */
 export const myWebsiteRouteConfig = [
-  { path: "my-website", element: <ModuleRouteGuard module="WEB_EDITOR"><MyWebsitePage /></ModuleRouteGuard> },
+  { path: "my-website", element: <WebsiteEditorRouteGuard><MyWebsitePage /></WebsiteEditorRouteGuard> },
   { path: "my-website/orders", element: <ModuleRouteGuard module="WEB_EDITOR"><WebOrdersPage /></ModuleRouteGuard> },
   { path: "my-website/reports", element: <ModuleRouteGuard module="WEB_EDITOR"><WebReportPage /></ModuleRouteGuard> },
 ];

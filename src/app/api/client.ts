@@ -72,6 +72,11 @@ export function setBranchStoreId(id: string | null): void {
   } catch {
     /* ignore */
   }
+  try {
+    window.dispatchEvent(new CustomEvent("inflero:branch-changed", { detail: { branchId: id } }));
+  } catch {
+    /* ignore (SSR / tests) */
+  }
 }
 
 export function setBranchTenantId(tenantId: string | null): void {

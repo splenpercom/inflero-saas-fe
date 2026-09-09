@@ -59,6 +59,8 @@ export interface ProductListItem {
   slug: string;
   productType: "SINGLE" | "VARIABLE";
   image: string;
+  /** Present on list + detail responses. */
+  categoryId?: string | null;
   category: string;
   brand: string;
   price: string;

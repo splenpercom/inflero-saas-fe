@@ -52,7 +52,10 @@ export function Profile() {
 
   const displayName = getUserDisplayName(user, pt("Demo User", "Demo İstifadəçi"));
   const initials = getUserInitials(displayName, user?.email);
-  const roleName = user?.role?.name ?? pt("Administrator", "Administrator");
+  const roleName =
+    user?.isTenantOwner || user?.role?.name === "Administrator"
+      ? "Admin"
+      : (user?.role?.name ?? pt("Administrator", "Administrator"));
   const statusLabel =
     user?.status === "ACTIVE" ? pt("Active", "Aktiv") : user?.status ?? pt("Active", "Aktiv");
   const companyName = user?.tenant?.name ?? pt("Inflero", "Inflero");

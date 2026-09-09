@@ -121,12 +121,15 @@ export function EditUserModal({ isOpen, onClose, onSave, user, roles = [], savin
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">{t("email")}</label>
+                <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  {t("email")} <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="email"
                   value={formData.email}
-                  readOnly
-                  className="w-full px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                  required
                 />
               </div>
             </div>
@@ -152,9 +155,13 @@ export function EditUserModal({ isOpen, onClose, onSave, user, roles = [], savin
                 <CustomSelect
                   value={formData.roleId}
                   onChange={(value) => setFormData({ ...formData, roleId: value })}
-                  options={roles.map((role) => ({ value: role.id, label: role.name }))}
+                  options={roles.map((role) => ({
+                    value: role.id,
+                    label: role.name === "Administrator" ? "Admin" : role.name,
+                  }))}
                   placeholder={t("selectRole")}
                   required
+                  disabled={user?.isTenantOwner === true}
                 />
               </div>
             </div>
@@ -192,6 +199,7 @@ export function EditUserModal({ isOpen, onClose, onSave, user, roles = [], savin
                   ]}
                   placeholder={t("status")}
                   required
+                  disabled={user?.isTenantOwner === true}
                 />
               </div>
             </div>

@@ -111,7 +111,16 @@ function toIsoDateOnly(iso: string | null | undefined): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Hub-provisioned owners use DB role "Administrator"; platform User Management shows "Admin". */
+export function displayUserRoleName(roleName: string | null | undefined, isTenantOwner?: boolean): string {
+  if (isTenantOwner) return "Admin";
+  if (!roleName) return "—";
+  if (roleName === "Administrator") return "Admin";
+  return roleName;
+}
+
 export function mapTenantUser(raw: RawTenantUser, language?: Language): TenantUserRow {
+  const isTenantOwner = raw.isTenantOwner === true;
   return {
     id: raw.id,
     email: raw.email,
@@ -121,7 +130,7 @@ export function mapTenantUser(raw: RawTenantUser, language?: Language): TenantUs
     avatar: userInitials(raw.firstName, raw.lastName, raw.email),
     phone: raw.phone ?? "—",
     roleId: raw.role?.id ?? "",
-    role: raw.role?.name ?? "—",
+    role: displayUserRoleName(raw.role?.name, isTenantOwner),
     status: userStatusToUi(raw.status),
     team: raw.team ?? "—",
     dateOfJoin: formatDisplayDate(raw.dateOfJoin, language),
@@ -130,7 +139,7 @@ export function mapTenantUser(raw: RawTenantUser, language?: Language): TenantUs
     dateOfBirthIso: toIsoDateOnly(raw.dateOfBirth),
     branch: raw.store?.name ?? "—",
     storeId: raw.storeId,
-    isTenantOwner: raw.isTenantOwner === true,
+    isTenantOwner,
     about: raw.about ?? "",
     bankName: raw.bankName ?? "",
     accountNo: raw.accountNo ?? "",

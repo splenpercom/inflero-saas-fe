@@ -5,3 +5,9 @@
 button, a, select{
     cursor: pointer;
 }
+
+/* Tailwind preflight sets img { max-width:100%; height:auto } which breaks Leaflet tiles */
+.leaflet-container img {
+  max-width: none !important;
+  max-height: none !important;
+}

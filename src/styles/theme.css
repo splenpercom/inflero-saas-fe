@@ -48,9 +48,9 @@ select:-webkit-autofill:focus {
 .dark select:-webkit-autofill,
 .dark select:-webkit-autofill:hover,
 .dark select:-webkit-autofill:focus {
-  -webkit-text-fill-color: #ffffff !important;
-  -webkit-box-shadow: 0 0 0px 1000px #111827 inset !important;
-  box-shadow: 0 0 0px 1000px #111827 inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #0f2926 inset !important;
+  box-shadow: 0 0 0px 1000px #0f2926 inset !important;
   transition: background-color 5000s ease-in-out 0s;
 }
 
@@ -130,7 +130,8 @@ select:-webkit-autofill:focus {
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: rgba(20, 184, 166, 0.22);
-  --input: oklch(0.269 0 0);
+  --input: #0a3d38;
+  --input-background: rgba(10, 61, 56, 0.55);
   --ring: #14b8a6;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -163,6 +164,24 @@ select:-webkit-autofill:focus {
   --glass-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
   --glass-blur: blur(20px);
   --glass-blur-strong: blur(40px);
+
+  /*
+   * Remap dark surface grays → brand green (matches sidebar).
+   * Keeps mid/light grays for readable muted text.
+   */
+  --color-gray-950: #042f2e;
+  --color-gray-900: #0f2926;
+  --color-gray-800: #134e4a;
+  --color-gray-700: #1a5c55;
+  --color-neutral-950: #042f2e;
+  --color-neutral-900: #0f2926;
+  --color-neutral-800: #134e4a;
+  --color-slate-950: #042f2e;
+  --color-slate-900: #0f2926;
+  --color-slate-800: #134e4a;
+  --color-zinc-950: #042f2e;
+  --color-zinc-900: #0f2926;
+  --color-zinc-800: #134e4a;
 }
 
 @theme inline {
@@ -176,7 +195,7 @@ select:-webkit-autofill:focus {
   --color-primary-foreground: var(--primary-foreground);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
-  /* Remap default Tailwind blue + indigo scales to brand teal #14b8a6 */
+  /* Remap default Tailwind blue + indigo + sky + cyan scales to brand teal #14b8a6 */
   --color-blue-50: #f0fdfa;
   --color-blue-100: #ccfbf1;
   --color-blue-200: #99f6e4;
@@ -199,6 +218,28 @@ select:-webkit-autofill:focus {
   --color-indigo-800: #115e59;
   --color-indigo-900: #134e4a;
   --color-indigo-950: #042f2e;
+  --color-sky-50: #f0fdfa;
+  --color-sky-100: #ccfbf1;
+  --color-sky-200: #99f6e4;
+  --color-sky-300: #5eead4;
+  --color-sky-400: #2dd4bf;
+  --color-sky-500: #14b8a6;
+  --color-sky-600: #0d9488;
+  --color-sky-700: #0f766e;
+  --color-sky-800: #115e59;
+  --color-sky-900: #134e4a;
+  --color-sky-950: #042f2e;
+  --color-cyan-50: #f0fdfa;
+  --color-cyan-100: #ccfbf1;
+  --color-cyan-200: #99f6e4;
+  --color-cyan-300: #5eead4;
+  --color-cyan-400: #2dd4bf;
+  --color-cyan-500: #14b8a6;
+  --color-cyan-600: #0d9488;
+  --color-cyan-700: #0f766e;
+  --color-cyan-800: #115e59;
+  --color-cyan-900: #134e4a;
+  --color-cyan-950: #042f2e;
   --color-brand-secondary: var(--brand-secondary);
   --color-brand-tertiary: var(--brand-tertiary);
   --color-brand-soft: var(--brand-soft);
@@ -242,6 +283,13 @@ select:-webkit-autofill:focus {
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 0% -20%, rgba(20, 184, 166, 0.14), transparent 55%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(13, 148, 136, 0.1), transparent 50%);
+    background-attachment: fixed;
   }
 
   /* Ultra high-quality rendering optimizations */

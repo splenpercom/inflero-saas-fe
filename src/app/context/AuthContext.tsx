@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getAccessToken, setBranchStoreId, setBranchTenantId } from "../api/client";
+import { getAccessToken, getBranchStoreId, setBranchStoreId, setBranchTenantId } from "../api/client";
 import { fetchMe, login as apiLogin, logout as apiLogout } from "../api/auth";
 import type { PlatformUser, TenantModuleKey } from "../api/auth";
 import {
@@ -42,9 +42,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isDemo, setIsDemo] = useState(() => isDemoSession());
   const [isLoading, setIsLoading] = useState(true);
   const [modulesLoaded, setModulesLoaded] = useState(() => isDemoSession());
+  const [branchScopeId, setBranchScopeId] = useState<string | null>(() => getBranchStoreId());
 
   const syncDemoFlag = useCallback(() => {
     setIsDemo(isDemoSession());
+  }, []);
+
+  useEffect(() => {
+    const onBranch = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ branchId: string | null }>).detail;
+      setBranchScopeId(detail?.branchId ?? getBranchStoreId());
+    };
+    window.addEventListener("inflero:branch-changed", onBranch);
+    return () => window.removeEventListener("inflero:branch-changed", onBranch);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -71,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (me.user.storeId && me.user.tenant.modules?.BRANCH_MANAGEMENT && !me.user.isTenantOwner) {
       setBranchStoreId(me.user.storeId);
     }
+    setBranchScopeId(getBranchStoreId());
   }, [syncDemoFlag]);
 
   useEffect(() => {
@@ -137,8 +148,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = !!user;
   const hasAppAccess = isAuthenticated || isDemo;
   const hasModule = useCallback(
-    (module: TenantModuleKey) => (isDemo ? true : modulesLoaded && user?.tenant.modules?.[module] === true),
-    [isDemo, modulesLoaded, user],
+    (module: TenantModuleKey) => {
+      if (isDemo) return true;
+      if (!modulesLoaded || !user) return false;
+      if (user.tenant.modules?.[module] !== true) return false;
+      if (module === "BRANCH_MANAGEMENT") return true;
+      // BM off → sole-store world; tenant flag is enough.
+      if (user.tenant.modules?.BRANCH_MANAGEMENT !== true) return true;
+      const allowed = user.tenant.moduleStores?.[module as Exclude<TenantModuleKey, "BRANCH_MANAGEMENT">] ?? [];
+      if (allowed.length === 0) return false;
+      // Owner "all branches" (no header): module available if enabled on any store.
+      if (!branchScopeId) return true;
+      return allowed.includes(branchScopeId);
+    },
+    [isDemo, modulesLoaded, user, branchScopeId],
   );
 
   useEffect(() => {

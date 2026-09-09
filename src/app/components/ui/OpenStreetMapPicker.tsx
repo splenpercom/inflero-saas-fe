@@ -43,6 +43,24 @@ function MapViewportSync({
   return null;
 }
 
+/** Leaflet often needs invalidateSize after mount inside scroll/accordion layouts. */
+function MapInvalidateSize() {
+  const map = useMap();
+  useEffect(() => {
+    const run = () => map.invalidateSize();
+    run();
+    const t1 = window.setTimeout(run, 100);
+    const t2 = window.setTimeout(run, 400);
+    window.addEventListener("resize", run);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.removeEventListener("resize", run);
+    };
+  }, [map]);
+  return null;
+}
+
 function MapClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(event) {
@@ -200,11 +218,18 @@ export function OpenStreetMapPicker({
       <div
         className={`relative w-full rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 ${mapHeightClassName}`}
       >
-        <MapContainer center={position} zoom={15} scrollWheelZoom className="h-full w-full z-0">
+        <MapContainer
+          center={position}
+          zoom={15}
+          scrollWheelZoom
+          className="h-full w-full z-0"
+          style={{ height: "100%", width: "100%", minHeight: 320 }}
+        >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          <MapInvalidateSize />
           <MapViewportSync latitude={latitude} longitude={longitude} zoom={mapZoom} />
           <MapClickHandler onPick={(lat, lng) => applyLocation(lat, lng, undefined, undefined)} />
           <Marker

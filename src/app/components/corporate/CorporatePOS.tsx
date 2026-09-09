@@ -21,6 +21,7 @@ import {
   Car,
   ChefHat,
   Armchair,
+  Factory,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -35,7 +36,7 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { createPosOrder, posCheckout, sendPosOrderToKot } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToKot, sendPosOrderToProduction } from "../../api/sales";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -402,6 +403,7 @@ export function CorporatePOS() {
   const [shippingInput, setShippingInput] = useState("0");
   const [serviceFeeInput, setServiceFeeInput] = useState("0");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
+  const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -409,6 +411,7 @@ export function CorporatePOS() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [sendingToKot, setSendingToKot] = useState(false);
+  const [sendingToProduction, setSendingToProduction] = useState(false);
   const { billers, defaultBillerId } = useSalesBillers((isAuthenticated || isDemo));
   const isEmployee = !isDemo && user?.role?.name.trim().toLowerCase() === "employee";
   const currentUserBillerId = useMemo(
@@ -515,15 +518,22 @@ export function CorporatePOS() {
   useEffect(() => {
     if (!(isAuthenticated || isDemo)) {
       setPosServiceFeeEnabled(false);
+      setPosSendToProductionEnabled(false);
       return;
     }
     let cancelled = false;
     fetchTenantSettings()
       .then((s) => {
-        if (!cancelled) setPosServiceFeeEnabled(s.posServiceFeeEnabled === true);
+        if (!cancelled) {
+          setPosServiceFeeEnabled(s.posServiceFeeEnabled === true);
+          setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setPosServiceFeeEnabled(false);
+        if (!cancelled) {
+          setPosServiceFeeEnabled(false);
+          setPosSendToProductionEnabled(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -993,6 +1003,81 @@ export function CorporatePOS() {
     }
   };
 
+  const handleSendToProduction = async () => {
+    if (!canCreate || isDemo || !isAuthenticated || !posSendToProductionEnabled) return;
+    if (cart.length === 0) {
+      alert(tr("Səbəti doldurun", "Please add items to cart"));
+      return;
+    }
+    if (!selectedPaymentMethod) {
+      alert(tr("Ödəniş üsulunu seçin", "Please select a payment method"));
+      return;
+    }
+    if (!selectedBillerId) {
+      alert(tr("Kassir seçin", "Please select an employee / biller"));
+      return;
+    }
+
+    const stockIssue = stockEnabled && cart.find((item) => {
+      const product = products.find((p) => p.id === item.id);
+      return !product || product.stock <= 0 || item.quantity > product.stock;
+    });
+    if (stockIssue) {
+      const product = products.find((p) => p.id === stockIssue.id);
+      if (product && product.stock <= 0) warnOutOfStock(product);
+      else if (product) warnInsufficientStock(product, product.stock);
+      else {
+        notifyWarning(
+          tr(
+            "Səbətdə stokda olmayan məhsullar var",
+            "Some items in the cart are out of stock or exceed available quantity",
+          ),
+        );
+      }
+      return;
+    }
+
+    const pmLabel: Record<PaymentMethod, string> = {
+      cash: tr("Nağd", "Cash"),
+      card: tr("Kart", "Card"),
+      bank: tr("Bank Transferi", "Bank Transfer"),
+    };
+    const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
+    const receiptPhone = selectedCustomer?.phone ?? "—";
+    const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
+
+    setSendingToProduction(true);
+    try {
+      const detail = await sendPosOrderToProduction({
+        status: "COMPLETED",
+        customerId: selectedCustomerId || null,
+        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+          ? { mileageAtService: Number(mileageInput) }
+          : {}),
+        billerId: selectedBillerId || null,
+        paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod),
+        shipping,
+        ...(serviceFee > 0 ? { serviceFee } : {}),
+        discount: discountAmount > 0 ? discountAmount : undefined,
+        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+        ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
+        ...(isGlobalMode ? { storeId: branchId ?? null } : {}),
+        ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
+      });
+
+      setReceipt(
+        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller),
+      );
+      notifySuccess(tr("İstehsala göndərildi", "Sent to production"));
+      resetCartAfterSave();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setSendingToProduction(false);
+    }
+  };
+
   const filteredProducts = products.filter((p) => {
     const q = searchQuery.toLowerCase();
     return (
@@ -1454,7 +1539,7 @@ export function CorporatePOS() {
                   <button
                     type="button"
                     onClick={() => void handleSaveDraft()}
-                    disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || isGlobalMode || !branchId}
+                    disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToProduction || isGlobalMode || !branchId}
                     className="px-3 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {savingDraft
@@ -1464,13 +1549,34 @@ export function CorporatePOS() {
                   <button
                     type="button"
                     onClick={() => void handlePlaceOrder()}
-                    disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || isGlobalMode || !branchId}
+                    disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToProduction || isGlobalMode || !branchId}
                     className="px-3 py-2.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     {placingOrder ? tr("Göndərilir...", "Processing...") : tr("Ödənişi Tamamla", "Complete & Print")}
                   </button>
                 </div>
+                {posSendToProductionEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSendToProduction()}
+                    disabled={
+                      cart.length === 0 ||
+                      placingOrder ||
+                      savingDraft ||
+                      sendingToKot ||
+                      sendingToProduction ||
+                      isGlobalMode ||
+                      !branchId
+                    }
+                    className="w-full px-3 py-2.5 text-xs font-medium text-white bg-[#0d9488] hover:bg-[#0f766e] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    <Factory className="w-3.5 h-3.5" />
+                    {sendingToProduction
+                      ? tr("İstehsala göndərilir...", "Sending to production...")
+                      : tr("İstehsala göndər", "Send to Production")}
+                  </button>
+                )}
                 {diningEnabled && (
                   <button
                     type="button"
@@ -1480,6 +1586,7 @@ export function CorporatePOS() {
                       placingOrder ||
                       savingDraft ||
                       sendingToKot ||
+                      sendingToProduction ||
                       isGlobalMode ||
                       !branchId ||
                       !selectedTableId

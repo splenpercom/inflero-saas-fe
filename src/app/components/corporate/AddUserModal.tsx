@@ -151,7 +151,10 @@ export function AddUserModal({
                 <CustomSelect
                   value={formData.roleId}
                   onChange={(value) => setFormData({ ...formData, roleId: value })}
-                  options={roles.map((role) => ({ value: role.id, label: role.name }))}
+                  options={roles.map((role) => ({
+                    value: role.id,
+                    label: role.name === "Administrator" ? "Admin" : role.name,
+                  }))}
                   placeholder={t("selectRole")}
                   required
                 />

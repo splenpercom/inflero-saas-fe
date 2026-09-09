@@ -334,12 +334,15 @@ export function UserManagement() {
     }
     setSaving(true);
     try {
+      const isOwner = selectedUser?.id === data.id && selectedUser.isTenantOwner;
       await updateTenantUser(data.id, {
         firstName: data.firstName,
         lastName: data.lastName,
+        email: data.email,
         phone: data.phone,
-        roleId: data.roleId,
-        status: data.status,
+        // Company owner keeps fixed Administrator role; sending roleId can 403 if dropdown changed.
+        ...(isOwner ? {} : { roleId: data.roleId }),
+        ...(isOwner ? {} : { status: data.status }),
         dateOfBirth: data.dateOfBirth || null,
         dateOfJoin: data.joiningDate || null,
         newPassword: data.password || null,
@@ -781,7 +784,12 @@ export function UserManagement() {
                               <button
                                 type="button"
                                 onClick={() => void handleDelete(role.id)}
-                                disabled={isDemo || saving}
+                                disabled={isDemo || saving || role.name === "Administrator"}
+                                title={
+                                  role.name === "Administrator"
+                                    ? tr("Administrator rolunu silmək olmaz", "Cannot delete the Administrator role")
+                                    : undefined
+                                }
                                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -817,6 +825,11 @@ export function UserManagement() {
       <ViewUserModal
         isOpen={viewUserModalOpen}
         onClose={() => setViewUserModalOpen(false)}
+        onEdit={(user) => {
+          setSelectedUser(user);
+          setViewUserModalOpen(false);
+          setEditUserModalOpen(true);
+        }}
         user={selectedUser}
       />
       <AddUserModal

@@ -86,7 +86,7 @@ export const userManagementTranslations = {
     purchases: "Purchases",
     finances: "Finances",
     people: "People",
-    reservations: "Reservations",
+    reservations: "Bookings",
     reports: "Reports",
     usermanagement: "User Management",
     settings: "Settings",

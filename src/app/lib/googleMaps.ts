@@ -5,6 +5,7 @@ export function getGoogleMapsApiKey(): string {
 
 let loadPromise: Promise<void> | null = null;
 let loadedLanguage: string | null = null;
+let pendingLanguage: string | null = null;
 
 export function loadGoogleMapsApi(language = "en"): Promise<void> {
   const apiKey = getGoogleMapsApiKey();
@@ -12,19 +13,36 @@ export function loadGoogleMapsApi(language = "en"): Promise<void> {
     return Promise.reject(new Error("MISSING_GOOGLE_MAPS_API_KEY"));
   }
 
-  if (window.google?.maps && loadedLanguage === language) {
+  // Already loaded — language on the script URL cannot be changed without a full reload.
+  if (window.google?.maps) {
+    loadedLanguage = loadedLanguage ?? language;
     return Promise.resolve();
   }
 
-  if (loadPromise && loadedLanguage === language) {
+  if (loadPromise && pendingLanguage === language) {
     return loadPromise;
   }
 
-  loadPromise = new Promise((resolve, reject) => {
+  // Reuse in-flight load even if language differs; avoid injecting duplicate scripts.
+  if (loadPromise) {
+    return loadPromise;
+  }
+
+  pendingLanguage = language;
+  loadPromise = new Promise<void>((resolve, reject) => {
     const callbackName = `__gmapsInit_${Date.now()}`;
-    const win = window as unknown as Record<string, () => void>;
+    const win = window as unknown as Record<string, (() => void) | undefined>;
+
+    const fail = (error: Error) => {
+      loadPromise = null;
+      pendingLanguage = null;
+      delete win[callbackName];
+      reject(error);
+    };
+
     win[callbackName] = () => {
       loadedLanguage = language;
+      pendingLanguage = null;
       resolve();
       delete win[callbackName];
     };
@@ -34,11 +52,7 @@ export function loadGoogleMapsApi(language = "en"): Promise<void> {
       `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}` +
       `&libraries=places&language=${encodeURIComponent(language)}&callback=${callbackName}`;
     script.async = true;
-    script.onerror = () => {
-      loadPromise = null;
-      delete win[callbackName];
-      reject(new Error("GOOGLE_MAPS_LOAD_FAILED"));
-    };
+    script.onerror = () => fail(new Error("GOOGLE_MAPS_LOAD_FAILED"));
     document.head.appendChild(script);
   });
 

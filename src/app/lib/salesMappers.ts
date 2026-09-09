@@ -62,6 +62,7 @@ export type SalesListQuery = {
   limit?: number;
   source?: string;
   kotStatus?: string;
+  productionStatus?: string;
 };
 
 export function salesListQueryString(q: SalesListQuery = {}): string {
@@ -73,6 +74,7 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   if (q.sortBy && q.sortBy !== "all") params.set("sortBy", q.sortBy);
   if (q.source && q.source !== "all") params.set("source", q.source);
   if (q.kotStatus && q.kotStatus !== "all") params.set("kotStatus", q.kotStatus);
+  if (q.productionStatus && q.productionStatus !== "all") params.set("productionStatus", q.productionStatus);
   if (q.page) params.set("page", String(q.page));
   if (q.pageSize) params.set("pageSize", String(q.pageSize));
   if (q.limit) params.set("limit", String(q.limit));

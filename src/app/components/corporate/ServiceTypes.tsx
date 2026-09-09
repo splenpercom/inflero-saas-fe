@@ -233,7 +233,7 @@ export function ServiceTypes() {
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {tr(
               "Rezervasiya formasında görünən xidmət növlərini idarə edin",
-              "Manage service types shown in the reservation form",
+              "Manage service types shown in the booking form",
             )}
           </p>
         </div>
@@ -361,7 +361,6 @@ export function ServiceTypes() {
       {showModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => e.target === e.currentTarget && closeModal()}
         >
           <div
             className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800"

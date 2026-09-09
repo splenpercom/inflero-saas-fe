@@ -62,7 +62,7 @@ export function AddVehicleModal({
   );
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-gray-900">
         <div className="flex items-center justify-between border-b p-4 dark:border-gray-800">
           <h2 className="text-sm font-semibold">{vehicle ? tr("Avtomobili redaktə et", "Edit vehicle") : tr("Avtomobil əlavə et", "Add vehicle")}</h2>

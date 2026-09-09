@@ -11,11 +11,16 @@ import {
   Copy, Monitor, Smartphone, ArrowLeft, X, ChevronRight,
   Image as ImageIcon, AlignLeft, Layers, ShoppingCart,
   MessageCircle, Link2, Pencil, LayoutTemplate, Columns, Upload,
-  CalendarDays, Clock, Users, Mail, MapPin,
+  CalendarDays, Clock, Users, Mail, MapPin, Lock, Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "../../i18n";
 import { pickLang } from "../../../../app/i18n/pickLang";
+import { useAuth } from "../../../../app/context/AuthContext";
+import { PublicBookingWizard } from "../../../../app/components/booking/PublicBookingWizard";
+import { WebsiteBookingProvider, useWebsiteBooking } from "./WebsiteBookingContext";
+import { isBranchSellingMode } from "./branchSelling";
+import { fetchBranchSwitcherStores, type BranchSwitcherStore } from "../../../../app/api/stores";
 import "../../styles/my-website.css";
 import {
   loadWebsiteConfigBySlug,
@@ -24,6 +29,17 @@ import {
 } from "../../lib/websiteConfigStorage";
 import { storePath, storeUrl } from "../../../../app/lib/bookingLinks";
 import { fetchTenantWebsiteConfig, saveTenantWebsiteConfig } from "../../../../app/api/website";
+import { fetchCategories, fetchProducts } from "../../../../app/api/inventory";
+import {
+  CatalogProvider,
+  EMPTY_CATALOG,
+  mapInventoryCategory,
+  mapInventoryProduct,
+  resolveProducts,
+  useCatalog,
+  type StorefrontCatalog,
+  type StorefrontProduct,
+} from "./storefrontCatalog";
 
 import type {
   BlockType, ProductSource, Block, ColumnItem, RowItem, ContentItem,
@@ -153,21 +169,6 @@ const TEMPLATES = [
     navStyle: "bold", badgeRadius: "rounded-lg",
   },
 ];
-const CATEGORIES = [
-  { id: "cat-1", name: "Electronics" }, { id: "cat-2", name: "Clothing" },
-  { id: "cat-3", name: "Home & Garden" }, { id: "cat-4", name: "Sports" }, { id: "cat-5", name: "Beauty" },
-];
-const PRODUCTS = [
-  { id: "p1", name: "Wireless Headphones", price: 129.99, originalPrice: 159.99, category: "cat-1", badge: "Best Seller", rating: 4.8, reviews: 312, image: "https://images.unsplash.com/photo-1612858249937-1cc0852093dd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { id: "p2", name: "Running Shoes",       price: 89.99,  originalPrice: 119.99, category: "cat-4", badge: "New",         rating: 4.6, reviews: 187, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { id: "p3", name: "Ceramic Mug Set",     price: 34.99,  originalPrice: null,   category: "cat-3", badge: "",           rating: 4.9, reviews: 94,  image: "https://images.unsplash.com/photo-1616241673347-67fb5dfa3167?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { id: "p4", name: "Yoga Mat",            price: 49.99,  originalPrice: 64.99,  category: "cat-4", badge: "Sale",        rating: 4.7, reviews: 256, image: "https://images.unsplash.com/photo-1637157216470-d92cd2edb2e8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { id: "p5", name: "Sunscreen SPF 50",    price: 19.99,  originalPrice: null,   category: "cat-5", badge: "",           rating: 4.5, reviews: 430, image: "https://images.unsplash.com/photo-1623676714504-edd78728155e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { id: "p6", name: "Smart Watch",         price: 249.99, originalPrice: 299.99, category: "cat-1", badge: "Hot",         rating: 4.8, reviews: 521, image: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { id: "p7", name: "Linen Shirt",         price: 59.99,  originalPrice: null,   category: "cat-2", badge: "New",         rating: 4.4, reviews: 68,  image: "https://images.unsplash.com/photo-1740711152088-88a009e877bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { id: "p8", name: "Desk Lamp",           price: 44.99,  originalPrice: 54.99,  category: "cat-3", badge: "Sale",        rating: 4.6, reviews: 143, image: "https://images.unsplash.com/photo-1667312939978-64cf31718a6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-];
-type StorefrontProduct = (typeof PRODUCTS)[number];
 type StorefrontCartLine = { product: StorefrontProduct; qty: number };
 export type StorefrontRuntime = {
   page: "home" | "product" | "checkout";
@@ -177,6 +178,8 @@ export type StorefrontRuntime = {
   selectedProduct: StorefrontProduct | null;
   openProduct: (product: StorefrontProduct) => void;
   cartCount: number;
+  selectedBranch?: { storeId: string; code: string; name: string; address?: string | null } | null;
+  onChangeBranch?: () => void;
 };
 const PAYMENT_METHODS: PaymentMethod[] = [
   { id: "epoint", name: "Epoint",            icon: "💳", enabled: false },
@@ -201,13 +204,14 @@ const BLOCK_META: Record<BlockType, { icon: React.ReactNode; label: string; desc
   "image-block":       { icon: <ImageIcon className="w-3.5 h-3.5" />,     label: "Image",           description: "Image with caption" },
   "image-text":        { icon: <Layout className="w-3.5 h-3.5" />,        label: "Image + Text",    description: "Image beside text and CTA" },
   "whatsapp-widget":   { icon: <MessageCircle className="w-3.5 h-3.5" />, label: "WhatsApp Widget", description: "Floating chat button" },
-  "reservation":       { icon: <CalendarDays className="w-3.5 h-3.5" />, label: "Reservation",     description: "Booking widget from your reservations" },
+  "reservation":       { icon: <CalendarDays className="w-3.5 h-3.5" />, label: "Booking",         description: "Live booking widget from Bookings module" },
+  "branches":          { icon: <Building2 className="w-3.5 h-3.5" />,    label: "Branches",        description: "Branch picker for multi-branch selling" },
   "socials":           { icon: <Link2 className="w-3.5 h-3.5" />,         label: "Social Links",    description: "Social profile links" },
 };
 
 const BLOCK_GROUPS = [
   { label: "Content", types: ["hero", "banner", "image-block", "image-text"] as BlockType[] },
-  { label: "Store",   types: ["featured-products", "category-grid"] as BlockType[] },
+  { label: "Store",   types: ["featured-products", "category-grid", "branches"] as BlockType[] },
   { label: "Engage",  types: ["testimonials", "socials", "whatsapp-widget", "reservation"] as BlockType[] },
   { label: "Custom",  types: ["custom-html"] as BlockType[] },
 ];
@@ -222,13 +226,14 @@ const BLOCK_META_AZ: Record<BlockType, { label: string; description: string }> =
   "image-block":       { label: "Şəkil",             description: "Başlıqlı şəkil" },
   "image-text":        { label: "Şəkil + Mətn",      description: "Şəkil və mətn yanı-yana" },
   "whatsapp-widget":   { label: "WhatsApp Düyməsi",  description: "Üzən söhbət düyməsi" },
-  "reservation":       { label: "Rezervasiya",       description: "Rezervasiya formu" },
+  "reservation":       { label: "Rezervasiya",       description: "Booking modulundan canlı rezervasiya formu" },
+  "branches":          { label: "Filiallar",         description: "Çoxfilial satış üçün filial seçimi" },
   "socials":           { label: "Sosial Linklər",    description: "Sosial media linkləri" },
 };
 
 const BLOCK_GROUPS_AZ = [
   { label: "Məzmun",  types: ["hero", "banner", "image-block", "image-text"] as BlockType[] },
-  { label: "Mağaza",  types: ["featured-products", "category-grid"] as BlockType[] },
+  { label: "Mağaza",  types: ["featured-products", "category-grid", "branches"] as BlockType[] },
   { label: "Cəlbetmə", types: ["testimonials", "socials", "whatsapp-widget", "reservation"] as BlockType[] },
   { label: "Xüsusi",  types: ["custom-html"] as BlockType[] },
 ];
@@ -243,11 +248,39 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function resolveProducts(src?: ProductSource) {
-  if (!src) return PRODUCTS.slice(0, 4);
-  if (src.mode === "category" && src.categoryId) return PRODUCTS.filter(p => p.category === src.categoryId).slice(0, src.limit);
-  if (src.mode === "specific" && src.productIds.length) return PRODUCTS.filter(p => src.productIds.includes(p.id)).slice(0, src.limit);
-  return PRODUCTS.slice(0, src.limit || 4);
+const PLACEHOLDER_PRODUCT: StorefrontProduct = {
+  id: "",
+  name: "Product",
+  price: 0,
+  originalPrice: null,
+  category: "",
+  badge: "",
+  rating: 0,
+  reviews: 0,
+  image: "",
+};
+
+async function loadInventoryCatalog(): Promise<StorefrontCatalog> {
+  const [cats, firstPage] = await Promise.all([
+    fetchCategories(),
+    fetchProducts({ page: 1, pageSize: 100, status: "ACTIVE", sortBy: "name", sortOrder: "asc" }),
+  ]);
+  const items = [...firstPage.items];
+  for (let page = 2; page <= Math.min(firstPage.totalPages, 10); page++) {
+    const next = await fetchProducts({
+      page,
+      pageSize: 100,
+      status: "ACTIVE",
+      sortBy: "name",
+      sortOrder: "asc",
+    });
+    items.push(...next.items);
+  }
+  return {
+    loading: false,
+    categories: cats.filter((c) => c.status === "active").map(mapInventoryCategory),
+    products: items.map(mapInventoryProduct),
+  };
 }
 
 const IMG_H: Record<string, string> = { sm: "h-24", md: "h-44", lg: "h-64" };
@@ -264,7 +297,8 @@ function makeBlock(type: BlockType): Block {
   if (type === "image-text")        return { ...base, imageHeight: "md", imagePosition: "left", heading: "Section Title", subheading: "Tell your brand story.", ctaText: "Learn more", ctaColor: "#14b8a6" };
   if (type === "whatsapp-widget")   return { ...base, waNumber: "", waMessage: "Hello! I have a question.", waLabel: "Chat with us" };
   if (type === "socials")           return { ...base, socialLinks: {} };
-  if (type === "reservation")       return { ...base, reservationTitle: "Make a Reservation", reservationSubtext: "Book your spot in just a few clicks.", reservationServices: ["Table for 2", "Table for 4", "Private Room"], reservationShowGuests: true, reservationShowNotes: true };
+  if (type === "reservation")       return { ...base, label: "Booking", reservationTitle: "Book an Appointment", reservationSubtext: "Same live booking flow as your /res booking page." };
+  if (type === "branches")          return { ...base, label: "Branches", branchesTitle: "Choose a branch", branchesSubtext: "Select a location to shop products available there.", branchStoreIds: [] };
   return base;
 }
 
@@ -434,6 +468,8 @@ function PreviewBlock({
   publicMode?: boolean;
   storefront?: StorefrontRuntime;
 }) {
+  const { categories: CATEGORIES, products: PRODUCTS } = useCatalog();
+  const { tenantSlug: bookingSlug, bookingsEnabled } = useWebsiteBooking();
   const _baseTmpl = TEMPLATES.find(t => t.id === config.template) ?? TEMPLATES[0];
   const tmpl = { ..._baseTmpl, accent: config.accentColor || _baseTmpl.accent };
   const isDark = config.template === "dark";
@@ -521,7 +557,7 @@ function PreviewBlock({
               {isVibrant && !compact && <div className="w-12 h-1 mx-auto mb-4 rounded-full" style={{background:block.ctaColor||tmpl.accent}}/>}
               <button
                 type="button"
-                onClick={isPublicStore ? (e) => { e.stopPropagation(); storefront!.openProduct(PRODUCTS[0]); } : undefined}
+                onClick={isPublicStore && PRODUCTS[0] ? (e) => { e.stopPropagation(); storefront!.openProduct(PRODUCTS[0]); } : undefined}
                 className={`${tmpl.btnRadius} font-semibold shadow-lg ${compact ? "px-4 py-1.5 text-xs" : isElegant?"px-10 py-3 text-sm tracking-widest uppercase":"px-6 py-2.5 text-sm"}`}
                 style={{ background: block.ctaColor || tmpl.accent, color: block.ctaBtnTextColor || "#ffffff" }}
               >
@@ -539,7 +575,7 @@ function PreviewBlock({
       const userCols = src?.columns ?? 4;
       const userRows = src?.rows ?? 1;
       const maxProducts = compact ? 2 : userCols * userRows;
-      const products = resolveProducts({ ...src, mode: src?.mode ?? "all", categoryId: src?.categoryId ?? "", productIds: src?.productIds ?? [], limit: maxProducts, title: src?.title ?? "" });
+      const products = resolveProducts(PRODUCTS, { ...src, mode: src?.mode ?? "all", categoryId: src?.categoryId ?? "", productIds: src?.productIds ?? [], limit: maxProducts, title: src?.title ?? "" });
       const colsMap: Record<number,string> = {2:"grid-cols-2",3:"grid-cols-3",4:"grid-cols-4",5:"grid-cols-5",6:"grid-cols-6"};
       const colsClass = compact ? "grid-cols-2" : viewport === "mobile" ? "grid-cols-3" : (colsMap[userCols] ?? "grid-cols-4");
       const visibleProducts = products.slice(0, maxProducts);
@@ -563,7 +599,13 @@ function PreviewBlock({
                 {!compact && <span className="text-[10px] font-medium px-2 py-1 rounded-full border" style={{ color: tmpl.accent, borderColor: tmpl.accent + "44" }}>Hamısına bax →</span>}
               </div>
               <div className={`grid ${colsClass} ${viewport === "mobile" ? "gap-2" : "gap-3"}`}>
-                {visibleProducts.map(p => {
+                {visibleProducts.length === 0 ? (
+                  <p className={`col-span-full text-xs ${textMuted} py-4 text-center`}>
+                    {PRODUCTS.length === 0
+                      ? "No active products in inventory yet."
+                      : "No products match this block filter."}
+                  </p>
+                ) : visibleProducts.map(p => {
                   const isHovered = hoveredProductId === p.id;
                   const isMobile = viewport === "mobile";
                   const showCartCta = !compact && (isPublicStore || isHovered);
@@ -639,7 +681,9 @@ function PreviewBlock({
                 {!compact && <span className="text-[10px] font-medium" style={{color:tmpl.accent}}>Bütün kateqoriyalar →</span>}
               </div>
               <div className={`grid gap-2 ${{2:"grid-cols-2",3:"grid-cols-3",4:"grid-cols-4",5:"grid-cols-5",6:"grid-cols-6"}[compact||viewport==="mobile" ? 2 : (block.categoryColumns??3)]??"grid-cols-3"}`}>
-                {CATEGORIES.slice(0, compact ? 2 : viewport === "mobile" ? 4 : CATEGORIES.length).map((c, i) => {
+                {CATEGORIES.length === 0 ? (
+                  <p className={`col-span-full text-xs ${textMuted} py-4 text-center`}>No active categories in inventory yet.</p>
+                ) : CATEGORIES.slice(0, compact ? 2 : viewport === "mobile" ? 4 : CATEGORIES.length).map((c, i) => {
                   const accent = catAccentPalette[i % catAccentPalette.length];
                   return (
                     <div key={c.id} className={`${tmpl.cardRadius} border overflow-hidden cursor-pointer group transition-all hover:shadow-md ${isDark ? "border-gray-700" : "border-gray-100"}`}>
@@ -846,100 +890,78 @@ function PreviewBlock({
     }
 
     case "reservation": {
-      const services = block.reservationServices ?? ["Table for 2", "Table for 4", "Private Room"];
-      const resBg = isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100";
-      const fieldCls = `w-full ${compact?"h-6 text-[9px]":"h-8 text-xs"} px-2 rounded-lg border ${isDark?"border-gray-600 bg-gray-700 text-gray-200":"border-gray-200 bg-gray-50 text-gray-700"} outline-none`;
+      const accent = tmpl.accent;
+      return (
+        <>
+          <DropLine active={!!dropBefore} />
+          <div className={wrap} onClick={blockClick} {...dragHandlers}>
+            <Overlay />
+            <div
+              className={compact ? "py-4 px-3" : "py-8 px-5"}
+              onClick={(e) => {
+                if (isPublicStore || bookingsEnabled) e.stopPropagation();
+              }}
+            >
+              {!bookingsEnabled ? (
+                <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-4 py-8 text-center">
+                  <Lock className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                  <p className={`text-sm font-semibold ${textBase}`}>Booking plugin disabled</p>
+                  <p className={`text-xs mt-1 ${textMuted}`}>
+                    Ask Inflero support to enable the Bookings module for this workspace.
+                  </p>
+                </div>
+              ) : !bookingSlug ? (
+                <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 px-4 py-8 text-center">
+                  <CalendarDays className="w-6 h-6 mx-auto mb-2" style={{ color: accent }} />
+                  <p className={`text-sm font-semibold ${textBase}`}>{block.reservationTitle || "Book an Appointment"}</p>
+                  <p className={`text-xs mt-1 ${textMuted}`}>Company slug is required to load the live booking widget.</p>
+                </div>
+              ) : (
+                <PublicBookingWizard
+                  tenantSlug={bookingSlug}
+                  title={block.reservationTitle}
+                  subtext={block.reservationSubtext}
+                  showLanguageSwitcher={!compact}
+                />
+              )}
+            </div>
+          </div>
+          <DropLine active={!!dropAfter} />
+        </>
+      );
+    }
+
+    case "branches": {
+      // Public storefront uses a full-page gate; do not render this block on the live site.
+      if (isPublicStore) return null;
+      const selectedCount = (block.branchStoreIds ?? []).length;
       return (
         <>
           <DropLine active={!!dropBefore} />
           <div className={wrap} onClick={blockClick} {...dragHandlers}>
             <Overlay />
             <div className={compact ? "py-4 px-3" : "py-8 px-5"}>
-              {/* Header */}
               <div className="text-center mb-4">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl mb-3" style={{background: tmpl.accent + "20"}}>
-                  <CalendarDays className="w-5 h-5" style={{color: tmpl.accent}} />
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl mb-3" style={{ background: tmpl.accent + "20" }}>
+                  <Building2 className="w-5 h-5" style={{ color: tmpl.accent }} />
                 </div>
-                <h3 className={`font-bold ${compact?"text-sm":"text-lg"} ${textBase}`}>{block.reservationTitle || "Rezervasiya Et"}</h3>
-                {!compact && block.reservationSubtext && <p className={`text-xs mt-1 ${textMuted}`}>{block.reservationSubtext}</p>}
-              </div>
-
-              {/* Widget form */}
-              <div className={`${tmpl.cardRadius} border p-4 ${resBg} ${tmpl.cardShadow} space-y-3`}>
-                {/* Service selector */}
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-1.5 ${textMuted} uppercase tracking-wide`}>Xidmət</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {services.slice(0, compact ? 2 : undefined).map((s, i) => (
-                      <span key={i} className={`text-[10px] font-medium px-2.5 py-1 rounded-full border transition-colors ${i===0?"text-white border-transparent":"border-gray-200 dark:border-gray-600 " + textMuted}`}
-                        style={i===0?{background:tmpl.accent}:{}}>
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
+                <h3 className={`font-bold ${compact ? "text-sm" : "text-lg"} ${textBase}`}>
+                  {block.branchesTitle || "Choose a branch"}
+                </h3>
                 {!compact && (
-                  <>
-                    {/* Date + Time */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-1 ${textMuted} uppercase tracking-wide`}>Tarix</label>
-                        <div className={`${fieldCls} flex items-center gap-1.5`}>
-                          <CalendarDays className="w-3 h-3 opacity-50 flex-shrink-0" />
-                          <span className="opacity-50">Tarix seçin</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-1 ${textMuted} uppercase tracking-wide`}>Vaxt</label>
-                        <div className={`${fieldCls} flex items-center gap-1.5`}>
-                          <Clock className="w-3 h-3 opacity-50 flex-shrink-0" />
-                          <span className="opacity-50">Vaxt seçin</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Guests */}
-                    {block.reservationShowGuests !== false && (
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-1 ${textMuted} uppercase tracking-wide`}>Qonaqlar</label>
-                        <div className={`${fieldCls} flex items-center gap-1.5`}>
-                          <Users className="w-3 h-3 opacity-50 flex-shrink-0" />
-                          <span className="opacity-50">Qonaq sayı</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Name + Contact */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-1 ${textMuted} uppercase tracking-wide`}>Ad</label>
-                        <input className={fieldCls} placeholder="Adınız" readOnly />
-                      </div>
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-1 ${textMuted} uppercase tracking-wide`}>Telefon</label>
-                        <input className={fieldCls} placeholder="+994 ···" readOnly />
-                      </div>
-                    </div>
-
-                    {/* Notes */}
-                    {block.reservationShowNotes !== false && (
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-1 ${textMuted} uppercase tracking-wide`}>Qeydlər <span className="normal-case font-normal opacity-60">(istəyə bağlı)</span></label>
-                        <div className={`w-full h-12 px-2 py-1.5 text-xs rounded-lg border ${isDark?"border-gray-600 bg-gray-700":"border-gray-200 bg-gray-50"} opacity-50 flex items-start`}>
-                          <span className={textMuted}>Xüsusi istəkləriniz?</span>
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  <p className={`text-xs mt-1 ${textMuted}`}>
+                    {block.branchesSubtext || "Customers pick a branch before shopping."}
+                  </p>
                 )}
-
-                <button className={`w-full py-2.5 ${tmpl.btnRadius} text-white text-xs font-bold shadow-md transition-opacity hover:opacity-90`} style={{background: tmpl.accent}}>
-                  Rezervasiyanı Təsdiqlə
-                </button>
-
-                <p className={`text-center text-[9px] ${textMuted}`}>
-                  Inflero Rezervasiyalarınıza bağlıdır — sifarişlər avtomatik sinxronlaşır.
+              </div>
+              <div className={`rounded-xl border border-dashed px-4 py-6 text-center ${isDark ? "border-gray-600 bg-gray-800/50" : "border-gray-200 bg-gray-50"}`}>
+                <p className={`text-xs font-medium ${textBase}`}>
+                  {selectedCount === 0
+                    ? "No branches selected yet — open settings to enable stores."
+                    : `${selectedCount} branch${selectedCount === 1 ? "" : "es"} enabled for web selling`}
+                </p>
+                <p className={`text-[10px] mt-1 ${textMuted}`}>
+                  Public visitors must select a branch first, then see only that branch’s in-stock products.
                 </p>
               </div>
             </div>
@@ -1128,8 +1150,6 @@ function PreviewRow({
 
 // ─── Product Detail & Checkout Pages ─────────────────────────────────────────
 
-const DEFAULT_PRODUCT = PRODUCTS[0];
-
 function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
   page: "product" | "checkout";
   config: WebsiteConfig;
@@ -1137,6 +1157,8 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
   isDark: boolean;
   storefront?: StorefrontRuntime;
 }) {
+  const { products: PRODUCTS } = useCatalog();
+  const DEFAULT_PRODUCT = PRODUCTS[0] ?? PLACEHOLDER_PRODUCT;
   const isElegant = config.template === "elegant";
   const [cartStep, setCartStep] = useState<"bag" | "shipping" | "payment" | "done">("bag");
   const [activeThumb, setActiveThumb] = useState(0);
@@ -1754,17 +1776,42 @@ function LivePreview({
             <span key={n.id} className={`text-xs ${isElegant?"tracking-widest uppercase text-[9px]":""} ${isDark ? "text-gray-400" : "text-gray-500"}`}>{n.label}</span>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={isPublicStore ? (e) => { e.stopPropagation(); storefront!.setPage("checkout"); window.scrollTo({ top: 0, behavior: "smooth" }); } : undefined}
-          className={`relative ${isPublicStore ? "cursor-pointer" : ""}`}
-          aria-label="Cart"
-        >
-          <ShoppingCart className="w-4 h-4" style={{ color: tmpl.accent }} />
-          {cartBadge > 0 && (
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full text-white text-[8px] font-bold flex items-center justify-center" style={{ background: tmpl.accent }}>{cartBadge}</span>
-          )}
-        </button>
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {isPublicStore && storefront?.selectedBranch && storefront.onChangeBranch ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                storefront.onChangeBranch?.();
+              }}
+              title={`${storefront.selectedBranch.name} — change branch`}
+              className="inline-flex max-w-[9.5rem] sm:max-w-[11rem] items-center gap-1.5 rounded-full border px-2 py-1 text-left transition-opacity hover:opacity-90"
+              style={{
+                borderColor: `${tmpl.accent}33`,
+                background: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.72)",
+              }}
+            >
+              <MapPin className="h-3 w-3 shrink-0" style={{ color: tmpl.accent }} />
+              <span
+                className={`min-w-0 truncate text-[10px] font-semibold leading-tight sm:text-[11px] ${isDark ? "text-white" : "text-gray-800"}`}
+              >
+                {storefront.selectedBranch.name}
+              </span>
+              <RefreshCw className="h-2.5 w-2.5 shrink-0 opacity-50" style={{ color: tmpl.accent }} />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={isPublicStore ? (e) => { e.stopPropagation(); storefront!.setPage("checkout"); window.scrollTo({ top: 0, behavior: "smooth" }); } : undefined}
+            className={`relative ${isPublicStore ? "cursor-pointer" : ""}`}
+            aria-label="Cart"
+          >
+            <ShoppingCart className="w-4 h-4" style={{ color: tmpl.accent }} />
+            {cartBadge > 0 && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full text-white text-[8px] font-bold flex items-center justify-center" style={{ background: tmpl.accent }}>{cartBadge}</span>
+            )}
+          </button>
+        </div>
         <div className={`absolute top-2 right-10 opacity-0 group-hover:opacity-100 ${selected?.kind === "header" ? "opacity-100" : ""} transition-opacity pointer-events-none ${publicMode ? "hidden" : ""}`}>
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#14b8a6] text-white text-[9px] font-medium"><Pencil className="w-2 h-2" /> Header</div>
         </div>
@@ -1883,6 +1930,7 @@ const textareaCls = `${inputCls} resize-none font-mono`;
 function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: (s: ProductSource) => void }) {
   const { language } = useLanguage();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const { categories: CATEGORIES, products: PRODUCTS, loading } = useCatalog();
   const filtered = src.mode === "category" && src.categoryId ? PRODUCTS.filter(p => p.category === src.categoryId) : PRODUCTS;
   return (
     <div className="space-y-3">
@@ -1900,6 +1948,10 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
       {src.mode === "specific" && (
         <Field label={tr("Məhsulları Seçin","Select Products")}>
           <div className="space-y-1 max-h-36 overflow-y-auto">
+            {loading && <p className="text-[10px] text-gray-400 px-1 py-2">{tr("Inventar yüklənir…", "Loading inventory…")}</p>}
+            {!loading && filtered.length === 0 && (
+              <p className="text-[10px] text-gray-400 px-1 py-2">{tr("Aktiv məhsul tapılmadı.", "No active products found.")}</p>
+            )}
             {filtered.map(p => {
               const on = src.productIds.includes(p.id);
               return (
@@ -1928,7 +1980,124 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
         </div>
       </Field>
       <p className="text-[10px] text-gray-400">{tr(`Maksimum ${(src.columns??4) * (src.rows??1)} məhsul göstərilir`, `Showing up to ${(src.columns??4) * (src.rows??1)} products`)}</p>
+      <p className="text-[10px] text-[#14b8a6]">
+        {loading
+          ? tr("Inventar sinxronlaşdırılır…", "Syncing inventory…")
+          : tr(`${PRODUCTS.length} məhsul · ${CATEGORIES.length} kateqoriya`, `${PRODUCTS.length} products · ${CATEGORIES.length} categories`)}
+      </p>
     </div>
+  );
+}
+
+function BranchesBlockSettings({
+  block,
+  set,
+  inputCls,
+  tr,
+}: {
+  block: Block;
+  set: (patch: Partial<Block>) => void;
+  inputCls: string;
+  tr: (az: string, en: string, ru?: string) => string;
+}) {
+  const [stores, setStores] = useState<BranchSwitcherStore[]>([]);
+  const [loading, setLoading] = useState(true);
+  const selected = new Set(block.branchStoreIds ?? []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await fetchBranchSwitcherStores();
+        if (!cancelled) setStores(rows);
+      } catch {
+        if (!cancelled) setStores([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggle = (storeId: string) => {
+    const next = new Set(selected);
+    if (next.has(storeId)) next.delete(storeId);
+    else next.add(storeId);
+    set({ branchStoreIds: [...next] });
+  };
+
+  return (
+    <>
+      <Field label={tr("Başlıq", "Title")}>
+        <input
+          className={inputCls}
+          value={block.branchesTitle ?? ""}
+          onChange={(e) => set({ branchesTitle: e.target.value })}
+          placeholder={tr("Filial seçin", "Choose a branch")}
+        />
+      </Field>
+      <Field label={tr("Alt mətn", "Subtext")}>
+        <input
+          className={inputCls}
+          value={block.branchesSubtext ?? ""}
+          onChange={(e) => set({ branchesSubtext: e.target.value })}
+          placeholder={tr("Məhsulları görmək üçün filial seçin.", "Select a location to shop products available there.")}
+        />
+      </Field>
+      <Field label={tr("Veb satış üçün filiallar", "Branches enabled for web selling")}>
+        {loading ? (
+          <p className="text-[10px] text-gray-400 py-2">{tr("Yüklənir…", "Loading…")}</p>
+        ) : stores.length === 0 ? (
+          <p className="text-[10px] text-amber-600 py-2">
+            {tr("Aktiv filial tapılmadı.", "No active branches found.")}
+          </p>
+        ) : (
+          <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 p-2">
+            {stores.map((s) => {
+              const on = selected.has(s.id);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => toggle(s.id)}
+                  className={`w-full flex items-start gap-2 text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                    on
+                      ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#0f766e] dark:text-[#99b3ff]"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 ${
+                      on ? "bg-[#14b8a6] border-[#14b8a6]" : "border-gray-300 dark:border-gray-600"
+                    }`}
+                  />
+                  <span className="min-w-0">
+                    <span className="font-medium block truncate">{s.name}</span>
+                    <span className="text-[10px] text-gray-400 block truncate">
+                      {s.code}
+                      {s.address ? ` · ${s.address}` : ""}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Field>
+      <div className="px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+        <p className="text-[10px] font-medium text-amber-800 dark:text-amber-300">
+          {tr("Filial satış rejimi", "Branch-selling mode")}
+        </p>
+        <p className="text-[10px] text-amber-700/90 dark:text-amber-400 mt-0.5">
+          {tr(
+            "Ən azı bir filial seçildikdə müştərilər əvvəlcə filial seçməlidirlər, sonra yalnız həmin filialın stokunda olan məhsulları görürlər.",
+            "When at least one branch is selected, customers must pick a branch first, then only see products in stock at that store.",
+          )}
+        </p>
+      </div>
+    </>
   );
 }
 
@@ -2028,40 +2197,18 @@ function BlockSettingsPanel({ block, onChange, onClose }: { block: Block; onChan
           ))}
         </>)}
         {block.type==="reservation"&&(<>
-          <Field label={tr("Başlıq", "Title")}><input className={inputCls} value={block.reservationTitle??""} onChange={e=>set({reservationTitle:e.target.value})} placeholder={tr("Rezervasiya edin", "Make a Reservation")}/></Field>
-          <Field label={tr("Alt mətn", "Subtext")}><input className={inputCls} value={block.reservationSubtext??""} onChange={e=>set({reservationSubtext:e.target.value})} placeholder={tr("Bir neçə klikdə yerinizi qeyd edin.", "Book your spot in just a few clicks.")}/></Field>
-          <Field label={tr("Xidmətlər", "Services")}>
-            <div className="space-y-1.5">
-              {(block.reservationServices||[]).map((s,i)=>(
-                <div key={i} className="flex items-center gap-2">
-                  <input className={`${inputCls} flex-1`} value={s} onChange={e=>{const arr=[...(block.reservationServices||[])];arr[i]=e.target.value;set({reservationServices:arr});}} placeholder={`${tr("Xidmət","Service")} ${i+1}`}/>
-                  <button onClick={()=>set({reservationServices:(block.reservationServices||[]).filter((_,j)=>j!==i)})} className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"><X className="w-3.5 h-3.5"/></button>
-                </div>
-              ))}
-              <button onClick={()=>set({reservationServices:[...(block.reservationServices||[]),""]})} className="flex items-center gap-1 text-[10px] font-medium text-[#14b8a6] hover:text-[#0f766e] transition-colors">
-                <Plus className="w-3 h-3"/> {tr("Xidmət əlavə et", "Add service")}
-              </button>
-            </div>
-          </Field>
-          <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <span className="text-xs text-gray-700 dark:text-gray-300">{tr("Qonaq sayı sahəsini göstər", "Show Guests field")}</span>
-            <button onClick={()=>set({reservationShowGuests:!(block.reservationShowGuests??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowGuests??true)?"bg-[#14b8a6]":"bg-gray-200 dark:bg-gray-700"}`}>
-              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${(block.reservationShowGuests??true)?"translate-x-4":"translate-x-0.5"}`}/>
-            </button>
-          </div>
-          <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <span className="text-xs text-gray-700 dark:text-gray-300">{tr("Qeydlər sahəsini göstər", "Show Notes field")}</span>
-            <button onClick={()=>set({reservationShowNotes:!(block.reservationShowNotes??true)})} className={`relative w-9 h-5 rounded-full transition-colors ${(block.reservationShowNotes??true)?"bg-[#14b8a6]":"bg-gray-200 dark:bg-gray-700"}`}>
-              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${(block.reservationShowNotes??true)?"translate-x-4":"translate-x-0.5"}`}/>
-            </button>
-          </div>
+          <Field label={tr("Başlıq", "Title")}><input className={inputCls} value={block.reservationTitle??""} onChange={e=>set({reservationTitle:e.target.value})} placeholder={tr("Randevu alın", "Book an Appointment")}/></Field>
+          <Field label={tr("Alt mətn", "Subtext")}><input className={inputCls} value={block.reservationSubtext??""} onChange={e=>set({reservationSubtext:e.target.value})} placeholder={tr("/res səhifənizlə eyni canlı rezervasiya axını.", "Same live booking flow as your /res page.")}/></Field>
           <div className="px-3 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-            <p className="text-[10px] font-medium text-blue-700 dark:text-blue-400">{tr("Inflero Rezervasiyaları ilə sinxronizasiya", "Synced with Inflero Reservations")}</p>
-            <p className="text-[10px] text-blue-500 dark:text-blue-500 mt-0.5">{tr("Bütün rezervasiyalar avtomatik olaraq idarə panelinizdə görünür.", "All bookings appear in your reservations dashboard automatically.")}</p>
+            <p className="text-[10px] font-medium text-blue-700 dark:text-blue-400">{tr("Inflero Booking ilə sinxronizasiya", "Synced with Inflero Bookings")}</p>
+            <p className="text-[10px] text-blue-500 dark:text-blue-500 mt-0.5">{tr("Xidmətlər, slotlar və sifarişlər /res booking modulunuzdan gəlir — paneldə avtomatik görünür.", "Services, slots, and bookings come from your /res Bookings module — they appear in the dashboard automatically.")}</p>
           </div>
         </>)}
+        {block.type==="branches"&&(
+          <BranchesBlockSettings block={block} set={set} inputCls={inputCls} tr={tr} />
+        )}
         {block.type==="category-grid"&&(<>
-          <p className="text-xs text-gray-400 bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">{tr("Kateqoriyalar mağazanızdan avtomatik çəkilir.", "Categories are pulled from your store automatically.")}</p>
+          <p className="text-xs text-gray-400 bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3">{tr("Kateqoriyalar inventarınızdan canlı çəkilir.", "Categories are pulled live from your inventory.")}</p>
           <Field label={tr("Sütun sayı", "Columns")}>
             <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               {[2,3,4,5,6].map(n=>(
@@ -2111,6 +2258,9 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
 }) {
   const { language } = useLanguage();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const { bookingsEnabled } = useWebsiteBooking();
+  const { hasModule } = useAuth();
+  const branchMgmtEnabled = hasModule("BRANCH_MANAGEMENT");
   const [changingLayout, setChangingLayout] = useState(false);
   const [adjustingWidths, setAdjustingWidths] = useState(false);
   const [pickingForCol, setPickingForCol] = useState<string | null>(null);
@@ -2237,12 +2387,41 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
                             <div className="px-2.5 py-1 bg-gray-50 dark:bg-gray-900/50">
                               <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider">{group.label}</span>
                             </div>
-                            {group.types.map(type => (
-                              <button key={type} onClick={() => { onAddBlockToColumn(col.id, type); setPickingForCol(null); }} className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-left border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors">
-                                <div className="text-[#14b8a6] dark:text-[#99b3ff]">{BLOCK_META[type].icon}</div>
-                                <p className="text-xs text-gray-700 dark:text-gray-200">{pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)}</p>
+                            {group.types.map(type => {
+                              const locked =
+                                (type === "reservation" && !bookingsEnabled) ||
+                                (type === "branches" && !branchMgmtEnabled);
+                              return (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => {
+                                  if (locked) {
+                                    toast.info(
+                                      tr(
+                                        "Bu plagin deaktivdir. Aktivləşdirmək üçün Inflero dəstəyi ilə əlaqə saxlayın.",
+                                        "This plugin is disabled. Contact Inflero support to enable this plugin.",
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  onAddBlockToColumn(col.id, type);
+                                  setPickingForCol(null);
+                                }}
+                                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors ${
+                                  locked ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                                }`}
+                              >
+                                <div className={locked ? "text-gray-400" : "text-[#14b8a6] dark:text-[#99b3ff]"}>
+                                  {locked ? <Lock className="w-3.5 h-3.5" /> : BLOCK_META[type].icon}
+                                </div>
+                                <p className="text-xs text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
+                                  {pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)}
+                                  {locked && <span className="text-[9px] uppercase text-amber-600">{tr("Deaktiv", "Disabled")}</span>}
+                                </p>
                               </button>
-                            ))}
+                              );
+                            })}
                           </div>
                         ))}
                         <button onClick={() => setPickingForCol(null)} className="w-full py-1.5 text-xs text-gray-400 hover:text-gray-600 border-t border-gray-100 dark:border-gray-700 transition-colors">{tr("Ləğv et", "Cancel")}</button>
@@ -2401,6 +2580,9 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
 }) {
   const { language } = useLanguage();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const { bookingsEnabled } = useWebsiteBooking();
+  const { hasModule } = useAuth();
+  const branchMgmtEnabled = hasModule("BRANCH_MANAGEMENT");
   const [addPhase, setAddPhase] = useState<AddPhase>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set(["r1"]));
 
@@ -2408,6 +2590,28 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
   const moveItem = (i: number, dir: -1|1) => { const arr=[...config.content]; const t=i+dir; if(t<0||t>=arr.length)return; [arr[i],arr[t]]=[arr[t],arr[i]]; onUpdate(arr); };
   const removeItem = (id: string) => onUpdate(config.content.filter(c=>c.id!==id));
   const toggleVisible = (id: string) => onUpdate(config.content.map(c=>c.id===id?{...c,visible:!c.visible}:c));
+
+  const requestAddBlock = (type: BlockType) => {
+    if (type === "reservation" && !bookingsEnabled) {
+      toast.info(
+        tr(
+          "Bu plagin deaktivdir. Aktivləşdirmək üçün Inflero dəstəyi ilə əlaqə saxlayın.",
+          "This plugin is disabled. Contact Inflero support to enable the Bookings plugin.",
+        ),
+      );
+      return;
+    }
+    if (type === "branches" && !branchMgmtEnabled) {
+      toast.info(
+        tr(
+          "Filial plagini deaktivdir. Aktivləşdirmək üçün Inflero dəstəyi ilə əlaqə saxlayın.",
+          "This plugin is disabled. Contact Inflero support to enable the Branch plugin.",
+        ),
+      );
+      return;
+    }
+    addTopLevelBlock(type);
+  };
 
   const addTopLevelBlock = (type: BlockType) => {
     const block = makeBlock(type);
@@ -2437,6 +2641,15 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
           <Plus className="w-3 h-3"/> {tr("Yeni", "Add")}
         </button>
       </div>
+
+      {isBranchSellingMode(config) && (
+        <div className="mx-4 mb-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[10px] text-amber-800 dark:text-amber-200">
+          {tr(
+            "Filial satış rejimi aktivdir: müştərilər əvvəlcə filial seçir, sonra yalnız həmin filialın stok məhsullarını görür. Redaktor önizləməsi isə paneldə seçilmiş filialın inventarına əsaslanır (stok sətiri olan məhsullar).",
+            "Branch-selling mode is on: customers pick a branch first, then only see in-stock (qty > 0) products for that store. Editor preview uses the dashboard’s selected branch inventory (products with a stock row there).",
+          )}
+        </div>
+      )}
 
       {/* Add menu */}
       {addPhase !== null && (
@@ -2470,12 +2683,42 @@ function BlocksPanel({ config, selected, onSelect, onUpdate }: {
                     <div className="px-3 py-1 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700/50">
                       <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.label}</span>
                     </div>
-                    {group.types.map(type => (
-                      <button key={type} onClick={() => addTopLevelBlock(type)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-left border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors">
-                        <div className="w-5 h-5 flex items-center justify-center text-[#14b8a6] dark:text-[#99b3ff]">{BLOCK_META[type].icon}</div>
-                        <div><p className="text-xs font-medium text-gray-800 dark:text-gray-200">{pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)}</p><p className="text-[10px] text-gray-400">{pickLang(language, BLOCK_META_AZ[type].description, BLOCK_META[type].description)}</p></div>
+                    {group.types.map(type => {
+                      const locked =
+                        (type === "reservation" && !bookingsEnabled) ||
+                        (type === "branches" && !branchMgmtEnabled);
+                      return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => requestAddBlock(type)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors ${
+                          locked
+                            ? "opacity-50 cursor-not-allowed hover:bg-transparent dark:hover:bg-transparent"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <div className={`w-5 h-5 flex items-center justify-center ${locked ? "text-gray-400" : "text-[#14b8a6] dark:text-[#99b3ff]"}`}>
+                          {locked ? <Lock className="w-3.5 h-3.5" /> : BLOCK_META[type].icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                            {pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)}
+                            {locked && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                                {tr("Deaktiv", "Disabled")}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {locked
+                              ? tr("Dəstəkdən plagini aktivləşdirin", "Ask support to enable this plugin")
+                              : pickLang(language, BLOCK_META_AZ[type].description, BLOCK_META[type].description)}
+                          </p>
+                        </div>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 ))}
               </div>
@@ -3069,6 +3312,8 @@ function defaultWebsiteConfig(companySlug?: string | null): WebsiteConfig {
 export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProps = {}) {
   const { language } = useLanguage();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const { hasModule, user } = useAuth();
+  const [catalog, setCatalog] = useState<StorefrontCatalog>({ ...EMPTY_CATALOG, loading: true });
   const [config, setConfig] = useState<WebsiteConfig>(() => {
     if (tenantId) {
       const saved = loadWebsiteConfigByTenant(tenantId);
@@ -3099,6 +3344,28 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
     })();
     return () => { cancelled = true; };
   }, [tenantId, companySlug]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      void (async () => {
+        setCatalog((prev) => ({ ...prev, loading: true }));
+        try {
+          const next = await loadInventoryCatalog();
+          if (!cancelled) setCatalog(next);
+        } catch {
+          if (!cancelled) setCatalog({ ...EMPTY_CATALOG, loading: false });
+        }
+      })();
+    };
+    load();
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [tenantId]);
 
   // Keep path-style domain in sync with company slug
   useEffect(() => {
@@ -3279,12 +3546,30 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
 
   const addBlockToColumn = useCallback((colId: string, type: BlockType) => {
     if (selected?.kind !== "row") return;
+    if (type === "reservation" && !hasModule("RESERVATIONS")) {
+      toast.info(
+        tr(
+          "Bu plagin deaktivdir. Aktivləşdirmək üçün Inflero dəstəyi ilə əlaqə saxlayın.",
+          "This plugin is disabled. Contact Inflero support to enable the Bookings plugin.",
+        ),
+      );
+      return;
+    }
+    if (type === "branches" && !hasModule("BRANCH_MANAGEMENT")) {
+      toast.info(
+        tr(
+          "Filial plagini deaktivdir. Aktivləşdirmək üçün Inflero dəstəyi ilə əlaqə saxlayın.",
+          "This plugin is disabled. Contact Inflero support to enable the Branch plugin.",
+        ),
+      );
+      return;
+    }
     const block = makeBlock(type);
     const rowId = selected.rowId;
     setConfig(prev => ({ ...prev, content: prev.content.map(c => { if (!isRow(c) || c.id !== rowId) return c; return { ...c, columns: c.columns.map(col => col.id !== colId ? col : { ...col, blocks: [...col.blocks, block] }) }; }) }));
     setSelected({ kind: "row-block", rowId, colId, blockId: block.id });
     toast.success(`${pickLang(language, BLOCK_META_AZ[type].label, BLOCK_META[type].label)} ${tr("əlavə edildi", "added")}`);
-  }, [selected]);
+  }, [selected, language, tr, hasModule]);
 
   const publicStoreUrl = storeUrl(companySlug?.trim() || config.domain || "mystore");
   const publicStorePath = storePath(companySlug?.trim() || config.domain || "mystore");
@@ -3326,7 +3611,17 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
   const showRow = !!selectedRow;
   const showHeader = selected?.kind === "header";
 
+  const bookingTenantSlug =
+    (companySlug?.trim() || user?.tenant.slug?.trim() || config.domain?.trim() || "") || null;
+
   return (
+    <WebsiteBookingProvider
+      value={{
+        tenantSlug: bookingTenantSlug,
+        bookingsEnabled: hasModule("RESERVATIONS"),
+      }}
+    >
+    <CatalogProvider value={catalog}>
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 overflow-hidden">
       {/* Top bar */}
       <div className="flex-shrink-0 h-12 flex items-center justify-between px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
@@ -3432,11 +3727,25 @@ export function MyWebsite({ tenantId = null, companySlug = null }: MyWebsiteProp
         </div>
       </div>
     </div>
+    </CatalogProvider>
+    </WebsiteBookingProvider>
   );
 }
 
 /** Read-only storefront canvas (public My Store page). */
-export function StorefrontView({ config }: { config: WebsiteConfig }) {
+export function StorefrontView({
+  config,
+  catalog = EMPTY_CATALOG,
+  companySlug = null,
+  selectedBranch = null,
+  onChangeBranch,
+}: {
+  config: WebsiteConfig;
+  catalog?: StorefrontCatalog;
+  companySlug?: string | null;
+  selectedBranch?: { storeId: string; code: string; name: string; address?: string | null } | null;
+  onChangeBranch?: () => void;
+}) {
   const noop = () => {};
   const [page, setPage] = useState<"home" | "product" | "checkout">("home");
   const [cart, setCart] = useState<StorefrontCartLine[]>([]);
@@ -3470,9 +3779,21 @@ export function StorefrontView({ config }: { config: WebsiteConfig }) {
     selectedProduct,
     openProduct,
     cartCount,
+    selectedBranch,
+    onChangeBranch,
   };
 
+  const bookingSlug = (companySlug?.trim() || config.domain?.trim() || "") || null;
+
   return (
+    <WebsiteBookingProvider
+      value={{
+        tenantSlug: bookingSlug,
+        // Public storefront: allow the live widget to load; API enforces module access.
+        bookingsEnabled: true,
+      }}
+    >
+    <CatalogProvider value={catalog}>
     <div className="h-full min-h-screen bg-white dark:bg-gray-950">
       <LivePreview
         config={config}
@@ -3497,5 +3818,7 @@ export function StorefrontView({ config }: { config: WebsiteConfig }) {
         onDeleteTopLevelBlock={noop}
       />
     </div>
+    </CatalogProvider>
+    </WebsiteBookingProvider>
   );
 }

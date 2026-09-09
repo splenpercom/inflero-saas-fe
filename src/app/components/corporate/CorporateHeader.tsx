@@ -139,8 +139,11 @@ export const CorporateHeader = memo(function CorporateHeader({
         action: "create",
       },
     ];
-    return actions.filter((action) => hasPermission(action.module, action.action));
-  }, [hasPermission, language]);
+    return actions.filter((action) => {
+      if (action.path === "/dashboard/people/suppliers" && !hasModule("STOCK")) return false;
+      return hasPermission(action.module, action.action);
+    });
+  }, [hasPermission, hasModule, language]);
 
   const canViewPos = hasModule("POS") && hasPermission("Sales", "view");
   const canViewReservations = hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
@@ -237,7 +240,7 @@ export const CorporateHeader = memo(function CorporateHeader({
           {canViewReservations && (
             <StatBadge
               icon={CalendarDays}
-              label={pt("Reservations", "Rezervasiyalar")}
+              label={pt("Bookings", "Rezervasiyalar")}
               count={reservationPendingCount}
               variant="success"
             />

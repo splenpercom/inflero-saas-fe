@@ -15,6 +15,7 @@ interface CustomSelectProps {
   onChange?: (value: string) => void;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
   className?: string;
 }
 
@@ -26,6 +27,7 @@ export function CustomSelect({
   onChange,
   placeholder = "Select",
   required = false,
+  disabled = false,
   className = "",
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -73,10 +75,15 @@ export function CustomSelect({
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen(!isOpen);
+        }}
         className={cn(
           "w-full min-w-[140px] px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between",
           required && !selectedValue && "border-red-500",
+          disabled && "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-80",
         )}
       >
         <span className="truncate">{selectedOption?.label || placeholder}</span>

@@ -74,6 +74,7 @@ export function GoogleMapPicker({
   useEffect(() => {
     if (!mapContainerRef.current) return;
     let cancelled = false;
+    let authWatchdogs: number[] = [];
 
     const win = window as unknown as Record<string, unknown>;
     const previousAuthFailure = win.gm_authFailure;
@@ -126,15 +127,23 @@ export function GoogleMapPicker({
           applyPosition(event.latLng.lat(), event.latLng.lng(), { reverse: true });
         });
 
+        google.maps.event.addListenerOnce(map, "tilesloaded", () => {
+          if (cancelled) return;
+          google.maps.event.trigger(map, "resize");
+          map.setCenter(center);
+        });
+
         if (cancelled) return;
         setMapReady(true);
         setLoadError(null);
 
-        window.setTimeout(() => {
+        const checkAuthError = () => {
           if (cancelled) return;
           const hasGoogleError = Boolean(mapContainerRef.current?.querySelector(".gm-err-container"));
           if (hasGoogleError) authFailureRef.current();
-        }, 1500);
+        };
+        authWatchdogs.push(window.setTimeout(checkAuthError, 1500));
+        authWatchdogs.push(window.setTimeout(checkAuthError, 3500));
       } catch {
         if (!cancelled) authFailureRef.current();
       }
@@ -142,8 +151,19 @@ export function GoogleMapPicker({
 
     void init();
 
+    // Hard timeout: never leave settings stuck on the Google spinner.
+    authWatchdogs.push(
+      window.setTimeout(() => {
+        if (cancelled) return;
+        if (!mapRef.current || mapContainerRef.current?.querySelector(".gm-err-container")) {
+          authFailureRef.current();
+        }
+      }, 6000),
+    );
+
     return () => {
       cancelled = true;
+      authWatchdogs.forEach((id) => window.clearTimeout(id));
       win.gm_authFailure = previousAuthFailure;
       autocompleteRef.current = null;
       markerRef.current = null;

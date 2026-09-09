@@ -307,7 +307,6 @@ export function LandingPage() {
       {showVideoModal && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setShowVideoModal(false)}
         >
           <div 
             className="relative w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl"

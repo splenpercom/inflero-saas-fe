@@ -965,6 +965,7 @@ const DEMO_TENANT_SETTINGS = {
   longitude: 49.8671,
   employeeCommissionEnabled: false,
   posServiceFeeEnabled: false,
+  posSendToProductionEnabled: false,
 };
 
 /**

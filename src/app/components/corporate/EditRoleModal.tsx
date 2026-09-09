@@ -81,12 +81,14 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
     });
   };
 
+  const isSystemAdministrator = role?.name === "Administrator";
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!roleName.trim() || !role || !onSave) return;
     onSave({
       id: role.id,
-      roleName: roleName.trim(),
+      roleName: isSystemAdministrator ? role.name : roleName.trim(),
       permissions: toApiPermissionsPreservingHidden(permissions, role.permissions, hasModule),
     });
   };
@@ -122,7 +124,12 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
                 type="text"
                 value={roleName}
                 onChange={(e) => setRoleName(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                readOnly={isSystemAdministrator}
+                className={`w-full px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] ${
+                  isSystemAdministrator
+                    ? "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                    : "bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                }`}
                 placeholder={t("enterRoleName")}
                 required
               />

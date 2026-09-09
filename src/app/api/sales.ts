@@ -2,6 +2,8 @@ import { apiDelete, apiGet, apiPatch, apiPost } from "./client";
 import { salesListQueryString, type SalesListQuery } from "../lib/salesMappers";
 import type { OrderStatusApi, PaymentMethodApi, PurchaseStatusApi } from "../lib/salesMappers";
 
+export type ProductionStatusApi = "IN_PROCESSING" | "IN_PRODUCTION" | "COMPLETED";
+
 export interface PosOrderListRow {
   id: string;
   customerId: string | null;
@@ -18,6 +20,7 @@ export interface PosOrderListRow {
   storeId: string | null;
   source?: string;
   kotStatus?: string | null;
+  productionStatus?: string | null;
   table?: { id: string; number: number; name: string } | null;
 }
 
@@ -79,6 +82,14 @@ export interface PosOrderDetail {
   vehicleLabel: string | null;
   mileageAtService: number | null;
   stockDeducted: boolean;
+  source?: string;
+  kotStatus?: string | null;
+  kotSentAt?: string | null;
+  kotUpdatedAt?: string | null;
+  productionStatus?: ProductionStatusApi | null;
+  productionSentAt?: string | null;
+  productionUpdatedAt?: string | null;
+  table?: { id: string; number: number; name: string } | null;
   payments: PosOrderPaymentRow[];
   items: PosOrderLineItem[];
 }
@@ -317,6 +328,24 @@ export async function posCheckout(body: CreatePosOrderBody) {
 /** Complete sale + kitchen ticket (DINING). */
 export async function sendPosOrderToKot(body: CreatePosOrderBody) {
   const res = await apiPost<{ success: boolean; data: PosOrderDetail }>("/tenant/sales/pos/send-to-kot", body);
+  return res.data;
+}
+
+/** Complete sale + start production track. */
+export async function sendPosOrderToProduction(body: CreatePosOrderBody) {
+  const res = await apiPost<{ success: boolean; data: PosOrderDetail }>(
+    "/tenant/sales/pos/send-to-production",
+    body,
+  );
+  return res.data;
+}
+
+/** Forward-only production status update. */
+export async function updatePosOrderProductionStatus(id: string, status: ProductionStatusApi) {
+  const res = await apiPatch<{ success: boolean; data: PosOrderDetail }>(
+    `/tenant/sales/pos-orders/${id}/production-status`,
+    { status },
+  );
   return res.data;
 }
 

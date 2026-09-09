@@ -258,7 +258,7 @@ export function NewDashboard() {
             {reservationsEnabled && <p className="text-sm text-white/70">
               {tr("You have", "Bugün")}{" "}
               <span className="text-white font-semibold">
-                {todayRes.length} {tr("reservations today", "rezervasiyanız var")}
+                {todayRes.length} {tr("bookings today", "rezervasiyanız var")}
               </span>
               {todayResPending > 0 && (
                 <>
@@ -284,7 +284,7 @@ export function NewDashboard() {
               className="flex items-center gap-1.5 bg-white text-[#14b8a6] rounded-xl px-3 py-2 text-xs font-bold hover:bg-white/90 transition-colors"
             >
               <CalendarDays className="w-3.5 h-3.5" />
-              {tr("View Reservations", "Rezervasiyalar")}
+              {tr("View Bookings", "Rezervasiyalar")}
             </button>}
           </div>
         </div>
@@ -294,7 +294,7 @@ export function NewDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           ...(reservationsEnabled ? [{
-            label: tr("Today's Reservations", "Bugünkü Rezervasiyalar"),
+            label: tr("Today's Bookings", "Bugünkü Rezervasiyalar"),
             value: String(todayRes.length),
             sub: `${todayResPending} ${tr("pending", "gözləyir")}`,
             icon: CalendarDays,
@@ -304,7 +304,9 @@ export function NewDashboard() {
           {
             label: tr("Total Customers", "Ümumi Müştərilər"),
             value: String(summary?.counts.customers ?? 0),
-            sub: `${summary?.counts.suppliers ?? 0} ${tr("suppliers", "təchizatçı")}`,
+            sub: stockEnabled
+              ? `${summary?.counts.suppliers ?? 0} ${tr("suppliers", "təchizatçı")}`
+              : tr("Active directory", "Aktiv müştəri bazası"),
             icon: Users,
             iconBg: "bg-orange-50 dark:bg-orange-900/20",
             iconColor: "text-orange-500",
@@ -447,7 +449,7 @@ export function NewDashboard() {
             </button>
           </div>
           {todayRes.length === 0 ? (
-            <p className="text-xs text-gray-400 py-6 text-center">{tr("No reservations today", "Bu gün rezervasiya yoxdur")}</p>
+            <p className="text-xs text-gray-400 py-6 text-center">{tr("No bookings today", "Bu gün rezervasiya yoxdur")}</p>
           ) : (
             <div className="space-y-2">
               {todayRes.map((r) => (

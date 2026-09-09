@@ -13,6 +13,7 @@ import { useAuth } from "../../context/AuthContext";
 interface ViewUserModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onEdit?: (user: TenantUserRow) => void;
   user: TenantUserRow | null;
 }
 
@@ -32,7 +33,7 @@ function rateLabel(
   return `${formatMoney(value)} (${t("commissionFixed")})`;
 }
 
-export function ViewUserModal({ isOpen, onClose, user }: ViewUserModalProps) {
+export function ViewUserModal({ isOpen, onClose, onEdit, user }: ViewUserModalProps) {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
   const t = (key: any) => getUserManagementTranslation(key, language);
@@ -103,7 +104,14 @@ export function ViewUserModal({ isOpen, onClose, user }: ViewUserModalProps) {
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/20 backdrop-blur-sm border border-white/30">
                       {user.role}
                     </span>
-                    <button className="mt-4 px-4 py-2 bg-white text-[#14b8a6] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!onEdit) return;
+                        onEdit(user);
+                      }}
+                      className="mt-4 px-4 py-2 bg-white text-[#14b8a6] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
                       {t("editProfile")}
                     </button>
                   </div>

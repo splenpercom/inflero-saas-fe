@@ -35,8 +35,11 @@ import {
   recordPosOrderPayment,
   fetchPosOrder,
   sendHeldPosOrderToKot,
+  updatePosOrderProductionStatus,
   type PosOrderListRow,
+  type ProductionStatusApi,
 } from "../../api/sales";
+import { fetchTenantSettings } from "../../api/tenantSettings";
 import { formatSalesDate, mapPaymentMethodToApi, isDraftOrderStatus, type PosUiPaymentMethod } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
@@ -64,6 +67,9 @@ export function POSOrders() {
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("all");
   const [selectedSource, setSelectedSource] = useState("all");
   const [selectedKotStatus, setSelectedKotStatus] = useState("all");
+  const [selectedProductionStatus, setSelectedProductionStatus] = useState("all");
+  const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
+  const [updatingProductionId, setUpdatingProductionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("last7days");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
@@ -92,7 +98,37 @@ export function POSOrders() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, selectedCustomer, selectedStatus, selectedPaymentStatus, selectedSource, selectedKotStatus, sortBy]);
+  }, [
+    debouncedSearch,
+    selectedCustomer,
+    selectedStatus,
+    selectedPaymentStatus,
+    selectedSource,
+    selectedKotStatus,
+    selectedProductionStatus,
+    sortBy,
+  ]);
+
+  useEffect(() => {
+    if (!(isAuthenticated || isDemo)) {
+      setPosSendToProductionEnabled(false);
+      return;
+    }
+    let cancelled = false;
+    fetchTenantSettings()
+      .then((s) => {
+        if (!cancelled) setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setPosSendToProductionEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isDemo, branchRevision]);
+
+  const showProductionColumn =
+    posSendToProductionEnabled || orders.some((o) => !!o.productionStatus);
 
   const loadItems = useCallback(async (opts?: { silent?: boolean }) => {
     if (!(isAuthenticated || isDemo) || !canView) {
@@ -118,6 +154,9 @@ export function POSOrders() {
               kotStatus: selectedKotStatus,
             }
           : {}),
+        ...(posSendToProductionEnabled || selectedProductionStatus !== "all"
+          ? { productionStatus: selectedProductionStatus }
+          : {}),
       });
       setOrders(data.items ?? []);
       setTotalItems(data.total ?? 0);
@@ -141,6 +180,8 @@ export function POSOrders() {
     selectedPaymentStatus,
     selectedSource,
     selectedKotStatus,
+    selectedProductionStatus,
+    posSendToProductionEnabled,
     diningEnabled,
     sortBy,
     branchRevision,
@@ -233,6 +274,34 @@ export function POSOrders() {
       partial: tr("Qismən", "Partial"),
     };
     return statusMap[key] || status;
+  };
+
+  const translateProductionStatus = (status: string | null | undefined) => {
+    if (!status) return "—";
+    if (status === "IN_PROCESSING") return tr("Emaldadır", "In Processing");
+    if (status === "IN_PRODUCTION") return tr("İstehsaldadır", "In Production");
+    if (status === "COMPLETED") return tr("Tamamlandı", "Completed");
+    return status;
+  };
+
+  const productionStatusOptions = (current: string): ProductionStatusApi[] => {
+    if (current === "IN_PROCESSING") return ["IN_PROCESSING", "IN_PRODUCTION", "COMPLETED"];
+    if (current === "IN_PRODUCTION") return ["IN_PRODUCTION", "COMPLETED"];
+    return ["COMPLETED"];
+  };
+
+  const handleProductionStatusChange = async (orderId: string, status: ProductionStatusApi) => {
+    if (!canEdit || isDemo) return;
+    setUpdatingProductionId(orderId);
+    try {
+      await updatePosOrderProductionStatus(orderId, status);
+      notifySuccess(tr("İstehsal statusu yeniləndi", "Production status updated"));
+      await loadItems({ silent: true });
+    } catch (err) {
+      notifyFromError(err, tr("İstehsal statusu yenilənmədi", "Failed to update production status"));
+    } finally {
+      setUpdatingProductionId(null);
+    }
   };
 
   const closeActionMenu = () => {
@@ -675,6 +744,23 @@ export function POSOrders() {
                 </>
               )}
 
+              {posSendToProductionEnabled && (
+                <div className="relative">
+                  <select
+                    value={selectedProductionStatus}
+                    onChange={(e) => setSelectedProductionStatus(e.target.value)}
+                    className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
+                  >
+                    <option value="all">{tr("İstehsal statusu", "Production")}</option>
+                    <option value="none">{tr("İstehsal yox", "No production")}</option>
+                    <option value="IN_PROCESSING">{tr("Emaldadır", "In Processing")}</option>
+                    <option value="IN_PRODUCTION">{tr("İstehsaldadır", "In Production")}</option>
+                    <option value="COMPLETED">{tr("Tamamlandı", "Completed")}</option>
+                  </select>
+                  <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              )}
+
               <div className="relative">
                 <select
                   value={sortBy}
@@ -763,6 +849,11 @@ export function POSOrders() {
                       </th>
                     </>
                   )}
+                  {showProductionColumn && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("İSTEHSAL", "PRODUCTION")}
+                    </th>
+                  )}
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
                     {tr("STATUS", "STATUS")}
                   </th>
@@ -787,13 +878,19 @@ export function POSOrders() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={diningEnabled ? 13 : 10} className="px-4 py-8 text-center text-xs text-gray-500">
+                    <td
+                      colSpan={(diningEnabled ? 13 : 10) + (showProductionColumn ? 1 : 0)}
+                      className="px-4 py-8 text-center text-xs text-gray-500"
+                    >
                       {tr("Yüklənir...", "Loading...")}
                     </td>
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan={diningEnabled ? 13 : 10} className="px-4 py-8 text-center text-xs text-gray-500">
+                    <td
+                      colSpan={(diningEnabled ? 13 : 10) + (showProductionColumn ? 1 : 0)}
+                      className="px-4 py-8 text-center text-xs text-gray-500"
+                    >
                       {emptyMessage}
                     </td>
                   </tr>
@@ -832,6 +929,33 @@ export function POSOrders() {
                             </span>
                           </td>
                         </>
+                      )}
+                      {showProductionColumn && (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {order.productionStatus && canEdit && !isDemo ? (
+                            <select
+                              value={order.productionStatus}
+                              disabled={updatingProductionId === order.id}
+                              onChange={(e) =>
+                                void handleProductionStatusChange(
+                                  order.id,
+                                  e.target.value as ProductionStatusApi,
+                                )
+                              }
+                              className="appearance-none max-w-[140px] pl-2 pr-6 py-1 text-[10px] font-medium bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 rounded-lg text-teal-800 dark:text-teal-200 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-50"
+                            >
+                              {productionStatusOptions(order.productionStatus).map((s) => (
+                                <option key={s} value={s}>
+                                  {translateProductionStatus(s)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                              {translateProductionStatus(order.productionStatus)}
+                            </span>
+                          )}
+                        </td>
                       )}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span

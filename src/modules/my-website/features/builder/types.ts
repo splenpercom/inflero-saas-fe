@@ -2,7 +2,8 @@ export type BlockType =
   | "hero" | "featured-products" | "category-grid" | "banner"
   | "testimonials" | "custom-html"
   | "image-block" | "image-text" | "whatsapp-widget" | "socials"
-  | "reservation";
+  | "reservation"
+  | "branches";
 
 export interface ProductSource {
   mode: "all" | "category" | "specific";
@@ -27,6 +28,10 @@ export interface Block {
   categoryColumns?: number;
   reservationTitle?: string; reservationSubtext?: string;
   reservationServices?: string[]; reservationShowGuests?: boolean; reservationShowNotes?: boolean;
+  /** Branches selling block */
+  branchesTitle?: string;
+  branchesSubtext?: string;
+  branchStoreIds?: string[];
 }
 
 export interface ColumnItem { id: string; ratio: number; blocks: Block[]; }

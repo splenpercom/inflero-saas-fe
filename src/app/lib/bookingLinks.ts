@@ -8,6 +8,7 @@ const RESERVED_STORE_SLUGS = new Set([
   "static",
   "favicon.ico",
   "customer-landing",
+  "res",
   "menu",
   "book",
   "reset-password",
@@ -30,9 +31,9 @@ export function storeUrl(
   return `${origin}${storePath(companySlug)}`;
 }
 
-/** Customer reservation booking: `/customer-landing/{tenantSlug}[/{branchSlug}]` */
+/** Customer booking page: `/res/{tenantSlug}[/{branchSlug}]` */
 export function customerBookingPath(tenantSlug: string, branchSlug?: string | null): string {
-  const base = `/customer-landing/${encodeURIComponent(tenantSlug.trim())}`;
+  const base = `/res/${encodeURIComponent(tenantSlug.trim())}`;
   if (branchSlug?.trim()) {
     return `${base}/${encodeURIComponent(branchSlug.trim())}`;
   }

@@ -17,6 +17,7 @@ export const ALL_BRANCHES_NAV_ENTRIES: AllBranchesNavEntry[] = [
   { labelKey: "dashboard", path: "/dashboard", permissionModule: "Dashboard" },
   { labelKey: "userManagement", path: "/dashboard/user-management", permissionModule: "User Management" },
   { labelKey: "warehouses", path: "/dashboard/people/warehouses", permissionModule: "People" },
+  { labelKey: "plugins", path: "/dashboard/plugins", permissionModule: "Settings" },
   { labelKey: "settings", path: "/dashboard/settings", permissionModule: "Settings" },
 ];
 
@@ -44,6 +45,10 @@ export function isAllBranchesAllowedPath(pathname: string): boolean {
   }
 
   if (path.startsWith("/dashboard/settings")) {
+    return true;
+  }
+
+  if (path.startsWith("/dashboard/plugins")) {
     return true;
   }
 
