@@ -21,6 +21,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { pickLang } from "../../../i18n/pickLang";
+import { ModernSelect } from "../../ui/ModernSelect";
 export function AnnualReport() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
@@ -198,17 +199,12 @@ export function AnnualReport() {
             onCustomToChange={setCustomTo}
           />
           {dateRange === "year" && (
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            <ModernSelect
+              value={String(selectedYear)}
+              onChange={(value) => setSelectedYear(Number(value))}
+              minWidth={100}
+              options={years.map((y) => ({ value: String(y), label: String(y) }))}
+            />
           )}
           <button type="button" onClick={() => void loadReport()} disabled={loading} className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />

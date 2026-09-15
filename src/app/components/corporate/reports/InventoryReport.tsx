@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { DataPagination } from "../../ui/DataPagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
-import { FileText, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { FileText, FileSpreadsheet } from "lucide-react";
 import { useReportDateRange } from "../../../hooks/useReportDateRange";
 import { ReportDateRangeFilter } from "./ReportDateRangeFilter";
 import { useLanguage } from "../../../i18n/LanguageContext";
@@ -177,46 +178,40 @@ export function InventoryReport() {
             />
 
             {/* Category Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Category</option>
-                <option value="electronics">Electronics</option>
-                <option value="furniture">Furniture</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedCategory}
+                placeholder="Category"
+                options={[
+                  { value: "all", label: "Category" },
+                  { value: "electronics", label: "Electronics" },
+                  { value: "furniture", label: "Furniture" }
+                ]}
+              />
 
             {/* Product Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedProduct}
-                onChange={(e) => setSelectedProduct(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Products</option>
-                <option value="electronics">Electronics</option>
-                <option value="furniture">Furniture</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedProduct}
+                placeholder="Products"
+                options={[
+                  { value: "all", label: "Products" },
+                  { value: "electronics", label: "Electronics" },
+                  { value: "furniture", label: "Furniture" }
+                ]}
+              />
 
             {/* Unit Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedUnit}
-                onChange={(e) => setSelectedUnit(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Units</option>
-                <option value="pc">Pc</option>
-                <option value="kg">Kg</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedUnit}
+                placeholder="Units"
+                options={[
+                  { value: "all", label: "Units" },
+                  { value: "pc", label: "Pc" },
+                  { value: "kg", label: "Kg" }
+                ]}
+              />
 
             {/* Generate Button */}
             <button

@@ -20,11 +20,12 @@ import {
 } from "lucide-react";
 import { memo, useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router";
-import { SimpleDropdown, SimpleDropdownItem, SimpleDropdownLabel, SimpleDropdownSeparator } from "../ui/simple-dropdown";
+import { SimpleDropdown, SimpleDropdownItem, SimpleDropdownSeparator } from "../ui/simple-dropdown";
 import { LanguageSwitcherDropdown } from "../LanguageSwitcherDropdown";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { getUserDisplayName, getUserInitials } from "../../lib/userDisplay";
+import { displayUserRoleName } from "../../lib/userManagementMappers";
 import { usePendingReservationCount } from "../../hooks/usePendingReservationCount";
 import { useHeaderStats } from "../../hooks/useHeaderStats";
 import { useSubscriptionBadge } from "../../hooks/useSubscriptionRemaining";
@@ -79,7 +80,7 @@ export const CorporateHeader = memo(function CorporateHeader({
     user,
     pt("Demo User", "Demo İstifadəçi"),
   );
-  const displayEmail = user?.email ?? (isDemo ? "demo@sample.local" : "—");
+  const displayRole = displayUserRoleName(user?.role?.name, user?.isTenantOwner);
   const initials = getUserInitials(displayName, user?.email);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -139,11 +140,8 @@ export const CorporateHeader = memo(function CorporateHeader({
         action: "create",
       },
     ];
-    return actions.filter((action) => {
-      if (action.path === "/dashboard/people/suppliers" && !hasModule("STOCK")) return false;
-      return hasPermission(action.module, action.action);
-    });
-  }, [hasPermission, hasModule, language]);
+    return actions.filter((action) => hasPermission(action.module, action.action));
+  }, [hasPermission, language]);
 
   const canViewPos = hasModule("POS") && hasPermission("Sales", "view");
   const canViewReservations = hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
@@ -339,24 +337,25 @@ export const CorporateHeader = memo(function CorporateHeader({
         {/* Profile Dropdown */}
         <SimpleDropdown
           trigger={
-            <button className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition ml-1">
-              <div className="w-7 h-7 rounded-full bg-[#14b8a6] flex items-center justify-center overflow-hidden">
+            <button className="flex items-center gap-2 p-1 pr-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition ml-1 max-w-[200px]">
+              <div className="w-7 h-7 rounded-full bg-[#14b8a6] flex items-center justify-center overflow-hidden flex-shrink-0">
                 {user?.avatar ? (
                   <img src={user.avatar} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-xs font-semibold text-white">{initials}</span>
                 )}
               </div>
+              <div className="flex flex-col items-start min-w-0 text-left leading-tight">
+                <span className="text-xs font-semibold text-gray-900 dark:text-white truncate max-w-[120px] sm:max-w-[140px]">
+                  {displayName}
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate max-w-[120px] sm:max-w-[140px]">
+                  {displayRole}
+                </span>
+              </div>
             </button>
           }
         >
-          <SimpleDropdownLabel>
-            <div className="flex flex-col">
-              <span className="font-semibold text-xs">{displayName}</span>
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-normal">{displayEmail}</span>
-            </div>
-          </SimpleDropdownLabel>
-          <SimpleDropdownSeparator />
           <SimpleDropdownItem onClick={() => navigate("/dashboard/profile")}>
             <User className="w-3.5 h-3.5 mr-2" />
             <span className="text-xs">{pt("Profile", "Profil")}</span>

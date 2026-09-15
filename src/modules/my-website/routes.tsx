@@ -7,8 +7,8 @@
  *
  * Or mount at any base path you prefer.
  */
-import { Route } from "react-router";
-import { MyWebsitePage, WebOrdersPage, WebReportPage } from "./pages";
+import { Navigate, Route } from "react-router";
+import { MyWebsitePage, WebReportPage } from "./pages";
 import { ModuleRouteGuard } from "../../app/components/modules/ModuleRouteGuard";
 import { WebsiteEditorRouteGuard } from "../../app/components/modules/WebsiteEditorRouteGuard";
 
@@ -16,7 +16,7 @@ import { WebsiteEditorRouteGuard } from "../../app/components/modules/WebsiteEdi
 export const myWebsiteRouteElements = (
   <>
     <Route path="my-website" element={<WebsiteEditorRouteGuard><MyWebsitePage /></WebsiteEditorRouteGuard>} />
-    <Route path="my-website/orders" element={<ModuleRouteGuard module="WEB_EDITOR"><WebOrdersPage /></ModuleRouteGuard>} />
+    <Route path="my-website/orders" element={<Navigate to="/dashboard/sales/pos-orders?source=WEB" replace />} />
     <Route path="my-website/reports" element={<ModuleRouteGuard module="WEB_EDITOR"><WebReportPage /></ModuleRouteGuard>} />
   </>
 );
@@ -24,6 +24,6 @@ export const myWebsiteRouteElements = (
 /** Flat config if you prefer data routers */
 export const myWebsiteRouteConfig = [
   { path: "my-website", element: <WebsiteEditorRouteGuard><MyWebsitePage /></WebsiteEditorRouteGuard> },
-  { path: "my-website/orders", element: <ModuleRouteGuard module="WEB_EDITOR"><WebOrdersPage /></ModuleRouteGuard> },
+  { path: "my-website/orders", element: <Navigate to="/dashboard/sales/pos-orders?source=WEB" replace /> },
   { path: "my-website/reports", element: <ModuleRouteGuard module="WEB_EDITOR"><WebReportPage /></ModuleRouteGuard> },
 ];

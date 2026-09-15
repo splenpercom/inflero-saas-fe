@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, EyeOff, Eye, User } from "lucide-react";
 import { CustomSelect } from "../ui/CustomSelect";
 import { DateInput } from "../ui/DateInput";
@@ -39,6 +39,10 @@ interface AddUserModalProps {
   roles?: { id: string; name: string }[];
   branches?: { id: string; name: string }[];
   showBranchSelect?: boolean;
+  /** Owner Add User: create/replace branch manager (fixed Manager role + required branch). */
+  createAsBranchManager?: boolean;
+  /** Manager role id when createAsBranchManager (backend also forces Manager). */
+  managerRoleId?: string;
   saving?: boolean;
 }
 
@@ -49,6 +53,8 @@ export function AddUserModal({
   roles = [],
   branches = [],
   showBranchSelect = false,
+  createAsBranchManager = false,
+  managerRoleId = "",
   saving,
 }: AddUserModalProps) {
   const { language } = useLanguage();
@@ -59,6 +65,18 @@ export function AddUserModal({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState<AddUserFormData>(emptyForm());
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const next = emptyForm();
+    if (createAsBranchManager && managerRoleId) {
+      next.roleId = managerRoleId;
+    }
+    if (createAsBranchManager && branches.length === 1) {
+      next.storeId = branches[0].id;
+    }
+    setFormData(next);
+  }, [isOpen, createAsBranchManager, managerRoleId, branches]);
+
   const resetForm = () => setFormData(emptyForm());
 
   const handleClose = () => {
@@ -68,7 +86,11 @@ export function AddUserModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave?.(formData);
+    const payload = {
+      ...formData,
+      roleId: createAsBranchManager && managerRoleId ? managerRoleId : formData.roleId,
+    };
+    onSave?.(payload);
   };
 
   if (!isOpen) return null;
@@ -79,7 +101,11 @@ export function AddUserModal({
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-[#14b8a6]" />
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("addNewUser")}</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+              {createAsBranchManager
+                ? pickLang(language, "Filial meneceri əlavə et", "Add branch manager")
+                : t("addNewUser")}
+            </h2>
           </div>
           <button type="button" onClick={handleClose} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors">
             <X className="w-4 h-4 text-gray-500" />
@@ -88,6 +114,16 @@ export function AddUserModal({
 
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-120px)] scrollbar-hide">
           <div className="p-4 space-y-3">
+            {createAsBranchManager && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {pickLang(
+                  language,
+                  "Bu istifadəçi seçilmiş filialın meneceri olacaq (əvvəlki menecer filialda qalır).",
+                  "This user becomes the branch manager for the selected branch (any previous manager stays on the branch).",
+                )}
+              </p>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
@@ -148,32 +184,39 @@ export function AddUserModal({
                 <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
                   {t("role")} <span className="text-red-500">*</span>
                 </label>
-                <CustomSelect
-                  value={formData.roleId}
-                  onChange={(value) => setFormData({ ...formData, roleId: value })}
-                  options={roles.map((role) => ({
-                    value: role.id,
-                    label: role.name === "Administrator" ? "Admin" : role.name,
-                  }))}
-                  placeholder={t("selectRole")}
-                  required
-                />
+                {createAsBranchManager ? (
+                  <input
+                    type="text"
+                    readOnly
+                    className="w-full px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                    value="Manager"
+                  />
+                ) : (
+                  <CustomSelect
+                    value={formData.roleId}
+                    onChange={(value) => setFormData({ ...formData, roleId: value })}
+                    options={roles.map((role) => ({
+                      value: role.id,
+                      label: role.name === "Administrator" ? "Admin" : role.name,
+                    }))}
+                    placeholder={t("selectRole")}
+                    required
+                  />
+                )}
               </div>
             </div>
 
             {showBranchSelect && (
               <div>
                 <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
-                  {t("branch")}
+                  {t("branch")} {createAsBranchManager ? <span className="text-red-500">*</span> : null}
                 </label>
                 <CustomSelect
                   value={formData.storeId}
                   onChange={(value) => setFormData({ ...formData, storeId: value })}
-                  options={[
-                    { value: "", label: pickLang(language, "Şirkət səviyyəsi", "Company-wide") },
-                    ...branches.map((b) => ({ value: b.id, label: b.name })),
-                  ]}
+                  options={branches.map((b) => ({ value: b.id, label: b.name }))}
                   placeholder={t("selectBranch")}
+                  required={createAsBranchManager}
                 />
               </div>
             )}

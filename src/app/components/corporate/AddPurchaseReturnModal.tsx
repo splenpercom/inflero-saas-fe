@@ -16,6 +16,7 @@ import { useSalesProductSearch } from "../../hooks/useSalesProductSearch";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { PurchaseBranchField, resolvePurchaseStoreIdForApi } from "./PurchaseBranchField";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface ProductLine {
@@ -407,20 +408,19 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
                 {tr("Təchizatçı", "Supplier")} <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-2">
-                <select
+                <ModernSelect
                   value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-                >
-                  <option value="">
-                    {suppliersLoading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select")}
-                  </option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSupplierId}
+                  className="flex-1"
+                  placeholder={suppliersLoading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select")}
+                  options={[
+                    {
+                      value: "",
+                      label: suppliersLoading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select"),
+                    },
+                    ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                />
                 <button
                   type="button"
                   onClick={() => void reloadSuppliers()}
@@ -680,15 +680,16 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                 {tr("Status", "Status")} <span className="text-red-500">*</span>
               </label>
-              <select
+              <ModernSelect
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              >
-                <option value="ordered">{tr("Sifariş edildi", "Ordered")}</option>
-                <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                <option value="received">{tr("Qəbul edildi", "Received")}</option>
-              </select>
+                onChange={setStatus}
+                className="w-full"
+                options={[
+                  { value: "ordered", label: tr("Sifariş edildi", "Ordered") },
+                  { value: "pending", label: tr("Gözləyir", "Pending") },
+                  { value: "received", label: tr("Qəbul edildi", "Received") },
+                ]}
+              />
             </div>
           </div>
         </div>

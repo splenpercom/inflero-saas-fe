@@ -5,7 +5,6 @@ import {
   Plus,
   FileText,
   FileSpreadsheet,
-  ChevronDown,
   ChevronUp,
   FolderTree,
   Edit2,
@@ -21,6 +20,7 @@ import { AddExpenseModal, type ExpenseFormData } from "./AddExpenseModal";
 import { ViewExpenseModal } from "./ViewExpenseModal";
 import { DateInput } from "../ui/DateInput";
 import { ManageExpenseCategoriesModal } from "./ManageExpenseCategoriesModal";
+import { ModernSelect } from "../ui/ModernSelect";
 import {
   createExpense,
   deleteExpense,
@@ -302,22 +302,26 @@ export function FinanceExpenses() {
             <div className="flex gap-2 ml-auto flex-wrap">
               <DateInput value={dateFrom} onChange={setDateFrom} className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
               <DateInput value={dateTo} onChange={setDateTo} className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
-              <div className="relative">
-                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer">
-                  <option value="all">{tr("Kateqoriya", "Category")}</option>
-                  {categories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-              <div className="relative">
-                <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer">
-                  <option value="all">{tr("Status", "Status")}</option>
-                  <option value="approved">{tr("Təsdiqləndi", "Approved")}</option>
-                  <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                  <option value="rejected">{tr("Rədd Edildi", "Rejected")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedCategory}
+                onChange={setSelectedCategory}
+                options={[
+                  { value: "all", label: tr("Kateqoriya", "Category") },
+                  ...categories.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                placeholder={tr("Kateqoriya", "Category")}
+              />
+              <ModernSelect
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                options={[
+                  { value: "all", label: tr("Status", "Status") },
+                  { value: "approved", label: tr("Təsdiqləndi", "Approved") },
+                  { value: "pending", label: tr("Gözləyir", "Pending") },
+                  { value: "rejected", label: tr("Rədd Edildi", "Rejected") },
+                ]}
+                placeholder={tr("Status", "Status")}
+              />
             </div>
           </div>
         </div>
@@ -346,7 +350,16 @@ export function FinanceExpenses() {
                   expenses.map((expense, index) => (
                     <tr key={expense.id} className={cn("border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors", index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/30 dark:bg-gray-800/10")}>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{expense.reference ?? "—"}</td>
-                      <td className="px-4 py-3 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">{expense.expenseName}</td>
+                      <td className="px-4 py-3 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span>{expense.expenseName}</span>
+                          {expense.purchaseId ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-200 border border-teal-200 dark:border-teal-800">
+                              {tr("Satınalma", "Purchase")}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{expense.category}</td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap max-w-[180px] truncate">{expense.description}</td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatFinanceDate(expense.date)}</td>
@@ -365,7 +378,7 @@ export function FinanceExpenses() {
                               <Eye className="w-3 h-3" />
                             </button>
                           )}
-                          {canEdit && !isDemo && expense.status === "PENDING" && (
+                          {canEdit && !isDemo && expense.status === "PENDING" && !expense.purchaseId && (
                             <button
                               onClick={() => { setEditExpense(expense); setIsAddExpenseModalOpen(true); }}
                               className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

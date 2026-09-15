@@ -81,3 +81,49 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   const s = params.toString();
   return s ? `?${s}` : "";
 }
+
+/** Branch initials from store name (e.g. "Filial 1 - Demo" → "F1D") or code fallback. */
+export function branchInitialsFromStore(
+  name: string | null | undefined,
+  code: string | null | undefined,
+): string {
+  const n = (name ?? "").trim();
+  if (n) {
+    const parts = n
+      .replace(/[^\w\u00C0-\u024F\s-]/gi, " ")
+      .split(/[\s/_-]+/)
+      .filter(Boolean);
+    const init = parts
+      .map((w) => (/^\d+$/.test(w) ? w : w.charAt(0)))
+      .join("")
+      .toUpperCase()
+      .slice(0, 4);
+    if (init) return init;
+  }
+  const c = (code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return c.slice(0, 4) || "BR";
+}
+
+/** Display order ID with branch initials prefix (adds prefix for legacy SL### refs). */
+export function formatOrderDisplayId(
+  reference: string,
+  storeName?: string | null,
+  storeCode?: string | null,
+): string {
+  if (!reference || reference === "—") return reference;
+  if (/^[A-Z0-9]{1,4}-/i.test(reference)) return reference;
+  const initials = branchInitialsFromStore(storeName, storeCode);
+  if (!initials) return reference;
+  return `${initials}-${reference}`;
+}
+
+/** Human source tag: POS counter, web store, or QR menu (dining). */
+export function orderSourceTag(
+  source: string | null | undefined,
+  _hasTable?: boolean,
+): "POS" | "QR Menu" | "Web" {
+  if (source === "WEB") return "Web";
+  if (source === "QR_MENU") return "QR Menu";
+  return "POS";
+}
+

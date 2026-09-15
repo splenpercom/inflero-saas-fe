@@ -6,7 +6,6 @@ import {
   FileText,
   FileSpreadsheet,
   RefreshCw,
-  ChevronDown,
   Edit2,
   Trash2,
 } from "lucide-react";
@@ -26,6 +25,7 @@ import { useConfirm } from "../../../context/ConfirmContext";
 import { AddSupplierModal, type SupplierFormData } from "./AddSupplierModal";
 import { DataPagination } from "../../ui/DataPagination";
 import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../hooks/usePagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 
 import { pickLang } from "../../../i18n/pickLang";
 export function Suppliers() {
@@ -221,18 +221,16 @@ export function Suppliers() {
               />
             </div>
             <div className="flex gap-2 ml-auto">
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value as "all" | "active" | "inactive")}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Status", "Status")}</option>
-                  <option value="active">{tr("Aktiv", "Active")}</option>
-                  <option value="inactive">{tr("Qeyri-aktiv", "Inactive")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedStatus}
+                onChange={(v) => setSelectedStatus(v as "all" | "active" | "inactive")}
+                options={[
+                  { value: "all", label: tr("Status", "Status") },
+                  { value: "active", label: tr("Aktiv", "Active") },
+                  { value: "inactive", label: tr("Qeyri-aktiv", "Inactive") },
+                ]}
+                placeholder={tr("Status", "Status")}
+              />
             </div>
           </div>
         </div>

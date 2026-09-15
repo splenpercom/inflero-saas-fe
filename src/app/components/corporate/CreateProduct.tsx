@@ -686,11 +686,16 @@ export function CreateProduct() {
                   <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
                     {/* Toolbar */}
                     <div className="flex items-center gap-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-300 dark:border-gray-700">
-                      <select className="px-2 py-1 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded">
-                        <option>{pickLang(language, "Normal", "Normal")}</option>
-                        <option>{pickLang(language, "Başlıq 1", "Heading 1")}</option>
-                        <option>{pickLang(language, "Başlıq 2", "Heading 2")}</option>
-                      </select>
+                      <ModernSelect
+                        value="normal"
+                        onChange={() => {}}
+                        minWidth={100}
+                        options={[
+                          { value: "normal", label: pickLang(language, "Normal", "Normal") },
+                          { value: "h1", label: pickLang(language, "Başlıq 1", "Heading 1") },
+                          { value: "h2", label: pickLang(language, "Başlıq 2", "Heading 2") },
+                        ]}
+                      />
                       <div className="w-px h-4 bg-gray-300 dark:bg-gray-700 mx-1" />
                       <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
                         <Bold className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
@@ -1060,14 +1065,16 @@ export function CreateProduct() {
                 <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                   {pickLang(language, "Kateqoriya *", "Category *")}
                 </label>
-                <select
+                <ModernSelect
                   value={subCatFormData.categoryId}
-                  onChange={(e) => setSubCatFormData({ ...subCatFormData, categoryId: e.target.value })}
-                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${subCatFormErrors.categoryId ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer`}
-                >
-                  <option value="">{pickLang(language, "Seç", "Select")}</option>
-                  {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
+                  onChange={(value) => setSubCatFormData({ ...subCatFormData, categoryId: value })}
+                  className="w-full"
+                  placeholder={pickLang(language, "Seç", "Select")}
+                  options={[
+                    { value: "", label: pickLang(language, "Seç", "Select") },
+                    ...categories.map((c) => ({ value: c.value, label: c.label })),
+                  ]}
+                />
                 {subCatFormErrors.categoryId && <p className="text-[10px] text-red-500 mt-1">{subCatFormErrors.categoryId}</p>}
               </div>
               <div>

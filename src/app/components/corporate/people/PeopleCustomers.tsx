@@ -6,7 +6,6 @@ import {
   FileText,
   FileSpreadsheet,
   RefreshCw,
-  ChevronDown,
   Eye,
   Edit2,
   Trash2,
@@ -29,6 +28,7 @@ import { AddCustomerModal, type CustomerFormData } from "./AddCustomerModal";
 import { CustomerVehiclesModal } from "./CustomerVehiclesModal";
 import { DataPagination } from "../../ui/DataPagination";
 import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../hooks/usePagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 
 import { pickLang } from "../../../i18n/pickLang";
 export function PeopleCustomers() {
@@ -170,11 +170,15 @@ export function PeopleCustomers() {
               <input type="text" placeholder={tr("Ad, telefon ilə axtar...", "Search name, phone...")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white" />
             </div>
             <div className="flex gap-2 ml-auto">
-              <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value as "all" | "active" | "inactive")} className="pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white">
-                <option value="all">{tr("Status", "Status")}</option>
-                <option value="active">{tr("Aktiv", "Active")}</option>
-                <option value="inactive">{tr("Qeyri-aktiv", "Inactive")}</option>
-              </select>
+              <ModernSelect
+                value={selectedStatus}
+                onChange={(value) => setSelectedStatus(value as "all" | "active" | "inactive")}
+                options={[
+                  { value: "all", label: tr("Status", "Status") },
+                  { value: "active", label: tr("Aktiv", "Active") },
+                  { value: "inactive", label: tr("Qeyri-aktiv", "Inactive") },
+                ]}
+              />
             </div>
           </div>
         </div>

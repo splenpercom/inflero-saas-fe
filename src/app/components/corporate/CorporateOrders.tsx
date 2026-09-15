@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Search, Eye, Edit2, Plus, ChevronDown } from "lucide-react";
+import { Search, Eye, Edit2, Plus } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { pickLang } from "../../i18n/pickLang";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
+import { ModernSelect } from "../ui/ModernSelect";
 
 interface Order {
   id: string;
@@ -122,20 +123,18 @@ export function CorporateOrders() {
         </div>
 
         {/* Status Filter */}
-        <div className="relative">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-        </div>
+        <ModernSelect
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: "all", label: "All Status" },
+            { value: "pending", label: "Pending" },
+            { value: "processing", label: "Processing" },
+            { value: "completed", label: "Completed" },
+            { value: "cancelled", label: "Cancelled" },
+          ]}
+          placeholder="All Status"
+        />
 
         {/* Add Button */}
         <button className="px-2.5 py-1.5 text-xs bg-[#0f766e] hover:bg-[#0d9488] text-white rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap">

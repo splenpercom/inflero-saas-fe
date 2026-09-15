@@ -68,17 +68,20 @@ export function ShowPaymentsModal({
   const due = order ? parseFloat(order.due) : 0;
   const payments = order?.payments ?? [];
   const isDraft = order ? isDraftOrderStatus(order.status) || isDraftOrderStatus(order.statusLabel) : false;
+  const isFullyRefunded =
+    (order?.paymentStatus ?? "").toLowerCase().replace(/\s+/g, "_") === "refunded";
+  const paymentBlocked = isDraft || isFullyRefunded;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {tr("Ödənişlər", "Payments")}
               </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -86,8 +89,8 @@ export function ShowPaymentsModal({
               </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
@@ -126,11 +129,16 @@ export function ShowPaymentsModal({
                       onClose();
                       onCreatePayment();
                     }}
-                    disabled={isDraft}
+                    disabled={paymentBlocked}
                     title={
                       isDraft
                         ? tr("Əvvəlcə qaralamanı tamamlayın", "Finalize the draft first")
-                        : undefined
+                        : isFullyRefunded
+                          ? tr(
+                              "Tam qaytarılmış sifarişə ödəniş yazıla bilməz",
+                              "Cannot record payment on a fully refunded order",
+                            )
+                          : undefined
                     }
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -191,11 +199,11 @@ export function ShowPaymentsModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-3 text-sm font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors"
+            className="px-4 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors"
           >
             {tr("Bağla", "Close")}
           </button>

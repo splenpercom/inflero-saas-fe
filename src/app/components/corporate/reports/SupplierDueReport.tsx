@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { DataPagination } from "../../ui/DataPagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
-import { FileText, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { FileText, FileSpreadsheet } from "lucide-react";
 import { useReportDateRange } from "../../../hooks/useReportDateRange";
 import { ReportDateRangeFilter } from "./ReportDateRangeFilter";
 import { useLanguage } from "../../../i18n/LanguageContext";
@@ -102,47 +103,41 @@ export function SupplierDueReport() {
             />
 
             {/* Supplier Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedSupplier}
-                onChange={(e) => setSelectedSupplier(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Supplier</option>
-                <option value="supplier1">Supplier 1</option>
-                <option value="supplier2">Supplier 2</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedSupplier}
+                placeholder="Supplier"
+                options={[
+                  { value: "all", label: "Supplier" },
+                  { value: "supplier1", label: "Supplier 1" },
+                  { value: "supplier2", label: "Supplier 2" }
+                ]}
+              />
 
             {/* Payment Status Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedPaymentStatus}
-                onChange={(e) => setSelectedPaymentStatus(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Payment Status</option>
-                <option value="paid">Paid</option>
-                <option value="pending">Pending</option>
-                <option value="overdue">Overdue</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedPaymentStatus}
+                placeholder="Payment Status"
+                options={[
+                  { value: "all", label: "Payment Status" },
+                  { value: "paid", label: "Paid" },
+                  { value: "pending", label: "Pending" },
+                  { value: "overdue", label: "Overdue" }
+                ]}
+              />
 
             {/* Reference Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedReference}
-                onChange={(e) => setSelectedReference(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Reference</option>
-                <option value="ref1">Reference 1</option>
-                <option value="ref2">Reference 2</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedReference}
+                placeholder="Reference"
+                options={[
+                  { value: "all", label: "Reference" },
+                  { value: "ref1", label: "Reference 1" },
+                  { value: "ref2", label: "Reference 2" }
+                ]}
+              />
 
             {/* Generate Button */}
             <button

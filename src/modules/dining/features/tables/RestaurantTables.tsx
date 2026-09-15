@@ -27,6 +27,7 @@ import {
   type DiningTable,
 } from "../../../../app/api/dining";
 import { ApiError } from "../../../../app/api/client";
+import { ModernSelect } from "../../../../app/components/ui/ModernSelect";
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors";
@@ -636,15 +637,17 @@ export function RestaurantTables() {
                         </span>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <select
+                        <ModernSelect
                           value={st}
-                          onChange={(e) => void setStatus(table.id, e.target.value as UiStatus)}
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border cursor-pointer focus:outline-none ${STATUS_BADGE[st]}`}
-                        >
-                          <option value="available">{tr("Boş", "Available")}</option>
-                          <option value="occupied">{tr("Dolu", "Occupied")}</option>
-                          <option value="reserved">{tr("Rezerv", "Reserved")}</option>
-                        </select>
+                          onChange={(value) => void setStatus(table.id, value as UiStatus)}
+                          minWidth={100}
+                          buttonClassName={`px-2 py-0.5 text-[10px] font-medium border ${STATUS_BADGE[st]}`}
+                          options={[
+                            { value: "available", label: tr("Boş", "Available") },
+                            { value: "occupied", label: tr("Dolu", "Occupied") },
+                            { value: "reserved", label: tr("Rezerv", "Reserved") },
+                          ]}
+                        />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">

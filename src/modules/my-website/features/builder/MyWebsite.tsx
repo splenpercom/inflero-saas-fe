@@ -28,8 +28,9 @@ import {
   saveWebsiteConfig,
 } from "../../lib/websiteConfigStorage";
 import { storePath, storeUrl } from "../../../../app/lib/bookingLinks";
-import { fetchTenantWebsiteConfig, saveTenantWebsiteConfig } from "../../../../app/api/website";
+import { createPublicWebOrder, fetchTenantWebsiteConfig, saveTenantWebsiteConfig } from "../../../../app/api/website";
 import { fetchCategories, fetchProducts } from "../../../../app/api/inventory";
+import { ModernSelect } from "../../../../app/components/ui/ModernSelect";
 import {
   CatalogProvider,
   EMPTY_CATALOG,
@@ -175,9 +176,11 @@ export type StorefrontRuntime = {
   setPage: (page: "home" | "product" | "checkout") => void;
   cart: StorefrontCartLine[];
   addToCart: (product: StorefrontProduct, qty?: number) => void;
+  clearCart?: () => void;
   selectedProduct: StorefrontProduct | null;
   openProduct: (product: StorefrontProduct) => void;
   cartCount: number;
+  companySlug?: string | null;
   selectedBranch?: { storeId: string; code: string; name: string; address?: string | null } | null;
   onChangeBranch?: () => void;
 };
@@ -1166,6 +1169,17 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState(2);
   const [isWide, setIsWide] = useState(false);
+  const [shipFirst, setShipFirst] = useState("");
+  const [shipLast, setShipLast] = useState("");
+  const [shipEmail, setShipEmail] = useState("");
+  const [shipPhone, setShipPhone] = useState("");
+  const [shipAddress, setShipAddress] = useState("");
+  const [shipCity, setShipCity] = useState("");
+  const [shipZip, setShipZip] = useState("");
+  const [payMethodId, setPayMethodId] = useState<"epoint" | "cod">("cod");
+  const [placing, setPlacing] = useState(false);
+  const [placedRef, setPlacedRef] = useState<string | null>(null);
+  const [placeError, setPlaceError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = containerRef.current;
@@ -1520,12 +1534,80 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
   // Checkout page
   const steps = ["bag","shipping","payment","done"] as const;
   const stepIdx = steps.indexOf(cartStep);
+  const isLiveCheckout = Boolean(storefront?.companySlug && storefront.cart.length > 0);
   const bagLines: StorefrontCartLine[] = storefront && storefront.cart.length > 0
     ? storefront.cart
     : PRODUCTS.slice(0, 2).map(p => ({ product: p, qty: 1 }));
   const bagSubtotal = bagLines.reduce((sum, line) => sum + line.product.price * line.qty, 0);
   const bagTotal = bagSubtotal;
   const bagTotalLabel = bagTotal.toFixed(2);
+
+  const enabledPayMethods = config.paymentMethods.filter((m) => m.enabled);
+  useEffect(() => {
+    const first = enabledPayMethods[0]?.id;
+    if (first === "epoint" || first === "cod") setPayMethodId(first);
+  }, [config.paymentMethods]);
+
+  const goShippingNext = () => {
+    if (!shipFirst.trim() || !shipLast.trim() || !shipPhone.trim() || !shipAddress.trim()) {
+      toast.error("Please fill name, phone and address");
+      return;
+    }
+    setCartStep("payment");
+  };
+
+  const placeOrder = async () => {
+    setPlaceError(null);
+    const slug = storefront?.companySlug?.trim();
+    if (!slug || !storefront || storefront.cart.length === 0) {
+      // Builder preview — keep local mock confirmation
+      setPlacedRef(`INF-${Math.floor(Math.random() * 90000 + 10000)}`);
+      setCartStep("done");
+      return;
+    }
+    setPlacing(true);
+    try {
+      const order = await createPublicWebOrder(slug, {
+        branch: storefront.selectedBranch?.code ?? null,
+        paymentMethod: payMethodId,
+        customer: {
+          name: `${shipFirst.trim()} ${shipLast.trim()}`.trim(),
+          email: shipEmail.trim(),
+          phone: shipPhone.trim(),
+        },
+        shipping: {
+          address: shipAddress.trim(),
+          city: shipCity.trim(),
+          postalCode: shipZip.trim(),
+          country: "",
+        },
+        items: storefront.cart.map((line) => ({
+          productId: line.product.id,
+          quantity: line.qty,
+        })),
+      });
+      storefront.clearCart?.();
+      setPlacedRef(null);
+      setPlaceError(null);
+      setCartStep("bag");
+      setShipFirst("");
+      setShipLast("");
+      setShipEmail("");
+      setShipPhone("");
+      setShipAddress("");
+      setShipCity("");
+      setShipZip("");
+      toast.success(`Order ${order.reference} placed`);
+      storefront.setPage("home");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to place order";
+      setPlaceError(msg);
+      toast.error(msg);
+    } finally {
+      setPlacing(false);
+    }
+  };
 
   return (
     <div className={`p-4 space-y-4 ${txt}`}>
@@ -1578,16 +1660,16 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
         <div className="space-y-3">
           <h2 className="text-sm font-bold">Çatdırılma Məlumatları</h2>
           <div className="grid grid-cols-2 gap-2">
-            <div><label className={`text-[10px] ${sub} block mb-1`}>Ad</label><input className={inputCls} placeholder="Əli"/></div>
-            <div><label className={`text-[10px] ${sub} block mb-1`}>Soyad</label><input className={inputCls} placeholder="Əliyev"/></div>
+            <div><label className={`text-[10px] ${sub} block mb-1`}>Ad</label><input className={inputCls} placeholder="Əli" value={shipFirst} onChange={(e)=>setShipFirst(e.target.value)}/></div>
+            <div><label className={`text-[10px] ${sub} block mb-1`}>Soyad</label><input className={inputCls} placeholder="Əliyev" value={shipLast} onChange={(e)=>setShipLast(e.target.value)}/></div>
           </div>
-          {config.shippingEmailEnabled && <div><label className={`text-[10px] ${sub} block mb-1`}>E-poçt</label><input className={inputCls} placeholder="ali@example.com" type="email"/></div>}
-          <div><label className={`text-[10px] ${sub} block mb-1`}>Telefon</label><input className={inputCls} placeholder="+994 50 000 0000"/></div>
-          <div><label className={`text-[10px] ${sub} block mb-1`}>Ünvan</label><input className={inputCls} placeholder="Nizami küç. 45"/></div>
+          {config.shippingEmailEnabled && <div><label className={`text-[10px] ${sub} block mb-1`}>E-poçt</label><input className={inputCls} placeholder="ali@example.com" type="email" value={shipEmail} onChange={(e)=>setShipEmail(e.target.value)}/></div>}
+          <div><label className={`text-[10px] ${sub} block mb-1`}>Telefon</label><input className={inputCls} placeholder="+994 50 000 0000" value={shipPhone} onChange={(e)=>setShipPhone(e.target.value)}/></div>
+          <div><label className={`text-[10px] ${sub} block mb-1`}>Ünvan</label><input className={inputCls} placeholder="Nizami küç. 45" value={shipAddress} onChange={(e)=>setShipAddress(e.target.value)}/></div>
           {(config.shippingCityEnabled || config.shippingZipEnabled) && (
             <div className={`grid gap-2 ${config.shippingCityEnabled && config.shippingZipEnabled ? "grid-cols-2" : "grid-cols-1"}`}>
-              {config.shippingCityEnabled && <div><label className={`text-[10px] ${sub} block mb-1`}>Şəhər</label><input className={inputCls} placeholder="Bakı"/></div>}
-              {config.shippingZipEnabled && <div><label className={`text-[10px] ${sub} block mb-1`}>Poçt Kodu</label><input className={inputCls} placeholder="AZ1000"/></div>}
+              {config.shippingCityEnabled && <div><label className={`text-[10px] ${sub} block mb-1`}>Şəhər</label><input className={inputCls} placeholder="Bakı" value={shipCity} onChange={(e)=>setShipCity(e.target.value)}/></div>}
+              {config.shippingZipEnabled && <div><label className={`text-[10px] ${sub} block mb-1`}>Poçt Kodu</label><input className={inputCls} placeholder="AZ1000" value={shipZip} onChange={(e)=>setShipZip(e.target.value)}/></div>}
             </div>
           )}
           <div className={`rounded-xl border ${card} p-3 space-y-2`}>
@@ -1634,7 +1716,7 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
           </div>
           <div className="flex gap-2">
             <button onClick={()=>setCartStep("bag")} className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-colors ${isDark?"border-gray-600 hover:bg-gray-700":"border-gray-300 hover:bg-gray-50"}`}>← Geri</button>
-            <button onClick={()=>setCartStep("payment")} className="flex-1 py-2 rounded-xl text-xs font-semibold text-white shadow-md transition-opacity hover:opacity-90" style={{background:tmpl.accent}}>Davam et →</button>
+            <button onClick={goShippingNext} className="flex-1 py-2 rounded-xl text-xs font-semibold text-white shadow-md transition-opacity hover:opacity-90" style={{background:tmpl.accent}}>Davam et →</button>
           </div>
         </div>
       )}
@@ -1644,30 +1726,35 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
           <h2 className="text-sm font-bold">Ödəniş</h2>
           <div className={`rounded-xl border ${card} p-3 space-y-2`}>
             <p className={`text-[10px] font-semibold ${txt} mb-1`}>Ödəniş üsulunu seçin</p>
-            {config.paymentMethods.filter(m=>m.enabled).map((m,i)=>(
-              <label key={m.id} className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer border transition-colors ${i===0?"border-[#14b8a6] bg-[#14b8a6]/5 dark:bg-[#14b8a6]/10":`border-transparent ${isDark?"hover:bg-gray-700":"hover:bg-gray-50"}`}`}>
-                <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${i===0?"border-[#14b8a6] bg-[#14b8a6]":"border-gray-300"}`}/>
+            {enabledPayMethods.map((m)=>(
+              <label key={m.id} onClick={() => { if (m.id === "epoint" || m.id === "cod") setPayMethodId(m.id); }} className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer border transition-colors ${payMethodId===m.id?"border-[#14b8a6] bg-[#14b8a6]/5 dark:bg-[#14b8a6]/10":`border-transparent ${isDark?"hover:bg-gray-700":"hover:bg-gray-50"}`}`}>
+                <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${payMethodId===m.id?"border-[#14b8a6] bg-[#14b8a6]":"border-gray-300"}`}/>
                 <span className="text-sm">{m.icon}</span>
                 <span className="text-[10px]">{m.name}</span>
               </label>
             ))}
           </div>
-          <div className={`rounded-xl border ${card} p-3 space-y-2`}>
-            <div><label className={`text-[10px] ${sub} block mb-1`}>Kart Nömrəsi</label><input className={inputCls} placeholder="4242 4242 4242 4242"/></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className={`text-[10px] ${sub} block mb-1`}>Son istifadə tarixi</label><input className={inputCls} placeholder="MM / YY"/></div>
-              <div><label className={`text-[10px] ${sub} block mb-1`}>CVV</label><input className={inputCls} placeholder="•••"/></div>
+          {payMethodId === "epoint" && (
+            <div className={`rounded-xl border ${card} p-3 space-y-2`}>
+              <div><label className={`text-[10px] ${sub} block mb-1`}>Kart Nömrəsi</label><input className={inputCls} placeholder="4242 4242 4242 4242"/></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className={`text-[10px] ${sub} block mb-1`}>Son istifadə tarixi</label><input className={inputCls} placeholder="MM / YY"/></div>
+                <div><label className={`text-[10px] ${sub} block mb-1`}>CVV</label><input className={inputCls} placeholder="•••"/></div>
+              </div>
+              <div><label className={`text-[10px] ${sub} block mb-1`}>Kartdakı Ad</label><input className={inputCls} placeholder="Əli Əliyev"/></div>
             </div>
-            <div><label className={`text-[10px] ${sub} block mb-1`}>Kartdakı Ad</label><input className={inputCls} placeholder="Əli Əliyev"/></div>
-          </div>
+          )}
           <div className={`rounded-xl border ${card} p-3 space-y-1 text-xs`}>
             <div className={`flex justify-between ${sub}`}><span>{bagLines.reduce((s, l) => s + l.qty, 0)} məhsul</span><span>{bagTotalLabel} ₼</span></div>
             <div className={`flex justify-between ${sub}`}><span>Çatdırılma</span><span className="text-[#14b8a6]">Pulsuz</span></div>
             <div className={`flex justify-between font-bold border-t pt-1.5 ${isDark?"border-gray-700":""}`}><span>Cəmi</span><span style={{color:tmpl.accent}}>{bagTotalLabel} ₼</span></div>
           </div>
+          {placeError && <p className="text-[10px] text-red-500">{placeError}</p>}
           <div className="flex gap-2">
             <button onClick={()=>setCartStep("shipping")} className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-colors ${isDark?"border-gray-600 hover:bg-gray-700":"border-gray-300 hover:bg-gray-50"}`}>← Geri</button>
-            <button onClick={()=>setCartStep("done")} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white shadow-md transition-opacity hover:opacity-90" style={{background:tmpl.accent}}>Sifariş Ver 🎉</button>
+            <button onClick={() => void placeOrder()} disabled={placing} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-60" style={{background:tmpl.accent}}>
+              {placing ? "…" : isLiveCheckout ? "Sifariş Ver 🎉" : "Sifariş Ver 🎉"}
+            </button>
           </div>
         </div>
       )}
@@ -1682,11 +1769,11 @@ function ProductOrCheckoutPage({ page, config, tmpl, isDark, storefront }: {
             <p className={`text-xs ${sub}`}>Alışınız üçün təşəkkür edirik. Tezliklə təsdiq e-poçtu alacaqsınız.</p>
           </div>
           <div className={`w-full rounded-xl border ${card} p-3 text-left space-y-1 text-xs`}>
-            <div className={`flex justify-between ${sub}`}><span>Sifariş #</span><span className="font-mono">INF-{Math.floor(Math.random()*90000+10000)}</span></div>
+            <div className={`flex justify-between ${sub}`}><span>Sifariş #</span><span className="font-mono">{placedRef ?? "—"}</span></div>
             <div className={`flex justify-between ${sub}`}><span>Ödənildi</span><span className="font-semibold" style={{color:tmpl.accent}}>{bagTotalLabel} ₼</span></div>
             <div className={`flex justify-between ${sub}`}><span>Təxmini çatdırılma</span><span>5–7 iş günü</span></div>
           </div>
-          <button onClick={() => { setCartStep("bag"); storefront?.setPage("home"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="px-6 py-2 rounded-xl text-xs font-semibold text-white shadow-md" style={{background:tmpl.accent}}>Alış-verişə Davam Et</button>
+          <button onClick={() => { setCartStep("bag"); setPlacedRef(null); storefront?.setPage("home"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="px-6 py-2 rounded-xl text-xs font-semibold text-white shadow-md" style={{background:tmpl.accent}}>Alış-verişə Davam Et</button>
         </div>
       )}
     </div>
@@ -1944,7 +2031,20 @@ function ProductSourceEditor({ src, onChange }: { src: ProductSource; onChange: 
           ))}
         </div>
       </Field>
-      {src.mode === "category" && <Field label={tr("Kateqoriya","Category")}><select className={inputCls} value={src.categoryId} onChange={e => onChange({ ...src, categoryId: e.target.value })}><option value="">— {tr("seçin","choose")} —</option>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>}
+      {src.mode === "category" && (
+        <Field label={tr("Kateqoriya", "Category")}>
+          <ModernSelect
+            value={src.categoryId}
+            onChange={(value) => onChange({ ...src, categoryId: value })}
+            className="w-full"
+            placeholder={`— ${tr("seçin", "choose")} —`}
+            options={[
+              { value: "", label: `— ${tr("seçin", "choose")} —` },
+              ...CATEGORIES.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+        </Field>
+      )}
       {src.mode === "specific" && (
         <Field label={tr("Məhsulları Seçin","Select Products")}>
           <div className="space-y-1 max-h-36 overflow-y-auto">
@@ -2343,8 +2443,31 @@ function RowSettingsPanel({ row, onChange, onClose, onAddBlockToColumn }: {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label={tr("Boşluq (kənar)", "Padding")}><select className={inputCls} value={row.padding??"md"} onChange={e=>set({padding:e.target.value as RowItem["padding"]})}><option value="none">{tr("Yox", "None")}</option><option value="sm">{tr("Kiçik", "Small")}</option><option value="md">{tr("Orta", "Medium")}</option><option value="lg">{tr("Böyük", "Large")}</option></select></Field>
-          <Field label={tr("Aralıq", "Gap")}><select className={inputCls} value={row.gap??"md"} onChange={e=>set({gap:e.target.value as RowItem["gap"]})}><option value="sm">{tr("Kiçik", "Small")}</option><option value="md">{tr("Orta", "Medium")}</option><option value="lg">{tr("Böyük", "Large")}</option></select></Field>
+          <Field label={tr("Boşluq (kənar)", "Padding")}>
+            <ModernSelect
+              value={row.padding ?? "md"}
+              onChange={(value) => set({ padding: value as RowItem["padding"] })}
+              className="w-full"
+              options={[
+                { value: "none", label: tr("Yox", "None") },
+                { value: "sm", label: tr("Kiçik", "Small") },
+                { value: "md", label: tr("Orta", "Medium") },
+                { value: "lg", label: tr("Böyük", "Large") },
+              ]}
+            />
+          </Field>
+          <Field label={tr("Aralıq", "Gap")}>
+            <ModernSelect
+              value={row.gap ?? "md"}
+              onChange={(value) => set({ gap: value as RowItem["gap"] })}
+              className="w-full"
+              options={[
+                { value: "sm", label: tr("Kiçik", "Small") },
+                { value: "md", label: tr("Orta", "Medium") },
+                { value: "lg", label: tr("Böyük", "Large") },
+              ]}
+            />
+          </Field>
         </div>
         <Field label={tr("Arxa fon rəngi", "Background Color")}>
           <div className="flex items-center gap-2">
@@ -3764,6 +3887,8 @@ export function StorefrontView({
     toast.success("Added to cart");
   }, []);
 
+  const clearCart = useCallback(() => setCart([]), []);
+
   const openProduct = useCallback((product: StorefrontProduct) => {
     setSelectedProduct(product);
     setPage("product");
@@ -3776,9 +3901,11 @@ export function StorefrontView({
     setPage,
     cart,
     addToCart,
+    clearCart,
     selectedProduct,
     openProduct,
     cartCount,
+    companySlug,
     selectedBranch,
     onChangeBranch,
   };

@@ -8,6 +8,7 @@ import { useSalesCustomers } from "../../hooks/useSalesCustomers";
 import { useSalesProductSearch } from "../../hooks/useSalesProductSearch";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface LineItem {
@@ -151,18 +152,16 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                 {tr("Müştəri", "Customer")}
               </label>
-              <select
+              <ModernSelect
                 value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              >
-                <option value="">{tr("Müştəri seçin (ixtiyari)", "Choose customer (optional)")}</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setCustomerId}
+                className="w-full"
+                placeholder={tr("Müştəri seçin (ixtiyari)", "Choose customer (optional)")}
+                options={[
+                  { value: "", label: tr("Müştəri seçin (ixtiyari)", "Choose customer (optional)") },
+                  ...customers.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">

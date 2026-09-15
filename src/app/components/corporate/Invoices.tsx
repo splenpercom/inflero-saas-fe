@@ -4,7 +4,6 @@ import {
   Search,
   FileText,
   FileSpreadsheet,
-  ChevronDown,
   Eye,
   Trash2,
   Plus,
@@ -22,6 +21,7 @@ import { useConfirm } from "../../context/ConfirmContext";
 import { CreateInvoiceModal } from "./CreateInvoiceModal";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 export function Invoices() {
@@ -226,49 +226,40 @@ export function Invoices() {
             </div>
 
             <div className="flex gap-2 ml-auto flex-wrap">
-              <div className="relative">
-                <select
-                  value={selectedCustomer}
-                  onChange={(e) => setSelectedCustomer(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Müştəri", "Customer")}</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedCustomer}
+                onChange={setSelectedCustomer}
+                options={[
+                  { value: "all", label: tr("Müştəri", "Customer") },
+                  ...customers.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                placeholder={tr("Müştəri", "Customer")}
+              />
 
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Status", "Status")}</option>
-                  <option value="paid">{tr("Ödənilib", "Paid")}</option>
-                  <option value="overdue">{tr("Gecikmiş", "Overdue")}</option>
-                  <option value="unpaid">{tr("Ödənilməyib", "Unpaid")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                options={[
+                  { value: "all", label: tr("Status", "Status") },
+                  { value: "paid", label: tr("Ödənilib", "Paid") },
+                  { value: "overdue", label: tr("Gecikmiş", "Overdue") },
+                  { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
+                ]}
+                placeholder={tr("Status", "Status")}
+              />
 
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="last7days">{tr("Sırala : Son 7 Gün", "Sort By : Last 7 Days")}</option>
-                  <option value="last30days">{tr("Sırala : Son 30 Gün", "Sort By : Last 30 Days")}</option>
-                  <option value="last90days">{tr("Sırala : Son 90 Gün", "Sort By : Last 90 Days")}</option>
-                  <option value="thisyear">{tr("Sırala : Bu İl", "Sort By : This Year")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={sortBy}
+                onChange={setSortBy}
+                options={[
+                  { value: "last7days", label: tr("Sırala : Son 7 Gün", "Sort By : Last 7 Days") },
+                  { value: "last30days", label: tr("Sırala : Son 30 Gün", "Sort By : Last 30 Days") },
+                  { value: "last90days", label: tr("Sırala : Son 90 Gün", "Sort By : Last 90 Days") },
+                  { value: "thisyear", label: tr("Sırala : Bu İl", "Sort By : This Year") },
+                ]}
+                placeholder={tr("Sırala : Son 7 Gün", "Sort By : Last 7 Days")}
+                minWidth={160}
+              />
             </div>
           </div>
         </div>

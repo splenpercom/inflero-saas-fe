@@ -17,6 +17,7 @@ interface ModernSelectProps {
   className?: string;
   buttonClassName?: string;
   minWidth?: number;
+  disabled?: boolean;
 }
 
 const DROPDOWN_ESTIMATED_HEIGHT = 240;
@@ -29,6 +30,7 @@ export function ModernSelect({
   className,
   buttonClassName,
   minWidth = 120,
+  disabled = false,
 }: ModernSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -53,14 +55,18 @@ export function ModernSelect({
     <div className={cn("relative", className)} ref={anchorRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen(!isOpen);
+        }}
         className={cn(
-          "w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] flex items-center justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-colors",
+          "w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] flex items-center justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 dark:disabled:hover:border-gray-700",
           buttonClassName,
         )}
         style={{ minWidth }}
       >
-        <span className={cn("truncate", !value && "text-gray-400")}>
+        <span className={cn("truncate", !selectedOption && "text-gray-400")}>
           {selectedOption?.label || placeholder}
         </span>
         <ChevronDown
@@ -72,6 +78,7 @@ export function ModernSelect({
       </button>
 
       {isOpen &&
+        !disabled &&
         createPortal(
           <div
             ref={portalRef}

@@ -3,7 +3,12 @@ import { X, Search, Trash2, RotateCcw } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
-import { createPurchase, fetchPurchase, type PurchaseListRow } from "../../api/purchases";
+import {
+  createPurchase,
+  fetchPurchase,
+  updatePurchase,
+  type PurchaseListRow,
+} from "../../api/purchases";
 import { mapPurchaseStatusToApi } from "../../lib/salesMappers";
 import { parsePurchaseAmount } from "../../lib/purchaseMappers";
 import { usePurchaseSuppliers } from "../../hooks/usePurchaseSuppliers";
@@ -14,8 +19,10 @@ import { PurchaseBranchField, resolvePurchaseStoreIdForApi } from "./PurchaseBra
 import { SupplierRecentPurchasesPanel } from "./SupplierRecentPurchasesPanel";
 import { PurchaseDetailModal } from "./PurchaseDetailModal";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
+
 interface ProductLine {
   productId: string;
   name: string;
@@ -30,6 +37,8 @@ interface AddPurchaseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /** When set, modal loads that purchase and saves via update. */
+  purchaseId?: string | null;
 }
 
 function lineTaxAmount(price: number, qty: number, discount: number, taxPercent: number) {
@@ -42,12 +51,74 @@ function lineTotalCost(price: number, qty: number, discount: number, taxPercent:
   return base + lineTaxAmount(price, qty, discount, taxPercent);
 }
 
-export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalProps) {
+function mapDetailItemsToLines(
+  items: Awaited<ReturnType<typeof fetchPurchase>>["items"],
+): ProductLine[] {
+  return items.map((item) => ({
+    productId: item.productId,
+    name: item.productName,
+    sku: item.sku ?? "",
+    qty: item.quantity,
+    purchasePrice: parsePurchaseAmount(item.purchasePrice),
+    discount: parsePurchaseAmount(item.discount),
+    taxPercent: parsePurchaseAmount(item.taxPercent),
+  }));
+}
+
+function resetFormState(setters: {
+  setSupplierId: (v: string) => void;
+  setSupplierSearch: (v: string) => void;
+  setDate: (v: string) => void;
+  setReference: (v: string) => void;
+  setProductSearch: (v: string) => void;
+  setProducts: (v: ProductLine[]) => void;
+  setOrderTax: (v: number) => void;
+  setDiscount: (v: number) => void;
+  setShipping: (v: number) => void;
+  setStatus: (v: string) => void;
+  setDescription: (v: string) => void;
+  setStoreId: (v: string) => void;
+  setShowProductList: (v: boolean) => void;
+  setViewPurchaseId: (v: string | null) => void;
+  setReusingPurchaseId: (v: string | null) => void;
+  setLinesLocked: (v: boolean) => void;
+  setInitialStatus: (v: string) => void;
+  setLoadedSupplierName: (v: string) => void;
+  setLoadingDetail: (v: boolean) => void;
+}) {
+  setters.setSupplierId("");
+  setters.setSupplierSearch("");
+  setters.setDate("");
+  setters.setReference("");
+  setters.setProductSearch("");
+  setters.setProducts([]);
+  setters.setOrderTax(0);
+  setters.setDiscount(0);
+  setters.setShipping(0);
+  setters.setStatus("pending");
+  setters.setDescription("");
+  setters.setStoreId("");
+  setters.setShowProductList(false);
+  setters.setViewPurchaseId(null);
+  setters.setReusingPurchaseId(null);
+  setters.setLinesLocked(false);
+  setters.setInitialStatus("pending");
+  setters.setLoadedSupplierName("");
+  setters.setLoadingDetail(false);
+}
+
+export function AddPurchaseModal({
+  isOpen,
+  onClose,
+  onSaved,
+  purchaseId = null,
+}: AddPurchaseModalProps) {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
   const { branchId, isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
+  const isEdit = !!purchaseId;
 
   const [supplierId, setSupplierId] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
@@ -65,6 +136,10 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
   const [saving, setSaving] = useState(false);
   const [viewPurchaseId, setViewPurchaseId] = useState<string | null>(null);
   const [reusingPurchaseId, setReusingPurchaseId] = useState<string | null>(null);
+  const [linesLocked, setLinesLocked] = useState(false);
+  const [initialStatus, setInitialStatus] = useState("pending");
+  const [loadedSupplierName, setLoadedSupplierName] = useState("");
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const { suppliers, loading: suppliersLoading, reload: reloadSuppliers } = usePurchaseSuppliers(
     supplierSearch,
@@ -72,40 +147,91 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
   );
   const { products: searchResults, loading: productsLoading } = useSalesProductSearch(
     productSearch,
-    isOpen,
+    isOpen && !linesLocked,
   );
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   useEffect(() => {
     if (!isOpen) {
-      setSupplierId("");
-      setSupplierSearch("");
-      setDate("");
-      setReference("");
-      setProductSearch("");
-      setProducts([]);
-      setOrderTax(0);
-      setDiscount(0);
-      setShipping(0);
-      setStatus("pending");
-      setDescription("");
-      setStoreId("");
-      setShowProductList(false);
-      setViewPurchaseId(null);
-      setReusingPurchaseId(null);
+      resetFormState({
+        setSupplierId,
+        setSupplierSearch,
+        setDate,
+        setReference,
+        setProductSearch,
+        setProducts,
+        setOrderTax,
+        setDiscount,
+        setShipping,
+        setStatus,
+        setDescription,
+        setStoreId,
+        setShowProductList,
+        setViewPurchaseId,
+        setReusingPurchaseId,
+        setLinesLocked,
+        setInitialStatus,
+        setLoadedSupplierName,
+        setLoadingDetail,
+      });
     }
   }, [isOpen]);
 
   useEffect(() => {
-    if (isOpen && !isGlobalMode && branchId) {
+    if (!isOpen || isEdit) return;
+    if (!isGlobalMode && branchId) {
       setStoreId(branchId);
     }
-  }, [isOpen, isGlobalMode, branchId]);
+  }, [isOpen, isEdit, isGlobalMode, branchId]);
+
+  useEffect(() => {
+    if (!isOpen || !purchaseId) return;
+
+    let cancelled = false;
+    setLoadingDetail(true);
+    fetchPurchase(purchaseId)
+      .then((detail) => {
+        if (cancelled) return;
+        const nextStatus = detail.status.toLowerCase();
+        setSupplierId(detail.supplierId ?? "");
+        setLoadedSupplierName(detail.supplierName ?? "");
+        setSupplierSearch("");
+        setDate(detail.date ? detail.date.slice(0, 10) : "");
+        setReference(detail.reference ?? "");
+        setProducts(mapDetailItemsToLines(detail.items));
+        setOrderTax(parsePurchaseAmount(detail.orderTax));
+        setDiscount(parsePurchaseAmount(detail.discount));
+        setShipping(parsePurchaseAmount(detail.shipping));
+        setStatus(nextStatus);
+        setInitialStatus(nextStatus);
+        setDescription(detail.description ?? "");
+        setStoreId(detail.storeId ?? (!isGlobalMode && branchId ? branchId : ""));
+        setLinesLocked(!!detail.stockReceivedAt);
+        setProductSearch("");
+        setShowProductList(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        notifyFromError(err, tr("Satınalma yüklənə bilmədi", "Failed to load purchase"));
+        onClose();
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetail(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, purchaseId, isGlobalMode, branchId, language]);
 
   const handleAddProduct = (id: string, name: string, sku: string) => {
+    if (linesLocked) return;
     if (products.some((p) => p.productId === id)) return;
-    setProducts([...products, { productId: id, name, sku, qty: 1, purchasePrice: 0, discount: 0, taxPercent: 0 }]);
+    setProducts([
+      ...products,
+      { productId: id, name, sku, qty: 1, purchasePrice: 0, discount: 0, taxPercent: 0 },
+    ]);
     setProductSearch("");
     setShowProductList(false);
   };
@@ -115,25 +241,17 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
     field: keyof Pick<ProductLine, "qty" | "purchasePrice" | "discount" | "taxPercent">,
     value: number,
   ) => {
+    if (linesLocked) return;
     setProducts(products.map((p) => (p.productId === productId ? { ...p, [field]: value } : p)));
   };
 
   const handleRemoveProduct = (productId: string) => {
+    if (linesLocked) return;
     setProducts(products.filter((p) => p.productId !== productId));
   };
 
-  const mapDetailItemsToLines = (items: Awaited<ReturnType<typeof fetchPurchase>>["items"]): ProductLine[] =>
-    items.map((item) => ({
-      productId: item.productId,
-      name: item.productName,
-      sku: item.sku ?? "",
-      qty: item.quantity,
-      purchasePrice: parsePurchaseAmount(item.purchasePrice),
-      discount: parsePurchaseAmount(item.discount),
-      taxPercent: parsePurchaseAmount(item.taxPercent),
-    }));
-
   const handleReusePurchase = async (purchase: PurchaseListRow) => {
+    if (isEdit || linesLocked) return;
     if (products.length > 0) {
       const ok = await askConfirm({
         title: tr("Təsdiq", "Confirm"),
@@ -157,7 +275,6 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
       if (detail.storeId) {
         setStoreId(detail.storeId);
       }
-      // New purchase: keep/choose a fresh date; do not reuse old reference (uniqueness).
       if (!date) {
         setDate(new Date().toISOString().slice(0, 10));
       }
@@ -175,7 +292,21 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
     }
   };
 
-  const selectedSupplierName = suppliers.find((s) => s.id === supplierId)?.name;
+  const selectedSupplierName =
+    suppliers.find((s) => s.id === supplierId)?.name || loadedSupplierName || undefined;
+
+  const supplierOptions = [
+    {
+      value: "",
+      label: suppliersLoading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select"),
+    },
+    ...(supplierId &&
+    loadedSupplierName &&
+    !suppliers.some((s) => s.id === supplierId)
+      ? [{ value: supplierId, label: loadedSupplierName }]
+      : []),
+    ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+  ];
 
   const linesSubtotal = products.reduce(
     (sum, p) => sum + lineTotalCost(p.purchasePrice, p.qty, p.discount, p.taxPercent),
@@ -184,7 +315,9 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
   const grandTotal = linesSubtotal + orderTax - discount + shipping;
 
   const handleSave = async () => {
-    if (!(isAuthenticated || isDemo) || !supplierId || !date || products.length === 0 || !status) return;
+    if (!(isAuthenticated || isDemo) || !supplierId || !date || products.length === 0 || !status) {
+      return;
+    }
 
     const invalidLine = products.some((p) => p.qty <= 0 || p.purchasePrice < 0);
     if (invalidLine) return;
@@ -203,7 +336,8 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
       return;
     }
 
-    if (stockEnabled && status === "received") {
+    const transitioningToReceived = status === "received" && initialStatus !== "received";
+    if (stockEnabled && (isEdit ? transitioningToReceived : status === "received")) {
       const ok = await askConfirm({
         title: tr("Təsdiq", "Confirm"),
         message: tr(
@@ -214,31 +348,50 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
       if (!ok) return;
     }
 
+    const body = {
+      supplierId,
+      date,
+      reference: reference.trim() || null,
+      ...(resolvedStoreId ? { storeId: resolvedStoreId } : {}),
+      orderTax,
+      discount,
+      shipping,
+      status: mapPurchaseStatusToApi(status),
+      description: description.trim() || null,
+      ...(!linesLocked
+        ? {
+            items: products.map((p) => ({
+              productId: p.productId,
+              quantity: p.qty,
+              purchasePrice: p.purchasePrice,
+              discount: p.discount || undefined,
+              taxPercent: p.taxPercent || undefined,
+            })),
+          }
+        : {}),
+    };
+
     setSaving(true);
     try {
-      await createPurchase({
-        supplierId,
-        date,
-        reference: reference.trim() || null,
-        ...(resolvedStoreId ? { storeId: resolvedStoreId } : {}),
-        orderTax,
-        discount,
-        shipping,
-        status: mapPurchaseStatusToApi(status),
-        description: description.trim() || null,
-        items: products.map((p) => ({
-          productId: p.productId,
-          quantity: p.qty,
-          purchasePrice: p.purchasePrice,
-          discount: p.discount || undefined,
-          taxPercent: p.taxPercent || undefined,
-        })),
-      });
-      notifySuccess(tr("Satınalma yaradıldı", "Purchase created"));
+      if (isEdit && purchaseId) {
+        await updatePurchase(purchaseId, body);
+        notifySuccess(tr("Satınalma uğurla yeniləndi", "Purchase updated successfully"));
+      } else {
+        await createPurchase({
+          ...body,
+          items: body.items!,
+        });
+        notifySuccess(tr("Satınalma yaradıldı", "Purchase created"));
+      }
       onSaved();
       onClose();
     } catch (err) {
-      notifyFromError(err);
+      notifyFromError(
+        err,
+        isEdit
+          ? tr("Satınalma yenilənə bilmədi", "Failed to update purchase")
+          : undefined,
+      );
     } finally {
       setSaving(false);
     }
@@ -250,355 +403,414 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
   const branchOk = !(isGlobalMode || status === "received") || !!resolvedStoreId;
 
   const canSubmit =
+    !loadingDetail &&
     supplierId &&
     date &&
     products.length > 0 &&
     status &&
     branchOk &&
-    products.every((p) => p.qty > 0 && p.purchasePrice >= 0);
+    products.every((p) => p.qty > 0 && p.purchasePrice >= 0) &&
+    !(isDemo && isEdit);
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-    >
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div
         className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-5xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-            {tr("Satınalma Əlavə Et", "Add Purchase")}
+            {isEdit
+              ? tr("Satınalmanı Redaktə Et", "Edit Purchase")
+              : tr("Satınalma Əlavə Et", "Add Purchase")}
           </h2>
-          <button type="button" onClick={onClose} className="text-white bg-red-500 hover:bg-red-600 rounded-full p-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-white bg-red-500 hover:bg-red-600 rounded-full p-1"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
-          {isGlobalMode && (
-            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
-              {tr(
-                "Bütün filiallar seçilib — satınalma üçün filial mütləq seçilməlidir.",
-                "All branches is selected — you must choose a branch for this purchase.",
-              )}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <PurchaseBranchField
-              value={storeId}
-              onChange={setStoreId}
-              required={isGlobalMode || status === "received"}
-            />
-            <div>
-              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("Təchizatçı", "Supplier")} <span className="text-red-500">*</span>
-              </label>
-              <div className="flex gap-2">
-                <select
-                  value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-                >
-                  <option value="">
-                    {suppliersLoading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select")}
-                  </option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => void reloadSuppliers()}
-                  className="px-2.5 py-1.5 bg-gray-800 text-white rounded-lg"
-                  title={tr("Yenilə", "Refresh")}
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <input
-                type="text"
-                value={supplierSearch}
-                onChange={(e) => {
-                  setSupplierSearch(e.target.value);
-                  setSupplierId("");
-                }}
-                placeholder={tr("Təchizatçı axtar", "Search supplier")}
-                className="w-full mt-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("Tarix", "Date")} <span className="text-red-500">*</span>
-              </label>
-              <DateInput
-                value={date}
-                onChange={setDate}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("İstinad", "Reference")}
-              </label>
-              <input
-                type="text"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              />
-            </div>
-          </div>
-
-          {supplierId && (
-            <SupplierRecentPurchasesPanel
-              supplierId={supplierId}
-              supplierName={selectedSupplierName}
-              enabled={isOpen}
-              reusingPurchaseId={reusingPurchaseId}
-              onView={setViewPurchaseId}
-              onReuse={(purchase) => void handleReusePurchase(purchase)}
-            />
-          )}
-
-          <div className="relative">
-            <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              {tr("Məhsul", "Product")} <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input
-                type="text"
-                value={productSearch}
-                onChange={(e) => {
-                  setProductSearch(e.target.value);
-                  setShowProductList(true);
-                }}
-                onFocus={() => setShowProductList(true)}
-                placeholder={tr("Məhsul axtar", "Search product")}
-                className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              />
-            </div>
-            {showProductList && productSearch && (
-              <div className="absolute z-20 w-full mt-1 max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-                {productsLoading ? (
-                  <p className="px-3 py-2 text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</p>
-                ) : searchResults.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-gray-500">
-                    {tr("Məhsul tapılmadı", "No products found")}
-                  </p>
-                ) : (
-                  searchResults.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => handleAddProduct(p.id, p.name, p.sku)}
-                      className="w-full px-3 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      {p.name} ({p.sku})
-                    </button>
-                  ))
+        {loadingDetail ? (
+          <p className="p-8 text-center text-sm text-gray-500">
+            {tr("Yüklənir...", "Loading...")}
+          </p>
+        ) : (
+          <div className="p-4 space-y-3">
+            {isGlobalMode && (
+              <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                {tr(
+                  "Bütün filiallar seçilib — satınalma üçün filial mütləq seçilməlidir.",
+                  "All branches is selected — you must choose a branch for this purchase.",
                 )}
               </div>
             )}
-          </div>
 
-          <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-x-auto">
-            <table className="w-full text-xs min-w-[700px]">
-              <thead className="bg-gray-100 dark:bg-gray-800">
-                <tr>
-                  <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                    {tr("Məhsul", "Product")}
-                  </th>
-                  <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                    {tr("Miqdar", "Qty")}
-                  </th>
-                  <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                    {tr("Qiymət", "Price")}
-                  </th>
-                  <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                    {tr("Endirim", "Discount")}
-                  </th>
-                  <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                    {tr("Vergi %", "Tax %")}
-                  </th>
-                  <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                    {tr("Cəmi", "Total")}
-                  </th>
-                  <th className="px-2 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {products.length === 0 ? (
+            {linesLocked && (
+              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3 py-2 text-xs text-blue-900 dark:text-blue-200">
+                {tr(
+                  "Stoka yazıldığı üçün məhsul sətirləri kilidlənib. Digər sahələri yeniləyə bilərsiniz.",
+                  "Line items are locked because stock was already received. You can still update other fields.",
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <PurchaseBranchField
+                value={storeId}
+                onChange={setStoreId}
+                required={isGlobalMode || status === "received"}
+              />
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("Təchizatçı", "Supplier")} <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <ModernSelect
+                    value={supplierId}
+                    onChange={setSupplierId}
+                    className="flex-1"
+                    placeholder={
+                      suppliersLoading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select")
+                    }
+                    options={supplierOptions}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void reloadSuppliers()}
+                    className="px-2.5 py-1.5 bg-gray-800 text-white rounded-lg"
+                    title={tr("Yenilə", "Refresh")}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={supplierSearch}
+                  onChange={(e) => {
+                    setSupplierSearch(e.target.value);
+                    setSupplierId("");
+                  }}
+                  placeholder={tr("Təchizatçı axtar", "Search supplier")}
+                  className="w-full mt-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("Tarix", "Date")} <span className="text-red-500">*</span>
+                </label>
+                <DateInput
+                  value={date}
+                  onChange={setDate}
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("İstinad", "Reference")}
+                </label>
+                <input
+                  type="text"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                />
+              </div>
+            </div>
+
+            {!isEdit && supplierId && (
+              <SupplierRecentPurchasesPanel
+                supplierId={supplierId}
+                supplierName={selectedSupplierName}
+                enabled={isOpen}
+                reusingPurchaseId={reusingPurchaseId}
+                onView={setViewPurchaseId}
+                onReuse={(purchase) => void handleReusePurchase(purchase)}
+              />
+            )}
+
+            <div className="relative">
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("Məhsul", "Product")} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={productSearch}
+                  disabled={linesLocked}
+                  onChange={(e) => {
+                    setProductSearch(e.target.value);
+                    setShowProductList(true);
+                  }}
+                  onFocus={() => setShowProductList(true)}
+                  placeholder={tr("Məhsul axtar", "Search product")}
+                  className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 disabled:opacity-50"
+                />
+              </div>
+              {!linesLocked && showProductList && productSearch && (
+                <div className="absolute z-20 w-full mt-1 max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+                  {productsLoading ? (
+                    <p className="px-3 py-2 text-xs text-gray-500">
+                      {tr("Yüklənir...", "Loading...")}
+                    </p>
+                  ) : searchResults.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-500">
+                      {tr("Məhsul tapılmadı", "No products found")}
+                    </p>
+                  ) : (
+                    searchResults.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleAddProduct(p.id, p.name, p.sku)}
+                        className="w-full px-3 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                      >
+                        {p.name} ({p.sku})
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-x-auto">
+              <table className="w-full text-xs min-w-[700px]">
+                <thead className="bg-gray-100 dark:bg-gray-800">
                   <tr>
-                    <td colSpan={7} className="px-2 py-4 text-center text-gray-500">
-                      {tr("Məhsul əlavə edin", "Add products")}
-                    </td>
+                    <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                      {tr("Məhsul", "Product")}
+                    </th>
+                    <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                      {tr("Miqdar", "Qty")}
+                    </th>
+                    <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                      {tr("Qiymət", "Price")}
+                    </th>
+                    <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                      {tr("Endirim", "Discount")}
+                    </th>
+                    <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                      {tr("Vergi %", "Tax %")}
+                    </th>
+                    <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                      {tr("Cəmi", "Total")}
+                    </th>
+                    <th className="px-2 py-2" />
                   </tr>
-                ) : (
-                  products.map((product) => (
-                    <tr key={product.productId} className="border-t border-gray-200 dark:border-gray-700">
-                      <td className="px-2 py-2 text-gray-900 dark:text-white">
-                        {product.name}
-                        <span className="text-gray-400 ml-1">({product.sku})</span>
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          value={product.qty}
-                          min={1}
-                          onChange={(e) =>
-                            handleUpdateLine(product.productId, "qty", Number(e.target.value))
-                          }
-                          className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          value={product.purchasePrice}
-                          min={0}
-                          step="0.01"
-                          onChange={(e) =>
-                            handleUpdateLine(product.productId, "purchasePrice", Number(e.target.value))
-                          }
-                          className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          value={product.discount}
-                          min={0}
-                          step="0.01"
-                          onChange={(e) =>
-                            handleUpdateLine(product.productId, "discount", Number(e.target.value))
-                          }
-                          className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          value={product.taxPercent}
-                          min={0}
-                          step="0.01"
-                          onChange={(e) =>
-                            handleUpdateLine(product.productId, "taxPercent", Number(e.target.value))
-                          }
-                          className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
-                        />
-                      </td>
-                      <td className="px-2 py-2 text-gray-900 dark:text-white">
-                        ₼
-                        {lineTotalCost(
-                          product.purchasePrice,
-                          product.qty,
-                          product.discount,
-                          product.taxPercent,
-                        ).toFixed(2)}
-                      </td>
-                      <td className="px-2 py-2">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveProduct(product.productId)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                </thead>
+                <tbody>
+                  {products.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-2 py-4 text-center text-gray-500">
+                        {tr("Məhsul əlavə edin", "Add products")}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    products.map((product) => (
+                      <tr
+                        key={product.productId}
+                        className="border-t border-gray-200 dark:border-gray-700"
+                      >
+                        <td className="px-2 py-2 text-gray-900 dark:text-white">
+                          {product.name}
+                          <span className="text-gray-400 ml-1">({product.sku})</span>
+                        </td>
+                        <td className="px-2 py-2">
+                          {linesLocked ? (
+                            <span>{product.qty}</span>
+                          ) : (
+                            <input
+                              type="number"
+                              value={product.qty}
+                              min={1}
+                              onChange={(e) =>
+                                handleUpdateLine(
+                                  product.productId,
+                                  "qty",
+                                  Number(e.target.value),
+                                )
+                              }
+                              className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                            />
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          {linesLocked ? (
+                            <span>{product.purchasePrice.toFixed(2)}</span>
+                          ) : (
+                            <input
+                              type="number"
+                              value={product.purchasePrice}
+                              min={0}
+                              step="0.01"
+                              onChange={(e) =>
+                                handleUpdateLine(
+                                  product.productId,
+                                  "purchasePrice",
+                                  Number(e.target.value),
+                                )
+                              }
+                              className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                            />
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          {linesLocked ? (
+                            <span>{product.discount.toFixed(2)}</span>
+                          ) : (
+                            <input
+                              type="number"
+                              value={product.discount}
+                              min={0}
+                              step="0.01"
+                              onChange={(e) =>
+                                handleUpdateLine(
+                                  product.productId,
+                                  "discount",
+                                  Number(e.target.value),
+                                )
+                              }
+                              className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                            />
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          {linesLocked ? (
+                            <span>{product.taxPercent}</span>
+                          ) : (
+                            <input
+                              type="number"
+                              value={product.taxPercent}
+                              min={0}
+                              step="0.01"
+                              onChange={(e) =>
+                                handleUpdateLine(
+                                  product.productId,
+                                  "taxPercent",
+                                  Number(e.target.value),
+                                )
+                              }
+                              className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                            />
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-gray-900 dark:text-white">
+                          ₼
+                          {lineTotalCost(
+                            product.purchasePrice,
+                            product.qty,
+                            product.discount,
+                            product.taxPercent,
+                          ).toFixed(2)}
+                        </td>
+                        <td className="px-2 py-2">
+                          {!linesLocked && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveProduct(product.productId)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-          <div className="flex justify-end">
-            <div className="w-72 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">{tr("Məhsul cəmi", "Lines subtotal")}</span>
-                <span>₼ {linesSubtotal.toFixed(2)}</span>
+            <div className="flex justify-end">
+              <div className="w-72 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {tr("Məhsul cəmi", "Lines subtotal")}
+                  </span>
+                  <span>₼ {linesSubtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t pt-2">
+                  <span>{tr("Ümumi məbləğ", "Grand total")}</span>
+                  <span>₼ {grandTotal.toFixed(2)}</span>
+                </div>
               </div>
-              <div className="flex justify-between font-semibold border-t pt-2">
-                <span>{tr("Ümumi məbləğ", "Grand total")}</span>
-                <span>₼ {grandTotal.toFixed(2)}</span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("Sifariş vergisi", "Order tax")}
+                </label>
+                <input
+                  type="number"
+                  value={orderTax}
+                  min={0}
+                  step="0.01"
+                  onChange={(e) => setOrderTax(Number(e.target.value))}
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("Endirim", "Discount")}
+                </label>
+                <input
+                  type="number"
+                  value={discount}
+                  min={0}
+                  step="0.01"
+                  onChange={(e) => setDiscount(Number(e.target.value))}
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("Çatdırılma", "Shipping")}
+                </label>
+                <input
+                  type="number"
+                  value={shipping}
+                  min={0}
+                  step="0.01"
+                  onChange={(e) => setShipping(Number(e.target.value))}
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("Status", "Status")} <span className="text-red-500">*</span>
+                </label>
+                <ModernSelect
+                  value={status}
+                  onChange={setStatus}
+                  className="w-full"
+                  options={[
+                    { value: "ordered", label: tr("Sifariş edildi", "Ordered") },
+                    { value: "pending", label: tr("Gözləyir", "Pending") },
+                    { value: "received", label: tr("Qəbul edildi", "Received") },
+                  ]}
+                />
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("Sifariş vergisi", "Order tax")}
+                {tr("Təsvir", "Description")}
               </label>
-              <input
-                type="number"
-                value={orderTax}
-                min={0}
-                step="0.01"
-                onChange={(e) => setOrderTax(Number(e.target.value))}
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
               />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("Endirim", "Discount")}
-              </label>
-              <input
-                type="number"
-                value={discount}
-                min={0}
-                step="0.01"
-                onChange={(e) => setDiscount(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("Çatdırılma", "Shipping")}
-              </label>
-              <input
-                type="number"
-                value={shipping}
-                min={0}
-                step="0.01"
-                onChange={(e) => setShipping(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("Status", "Status")} <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-              >
-                <option value="ordered">{tr("Sifariş edildi", "Ordered")}</option>
-                <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                <option value="received">{tr("Qəbul edildi", "Received")}</option>
-              </select>
             </div>
           </div>
-
-          <div>
-            <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              {tr("Təsvir", "Description")}
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-            />
-          </div>
-        </div>
+        )}
 
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2 sticky bottom-0 bg-white dark:bg-gray-900">
           <button
@@ -614,7 +826,11 @@ export function AddPurchaseModal({ isOpen, onClose, onSaved }: AddPurchaseModalP
             disabled={!canSubmit || saving}
             className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium disabled:opacity-50"
           >
-            {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq et", "Submit")}
+            {saving
+              ? tr("Yadda saxlanılır...", "Saving...")
+              : isEdit
+                ? tr("Yadda saxla", "Save Changes")
+                : tr("Təsdiq et", "Submit")}
           </button>
         </div>
       </div>

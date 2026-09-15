@@ -5,6 +5,7 @@ import { recordPurchasePayment } from "../../api/purchases";
 import { mapPaymentMethodToApi } from "../../lib/purchaseMappers";
 import type { PosUiPaymentMethod } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { ModernSelect } from "../ui/ModernSelect";
 import { pickLang } from "../../i18n/pickLang";
 
 interface RecordPurchasePaymentModalProps {
@@ -110,15 +111,16 @@ export function RecordPurchasePaymentModal({
             <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
               {tr("Ödəniş üsulu", "Payment method")}
             </label>
-            <select
+            <ModernSelect
               value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as PosUiPaymentMethod)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-            >
-              <option value="cash">{tr("Nağd", "Cash")}</option>
-              <option value="card">{tr("Kart", "Card")}</option>
-              <option value="bank">{tr("Bank köçürməsi", "Bank transfer")}</option>
-            </select>
+              onChange={(value) => setPaymentMethod(value as PosUiPaymentMethod)}
+              className="w-full"
+              options={[
+                { value: "cash", label: tr("Nağd", "Cash") },
+                { value: "card", label: tr("Kart", "Card") },
+                { value: "bank", label: tr("Bank köçürməsi", "Bank transfer") },
+              ]}
+            />
           </div>
           <div>
             <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">

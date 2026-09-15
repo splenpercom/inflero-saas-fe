@@ -4,12 +4,12 @@ import {
   FileText,
   FileSpreadsheet,
   RefreshCw,
-  ChevronDown,
   ChevronUp,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface CashFlowItem {
@@ -221,19 +221,17 @@ export function CashFlow() {
 
             {/* Payment Method Filter */}
             <div className="flex gap-2 ml-auto">
-              <div className="relative">
-                <select
-                  value={selectedPaymentMethod}
-                  onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Ödəniş Üsulu", "Payment Method")}</option>
-                  <option value="stripe">Stripe</option>
-                  <option value="cash">{tr("Nağd", "Cash")}</option>
-                  <option value="paypal">Paypal</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedPaymentMethod}
+                onChange={setSelectedPaymentMethod}
+                options={[
+                  { value: "all", label: tr("Ödəniş Üsulu", "Payment Method") },
+                  { value: "stripe", label: "Stripe" },
+                  { value: "cash", label: tr("Nağd", "Cash") },
+                  { value: "paypal", label: "Paypal" },
+                ]}
+                placeholder={tr("Ödəniş Üsulu", "Payment Method")}
+              />
             </div>
           </div>
         </div>

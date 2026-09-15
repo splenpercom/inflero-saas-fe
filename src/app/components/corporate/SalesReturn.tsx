@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Eye,
   Trash2,
-  ChevronDown,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -27,6 +26,7 @@ import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 export function SalesReturn() {
@@ -113,20 +113,20 @@ export function SalesReturn() {
   }, [loadReturns]);
 
   const getStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "received":
-        return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
-      case "pending":
-        return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
-      case "ordered":
-        return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
+    const key = status.toLowerCase().replace(/\s+/g, "_");
+    switch (key) {
+      case "refunded":
+        return "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300";
+      case "partially_refunded":
+        return "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
       default:
-        return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400";
+        return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
     }
   };
 
   const getPaymentStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    const key = status.toLowerCase().replace(/\s+/g, "_");
+    switch (key) {
       case "paid":
         return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
       case "overdue":
@@ -135,28 +135,33 @@ export function SalesReturn() {
         return "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
       case "unpaid":
         return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
+      case "refunded":
+        return "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300";
+      case "partially_refunded":
+        return "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
       default:
         return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400";
     }
   };
 
   const translateStatus = (status: string) => {
-    const statusMap: Record<string, string> = {
-      Received: tr("Qəbul edildi", "Received"),
-      Pending: tr("Gözləyir", "Pending"),
-      Ordered: tr("Sifariş edildi", "Ordered"),
-    };
-    return statusMap[status] || status;
+    const key = status.toLowerCase().replace(/\s+/g, "_");
+    if (key === "refunded") return tr("Qaytarılıb", "Refunded");
+    if (key === "partially_refunded") return tr("Qismən qaytarılıb", "Partially Refunded");
+    return status === "—" ? "—" : status;
   };
 
   const translatePaymentStatus = (status: string) => {
+    const key = status.toLowerCase().replace(/\s+/g, "_");
     const statusMap: Record<string, string> = {
-      Paid: tr("Ödənilib", "Paid"),
-      Unpaid: tr("Ödənilməyib", "Unpaid"),
-      Overdue: tr("Gecikmiş", "Overdue"),
-      Partial: tr("Qismən", "Partial"),
+      paid: tr("Ödənilib", "Paid"),
+      unpaid: tr("Ödənilməyib", "Unpaid"),
+      overdue: tr("Gecikmiş", "Overdue"),
+      partial: tr("Qismən", "Partial"),
+      refunded: tr("Qaytarılıb", "Refunded"),
+      partially_refunded: tr("Qismən qaytarılıb", "Partially Refunded"),
     };
-    return statusMap[status] || status;
+    return statusMap[key] || status;
   };
 
   const handleExportPDF = () => {
@@ -267,65 +272,52 @@ export function SalesReturn() {
             </div>
 
             <div className="flex gap-2 ml-auto flex-wrap">
-              <div className="relative">
-                <select
-                  value={selectedCustomer}
-                  onChange={(e) => setSelectedCustomer(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Müştəri", "Customer")}</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedCustomer}
+                onChange={setSelectedCustomer}
+                options={[
+                  { value: "all", label: tr("Müştəri", "Customer") },
+                  ...customers.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                placeholder={tr("Müştəri", "Customer")}
+              />
 
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Status", "Status")}</option>
-                  <option value="ordered">{tr("Sifariş edildi", "Ordered")}</option>
-                  <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                  <option value="received">{tr("Qəbul edildi", "Received")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                options={[
+                  { value: "all", label: tr("Status", "Status") },
+                  { value: "partially_refunded", label: tr("Qismən qaytarılıb", "Partially Refunded") },
+                  { value: "refunded", label: tr("Qaytarılıb", "Refunded") },
+                ]}
+                placeholder={tr("Status", "Status")}
+              />
 
-              <div className="relative">
-                <select
-                  value={selectedPaymentStatus}
-                  onChange={(e) => setSelectedPaymentStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Ödəniş statusu", "Payment status")}</option>
-                  <option value="paid">{tr("Ödənilib", "Paid")}</option>
-                  <option value="partial">{tr("Qismən", "Partial")}</option>
-                  <option value="overdue">{tr("Gecikmiş", "Overdue")}</option>
-                  <option value="unpaid">{tr("Ödənilməyib", "Unpaid")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedPaymentStatus}
+                onChange={setSelectedPaymentStatus}
+                options={[
+                  { value: "all", label: tr("Ödəniş statusu", "Payment status") },
+                  { value: "paid", label: tr("Ödənilib", "Paid") },
+                  { value: "partial", label: tr("Qismən", "Partial") },
+                  { value: "overdue", label: tr("Gecikmiş", "Overdue") },
+                  { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
+                ]}
+                placeholder={tr("Ödəniş statusu", "Payment status")}
+              />
 
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="last7days">{tr("Son 7 gün", "Last 7 days")}</option>
-                  <option value="last30days">{tr("Son 30 gün", "Last 30 days")}</option>
-                  <option value="last90days">{tr("Son 90 gün", "Last 90 days")}</option>
-                  <option value="thisyear">{tr("Bu il", "This year")}</option>
-                  <option value="all">{tr("Hamısı", "All")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={sortBy}
+                onChange={setSortBy}
+                options={[
+                  { value: "last7days", label: tr("Son 7 gün", "Last 7 days") },
+                  { value: "last30days", label: tr("Son 30 gün", "Last 30 days") },
+                  { value: "last90days", label: tr("Son 90 gün", "Last 90 days") },
+                  { value: "thisyear", label: tr("Bu il", "This year") },
+                  { value: "all", label: tr("Hamısı", "All") },
+                ]}
+                placeholder={tr("Son 7 gün", "Last 7 days")}
+              />
             </div>
           </div>
         </div>

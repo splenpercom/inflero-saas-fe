@@ -788,18 +788,16 @@ export function SubCategory() {
                   <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                     {tr("Kateqoriya *", "Category *")}
                   </label>
-                  <select
+                  <ModernSelect
                     value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                    className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${formErrors.categoryId ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer`}
-                  >
-                    <option value="">{tr("Seç", "Select")}</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, categoryId: value })}
+                    className="w-full"
+                    placeholder={tr("Seç", "Select")}
+                    options={[
+                      { value: "", label: tr("Seç", "Select") },
+                      ...categories.map((c) => ({ value: c.id, label: c.name })),
+                    ]}
+                  />
                   {formErrors.categoryId && <p className="text-[10px] text-red-500 mt-1">{formErrors.categoryId}</p>}
                 </div>
 

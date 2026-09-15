@@ -35,9 +35,9 @@ import { AddWarehouseModal, type BranchFormData } from "./AddWarehouseModal";
 import { pickLang } from "../../../i18n/pickLang";
 export function Warehouses() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const { isDemo, isAuthenticated, hasModule, user } = useAuth();
   const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
-  const { refreshBranches } = useBranch();
+  const { refreshBranches, isGlobalMode } = useBranch();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
   const askConfirm = useConfirm();
   const [stores, setStores] = useState<StoreRecord[]>([]);
@@ -50,9 +50,10 @@ export function Warehouses() {
   const [saving, setSaving] = useState(false);
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const canManageBranches = (!!user?.isTenantOwner || isDemo) && isGlobalMode;
 
   const loadData = useCallback(async () => {
-    if (!(isAuthenticated || isDemo) || !canView) {
+    if (!(isAuthenticated || isDemo) || !canView || !canManageBranches) {
       setStores([]);
       setQuota(null);
       setManagers([]);
@@ -74,7 +75,7 @@ export function Warehouses() {
     } finally {
       setLoading(false);
     }
-  }, [isDemo, isAuthenticated, canView, language, branchManagementEnabled]);
+  }, [isDemo, isAuthenticated, canView, canManageBranches, language, branchManagementEnabled]);
 
   useEffect(() => {
     void loadData();

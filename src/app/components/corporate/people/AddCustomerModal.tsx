@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import type { PeopleCustomer, UiPeopleStatus } from "../../../api/people";
+import { ModernSelect } from "../../ui/ModernSelect";
 
 import { pickLang } from "../../../i18n/pickLang";
 export type CustomerFormData = {
@@ -93,10 +94,15 @@ export function AddCustomerModal({
             {isEdit && (
               <div>
                 <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Status", "Status")}</label>
-                <select value={status} onChange={(e) => setStatus(e.target.value as UiPeopleStatus)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
-                  <option value="Active">{tr("Aktiv", "Active")}</option>
-                  <option value="Inactive">{tr("Qeyri-aktiv", "Inactive")}</option>
-                </select>
+                <ModernSelect
+                  value={status}
+                  onChange={(value) => setStatus(value as UiPeopleStatus)}
+                  className="w-full"
+                  options={[
+                    { value: "Active", label: tr("Aktiv", "Active") },
+                    { value: "Inactive", label: tr("Qeyri-aktiv", "Inactive") },
+                  ]}
+                />
               </div>
             )}
           </div>

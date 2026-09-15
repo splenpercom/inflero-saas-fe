@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Search } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface StockAdjustment {
@@ -144,19 +145,21 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Anbar", "Warehouse")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={warehouse}
-              onChange={(e) => setWarehouse(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              <option value="">{tr("Seçin", "Select")}</option>
-              <option value="Lavish Warehouse">Lavish Warehouse</option>
-              <option value="Quaint Warehouse">Quaint Warehouse</option>
-              <option value="Overflow Warehouse">Overflow Warehouse</option>
-              <option value="Traditional Warehouse">Traditional Warehouse</option>
-              <option value="Cool Warehouse">Cool Warehouse</option>
-              <option value="Retail Supply Hub">Retail Supply Hub</option>
-            </select>
+              onChange={setWarehouse}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                { value: "Lavish Warehouse", label: "Lavish Warehouse" },
+                { value: "Quaint Warehouse", label: "Quaint Warehouse" },
+                { value: "Overflow Warehouse", label: "Overflow Warehouse" },
+                { value: "Traditional Warehouse", label: "Traditional Warehouse" },
+                { value: "Cool Warehouse", label: "Cool Warehouse" },
+                { value: "Retail Supply Hub", label: "Retail Supply Hub" },
+              ]}
+            />
           </div>
 
           {/* Store */}
@@ -164,20 +167,22 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Mağaza", "Store")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={store}
-              onChange={(e) => setStore(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              <option value="">{tr("Seçin", "Select")}</option>
-              <option value="Electro Mart">Electro Mart</option>
-              <option value="Quantum Gadgets">Quantum Gadgets</option>
-              <option value="Prime Bazaar">Prime Bazaar</option>
-              <option value="Gadget World">Gadget World</option>
-              <option value="Volt Vault">Volt Vault</option>
-              <option value="Elite Retail">Elite Retail</option>
-              <option value="Prime Mart">Prime Mart</option>
-            </select>
+              onChange={setStore}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                { value: "Electro Mart", label: "Electro Mart" },
+                { value: "Quantum Gadgets", label: "Quantum Gadgets" },
+                { value: "Prime Bazaar", label: "Prime Bazaar" },
+                { value: "Gadget World", label: "Gadget World" },
+                { value: "Volt Vault", label: "Volt Vault" },
+                { value: "Elite Retail", label: "Elite Retail" },
+                { value: "Prime Mart", label: "Prime Mart" },
+              ]}
+            />
           </div>
 
           {/* Adjustment Quantity */}
@@ -199,21 +204,23 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Səbəb", "Reason")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              <option value="">{tr("Seçin", "Select")}</option>
-              <option value="Stock replenishment">{tr("Ehtiyat Doldurulması", "Stock Replenishment")}</option>
-              <option value="Damaged goods">{tr("Zədələnmiş Mallar", "Damaged Goods")}</option>
-              <option value="Theft/Loss">{tr("Oğurluq/İtki", "Theft/Loss")}</option>
-              <option value="Stock count correction">{tr("Ehtiyat Sayımı Düzəlişi", "Stock Count Correction")}</option>
-              <option value="Defective items">{tr("Qüsurlu Mallar", "Defective Items")}</option>
-              <option value="Customer return">{tr("Müştəri Qaytarması", "Customer Return")}</option>
-              <option value="Expired products">{tr("Vaxtı Keçmiş Məhsullar", "Expired Products")}</option>
-              <option value="Other">{tr("Digər", "Other")}</option>
-            </select>
+              onChange={setReason}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                { value: "Stock replenishment", label: tr("Ehtiyat Doldurulması", "Stock Replenishment") },
+                { value: "Damaged goods", label: tr("Zədələnmiş Mallar", "Damaged Goods") },
+                { value: "Theft/Loss", label: tr("Oğurluq/İtki", "Theft/Loss") },
+                { value: "Stock count correction", label: tr("Ehtiyat Sayımı Düzəlişi", "Stock Count Correction") },
+                { value: "Defective items", label: tr("Qüsurlu Mallar", "Defective Items") },
+                { value: "Customer return", label: tr("Müştəri Qaytarması", "Customer Return") },
+                { value: "Expired products", label: tr("Vaxtı Keçmiş Məhsullar", "Expired Products") },
+                { value: "Other", label: tr("Digər", "Other") },
+              ]}
+            />
           </div>
 
           {/* Reference Number */}
@@ -235,20 +242,22 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Məsul Şəxs", "Responsible Person")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={responsiblePerson}
-              onChange={(e) => setResponsiblePerson(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              <option value="">{tr("Seçin", "Select")}</option>
-              <option value="James Kirwin">James Kirwin</option>
-              <option value="Francis Chang">Francis Chang</option>
-              <option value="Antonio Engle">Antonio Engle</option>
-              <option value="Leo Kelly">Leo Kelly</option>
-              <option value="Annette Walker">Annette Walker</option>
-              <option value="John Weaver">John Weaver</option>
-              <option value="Gary Hennessy">Gary Hennessy</option>
-            </select>
+              onChange={setResponsiblePerson}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                { value: "James Kirwin", label: "James Kirwin" },
+                { value: "Francis Chang", label: "Francis Chang" },
+                { value: "Antonio Engle", label: "Antonio Engle" },
+                { value: "Leo Kelly", label: "Leo Kelly" },
+                { value: "Annette Walker", label: "Annette Walker" },
+                { value: "John Weaver", label: "John Weaver" },
+                { value: "Gary Hennessy", label: "Gary Hennessy" },
+              ]}
+            />
           </div>
 
           {/* Notes */}

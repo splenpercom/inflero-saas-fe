@@ -4,20 +4,20 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import {
   fetchSalesReturn,
-  updateSalesReturn,
   recordSalesReturnPayment,
   type SalesReturnDetail,
 } from "../../api/sales";
 import {
   formatSalesDate,
   mapPaymentMethodToApi,
-  mapPurchaseStatusToApi,
   type PosUiPaymentMethod,
 } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { cn } from "../ui/utils";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
+
 interface SalesReturnDetailModalProps {
   returnId: string | null;
   canEdit: boolean;
@@ -27,7 +27,7 @@ interface SalesReturnDetailModalProps {
 
 export function SalesReturnDetailModal({
   returnId,
-  canEdit,
+  canEdit: _canEdit,
   onClose,
   onChanged,
 }: SalesReturnDetailModalProps) {
@@ -36,8 +36,6 @@ export function SalesReturnDetailModal({
   const stockEnabled = hasModule("STOCK");
   const [detail, setDetail] = useState<SalesReturnDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [statusUi, setStatusUi] = useState("");
-  const [savingStatus, setSavingStatus] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PosUiPaymentMethod>("cash");
   const [paymentNote, setPaymentNote] = useState("");
@@ -51,7 +49,6 @@ export function SalesReturnDetailModal({
     try {
       const data = await fetchSalesReturn(id);
       setDetail(data);
-      setStatusUi(data.statusLabel.toLowerCase());
       const due = parseFloat(data.due);
       setPaymentAmount(due > 0 ? String(due) : "");
     } catch (err) {
@@ -74,48 +71,23 @@ export function SalesReturnDetailModal({
 
   const dueAmount = detail ? parseFloat(detail.due) : 0;
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "received":
-        return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
-      case "pending":
-        return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
-      case "ordered":
-        return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
-      default:
-        return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400";
-    }
-  };
-
-  const getPaymentStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "paid":
-        return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
-      case "overdue":
-        return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400";
-      case "partial":
+  const getRefundStatusBadgeColor = (status: string) => {
+    const key = status.toLowerCase().replace(/\s+/g, "_");
+    switch (key) {
+      case "refunded":
+        return "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300";
+      case "partially_refunded":
         return "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
       default:
-        return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
+        return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
     }
   };
 
-  const handleSaveStatus = async () => {
-    if (!canEdit || isDemo || !detail || !statusUi) return;
-    setSavingStatus(true);
-    try {
-      const updated = await updateSalesReturn(detail.id, {
-        status: mapPurchaseStatusToApi(statusUi),
-      });
-      setDetail(updated);
-      setStatusUi(updated.statusLabel.toLowerCase());
-      notifySuccess(tr("Status yeniləndi", "Status updated"));
-      onChanged();
-    } catch (err) {
-      notifyFromError(err);
-    } finally {
-      setSavingStatus(false);
-    }
+  const translateRefundStatus = (status: string) => {
+    const key = status.toLowerCase().replace(/\s+/g, "_");
+    if (key === "refunded") return tr("Qaytarılıb", "Refunded");
+    if (key === "partially_refunded") return tr("Qismən qaytarılıb", "Partially Refunded");
+    return status === "—" ? "—" : status;
   };
 
   const handleRecordPayment = async () => {
@@ -142,10 +114,10 @@ export function SalesReturnDetailModal({
     }
   };
 
+  const orderStatus = detail?.orderPaymentStatus || detail?.statusLabel || "—";
+
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-    >
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div
         className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-3xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -192,46 +164,13 @@ export function SalesReturnDetailModal({
                 )}
                 <div>
                   <p className="text-gray-500">{tr("Status", "Status")}</p>
-                  {canEdit && !isDemo ? (
-                    <div className="flex gap-2 mt-1">
-                      <select
-                        value={statusUi}
-                        onChange={(e) => setStatusUi(e.target.value)}
-                        className="flex-1 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-                      >
-                        <option value="ordered">{tr("Sifariş edildi", "Ordered")}</option>
-                        <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                        <option value="received">{tr("Qəbul edildi", "Received")}</option>
-                      </select>
-                      <button
-                        type="button"
-                        disabled={savingStatus}
-                        onClick={() => void handleSaveStatus()}
-                        className="px-2 py-1 text-xs bg-[#14b8a6] text-white rounded-lg disabled:opacity-50"
-                      >
-                        {tr("Yadda saxla", "Save")}
-                      </button>
-                    </div>
-                  ) : (
-                    <span
-                      className={cn(
-                        "inline-flex mt-1 px-2 py-0.5 rounded text-[10px] font-medium",
-                        getStatusBadgeColor(detail.statusLabel),
-                      )}
-                    >
-                      {detail.statusLabel}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <p className="text-gray-500">{tr("Ödəniş statusu", "Payment status")}</p>
                   <span
                     className={cn(
                       "inline-flex mt-1 px-2 py-0.5 rounded text-[10px] font-medium",
-                      getPaymentStatusBadgeColor(detail.paymentStatus),
+                      getRefundStatusBadgeColor(orderStatus),
                     )}
                   >
-                    {detail.paymentStatus}
+                    {translateRefundStatus(orderStatus)}
                   </span>
                 </div>
                 {stockEnabled && detail.restockedAt && (
@@ -292,30 +231,12 @@ export function SalesReturnDetailModal({
 
               <div className="flex justify-end">
                 <div className="w-64 space-y-1 text-xs">
-                  {detail.orderTax && parseFloat(detail.orderTax) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">{tr("Sifariş vergisi", "Order tax")}</span>
-                      <span>₼{parseFloat(detail.orderTax).toFixed(2)}</span>
-                    </div>
-                  )}
-                  {detail.discount && parseFloat(detail.discount) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">{tr("Endirim", "Discount")}</span>
-                      <span>-₼{parseFloat(detail.discount).toFixed(2)}</span>
-                    </div>
-                  )}
-                  {detail.shipping && parseFloat(detail.shipping) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">{tr("Çatdırılma", "Shipping")}</span>
-                      <span>₼{parseFloat(detail.shipping).toFixed(2)}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between font-semibold border-t pt-1">
                     <span>{tr("Cəmi", "Total")}</span>
                     <span>₼{parseFloat(detail.total).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">{tr("Ödənilib", "Paid")}</span>
+                    <span className="text-gray-500">{tr("Ödənilib", "Paid / Refunded")}</span>
                     <span className="text-green-600">₼{parseFloat(detail.paid).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -338,64 +259,49 @@ export function SalesReturnDetailModal({
                       step="0.01"
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                       placeholder={tr("Məbləğ", "Amount")}
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                     />
-                    <select
+                    <ModernSelect
                       value={paymentMethod}
-                      onChange={(e) =>
-                        setPaymentMethod(e.target.value as PosUiPaymentMethod)
-                      }
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-                    >
-                      <option value="cash">{tr("Nağd", "Cash")}</option>
-                      <option value="card">{tr("Kart", "Card")}</option>
-                      <option value="bank">{tr("Bank", "Bank transfer")}</option>
-                    </select>
+                      onChange={(v) => setPaymentMethod(v as PosUiPaymentMethod)}
+                      options={[
+                        { value: "cash", label: tr("Nağd", "Cash") },
+                        { value: "card", label: tr("Kart", "Card") },
+                        { value: "bank", label: tr("Bank", "Bank") },
+                      ]}
+                    />
                     <input
                       type="text"
                       value={paymentReference}
                       onChange={(e) => setPaymentReference(e.target.value)}
+                      className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                       placeholder={tr("İstinad", "Reference")}
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                     />
                     <input
                       type="text"
                       value={paymentNote}
                       onChange={(e) => setPaymentNote(e.target.value)}
+                      className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                       placeholder={tr("Qeyd", "Note")}
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                     />
                   </div>
                   <button
                     type="button"
-                    disabled={
-                      recordingPayment ||
-                      !paymentAmount ||
-                      parseFloat(paymentAmount) <= 0 ||
-                      parseFloat(paymentAmount) > dueAmount
-                    }
+                    disabled={recordingPayment}
                     onClick={() => void handleRecordPayment()}
-                    className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg disabled:opacity-50"
+                    className="px-4 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg disabled:opacity-50"
                   >
-                    {tr("Ödənişi qeyd et", "Record payment")}
+                    {recordingPayment
+                      ? tr("Saxlanılır...", "Saving...")
+                      : tr("Ödənişi yaz", "Record payment")}
                   </button>
                 </div>
               )}
             </>
           ) : (
-            <p className="text-xs text-gray-500">{tr("Məlumat tapılmadı", "No data found")}</p>
+            <p className="text-xs text-gray-500">{tr("Tapılmadı", "Not found")}</p>
           )}
-        </div>
-
-        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex justify-end sticky bottom-0 bg-white dark:bg-gray-900">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 rounded-lg"
-          >
-            {tr("Bağla", "Close")}
-          </button>
         </div>
       </div>
     </div>

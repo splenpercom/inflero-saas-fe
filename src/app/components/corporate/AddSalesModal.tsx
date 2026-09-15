@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Scan, Trash2 } from "lucide-react";
+import { X, Scan, Trash2, Search } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { createPosOrder } from "../../api/sales";
@@ -10,6 +10,7 @@ import { useSalesProductSearch } from "../../hooks/useSalesProductSearch";
 import { mapOrderStatusToApi } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface ProductItem {
@@ -30,9 +31,10 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user } = useAuth();
   const [customerId, setCustomerId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
   const [billerId, setBillerId] = useState("");
   const [date, setDate] = useState("");
-  const [reference, setReference] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [taxPercent, setTaxPercent] = useState(0);
@@ -40,10 +42,10 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
   const [shipping, setShipping] = useState(0);
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [showProductList, setShowProductList] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState("");
 
-  const { customers } = useSalesCustomers(customerSearch, isOpen);
+  const { customers, loading: customersLoading } = useSalesCustomers(customerSearch, isOpen);
   const { products: searchResults, loading: productsLoading } = useSalesProductSearch(productSearch, isOpen);
   const { billers, defaultBillerId, loading: billersLoading } = useSalesBillers(isOpen);
 
@@ -58,9 +60,10 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
   useEffect(() => {
     if (!isOpen) {
       setCustomerId("");
+      setCustomerSearch("");
+      setCustomerMenuOpen(false);
       setBillerId("");
       setDate("");
-      setReference("");
       setProductSearch("");
       setProducts([]);
       setTaxPercent(0);
@@ -68,9 +71,14 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
       setShipping(0);
       setStatus("");
       setShowProductList(false);
-      setCustomerSearch("");
     }
   }, [isOpen]);
+
+  const handleSelectCustomer = (id: string, name: string) => {
+    setCustomerId(id);
+    setCustomerSearch(name);
+    setCustomerMenuOpen(false);
+  };
 
   const handleAddProduct = async (productId: string) => {
     if (products.find((p) => p.id === productId)) return;
@@ -112,9 +120,50 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
 
   const totals = calculateTotals();
 
+  const buildOrderBody = (orderStatus: string) => ({
+    customerId: customerId || null,
+    billerId: billerId || null,
+    status: mapOrderStatusToApi(orderStatus),
+    ...(date ? { date } : {}),
+    reference: null,
+    taxPercent,
+    discount,
+    shipping,
+    items: products.map((p) => ({
+      productId: p.id,
+      quantity: p.qty,
+      price: p.unitPrice,
+    })),
+  });
+
+  const handleSaveDraft = async () => {
+    if (isDemo || !isAuthenticated) return;
+    if (products.length === 0) return;
+
+    setSavingDraft(true);
+    try {
+      const detail = await createPosOrder({
+        ...buildOrderBody("held"),
+        initialPaymentAmount: 0,
+      });
+      notifySuccess(
+        tr(
+          `Qaralama saxlanıldı (${detail.reference})`,
+          `Draft saved (${detail.reference})`,
+        ),
+      );
+      onSaved();
+      onClose();
+    } catch (err) {
+      notifyFromError(err, tr("Qaralama saxlanılmadı", "Failed to save draft"));
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const handleSave = async () => {
     if (isDemo || !isAuthenticated) return;
-    if (!customerId || !date || products.length === 0 || !status) return;
+    if (!date || products.length === 0 || !status) return;
     if (!billerId) {
       notifyFromError(new Error(tr("Kassir seçin", "Please select an employee / biller")));
       return;
@@ -122,21 +171,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
 
     setSaving(true);
     try {
-      await createPosOrder({
-        customerId,
-        billerId: billerId || null,
-        status: mapOrderStatusToApi(status),
-        date,
-        reference: reference || null,
-        taxPercent,
-        discount,
-        shipping,
-        items: products.map((p) => ({
-          productId: p.id,
-          quantity: p.qty,
-          price: p.unitPrice,
-        })),
-      });
+      await createPosOrder(buildOrderBody(status));
       notifySuccess(tr("Satış uğurla əlavə edildi", "Sale added successfully"));
       onSaved();
       onClose();
@@ -147,6 +182,8 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
     }
   };
 
+  const busy = saving || savingDraft;
+
   if (!isOpen) return null;
 
   const filteredSearchResults = searchResults.filter((p) => !products.find((line) => line.id === p.id));
@@ -156,62 +193,85 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
       className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
     >
       <div
-        className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-5xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-4xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
             {tr("Satış Əlavə Et", "Add Sale")}
           </h2>
-          <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
         <div className="p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="relative">
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("Müştəri", "Customer")} <span className="text-red-500">*</span>
+                {tr("Müştəri", "Customer")}
               </label>
-              <input
-                type="text"
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                placeholder={tr("Müştəri axtar...", "Search customer...")}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white mb-1"
-              />
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-              >
-                <option value="">{tr("Müştəri Seç", "Choose Customer")}</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    setCustomerId("");
+                    setCustomerMenuOpen(true);
+                  }}
+                  onFocus={() => setCustomerMenuOpen(true)}
+                  placeholder={tr("Müştəri axtar və seç", "Search and select customer")}
+                  className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                />
+              </div>
+              {customerMenuOpen && (
+                <div className="absolute z-20 w-full mt-1 max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+                  {customersLoading ? (
+                    <p className="px-3 py-2 text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</p>
+                  ) : customers.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-500">
+                      {tr("Müştəri tapılmadı", "No customers found")}
+                    </p>
+                  ) : (
+                    customers.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleSelectCustomer(c.id, c.name)}
+                        className={`w-full px-3 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                          customerId === c.id
+                            ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6]"
+                            : "text-gray-900 dark:text-white"
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                 {tr("Kassir", "Biller")}
               </label>
-              <select
+              <ModernSelect
                 value={billerId}
-                onChange={(e) => setBillerId(e.target.value)}
+                onChange={(value) => {
+                  setBillerId(value);
+                  setCustomerMenuOpen(false);
+                }}
                 disabled={billersLoading}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer disabled:opacity-60"
-              >
-                <option value="">{tr("Kassir Seç", "Choose Biller")}</option>
-                {billers.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+                className="w-full"
+                placeholder={tr("Kassir Seç", "Choose Biller")}
+                options={[
+                  { value: "", label: tr("Kassir Seç", "Choose Biller") },
+                  ...billers.map((b) => ({ value: b.id, label: b.name })),
+                ]}
+              />
               {!billersLoading && billers.length === 0 && user && (
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
                   {tr(
@@ -228,20 +288,11 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               </label>
               <DateInput
                 value={date}
-                onChange={setDate}
+                onChange={(value) => {
+                  setDate(value);
+                  setCustomerMenuOpen(false);
+                }}
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("İstinad", "Reference")}
-              </label>
-              <input
-                type="text"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
           </div>
@@ -257,8 +308,12 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 onChange={(e) => {
                   setProductSearch(e.target.value);
                   setShowProductList(true);
+                  setCustomerMenuOpen(false);
                 }}
-                onFocus={() => setShowProductList(true)}
+                onFocus={() => {
+                  setShowProductList(true);
+                  setCustomerMenuOpen(false);
+                }}
                 placeholder={tr("Məhsul kodu daxil edin və seçin", "Please type product code and select")}
                 className="w-full px-2.5 py-1.5 pr-10 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
@@ -414,34 +469,47 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                 {tr("Status", "Status")} <span className="text-red-500">*</span>
               </label>
-              <select
+              <ModernSelect
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-              >
-                <option value="">{tr("Seç", "Select")}</option>
-                <option value="completed">{tr("Tamamlandı", "Completed")}</option>
-                <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                <option value="cancelled">{tr("Ləğv Edildi", "Cancelled")}</option>
-                <option value="held">{tr("Qaralama", "Draft")}</option>
-              </select>
+                onChange={setStatus}
+                className="w-full"
+                placeholder={tr("Seç", "Select")}
+                options={[
+                  { value: "", label: tr("Seç", "Select") },
+                  { value: "completed", label: tr("Tamamlandı", "Completed") },
+                  { value: "pending", label: tr("Gözləyir", "Pending") },
+                  { value: "cancelled", label: tr("Ləğv Edildi", "Cancelled") },
+                  { value: "held", label: tr("Qaralama", "Draft") },
+                ]}
+              />
             </div>
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-3 sticky bottom-0 bg-white dark:bg-gray-900">
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2 sticky bottom-0 bg-white dark:bg-gray-900">
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-3 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            disabled={busy}
+            className="px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
           >
             {tr("Ləğv Et", "Cancel")}
           </button>
           <button
             type="button"
+            onClick={() => void handleSaveDraft()}
+            disabled={products.length === 0 || busy || isDemo}
+            className="px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {savingDraft
+              ? tr("Saxlanılır...", "Saving...")
+              : tr("Qaralama olaraq saxla", "Save as Draft")}
+          </button>
+          <button
+            type="button"
             onClick={() => void handleSave()}
-            disabled={!customerId || !date || products.length === 0 || !status || saving || isDemo}
-            className="px-6 py-3 text-sm bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!date || products.length === 0 || !status || busy || isDemo}
+            className="px-4 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq Et", "Submit")}
           </button>

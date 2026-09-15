@@ -19,6 +19,7 @@ import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { cn } from "../ui/utils";
 import { PurchaseBranchField, resolvePurchaseStoreIdForApi } from "./PurchaseBranchField";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface PurchaseReturnDetailModalProps {
@@ -232,15 +233,16 @@ export function PurchaseReturnDetailModal({
                   )}
                   {canEdit && !isDemo ? (
                     <div className="flex gap-2 mt-1">
-                      <select
+                      <ModernSelect
                         value={statusUi}
-                        onChange={(e) => setStatusUi(e.target.value)}
-                        className="flex-1 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-                      >
-                        <option value="ordered">{tr("Sifariş edildi", "Ordered")}</option>
-                        <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                        <option value="received">{tr("Qəbul edildi", "Received")}</option>
-                      </select>
+                        onChange={setStatusUi}
+                        className="flex-1"
+                        options={[
+                          { value: "ordered", label: tr("Sifariş edildi", "Ordered") },
+                          { value: "pending", label: tr("Gözləyir", "Pending") },
+                          { value: "received", label: tr("Qəbul edildi", "Received") },
+                        ]}
+                      />
                       <button
                         type="button"
                         disabled={savingStatus}
@@ -393,17 +395,16 @@ export function PurchaseReturnDetailModal({
                       placeholder={tr("Məbləğ", "Amount")}
                       className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                     />
-                    <select
+                    <ModernSelect
                       value={paymentMethod}
-                      onChange={(e) =>
-                        setPaymentMethod(e.target.value as PosUiPaymentMethod)
-                      }
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-                    >
-                      <option value="cash">{tr("Nağd", "Cash")}</option>
-                      <option value="card">{tr("Kart", "Card")}</option>
-                      <option value="bank">{tr("Bank", "Bank transfer")}</option>
-                    </select>
+                      onChange={(value) => setPaymentMethod(value as PosUiPaymentMethod)}
+                      className="w-full"
+                      options={[
+                        { value: "cash", label: tr("Nağd", "Cash") },
+                        { value: "card", label: tr("Kart", "Card") },
+                        { value: "bank", label: tr("Bank", "Bank transfer") },
+                      ]}
+                    />
                     <input
                       type="text"
                       value={paymentReference}

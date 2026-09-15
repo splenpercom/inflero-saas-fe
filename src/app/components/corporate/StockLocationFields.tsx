@@ -50,6 +50,7 @@ export function StockLocationFields({ value, onChange, disabled = false }: Stock
       <ModernSelect
         value={value.storeId ?? ""}
         onChange={(id) => onChange({ storeId: id || null })}
+        className="w-full"
         placeholder={loading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select")}
         options={branches.map((b) => ({ value: b.id, label: b.name }))}
         disabled={disabled || loading}

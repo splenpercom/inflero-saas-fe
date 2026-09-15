@@ -15,11 +15,10 @@ import {
   type PaymentMethodApi,
 } from "../../api/sales";
 import { formatSalesDate } from "../../lib/salesMappers";
+import { downloadInvoicePdf, printInvoiceDocument } from "../../lib/invoicePdf";
 import { notifyFromError, notifyInfo, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { CreatePaymentModal } from "./CreatePaymentModal";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 function mapPaymentMethodToApi(method: string): PaymentMethodApi {
   if (method === "Card") return "CARD";
@@ -30,10 +29,6 @@ function mapPaymentMethodToApi(method: string): PaymentMethodApi {
 function parseAmount(value: string | number): number {
   if (typeof value === "number") return value;
   return parseFloat(value) || 0;
-}
-
-function formatPdfMoney(value: string | number): string {
-  return `${parseAmount(value).toFixed(2)} AZN`;
 }
 
 export function InvoiceView() {
@@ -121,148 +116,23 @@ export function InvoiceView() {
     notifyInfo(tr("Tezliklə əlavə olunacaq", "Coming soon"));
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!invoice) return;
-
-    const doc = new jsPDF();
-    const invTotal = parseAmount(invoice.total);
-    const invSubtotal = parseAmount(invoice.subtotal);
-    const invTax = parseAmount(invoice.tax);
-    const invDiscount = parseAmount(invoice.discount);
-    const invPaid = parseAmount(invoice.paid);
-    const invDue = parseAmount(invoice.amountDue);
-    const invCustomer = invoice.customer;
-
-    doc.setFontSize(18);
-    doc.setTextColor(20, 184, 166);
-    doc.text("Inflero", 14, 18);
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text("123 Business Street, Business City", 14, 25);
-    doc.text("noreply@inflero.com", 14, 30);
-
-    doc.setFontSize(16);
-    doc.setTextColor(20, 184, 166);
-    doc.text(tr("QAİMƏ", "INVOICE"), 140, 18, { align: "right" });
-    doc.setFontSize(10);
-    doc.setTextColor(60, 60, 60);
-    doc.text(`${tr("Qaimə No", "Invoice No")}: ${invoice.invoiceNo}`, 140, 26, { align: "right" });
-    doc.text(`${tr("Tarix", "Date")}: ${formatSalesDate(invoice.createdAt)}`, 140, 32, { align: "right" });
-    doc.text(`${tr("Son Tarix", "Due Date")}: ${formatSalesDate(invoice.dueDate)}`, 140, 38, { align: "right" });
-    doc.text(`${tr("Status", "Status")}: ${invoice.status}`, 140, 44, { align: "right" });
-
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    doc.text(tr("Müştəri", "Bill To"), 14, 52);
-    doc.setFontSize(10);
-    doc.setTextColor(60, 60, 60);
-    if (invCustomer) {
-      doc.text(invCustomer.name, 14, 58);
-      let y = 63;
-      if (invCustomer.country) {
-        doc.text(invCustomer.country, 14, y);
-        y += 5;
-      }
-      if (invCustomer.email) {
-        doc.text(invCustomer.email, 14, y);
-        y += 5;
-      }
-      if (invCustomer.phone) {
-        doc.text(invCustomer.phone, 14, y);
-      }
-    } else {
-      doc.text(tr("Müştəri təyin edilməyib", "No customer assigned"), 14, 58);
+    try {
+      await downloadInvoicePdf({ invoice, sourceOrder, tr });
+      notifySuccess(tr("Qaimə yükləndi", "Invoice downloaded"));
+    } catch (err) {
+      notifyFromError(err, tr("Qaimə yüklənə bilmədi", "Failed to download invoice"));
     }
-    if (sourceOrder?.vehicleLabel) {
-      doc.text(`${tr("Avtomobil", "Vehicle")}: ${sourceOrder.vehicleLabel}`, 105, 58);
-      if (sourceOrder.mileageAtService != null) {
-        doc.text(`${tr("Yürüş", "Mileage")}: ${sourceOrder.mileageAtService} km`, 105, 63);
-      }
+  };
+
+  const handlePrint = () => {
+    if (!invoice) return;
+    try {
+      printInvoiceDocument({ invoice, sourceOrder, tr });
+    } catch (err) {
+      notifyFromError(err, tr("Çap uğursuz oldu", "Failed to print"));
     }
-
-    autoTable(doc, {
-      startY: 78,
-      head: [
-        [
-          tr("Təsvir", "Description"),
-          tr("Miqdar", "Qty"),
-          tr("Qiymət", "Unit Price"),
-          tr("Cəm", "Total"),
-        ],
-      ],
-      body: invoice.items.map((item) => [
-        item.description,
-        String(item.quantity),
-        formatPdfMoney(item.unitPrice),
-        formatPdfMoney(item.total),
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: [20, 184, 166], fontSize: 9 },
-      bodyStyles: { fontSize: 9 },
-      columnStyles: {
-        1: { halign: "right" },
-        2: { halign: "right" },
-        3: { halign: "right" },
-      },
-    });
-
-    const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 120;
-    let y = finalY + 10;
-
-    const totals: [string, string][] = [
-      [tr("Alt Məbləğ", "Subtotal"), formatPdfMoney(invSubtotal)],
-      [tr("Vergi", "Tax"), formatPdfMoney(invTax)],
-      [tr("Endirim", "Discount"), formatPdfMoney(invDiscount)],
-      [tr("Ümumi", "Total"), formatPdfMoney(invTotal)],
-      [tr("Ödənilib", "Paid"), formatPdfMoney(invPaid)],
-      [tr("Qalan Borc", "Amount Due"), formatPdfMoney(invDue)],
-    ];
-
-    doc.setFontSize(10);
-    totals.forEach(([label, value]) => {
-      doc.text(label, 130, y);
-      doc.text(value, 196, y, { align: "right" });
-      y += 6;
-    });
-
-    const payments = invoice.payments ?? [];
-    if (payments.length > 0) {
-      y += 4;
-      autoTable(doc, {
-        startY: y,
-        head: [
-          [
-            tr("Tarix", "Date"),
-            tr("Üsul", "Method"),
-            tr("Məbləğ", "Amount"),
-            tr("İstinad", "Reference"),
-          ],
-        ],
-        body: payments.map((payment) => [
-          formatSalesDate(payment.date),
-          payment.method,
-          formatPdfMoney(payment.allocatedAmount),
-          payment.reference || payment.note || "-",
-        ]),
-        theme: "striped",
-        headStyles: { fillColor: [20, 184, 166], fontSize: 8 },
-        bodyStyles: { fontSize: 8 },
-      });
-    }
-
-    if (invoice.notes) {
-      const notesY =
-        (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 10;
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      doc.text(tr("Qeydlər", "Notes"), 14, notesY + 10);
-      doc.setTextColor(80, 80, 80);
-      doc.text(invoice.notes, 14, notesY + 16, { maxWidth: 180 });
-    }
-
-    const safeName = invoice.invoiceNo.replace(/[^\w.-]+/g, "_");
-    doc.save(`invoice_${safeName}.pdf`);
-    notifySuccess(tr("Qaimə yükləndi", "Invoice downloaded"));
   };
 
   if (loading) {
@@ -345,14 +215,14 @@ export function InvoiceView() {
               <span className="hidden sm:inline">{tr("Göndər", "Send")}</span>
             </button>
             <button
-              onClick={() => window.print()}
+              onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <Printer className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{tr("Çap et", "Print")}</span>
             </button>
             <button
-              onClick={handleDownloadPDF}
+              onClick={() => void handleDownloadPDF()}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
             >
               <Download className="w-3.5 h-3.5" />

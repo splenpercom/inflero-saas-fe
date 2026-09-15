@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { DataPagination } from "../../ui/DataPagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
-import { FileText, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { FileText, FileSpreadsheet } from "lucide-react";
 import { useReportDateRange } from "../../../hooks/useReportDateRange";
 import { ReportDateRangeFilter } from "./ReportDateRangeFilter";
 import { useLanguage } from "../../../i18n/LanguageContext";
@@ -178,60 +179,52 @@ export function ProductExpiryReport() {
             />
 
             {/* Store Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedStore}
-                onChange={(e) => setSelectedStore(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Store</option>
-                <option value="store1">Store 1</option>
-                <option value="store2">Store 2</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedStore}
+                placeholder="Store"
+                options={[
+                  { value: "all", label: "Store" },
+                  { value: "store1", label: "Store 1" },
+                  { value: "store2", label: "Store 2" }
+                ]}
+              />
 
             {/* Category Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Category</option>
-                <option value="electronics">Electronics</option>
-                <option value="furniture">Furniture</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedCategory}
+                placeholder="Category"
+                options={[
+                  { value: "all", label: "Category" },
+                  { value: "electronics", label: "Electronics" },
+                  { value: "furniture", label: "Furniture" }
+                ]}
+              />
 
             {/* Brand Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedBrand}
-                onChange={(e) => setSelectedBrand(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Brand</option>
-                <option value="apple">Apple</option>
-                <option value="nike">Nike</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedBrand}
+                placeholder="Brand"
+                options={[
+                  { value: "all", label: "Brand" },
+                  { value: "apple", label: "Apple" },
+                  { value: "nike", label: "Nike" }
+                ]}
+              />
 
             {/* Product Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedProduct}
-                onChange={(e) => setSelectedProduct(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Product</option>
-                <option value="product1">Product 1</option>
-                <option value="product2">Product 2</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedProduct}
+                placeholder="Product"
+                options={[
+                  { value: "all", label: "Product" },
+                  { value: "product1", label: "Product 1" },
+                  { value: "product2", label: "Product 2" }
+                ]}
+              />
 
             {/* Generate Button */}
             <button

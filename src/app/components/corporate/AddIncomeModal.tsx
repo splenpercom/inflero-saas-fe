@@ -5,6 +5,7 @@ import type { FinanceCategory, BankAccountRow, IncomeListRow } from "../../api/f
 import type { BranchSwitcherStore } from "../../api/stores";
 import { notifyFromError } from "../../lib/toast";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 export interface IncomeFormData {
@@ -138,10 +139,16 @@ export function AddIncomeModal({
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Kateqoriya", "Category")} <span className="text-red-500">*</span></label>
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer">
-              <option value="">{tr("Seçin", "Select")}</option>
-              {activeCategories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-            </select>
+            <ModernSelect
+              value={categoryId}
+              onChange={setCategoryId}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                ...activeCategories.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
             {activeCategories.length === 0 && (
               <div className="mt-1.5 text-[10px] text-amber-700 dark:text-amber-400">
                 <p>
@@ -166,10 +173,17 @@ export function AddIncomeModal({
           {(isGlobalMode || isEdit) && (
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Mağaza / Filial", "Store / Branch")} <span className="text-red-500">*</span></label>
-              <select value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={isEdit} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer disabled:opacity-60">
-                <option value="">{tr("Seçin", "Select")}</option>
-                {branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-              </select>
+              <ModernSelect
+                value={storeId}
+                onChange={setStoreId}
+                disabled={isEdit}
+                className="w-full"
+                placeholder={tr("Seçin", "Select")}
+                options={[
+                  { value: "", label: tr("Seçin", "Select") },
+                  ...branches.map((b) => ({ value: b.id, label: b.name })),
+                ]}
+              />
             </div>
           )}
 
@@ -186,10 +200,17 @@ export function AddIncomeModal({
             </div>
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Hesab", "Account")} {!isEdit && <span className="text-red-500">*</span>}</label>
-              <select value={accountId} onChange={(e) => setAccountId(e.target.value)} disabled={isEdit} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer disabled:opacity-60">
-                <option value="">{tr("Seçin", "Select")}</option>
-                {activeAccounts.map((a) => (<option key={a.id} value={a.id}>{a.accountHolderName}</option>))}
-              </select>
+              <ModernSelect
+                value={accountId}
+                onChange={setAccountId}
+                disabled={isEdit}
+                className="w-full"
+                placeholder={tr("Seçin", "Select")}
+                options={[
+                  { value: "", label: tr("Seçin", "Select") },
+                  ...activeAccounts.map((a) => ({ value: a.id, label: a.accountHolderName })),
+                ]}
+              />
             </div>
           </div>
 

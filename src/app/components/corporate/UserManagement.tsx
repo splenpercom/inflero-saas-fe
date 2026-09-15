@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocation } from "react-router";
 import { cn } from "../ui/utils";
 import {
   Search,
@@ -47,12 +48,17 @@ import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination
 import { pickLang, mapLang } from "../../i18n/pickLang";
 export function UserManagement() {
   const { language } = useLanguage();
+  const location = useLocation();
   const { isDemo, isAuthenticated, user: authUser, hasModule } = useAuth();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("User Management");
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
 
-  const [activeTab, setActiveTab] = useState<"users" | "roles">("users");
+  const activeTab: "users" | "roles" = /\/user-management\/roles\/?$/.test(
+    location.pathname.replace(/\/+$/, "") || location.pathname,
+  )
+    ? "roles"
+    : "users";
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -75,10 +81,10 @@ export function UserManagement() {
 
   const ut = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
-      users: { en: "Users", az: "İstifadəçilər" },
-      rolesPermission: { en: "Roles & Permission", az: "Rollar və İcazələr" },
-      manageUsers: { en: "Manage your users", az: "İstifadəçilərinizi idarə edin" },
-      manageRoles: { en: "Manage your roles", az: "Rollarınızı idarə edin" },
+      users: { en: "Employee", az: "İşçi" },
+      rolesPermission: { en: "User roles", az: "İstifadəçi rolları" },
+      manageUsers: { en: "Manage your employees", az: "İşçilərinizi idarə edin" },
+      manageRoles: { en: "Manage user roles and permissions", az: "İstifadəçi rollarını və icazələri idarə edin" },
       search: { en: "Search...", az: "Axtar..." },
       all: { en: "All", az: "Hamısı" },
       active: { en: "Active", az: "Aktiv" },
@@ -122,6 +128,11 @@ export function UserManagement() {
     return mapLang(language, translations[key], key);
   };
 
+  useEffect(() => {
+    setSearchQuery("");
+    setStatusFilter("all");
+  }, [activeTab]);
+
   const loadRoles = useCallback(async () => {
     if ((!(isAuthenticated || isDemo)) || !canView) {
       setRoles([]);
@@ -144,13 +155,21 @@ export function UserManagement() {
     setLoading(true);
     try {
       const rows = await fetchTenantUsers();
-      setUsers(rows);
+      // Defense-in-depth aligned with backend privacy rules.
+      const visible = authUser?.isTenantOwner
+        ? rows.filter((u) => u.id === authUser.id || u.isBranchManager)
+        : rows.filter(
+            (u) =>
+              !u.isTenantOwner &&
+              (u.id === authUser?.id || u.createdByUserId === authUser?.id),
+          );
+      setUsers(visible);
     } catch (err) {
       notifyFromError(err, tr("İstifadəçiləri yükləmək alınmadı", "Failed to load users"));
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, isDemo, canView, language, branchRevision]);
+  }, [isAuthenticated, isDemo, canView, language, branchRevision, authUser?.isTenantOwner, authUser?.id]);
 
   const loadBranches = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || authUser?.storeId) {
@@ -303,6 +322,22 @@ export function UserManagement() {
       notifyFromError(null, ut("passwordMismatch"));
       return;
     }
+    const isOwnerCreate = authUser?.isTenantOwner === true;
+    if (isOwnerCreate && !data.storeId && branches.length > 0) {
+      notifyFromError(
+        null,
+        tr("Filial seçilməlidir", "A branch is required to create a branch manager"),
+      );
+      return;
+    }
+    const managerRole = roles.find((r) => r.name.toLowerCase() === "manager");
+    const roleId = isOwnerCreate
+      ? managerRole?.id || data.roleId
+      : data.roleId;
+    if (!roleId) {
+      notifyFromError(null, tr("Rol seçilməlidir", "A role is required"));
+      return;
+    }
     setSaving(true);
     try {
       await createTenantUser({
@@ -311,7 +346,7 @@ export function UserManagement() {
         email: data.email,
         phone: data.phone,
         password: data.password,
-        roleId: data.roleId,
+        roleId,
         storeId: data.storeId || null,
         dateOfBirth: data.dateOfBirth || null,
         dateOfJoin: data.joiningDate || null,
@@ -444,7 +479,21 @@ export function UserManagement() {
     );
   };
 
-  const roleOptions = roles.map((r) => ({ id: r.id, name: r.name }));
+  const isOwnerActor = authUser?.isTenantOwner === true;
+  const staffRoleOptions = roles
+    .filter((r) => {
+      const n = r.name.toLowerCase();
+      return n !== "manager" && n !== "administrator";
+    })
+    .map((r) => ({ id: r.id, name: r.name }));
+  const managerRoleId = roles.find((r) => r.name.toLowerCase() === "manager")?.id ?? "";
+  const addUserRoleOptions = isOwnerActor
+    ? roles.filter((r) => r.name.toLowerCase() === "manager").map((r) => ({ id: r.id, name: r.name }))
+    : staffRoleOptions;
+  /** Owners may assign any role; branch actors get staff roles only (plus current if already Manager). */
+  const editUserRoleOptions = isOwnerActor
+    ? roles.map((r) => ({ id: r.id, name: r.name }))
+    : staffRoleOptions;
 
   if (!canView && isAuthenticated) {
     return <NoAccessPanel />;
@@ -542,33 +591,6 @@ export function UserManagement() {
               )}
             </div>
           </div>
-        </div>
-
-        <div className="flex gap-2 mb-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab("users")}
-            className={cn(
-              "px-4 py-2 text-xs font-medium rounded-lg transition-colors",
-              activeTab === "users"
-                ? "bg-[#14b8a6] text-white shadow-sm"
-                : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800",
-            )}
-          >
-            {ut("users")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("roles")}
-            className={cn(
-              "px-4 py-2 text-xs font-medium rounded-lg transition-colors",
-              activeTab === "roles"
-                ? "bg-[#14b8a6] text-white shadow-sm"
-                : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800",
-            )}
-          >
-            {ut("rolesPermission")}
-          </button>
         </div>
 
         {activeTab === "users" && (
@@ -837,9 +859,11 @@ export function UserManagement() {
         isOpen={addUserModalOpen}
         onClose={() => setAddUserModalOpen(false)}
         onSave={handleSaveUser}
-        roles={roleOptions}
+        roles={addUserRoleOptions}
         branches={branches}
-        showBranchSelect={!authUser?.storeId && branches.length > 0}
+        showBranchSelect={isOwnerActor && branches.length > 0}
+        createAsBranchManager={isOwnerActor}
+        managerRoleId={managerRoleId}
         saving={saving}
       />
       <AddRoleModal
@@ -867,7 +891,17 @@ export function UserManagement() {
         }}
         onSave={handleUpdateUser}
         user={selectedUser}
-        roles={roleOptions}
+        roles={
+          !isOwnerActor &&
+          selectedUser &&
+          selectedUser.role.toLowerCase() === "manager" &&
+          !editUserRoleOptions.some((r) => r.id === selectedUser.roleId)
+            ? [
+                ...editUserRoleOptions,
+                { id: selectedUser.roleId, name: selectedUser.role },
+              ]
+            : editUserRoleOptions
+        }
         saving={saving}
       />
     </div>

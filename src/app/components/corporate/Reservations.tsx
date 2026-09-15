@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, Link } from "react-router";
 import { cn } from "../ui/utils";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 import {
   Search,
   Plus,
@@ -545,21 +546,24 @@ export function Reservations() {
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Avtomobil", "Vehicle")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={formVehicleId}
-              onChange={(e) => {
-                setFormVehicleId(e.target.value);
-                if (!e.target.value) setFormMileage("");
+              onChange={(value) => {
+                setFormVehicleId(value);
+                if (!value) setFormMileage("");
               }}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-            >
-              <option value="">{tr("Avtomobil seçin", "Select vehicle")}</option>
-              {customerVehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {[vehicle.make, vehicle.model, vehicle.plate].filter(Boolean).join(" · ")}
-                </option>
-              ))}
-            </select>
+              className="w-full"
+              placeholder={tr("Avtomobil seçin", "Select vehicle")}
+              options={[
+                { value: "", label: tr("Avtomobil seçin", "Select vehicle") },
+                ...customerVehicles.map((vehicle) => ({
+                  value: vehicle.id,
+                  label: [vehicle.make, vehicle.model, vehicle.plate]
+                    .filter(Boolean)
+                    .join(" · "),
+                })),
+              ]}
+            />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
@@ -689,16 +693,19 @@ export function Reservations() {
           <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
             {tr("Saat", "Time")} <span className="text-red-500">*</span>
           </label>
-          <select
+          <ModernSelect
             value={formTime}
-            onChange={(e) => setFormTime(e.target.value)}
-            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-          >
-            <option value="">{tr("Saat seçin", "Select time")}</option>
-            {generateTimeSlots(resConfig).map((slot) => (
-              <option key={slot} value={slot}>{slot}</option>
-            ))}
-          </select>
+            onChange={setFormTime}
+            className="w-full"
+            placeholder={tr("Saat seçin", "Select time")}
+            options={[
+              { value: "", label: tr("Saat seçin", "Select time") },
+              ...generateTimeSlots(resConfig).map((slot) => ({
+                value: slot,
+                label: slot,
+              })),
+            ]}
+          />
         </div>
       </div>
 
@@ -943,20 +950,18 @@ export function Reservations() {
               </div>
 
               {/* Status filter */}
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Bütün statuslar", "All Statuses")}</option>
-                  <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                  <option value="confirmed">{tr("Təsdiqlənib", "Confirmed")}</option>
-                  <option value="completed">{tr("Tamamlandı", "Completed")}</option>
-                  <option value="cancelled">{tr("Ləğv edildi", "Cancelled")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                options={[
+                  { value: "all", label: tr("Bütün statuslar", "All Statuses") },
+                  { value: "pending", label: tr("Gözləyir", "Pending") },
+                  { value: "confirmed", label: tr("Təsdiqlənib", "Confirmed") },
+                  { value: "completed", label: tr("Tamamlandı", "Completed") },
+                  { value: "cancelled", label: tr("Ləğv edildi", "Cancelled") },
+                ]}
+                placeholder={tr("Bütün statuslar", "All Statuses")}
+              />
             </div>
           </div>
         </div>

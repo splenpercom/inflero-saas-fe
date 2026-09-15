@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Edit2,
   Trash2,
-  ChevronDown,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -23,6 +22,7 @@ import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
+import { ModernSelect } from "../ui/ModernSelect";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -295,34 +295,30 @@ export function PurchaseReturn() {
             </div>
 
             <div className="flex gap-2">
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Status", "Status")}</option>
-                  <option value="received">{tr("Qəbul Edildi", "Received")}</option>
-                  <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                  <option value="ordered">{tr("Sifariş Edildi", "Ordered")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                options={[
+                  { value: "all", label: tr("Status", "Status") },
+                  { value: "received", label: tr("Qəbul Edildi", "Received") },
+                  { value: "pending", label: tr("Gözləyir", "Pending") },
+                  { value: "ordered", label: tr("Sifariş Edildi", "Ordered") },
+                ]}
+                placeholder={tr("Status", "Status")}
+              />
 
-              <div className="relative">
-                <select
-                  value={selectedPaymentStatus}
-                  onChange={(e) => setSelectedPaymentStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Ödəniş Statusu", "Payment Status")}</option>
-                  <option value="paid">{tr("Ödənilib", "Paid")}</option>
-                  <option value="partial">{tr("Qismən", "Partial")}</option>
-                  <option value="unpaid">{tr("Ödənilməyib", "Unpaid")}</option>
-                  <option value="overdue">{tr("Gecikmiş", "Overdue")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedPaymentStatus}
+                onChange={setSelectedPaymentStatus}
+                options={[
+                  { value: "all", label: tr("Ödəniş Statusu", "Payment Status") },
+                  { value: "paid", label: tr("Ödənilib", "Paid") },
+                  { value: "partial", label: tr("Qismən", "Partial") },
+                  { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
+                  { value: "overdue", label: tr("Gecikmiş", "Overdue") },
+                ]}
+                placeholder={tr("Ödəniş Statusu", "Payment Status")}
+              />
             </div>
 
             <div className="flex gap-2">

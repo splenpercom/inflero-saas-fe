@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { DataPagination } from "../../ui/DataPagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
-import { FileText, FileSpreadsheet, ChevronDown, DollarSign, CheckCircle, AlertCircle, XCircle } from "lucide-react";
+import { FileText, FileSpreadsheet, DollarSign, CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import { useReportDateRange } from "../../../hooks/useReportDateRange";
 import { ReportDateRangeFilter } from "./ReportDateRangeFilter";
 import { useLanguage } from "../../../i18n/LanguageContext";
@@ -153,33 +154,29 @@ export function InvoiceReport() {
             />
 
             {/* Customer Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedCustomer}
-                onChange={(e) => setSelectedCustomer(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Customer</option>
-                <option value="customer1">Customer 1</option>
-                <option value="customer2">Customer 2</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedCustomer}
+                placeholder="Customer"
+                options={[
+                  { value: "all", label: "Customer" },
+                  { value: "customer1", label: "Customer 1" },
+                  { value: "customer2", label: "Customer 2" }
+                ]}
+              />
 
             {/* Status Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Status</option>
-                <option value="paid">Paid</option>
-                <option value="unpaid">Unpaid</option>
-                <option value="overdue">Overdue</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedStatus}
+                placeholder="Status"
+                options={[
+                  { value: "all", label: "Status" },
+                  { value: "paid", label: "Paid" },
+                  { value: "unpaid", label: "Unpaid" },
+                  { value: "overdue", label: "Overdue" }
+                ]}
+              />
 
             {/* Generate Button */}
             <button

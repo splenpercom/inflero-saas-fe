@@ -15,7 +15,8 @@ export interface AllBranchesNavEntry {
 /** Top-level sidebar entries for tenant owners in all-branches (global) mode. */
 export const ALL_BRANCHES_NAV_ENTRIES: AllBranchesNavEntry[] = [
   { labelKey: "dashboard", path: "/dashboard", permissionModule: "Dashboard" },
-  { labelKey: "userManagement", path: "/dashboard/user-management", permissionModule: "User Management" },
+  { labelKey: "employees", path: "/dashboard/user-management", permissionModule: "User Management" },
+  { labelKey: "userRoles", path: "/dashboard/user-management/roles", permissionModule: "User Management" },
   { labelKey: "warehouses", path: "/dashboard/people/warehouses", permissionModule: "People" },
   { labelKey: "plugins", path: "/dashboard/plugins", permissionModule: "Settings" },
   { labelKey: "settings", path: "/dashboard/settings", permissionModule: "Settings" },

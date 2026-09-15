@@ -4,6 +4,20 @@ import type { OrderStatusApi, PaymentMethodApi, PurchaseStatusApi } from "../lib
 
 export type ProductionStatusApi = "IN_PROCESSING" | "IN_PRODUCTION" | "COMPLETED";
 
+export interface PosOrderWebMeta {
+  status: "pending" | "confirmed" | "shipped" | "completed" | "cancelled";
+  paymentStatus: "paid" | "unpaid" | "refunded";
+  paymentMethod: "epoint" | "cod";
+  customer: { name: string; email: string; phone: string };
+  shipping: {
+    address: string;
+    city: string;
+    country: string;
+    postalCode: string;
+    notes?: string;
+  };
+}
+
 export interface PosOrderListRow {
   id: string;
   customerId: string | null;
@@ -18,10 +32,14 @@ export interface PosOrderListRow {
   paymentStatus: string;
   biller: string;
   storeId: string | null;
+  storeCode?: string | null;
+  storeName?: string | null;
   source?: string;
   kotStatus?: string | null;
   productionStatus?: string | null;
   table?: { id: string; number: number; name: string } | null;
+  /** Present when source === WEB */
+  web?: PosOrderWebMeta | null;
 }
 
 export interface SalesBillerRow {
@@ -40,6 +58,10 @@ export interface PosOrderLineItem {
   sku: string;
   quantity: number;
   price: string;
+  /** Units already returned for this product on the order (product-level). */
+  returnedQty?: number;
+  /** quantity - returnedQty, floored at 0. */
+  remainingQty?: number;
 }
 
 export interface PosOrderPaymentRow {
@@ -63,6 +85,8 @@ export interface PosOrderDetail {
   grandTotal: string;
   paid: string;
   due: string;
+  /** Cash refunded via linked sales returns (auto refund payments). */
+  refunded?: string;
   paymentStatus: string;
   paymentMethod: PaymentMethodApi | null;
   shipping: string | null;
@@ -92,6 +116,10 @@ export interface PosOrderDetail {
   table?: { id: string; number: number; name: string } | null;
   payments: PosOrderPaymentRow[];
   items: PosOrderLineItem[];
+  /** Present when source === WEB */
+  web?: PosOrderWebMeta | null;
+  /** Linked sales invoice when one exists for this order. */
+  invoiceId?: string | null;
 }
 
 export interface InvoiceListRow {
@@ -205,6 +233,8 @@ export interface SalesReturnDetail {
   status: PurchaseStatusApi;
   statusLabel: string;
   paymentStatus: string;
+  /** Linked order refund status: Refunded / Partially Refunded / — */
+  orderPaymentStatus?: string;
   items: SalesReturnLineItem[];
 }
 
@@ -254,7 +284,7 @@ export type CreateSalesReturnBody = {
   reference?: string | null;
   documentNo?: string | null;
   customerId?: string | null;
-  posOrderId?: string | null;
+  posOrderId: string;
   storeId?: string | null;
   date?: string;
   orderTax?: number;
@@ -268,6 +298,41 @@ export type CreateSalesReturnBody = {
     discount?: number;
     taxPercent?: number;
   }[];
+};
+
+export type ReturnablePosOrderItem = {
+  productId: string;
+  productName: string;
+  sku: string | null;
+  orderedQty: number;
+  alreadyReturnedQty: number;
+  remainingQty: number;
+  unitPrice: string;
+  lineTotal: string;
+};
+
+export type ReturnablePosOrder = {
+  id: string;
+  reference: string;
+  date: string;
+  customerId: string | null;
+  customerName: string;
+  grandTotal: string;
+  paymentStatus: string;
+  status: string;
+  storeId: string | null;
+  hasReturnableItems: boolean;
+  items: ReturnablePosOrderItem[];
+};
+
+export type SalesReturnQuantityLimit = {
+  productId: string;
+  productName: string;
+  sku: string | null;
+  orderedQty: number;
+  alreadyReturnedQty: number;
+  remainingQty: number;
+  unitPrice: string;
 };
 
 export type RecordPaymentBody = {
@@ -427,6 +492,39 @@ export async function fetchSalesReturns(query: SalesListQuery = {}) {
       totalPages: number;
     };
   }>(`/tenant/sales/returns${salesListQueryString(query)}`);
+  return res.data;
+}
+
+export async function fetchReturnablePosOrders(query: {
+  search?: string;
+  customerId?: string;
+  page?: number;
+  pageSize?: number;
+} = {}) {
+  const params = new URLSearchParams();
+  if (query.search?.trim()) params.set("search", query.search.trim());
+  if (query.customerId) params.set("customerId", query.customerId);
+  if (query.page) params.set("page", String(query.page));
+  if (query.pageSize) params.set("pageSize", String(query.pageSize));
+  const qs = params.toString();
+  const res = await apiGet<{
+    success: boolean;
+    data: {
+      items: ReturnablePosOrder[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    };
+  }>(`/tenant/sales/pos-orders/returnable${qs ? `?${qs}` : ""}`);
+  return res.data;
+}
+
+export async function fetchSalesReturnQuantityLimits(posOrderId: string) {
+  const params = new URLSearchParams({ posOrderId });
+  const res = await apiGet<{ success: boolean; data: SalesReturnQuantityLimit[] }>(
+    `/tenant/sales/returns/quantity-limits?${params.toString()}`,
+  );
   return res.data;
 }
 

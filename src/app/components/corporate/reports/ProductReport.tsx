@@ -25,6 +25,7 @@ import * as XLSX from "xlsx";
 import { pickLang } from "../../../i18n/pickLang";
 import { DataPagination } from "../../ui/DataPagination";
 import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 
 export function ProductReport() {
   const { language } = useLanguage();
@@ -313,18 +314,15 @@ export function ProductReport() {
                 className="pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] w-48"
               />
             </div>
-            <select
+            <ModernSelect
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-            >
-              <option value="all">{pt("All Categories", "Bütün Kateqoriyalar")}</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+              onChange={setCategoryFilter}
+              minWidth={160}
+              options={[
+                { value: "all", label: pt("All Categories", "Bütün Kateqoriyalar") },
+                ...categories.map((cat) => ({ value: cat, label: cat })),
+              ]}
+            />
           </div>
         </div>
 

@@ -198,6 +198,11 @@ export function PublicStorefront() {
           setRemoteLoaded(true);
           return;
         }
+        // Explicit branch link but store/branch unavailable (module off, unpublished, etc.)
+        if (branchParam) {
+          setNotFound(true);
+          return;
+        }
         // No published remote config — local draft only when not branch-selling.
         const local = loadWebsiteConfigBySlug(slug);
         if (cancelled) return;

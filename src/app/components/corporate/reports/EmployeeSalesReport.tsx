@@ -42,6 +42,7 @@ import * as XLSX from "xlsx";
 import { pickLang } from "../../../i18n/pickLang";
 import { DataPagination } from "../../ui/DataPagination";
 import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 
 const PIE_COLORS = ["#14b8a6", "#14b8a6", "#f97316", "#10b981", "#a78bfa", "#ec4899", "#0ea5e9", "#64748b"];
 
@@ -368,17 +369,15 @@ export function EmployeeSalesReport() {
                 <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                   {pt("Categories by Employee", "İşçi üzrə Kateqoriyalar")}
                 </h2>
-                <select
+                <ModernSelect
                   value={selectedBillerId ?? ""}
-                  onChange={(e) => setSelectedBillerId(e.target.value)}
-                  className="px-2 py-1 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
-                >
-                  {items.map((row) => (
-                    <option key={row.billerId ?? "__none__"} value={row.billerId ?? "__none__"}>
-                      {row.billerName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedBillerId}
+                  minWidth={160}
+                  options={items.map((row) => ({
+                    value: row.billerId ?? "__none__",
+                    label: row.billerName,
+                  }))}
+                />
               </div>
               {categoryPieData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>

@@ -1,5 +1,6 @@
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useBranch } from "../../context/BranchContext";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface PurchaseBranchFieldProps {
@@ -52,19 +53,17 @@ export function PurchaseBranchField({
       <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
         {tr("Filial", "Branch")} {required && <span className="text-red-500">*</span>}
       </label>
-      <select
+      <ModernSelect
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         disabled={isBranchLocked && !!branchId}
-        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-      >
-        <option value="">{tr("Filial seçin", "Select branch")}</option>
-        {branches.map((b) => (
-          <option key={b.id} value={b.id}>
-            {b.name}
-          </option>
-        ))}
-      </select>
+        className="w-full"
+        placeholder={tr("Filial seçin", "Select branch")}
+        options={[
+          { value: "", label: tr("Filial seçin", "Select branch") },
+          ...branches.map((b) => ({ value: b.id, label: b.name })),
+        ]}
+      />
       <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-400">
         {tr(
           "Qəbul edilmiş satınalmalar stoka yazılır — filial mütləqdir.",

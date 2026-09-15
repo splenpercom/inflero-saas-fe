@@ -67,6 +67,7 @@ export function SaleDetailModal({
   const grandTotal = order ? parseFloat(order.grandTotal) : 0;
   const paid = order ? parseFloat(order.paid) : 0;
   const due = order ? parseFloat(order.due) : 0;
+  const refunded = order?.refunded ? parseFloat(order.refunded) : 0;
   const discount = order?.discount ? parseFloat(order.discount) : 0;
   const shippingCost = order?.shipping ? parseFloat(order.shipping) : 0;
   const serviceFee = order?.serviceFee ? parseFloat(order.serviceFee) : 0;
@@ -109,20 +110,20 @@ export function SaleDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#14b8a6] flex items-center justify-center">
-              <FileText className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#14b8a6] flex items-center justify-center">
+              <FileText className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {tr("Satış Detalları", "Sale Details")}
               </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">{order?.reference ?? "—"}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
@@ -133,70 +134,82 @@ export function SaleDetailModal({
             <p className="text-center text-sm text-gray-500 py-8">{tr("Satış tapılmadı", "Sale not found")}</p>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                <div className="glass-card px-2.5 py-2 rounded-lg border border-white/20 dark:border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                      <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Müştəri", "Customer")}</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Müştəri", "Customer")}</p>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{order.customerName ?? "—"}</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.customerName ?? "—"}</p>
                 </div>
 
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                      <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <div className="glass-card px-2.5 py-2 rounded-lg border border-white/20 dark:border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                      <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Tarix", "Date")}</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Tarix", "Date")}</p>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{formatSalesDate(order.date)}</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatSalesDate(order.date)}</p>
                 </div>
 
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                      <UserCheck className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                <div className="glass-card px-2.5 py-2 rounded-lg border border-white/20 dark:border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
+                      <UserCheck className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Kassir", "Biller")}</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Kassir", "Biller")}</p>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{order.billerName ?? "—"}</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.billerName ?? "—"}</p>
                 </div>
 
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
-                      <FileText className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <div className="glass-card px-2.5 py-2 rounded-lg border border-white/20 dark:border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center shrink-0">
+                      <FileText className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Status", "Status")}</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Status", "Status")}</p>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                        {isDraft ? tr("Qaralama", "Draft") : order.statusLabel}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {isDraft ? tr("Qaralama", "Draft") : order.statusLabel}
-                  </p>
                 </div>
 
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                      <CreditCard className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <div className="glass-card px-2.5 py-2 rounded-lg border border-white/20 dark:border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                      <CreditCard className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Ödəniş Statusu", "Payment Status")}</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Ödəniş Statusu", "Payment Status")}</p>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{order.paymentStatus}</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.paymentStatus}</p>
                 </div>
                 {order.vehicleLabel && (
-                  <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
-                        <Car className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                  <div className="glass-card px-2.5 py-2 rounded-lg border border-white/20 dark:border-white/10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center shrink-0">
+                        <Car className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
                       </div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Avtomobil", "Vehicle")}</span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Avtomobil", "Vehicle")}</p>
+                        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{order.vehicleLabel}</p>
+                        {order.mileageAtService != null && (
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400">{order.mileageAtService} km</p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.vehicleLabel}</p>
-                    {order.mileageAtService != null && (
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{order.mileageAtService} km</p>
-                    )}
                   </div>
                 )}
               </div>
@@ -206,6 +219,14 @@ export function SaleDetailModal({
                   <Package className="w-4 h-4" />
                   {tr("Məhsullar", "Products")}
                 </h3>
+                {order.items.some((i) => (i.returnedQty ?? 0) > 0) && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 mb-3">
+                    {tr(
+                      "Bu sifarişdə qaytarılmış məhsullar var. Aşağıda hər sətir üçün qaytarma məlumatı göstərilir.",
+                      "This order has refunded products. Return details are shown on each line below.",
+                    )}
+                  </p>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -236,11 +257,47 @@ export function SaleDetailModal({
                         order.items.map((item) => {
                           const price = parseFloat(item.price);
                           const lineTotal = price * item.quantity;
+                          const returnedQty = item.returnedQty ?? 0;
+                          const remainingQty =
+                            item.remainingQty ?? Math.max(0, item.quantity - returnedQty);
+                          const fullyRefunded = returnedQty > 0 && remainingQty <= 0;
+                          const partiallyRefunded = returnedQty > 0 && remainingQty > 0;
                           return (
-                            <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800">
-                              <td className="py-2 px-3 text-xs text-gray-900 dark:text-white">{item.productName}</td>
+                            <tr
+                              key={item.id}
+                              className={`border-b border-gray-100 dark:border-gray-800 ${
+                                fullyRefunded ? "bg-gray-50/80 dark:bg-gray-800/30 opacity-80" : ""
+                              }`}
+                            >
+                              <td className="py-2 px-3 text-xs text-gray-900 dark:text-white">
+                                <div className="flex flex-col gap-0.5">
+                                  <span>{item.productName}</span>
+                                  {fullyRefunded ? (
+                                    <span className="inline-flex w-fit px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                                      {tr("Qaytarılıb", "Refunded")}
+                                      {returnedQty > 0 ? ` · ${returnedQty}` : ""}
+                                    </span>
+                                  ) : partiallyRefunded ? (
+                                    <span className="inline-flex w-fit px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200">
+                                      {tr(
+                                        `${returnedQty} qaytarılıb · ${remainingQty} qalıb`,
+                                        `${returnedQty} refunded · ${remainingQty} left`,
+                                      )}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </td>
                               <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">{item.sku}</td>
-                              <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{item.quantity}</td>
+                              <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">
+                                <div className="flex flex-col items-end gap-0.5">
+                                  <span>{item.quantity}</span>
+                                  {returnedQty > 0 && (
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                      {tr(`Qaytarılıb: ${returnedQty}`, `Returned: ${returnedQty}`)}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">₼{price.toFixed(2)}</td>
                               <td className="py-2 px-3 text-xs text-right font-semibold text-gray-900 dark:text-white">
                                 ₼{lineTotal.toFixed(2)}
@@ -300,6 +357,12 @@ export function SaleDetailModal({
                       <span className="text-gray-600 dark:text-gray-400">{tr("Ödənilib", "Paid")}:</span>
                       <span className="font-medium text-green-600 dark:text-green-400">₼{paid.toFixed(2)}</span>
                     </div>
+                    {refunded > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-600 dark:text-gray-400">{tr("Qaytarılıb", "Refunded")}:</span>
+                        <span className="font-medium text-red-600 dark:text-red-400">-₼{refunded.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600 dark:text-gray-400">{tr("Borc", "Due")}:</span>
                       <span className="font-medium text-[#14b8a6] dark:text-[#14b8a6]">₼{due.toFixed(2)}</span>
@@ -374,7 +437,7 @@ export function SaleDetailModal({
                     type="button"
                     onClick={() => void handleFinalize()}
                     disabled={finalizing || isDemo}
-                    className="w-full px-3 py-2.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg disabled:opacity-50"
+                    className="w-full px-3 py-1.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg disabled:opacity-50"
                   >
                     {finalizing
                       ? tr("Tamamlanır...", "Finalizing...")

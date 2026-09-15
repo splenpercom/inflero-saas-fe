@@ -27,12 +27,9 @@ import { ManageStock } from "./components/corporate/ManageStock";
 import { StockAdjustment } from "./components/corporate/StockAdjustment";
 import { StockTransfer } from "./components/corporate/StockTransfer";
 import { POSOrders } from "./components/corporate/POSOrders";
-import { Invoices } from "./components/corporate/Invoices";
-import { InvoiceView } from "./components/corporate/InvoiceView";
 import { SalesReturn } from "./components/corporate/SalesReturn";
 import { CorporatePOS } from "./components/corporate/CorporatePOS";
 import { Purchase } from "./components/corporate/Purchase";
-import { PurchaseOrder } from "./components/corporate/PurchaseOrder";
 import { PurchaseReturn } from "./components/corporate/PurchaseReturn";
 import { FinanceExpenses } from "./components/corporate/FinanceExpenses";
 import { Income } from "./components/corporate/Income";
@@ -58,7 +55,6 @@ import { PublicStorefront } from "./components/storefront/PublicStorefront";
 import {
   MyWebsiteProvider,
   MyWebsitePage,
-  WebOrdersPage,
   WebReportPage,
 } from "../modules/my-website";
 import {
@@ -73,6 +69,7 @@ import { BranchProvider } from "./context/BranchContext";
 import { ConfirmProvider } from "./context/ConfirmContext";
 import { DashboardPermissionGuard } from "./components/permissions/DashboardPermissionGuard";
 import { AllBranchesScopeGuard } from "./components/permissions/AllBranchesScopeGuard";
+import { OwnerBranchesRouteGuard } from "./components/permissions/OwnerBranchesRouteGuard";
 import { BranchScopeBanner } from "./components/BranchScopeBanner";
 import { Toaster } from "sonner";
 import { useTheme } from "./i18n/ThemeContext";
@@ -308,13 +305,14 @@ function AppShell() {
 
               {/* Sales Routes */}
               <Route path="sales/pos-orders" element={<ModuleRouteGuard module="POS"><POSOrders /></ModuleRouteGuard>} />
-              <Route path="sales/invoices" element={<Invoices />} />
-              <Route path="sales/invoice-view/:id" element={<InvoiceView />} />
+              {/* Invoices UI removed — redirect old bookmarks to Orders */}
+              <Route path="sales/invoices" element={<Navigate to="/dashboard/sales/pos-orders" replace />} />
+              <Route path="sales/invoice-view/:id" element={<Navigate to="/dashboard/sales/pos-orders" replace />} />
               <Route path="sales/return" element={<SalesReturn />} />
 
               {/* Purchase Routes */}
               <Route path="purchases" element={<Purchase />} />
-              <Route path="purchases/order" element={<PurchaseOrder />} />
+              <Route path="purchases/order" element={<Navigate to="/dashboard/purchases" replace />} />
               <Route path="purchases/return" element={<PurchaseReturn />} />
 
               {/* Finance Routes */}
@@ -326,26 +324,20 @@ function AppShell() {
               {/* People Routes */}
               <Route path="people/customers" element={<PeopleCustomers />} />
               <Route path="people/customers/:id" element={<CustomerProfile />} />
-              <Route
-                path="people/suppliers"
-                element={
-                  <ModuleRouteGuard module="STOCK">
-                    <Suppliers />
-                  </ModuleRouteGuard>
-                }
-              />
+              <Route path="people/suppliers" element={<Suppliers />} />
               <Route
                 path="people/warehouses"
                 element={
-                  <ModuleRouteGuard module="BRANCH_MANAGEMENT">
+                  <OwnerBranchesRouteGuard>
                     <Warehouses />
-                  </ModuleRouteGuard>
+                  </OwnerBranchesRouteGuard>
                 }
               />
 
               {/* Reports and User Management */}
               <Route path="reports" element={<Reports />} />
               <Route path="user-management/users/:id" element={<UserDetail />} />
+              <Route path="user-management/roles" element={<UserManagement />} />
               <Route path="user-management" element={<UserManagement />} />
 
               {/* Report Pages */}
@@ -370,13 +362,7 @@ function AppShell() {
               />
               <Route
                 path="my-website/orders"
-                element={
-                  <ModuleRouteGuard module="WEB_EDITOR">
-                    <MyWebsiteProvider>
-                      <WebOrdersPage />
-                    </MyWebsiteProvider>
-                  </ModuleRouteGuard>
-                }
+                element={<Navigate to="/dashboard/sales/pos-orders?source=WEB" replace />}
               />
               <Route
                 path="my-website/reports"

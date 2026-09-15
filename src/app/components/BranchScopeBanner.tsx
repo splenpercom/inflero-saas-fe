@@ -22,6 +22,7 @@ export function BranchScopeBanner() {
   if (!branchManagementEnabled) return null;
 
   if (!hasBranches) {
+    if (!user?.isTenantOwner && !isDemo) return null;
     return (
       <div className="bg-teal-50 dark:bg-[#0a3d38]/80 border-b border-teal-200 dark:border-[#14b8a6]/25 px-3 py-2 text-center text-xs text-teal-900 dark:text-[#99f6e4]">
         <span className="font-semibold">{tr("Qlobal rejim", "Global mode")}</span>

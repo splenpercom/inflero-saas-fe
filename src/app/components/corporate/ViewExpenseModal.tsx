@@ -33,6 +33,7 @@ export function ViewExpenseModal({
 
   if (!expense) return null;
 
+  const fromPurchase = !!expense.purchaseId;
   const bankAccount = bankAccounts.find((a) => a.id === expense.accountId);
   const bankLabel = bankAccount
     ? `${bankAccount.accountHolderName} (${bankAccount.accountNo})`
@@ -74,10 +75,26 @@ export function ViewExpenseModal({
         </div>
 
         <div className="p-4 space-y-4">
+          {fromPurchase && (
+            <div className="rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/40 px-3 py-2 text-xs text-teal-900 dark:text-teal-200">
+              {tr(
+                "Bu xərc satınalmadan avtomatik yaradılıb. Dəyişiklik üçün Satınalmalar səhifəsindən redaktə edin.",
+                "This expense was created from a purchase. Edit it from the Purchases page.",
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{tr("Xərc", "Expense")}</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">{expense.expenseName}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{expense.expenseName}</p>
+                {fromPurchase && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-200 border border-teal-200 dark:border-teal-800">
+                    {tr("Satınalma", "Purchase")}
+                  </span>
+                )}
+              </div>
             </div>
             <span
               className={cn(
@@ -106,7 +123,7 @@ export function ViewExpenseModal({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800">
-          {canDelete && expense.status !== "APPROVED" && onDelete && (
+          {!fromPurchase && canDelete && expense.status !== "APPROVED" && onDelete && (
             <button
               type="button"
               onClick={() => onDelete(expense)}
@@ -116,7 +133,7 @@ export function ViewExpenseModal({
               {tr("Sil", "Delete")}
             </button>
           )}
-          {canEdit && expense.status === "PENDING" && onReject && (
+          {!fromPurchase && canEdit && expense.status === "PENDING" && onReject && (
             <button
               type="button"
               onClick={() => onReject(expense)}
@@ -126,7 +143,7 @@ export function ViewExpenseModal({
               {tr("Rədd et", "Reject")}
             </button>
           )}
-          {canEdit && expense.status === "PENDING" && onApprove && (
+          {!fromPurchase && canEdit && expense.status === "PENDING" && onApprove && (
             <button
               type="button"
               onClick={() => onApprove(expense)}
@@ -136,7 +153,7 @@ export function ViewExpenseModal({
               {tr("Təsdiqlə", "Approve")}
             </button>
           )}
-          {canEdit && expense.status === "PENDING" && onEdit && (
+          {!fromPurchase && canEdit && expense.status === "PENDING" && onEdit && (
             <button
               type="button"
               onClick={() => onEdit(expense)}

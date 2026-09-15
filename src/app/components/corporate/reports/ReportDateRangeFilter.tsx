@@ -1,6 +1,7 @@
 import { useLanguage } from "../../../i18n/LanguageContext";
 import type { DateRangePreset } from "../../../lib/reportMappers";
 import { DateInput } from "../../ui/DateInput";
+import { ModernSelect } from "../../ui/ModernSelect";
 
 import { pickLang } from "../../../i18n/pickLang";
 interface ReportDateRangeFilterProps {
@@ -29,17 +30,20 @@ export function ReportDateRangeFilter({
 
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
-      <select
+      <ModernSelect
         value={preset}
-        onChange={(e) => onPresetChange(e.target.value as DateRangePreset)}
-        className="px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-      >
-        <option value="week">{pt("This Week", "Bu Həftə")}</option>
-        <option value="month">{pt("This Month", "Bu Ay")}</option>
-        <option value="quarter">{pt("This Quarter", "Bu Rüb")}</option>
-        {includeYear && <option value="year">{pt("This Year", "Bu İl")}</option>}
-        <option value="custom">{pt("Custom Range", "Xüsusi Aralıq")}</option>
-      </select>
+        onChange={(value) => onPresetChange(value as DateRangePreset)}
+        minWidth={140}
+        options={[
+          { value: "week", label: pt("This Week", "Bu Həftə") },
+          { value: "month", label: pt("This Month", "Bu Ay") },
+          { value: "quarter", label: pt("This Quarter", "Bu Rüb") },
+          ...(includeYear
+            ? [{ value: "year", label: pt("This Year", "Bu İl") }]
+            : []),
+          { value: "custom", label: pt("Custom Range", "Xüsusi Aralıq") },
+        ]}
+      />
       {preset === "custom" && (
         <>
           <DateInput value={customFrom} onChange={onCustomFromChange} className="w-32" />

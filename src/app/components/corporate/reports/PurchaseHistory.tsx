@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { FileText, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { ModernSelect } from "../../ui/ModernSelect";
+import { FileText, FileSpreadsheet } from "lucide-react";
 import { useReportDateRange } from "../../../hooks/useReportDateRange";
 import { ReportDateRangeFilter } from "./ReportDateRangeFilter";
 
@@ -190,32 +191,28 @@ export function PurchaseHistory() {
             />
 
             {/* Store Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedStore}
-                onChange={(e) => setSelectedStore(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Store</option>
-                <option value="store1">Store 1</option>
-                <option value="store2">Store 2</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedStore}
+                placeholder="Store"
+                options={[
+                  { value: "all", label: "Store" },
+                  { value: "store1", label: "Store 1" },
+                  { value: "store2", label: "Store 2" }
+                ]}
+              />
 
             {/* Product Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedProduct}
-                onChange={(e) => setSelectedProduct(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Products</option>
-                <option value="electronics">Electronics</option>
-                <option value="furniture">Furniture</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedProduct}
+                placeholder="Products"
+                options={[
+                  { value: "all", label: "Products" },
+                  { value: "electronics", label: "Electronics" },
+                  { value: "furniture", label: "Furniture" }
+                ]}
+              />
 
             {/* Generate Button */}
             <button
@@ -331,11 +328,16 @@ export function PurchaseHistory() {
           <div className="border-t border-gray-200 dark:border-gray-800 p-3 flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
             <div className="flex items-center gap-2">
               <span>Rows Per Page:</span>
-              <select className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-                <option>10</option>
-                <option>25</option>
-                <option>50</option>
-              </select>
+              <ModernSelect
+                value="10"
+                onChange={() => {}}
+                minWidth={72}
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "25", label: "25" },
+                  { value: "50", label: "50" },
+                ]}
+              />
               <span>- Entries</span>
             </div>
             <div className="flex gap-1">

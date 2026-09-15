@@ -43,6 +43,8 @@ export interface ExpenseListRow {
   date: string;
   amount: string;
   status: ExpenseStatusApi;
+  /** When set, this expense mirrors a purchase and should be managed from Purchases. */
+  purchaseId?: string | null;
 }
 
 export interface IncomeListRow {

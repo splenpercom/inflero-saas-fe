@@ -53,6 +53,7 @@ export interface RawTenantUser {
   ifsc: string | null;
   isTenantOwner?: boolean;
   storeId: string | null;
+  createdByUserId?: string | null;
   store: { id: string; name: string; code: string } | null;
   branchesAsManager?: { id: string; name: string; code: string }[];
   role: { id: string; name: string } | null;
@@ -77,6 +78,8 @@ export interface TenantUserRow {
   branch: string;
   storeId: string | null;
   isTenantOwner: boolean;
+  isBranchManager: boolean;
+  createdByUserId: string | null;
   about: string;
   bankName: string;
   accountNo: string;
@@ -140,6 +143,8 @@ export function mapTenantUser(raw: RawTenantUser, language?: Language): TenantUs
     branch: raw.store?.name ?? "—",
     storeId: raw.storeId,
     isTenantOwner,
+    isBranchManager: (raw.branchesAsManager?.length ?? 0) > 0,
+    createdByUserId: raw.createdByUserId ?? null,
     about: raw.about ?? "",
     bankName: raw.bankName ?? "",
     accountNo: raw.accountNo ?? "",

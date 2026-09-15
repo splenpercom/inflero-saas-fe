@@ -103,6 +103,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       people: { en: "Users", az: "İstifadəçilər" },
       reports: { en: "Reports", az: "Hesabatlar" },
       userManagement: { en: "User Management", az: "İstifadəçi İdarəetməsi" },
+      employees: { en: "Employee", az: "İşçi" },
+      userRoles: { en: "User roles", az: "İstifadəçi rolları" },
       settings: { en: "Settings", az: "Parametrlər" },
       plugins: { en: "Plugins", az: "Plaginlər" },
       reservations: { en: "Bookings", az: "Rezervasiyalar" },
@@ -138,7 +140,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       stockTransfer: { en: "Stock Transfer", az: "Anbar Transferi" },
       
       // Sales Sub-items
-      posOrders: { en: "POS Orders", az: "POS Sifarişləri" },
+      posOrders: { en: "Orders", az: "Sifarişlər" },
       invoices: { en: "Invoices", az: "Qaimələr" },
       salesReturn: { en: "Sales Return", az: "Satış Qaytarması" },
       pos: { en: "POS", az: "POS" },
@@ -225,7 +227,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const allBranchesNavItems: NavItem[] = useMemo(() => {
     const icons: Record<string, React.ComponentType<{ className?: string }>> = {
       dashboard: LayoutDashboard,
-      userManagement: Users,
+      employees: Users,
+      userRoles: Users,
       warehouses: Building2,
       plugins: Puzzle,
       settings: Settings,
@@ -246,7 +249,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "My Website",
       subItems: [
         { labelKey: "myWebsite", label: st("myWebsite"), path: "/dashboard/my-website" },
-        { labelKey: "webOrders", label: st("webOrders"), path: "/dashboard/my-website/orders" },
         { labelKey: "webReports", label: st("webReports"), path: "/dashboard/my-website/reports" },
       ],
     });
@@ -301,7 +303,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "Sales",
       subItems: [
         { labelKey: "posOrders", label: st("posOrders"), path: "/dashboard/sales/pos-orders" },
-        { labelKey: "invoices", label: st("invoices"), path: "/dashboard/sales/invoices" },
         { labelKey: "salesReturn", label: st("salesReturn"), path: "/dashboard/sales/return" },
         { labelKey: "pos", label: st("pos"), path: "/dashboard/sales/pos" },
       ],
@@ -313,7 +314,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "Purchases",
       subItems: [
         { labelKey: "purchase", label: st("purchase"), path: "/dashboard/purchases" },
-        { labelKey: "purchaseOrder", label: st("purchaseOrder"), path: "/dashboard/purchases/order" },
         { labelKey: "purchaseReturn", label: st("purchaseReturn"), path: "/dashboard/purchases/return" },
       ],
     },
@@ -337,11 +337,16 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       subItems: [
         { labelKey: "peopleCustomers", label: st("peopleCustomers"), path: "/dashboard/people/customers" },
         { labelKey: "suppliers", label: st("suppliers"), path: "/dashboard/people/suppliers" },
-        { labelKey: "warehouses", label: st("warehouses"), path: "/dashboard/people/warehouses" },
         {
-          labelKey: "userManagement",
-          label: st("userManagement"),
+          labelKey: "employees",
+          label: st("employees"),
           path: "/dashboard/user-management",
+          permissionModule: "User Management",
+        },
+        {
+          labelKey: "userRoles",
+          label: st("userRoles"),
+          path: "/dashboard/user-management/roles",
           permissionModule: "User Management",
         },
       ],
@@ -376,7 +381,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "My Website",
       subItems: [
         { labelKey: "myWebsite", label: st("myWebsite"), path: "/dashboard/my-website" },
-        { labelKey: "webOrders", label: st("webOrders"), path: "/dashboard/my-website/orders" },
         { labelKey: "webReports", label: st("webReports"), path: "/dashboard/my-website/reports" },
       ],
     },
@@ -428,10 +432,9 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         if (item.subItems) {
           const filteredSubItems = item.subItems.filter((sub) => {
             if (["expiredProducts", "lowStocks"].includes(sub.labelKey) && !hasModule("STOCK")) return false;
-            if (sub.labelKey === "suppliers" && !hasModule("STOCK")) return false;
+            // Suppliers stay available without STOCK — required for purchases.
             if (["pos", "posOrders"].includes(sub.labelKey) && !hasModule("POS")) return false;
             if (sub.labelKey === "stockTransfer" && !branchManagementEnabled) return false;
-            if (sub.labelKey === "warehouses" && !branchManagementEnabled) return false;
             // Branch users cannot open the website editor when BRANCH_MANAGEMENT is on.
             if (
               sub.path === "/dashboard/my-website" &&
@@ -762,7 +765,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         </div>
       </div>
 
-      {(hasModule("DINING") || hasModule("RESERVATIONS") || (myStorePath && !isDemo)) && (
+      {(hasModule("DINING") || hasModule("RESERVATIONS") || (hasModule("WEB_EDITOR") && myStorePath && !isDemo)) && (
         <div className="flex-shrink-0 border-t border-white/10 dark:border-white/5 p-2 space-y-1">
           {hasModule("RESERVATIONS") && tenantSlug && (
             <Link
@@ -869,7 +872,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
               </Link>
             </>
           )}
-          {myStorePath && !isDemo && (
+          {hasModule("WEB_EDITOR") && myStorePath && !isDemo && (
             <Link
               to={myStorePath}
               target="_blank"

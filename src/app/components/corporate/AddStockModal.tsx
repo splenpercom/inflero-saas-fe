@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Search } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface AddStockModalProps {
@@ -72,16 +73,18 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Anbar", "Warehouse")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={warehouse}
-              onChange={(e) => setWarehouse(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              <option value="">{tr("Seçin", "Select")}</option>
-              <option value="warehouse1">{tr("Anbar 1", "Warehouse 1")}</option>
-              <option value="warehouse2">{tr("Anbar 2", "Warehouse 2")}</option>
-              <option value="warehouse3">{tr("Anbar 3", "Warehouse 3")}</option>
-            </select>
+              onChange={setWarehouse}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                { value: "warehouse1", label: tr("Anbar 1", "Warehouse 1") },
+                { value: "warehouse2", label: tr("Anbar 2", "Warehouse 2") },
+                { value: "warehouse3", label: tr("Anbar 3", "Warehouse 3") },
+              ]}
+            />
           </div>
 
           {/* Store */}
@@ -89,16 +92,18 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Mağaza", "Store")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={store}
-              onChange={(e) => setStore(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              <option value="">{tr("Seçin", "Select")}</option>
-              <option value="store1">{tr("Mağaza 1", "Store 1")}</option>
-              <option value="store2">{tr("Mağaza 2", "Store 2")}</option>
-              <option value="store3">{tr("Mağaza 3", "Store 3")}</option>
-            </select>
+              onChange={setStore}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                { value: "store1", label: tr("Mağaza 1", "Store 1") },
+                { value: "store2", label: tr("Mağaza 2", "Store 2") },
+                { value: "store3", label: tr("Mağaza 3", "Store 3") },
+              ]}
+            />
           </div>
 
           {/* Responsible Person */}
@@ -106,16 +111,18 @@ export function AddStockModal({ isOpen, onClose, onSave }: AddStockModalProps) {
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Məsul Şəxs", "Responsible Person")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={responsiblePerson}
-              onChange={(e) => setResponsiblePerson(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              <option value="">{tr("Seçin", "Select")}</option>
-              <option value="person1">{tr("Ali Məmmədov", "Ali Mammadov")}</option>
-              <option value="person2">{tr("Leyla İsmayılova", "Leyla Ismayilova")}</option>
-              <option value="person3">{tr("Rəşad Həsənov", "Rashad Hasanov")}</option>
-            </select>
+              onChange={setResponsiblePerson}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                { value: "person1", label: tr("Ali Məmmədov", "Ali Mammadov") },
+                { value: "person2", label: tr("Leyla İsmayılova", "Leyla Ismayilova") },
+                { value: "person3", label: tr("Rəşad Həsənov", "Rashad Hasanov") },
+              ]}
+            />
           </div>
 
           {/* Product */}

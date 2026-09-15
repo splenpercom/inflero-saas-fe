@@ -141,12 +141,16 @@ export function AddExpenseModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Kateqoriya", "Category")} <span className="text-red-500">*</span></label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer">
-                <option value="">{tr("Seçin", "Select")}</option>
-                {activeCategories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <ModernSelect
+                value={categoryId}
+                onChange={setCategoryId}
+                className="w-full"
+                placeholder={tr("Seçin", "Select")}
+                options={[
+                  { value: "", label: tr("Seçin", "Select") },
+                  ...activeCategories.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+              />
               {activeCategories.length === 0 && (
                 <div className="mt-1.5 text-[10px] text-amber-700 dark:text-amber-400">
                   <p>
@@ -188,6 +192,7 @@ export function AddExpenseModal({
                 <ModernSelect
                   value={status}
                   onChange={(value) => setStatus(value as ExpenseStatusApi)}
+                  className="w-full"
                   options={[
                     { value: "PENDING", label: mapExpenseStatusLabel("PENDING", tr) },
                     { value: "APPROVED", label: mapExpenseStatusLabel("APPROVED", tr) },
@@ -201,12 +206,21 @@ export function AddExpenseModal({
 
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Bank Hesabı", "Bank Account")}</label>
-            <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer">
-              <option value="">{tr("Seçin (opsional)", "Select (optional)")}</option>
-              {bankAccounts.filter((a) => a.status === "ACTIVE").map((a) => (
-                <option key={a.id} value={a.id}>{a.accountHolderName} ({a.accountNo})</option>
-              ))}
-            </select>
+            <ModernSelect
+              value={accountId}
+              onChange={setAccountId}
+              className="w-full"
+              placeholder={tr("Seçin (opsional)", "Select (optional)")}
+              options={[
+                { value: "", label: tr("Seçin (opsional)", "Select (optional)") },
+                ...bankAccounts
+                  .filter((a) => a.status === "ACTIVE")
+                  .map((a) => ({
+                    value: a.id,
+                    label: `${a.accountHolderName} (${a.accountNo})`,
+                  })),
+              ]}
+            />
             {!isEdit && status === "APPROVED" && (
               <p className="mt-1.5 text-[10px] text-amber-700 dark:text-amber-400">
                 {tr(

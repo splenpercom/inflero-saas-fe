@@ -4,6 +4,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { fetchPosOrder, type PosOrderDetail } from "../../api/sales";
 import { notifyFromError } from "../../lib/toast";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 export interface PaymentFormData {
@@ -130,13 +131,13 @@ export function CreatePaymentModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {tr("Ödəniş Yarat", "Create Payment")}
               </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -144,8 +145,8 @@ export function CreatePaymentModal({
               </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
@@ -230,16 +231,16 @@ export function CreatePaymentModal({
                 <CreditCard className="w-3.5 h-3.5" />
                 {tr("Ödəniş Üsulu", "Payment Method")}
               </label>
-              <select
+              <ModernSelect
                 value={formData.paymentMethod}
-                onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                required
-              >
-                <option value="Cash">{tr("Nağd", "Cash")}</option>
-                <option value="Card">{tr("Kart", "Card")}</option>
-                <option value="Bank Transfer">{tr("Bank Transferi", "Bank Transfer")}</option>
-              </select>
+                onChange={(value) => setFormData({ ...formData, paymentMethod: value })}
+                className="w-full"
+                options={[
+                  { value: "Cash", label: tr("Nağd", "Cash") },
+                  { value: "Card", label: tr("Kart", "Card") },
+                  { value: "Bank Transfer", label: tr("Bank Transferi", "Bank Transfer") },
+                ]}
+              />
             </div>
 
             <div>
@@ -271,11 +272,11 @@ export function CreatePaymentModal({
           </form>
         )}
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             {tr("Ləğv et", "Cancel")}
           </button>
@@ -283,9 +284,9 @@ export function CreatePaymentModal({
             type="button"
             onClick={(e) => void handleSubmit(e)}
             disabled={loading || !summary || saving || formData.amount <= 0 || formData.amount > due}
-            className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
+            <Save className="w-3.5 h-3.5" />
             {saving ? tr("Yaradılır...", "Creating...") : tr("Ödənişi Yarat", "Create Payment")}
           </button>
         </div>

@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router";
 import { cn } from "../ui/utils";
 import {
@@ -7,16 +6,14 @@ import {
   FileText,
   RefreshCw,
   Search,
-  ChevronDown,
   Eye,
   Edit2,
   Trash2,
   Plus,
-  MoreVertical,
-  DollarSign,
   Download,
   CheckCircle2,
   ChefHat,
+  Columns3,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -27,7 +24,6 @@ import { useSalesCustomers } from "../../hooks/useSalesCustomers";
 import { AddSalesModal } from "./AddSalesModal";
 import { SaleDetailModal } from "./SaleDetailModal";
 import { EditSaleModal } from "./EditSaleModal";
-import { ShowPaymentsModal } from "./ShowPaymentsModal";
 import { CreatePaymentModal } from "./CreatePaymentModal";
 import {
   fetchPosOrders,
@@ -40,20 +36,147 @@ import {
   type ProductionStatusApi,
 } from "../../api/sales";
 import { fetchTenantSettings } from "../../api/tenantSettings";
-import { formatSalesDate, mapPaymentMethodToApi, isDraftOrderStatus, type PosUiPaymentMethod } from "../../lib/salesMappers";
+import {
+  formatSalesDate,
+  mapPaymentMethodToApi,
+  isDraftOrderStatus,
+  formatOrderDisplayId,
+  orderSourceTag,
+  type PosUiPaymentMethod,
+} from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { updateWebOrderApi } from "../../api/website";
+import type { WebOrder } from "../../../modules/my-website/features/orders/types";
+import {
+  WebStatusPill,
+  WebPaymentStatusPill,
+  WebOrderDetailModal,
+  StatusPillDropdown,
+  type StatusPillOption,
+} from "../../../modules/my-website/features/orders/WebOrderUi";
 import { useConfirm } from "../../context/ConfirmContext";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
+import { ModernSelect } from "../ui/ModernSelect";
+import { InvoicePreviewModal } from "./InvoicePreviewModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { pickLang } from "../../i18n/pickLang";
+
+function isWebOrder(order: PosOrderListRow): boolean {
+  return String(order.source ?? "").toUpperCase() === "WEB";
+}
+
+function webStatusFromOrder(order: PosOrderListRow): WebOrder["status"] {
+  if (order.web?.status) return order.web.status;
+  const s = String(order.status ?? "").toLowerCase();
+  if (s.includes("cancel")) return "cancelled";
+  if (s.includes("complete")) return "completed";
+  if (s.includes("process") || s.includes("pending")) return "pending";
+  return "pending";
+}
+
+function webPaymentStatusFromOrder(order: PosOrderListRow): WebOrder["paymentStatus"] {
+  if (order.web?.paymentStatus) return order.web.paymentStatus;
+  const p = String(order.paymentStatus ?? "").toLowerCase().replace(/\s+/g, "_");
+  if (p.includes("refund")) return "refunded";
+  if (p === "paid" || p.endsWith("_paid") || p.includes("partial")) return "paid";
+  if (p.includes("unpaid") || p.includes("overdue")) return "unpaid";
+  return "unpaid";
+}
+
+function formatWebOrderDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function webOrderFromPosDetail(
+  detail: Awaited<ReturnType<typeof fetchPosOrder>>,
+  listRow?: PosOrderListRow,
+): WebOrder {
+  const web = detail.web ?? listRow?.web;
+  return {
+    id: detail.id,
+    reference: detail.reference,
+    date: formatWebOrderDate(detail.date),
+    status: (web?.status as WebOrder["status"]) ?? "pending",
+    paymentStatus: (web?.paymentStatus as WebOrder["paymentStatus"]) ?? "unpaid",
+    paymentMethod: (web?.paymentMethod as WebOrder["paymentMethod"]) ?? "cod",
+    grandTotal: parseFloat(detail.grandTotal) || listRow?.grandTotal || 0,
+    customer: web?.customer ?? {
+      name: detail.customerName ?? "—",
+      email: "",
+      phone: "",
+    },
+    shipping: web?.shipping ?? {
+      address: "—",
+      city: "",
+      country: "",
+      postalCode: "",
+    },
+    items: detail.items.map((i) => ({
+      name: i.productName,
+      qty: i.quantity,
+      price: parseFloat(i.price) || 0,
+    })),
+  };
+}
+
+type OrdersColumnKey =
+  | "customer"
+  | "id"
+  | "date"
+  | "source"
+  | "table"
+  | "kot"
+  | "production"
+  | "status"
+  | "grandTotal"
+  | "paid"
+  | "due"
+  | "paymentStatus"
+  | "biller";
+
+const ORDERS_COLUMNS_STORAGE_KEY = "inflero-orders-visible-columns";
+
+const DEFAULT_ORDERS_COLUMNS: Record<OrdersColumnKey, boolean> = {
+  customer: true,
+  id: true,
+  date: true,
+  source: true,
+  table: true,
+  kot: true,
+  production: true,
+  status: true,
+  grandTotal: true,
+  paid: true,
+  due: true,
+  paymentStatus: true,
+  biller: true,
+};
+
+function loadOrdersColumns(): Record<OrdersColumnKey, boolean> {
+  try {
+    const raw = localStorage.getItem(ORDERS_COLUMNS_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_ORDERS_COLUMNS };
+    const parsed = JSON.parse(raw) as Partial<Record<OrdersColumnKey, boolean>>;
+    return { ...DEFAULT_ORDERS_COLUMNS, ...parsed };
+  } catch {
+    return { ...DEFAULT_ORDERS_COLUMNS };
+  }
+}
 export function POSOrders() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const posEnabled = hasModule("POS");
   const diningEnabled = hasModule("DINING");
+  const webEditorEnabled = hasModule("WEB_EDITOR");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Sales");
   const branchRevision = useBranchRevision();
   const { customers } = useSalesCustomers("", true);
@@ -65,31 +188,47 @@ export function POSOrders() {
   const [selectedCustomer, setSelectedCustomer] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("all");
-  const [selectedSource, setSelectedSource] = useState("all");
+  const [selectedSource, setSelectedSource] = useState(() => {
+    const s = new URLSearchParams(window.location.search).get("source");
+    return s === "WEB" || s === "POS" || s === "QR_MENU" ? s : "all";
+  });
+
+  useEffect(() => {
+    if (selectedSource === "WEB" && !webEditorEnabled) setSelectedSource("all");
+    if (selectedSource === "QR_MENU" && !diningEnabled) setSelectedSource("all");
+  }, [selectedSource, webEditorEnabled, diningEnabled]);
+
   const [selectedKotStatus, setSelectedKotStatus] = useState("all");
   const [selectedProductionStatus, setSelectedProductionStatus] = useState("all");
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [updatingProductionId, setUpdatingProductionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("last7days");
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Record<OrdersColumnKey, boolean>>(loadOrdersColumns);
+  const columnsMenuRef = useRef<HTMLDivElement | null>(null);
   const [isAddSalesModalOpen, setIsAddSalesModalOpen] = useState(false);
   const [isSaleDetailModalOpen, setIsSaleDetailModalOpen] = useState(false);
   const [isEditSaleModalOpen, setIsEditSaleModalOpen] = useState(false);
-  const [isShowPaymentsModalOpen, setIsShowPaymentsModalOpen] = useState(false);
   const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
+  const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [invoicePreviewOrderId, setInvoicePreviewOrderId] = useState<string | null>(null);
+  const [webDetailOrder, setWebDetailOrder] = useState<WebOrder | null>(null);
   const [orders, setOrders] = useState<PosOrderListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [paymentsReloadKey, setPaymentsReloadKey] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+
+  useEffect(() => {
+    if (!posSendToProductionEnabled && selectedProductionStatus !== "all") {
+      setSelectedProductionStatus("all");
+    }
+  }, [posSendToProductionEnabled, selectedProductionStatus]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -127,8 +266,67 @@ export function POSOrders() {
     };
   }, [isAuthenticated, isDemo, branchRevision]);
 
-  const showProductionColumn =
-    posSendToProductionEnabled || orders.some((o) => !!o.productionStatus);
+  const showProductionColumn = posSendToProductionEnabled && visibleColumns.production;
+
+  const col = (key: OrdersColumnKey) => visibleColumns[key];
+
+  const toggleColumn = (key: OrdersColumnKey) => {
+    setVisibleColumns((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(ORDERS_COLUMNS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const columnLabels = useMemo(
+    (): { key: OrdersColumnKey; label: string; available: boolean }[] => [
+      { key: "customer", label: tr("Müştəri", "Customer"), available: true },
+      { key: "id", label: "ID", available: true },
+      { key: "date", label: tr("Tarix", "Date"), available: true },
+      { key: "source", label: tr("Mənbə", "Source"), available: true },
+      { key: "table", label: tr("Masa", "Table"), available: diningEnabled },
+      { key: "kot", label: "KOT", available: diningEnabled },
+      { key: "production", label: tr("İstehsal", "Production"), available: posSendToProductionEnabled },
+      { key: "status", label: tr("Status", "Status"), available: true },
+      { key: "grandTotal", label: tr("Ümumi", "Total"), available: true },
+      { key: "paid", label: tr("Ödənilib", "Paid"), available: true },
+      { key: "due", label: tr("Borc", "Due"), available: true },
+      { key: "paymentStatus", label: tr("Ödəniş", "Payment"), available: true },
+      { key: "biller", label: tr("Kassir", "Biller"), available: true },
+    ],
+    [language, diningEnabled, posSendToProductionEnabled],
+  );
+
+  useEffect(() => {
+    if (!columnsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (columnsMenuRef.current && !columnsMenuRef.current.contains(e.target as Node)) {
+        setColumnsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [columnsOpen]);
+
+  const visibleColCount =
+    (col("customer") ? 1 : 0) +
+    (col("id") ? 1 : 0) +
+    (col("date") ? 1 : 0) +
+    (col("source") ? 1 : 0) +
+    (diningEnabled && col("table") ? 1 : 0) +
+    (diningEnabled && col("kot") ? 1 : 0) +
+    (showProductionColumn ? 1 : 0) +
+    (col("status") ? 1 : 0) +
+    (col("grandTotal") ? 1 : 0) +
+    (col("paid") ? 1 : 0) +
+    (col("due") ? 1 : 0) +
+    (col("paymentStatus") ? 1 : 0) +
+    (col("biller") ? 1 : 0) +
+    1; // actions
 
   const loadItems = useCallback(async (opts?: { silent?: boolean }) => {
     if (!(isAuthenticated || isDemo) || !canView) {
@@ -145,20 +343,23 @@ export function POSOrders() {
         customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
         status: selectedStatus,
         paymentStatus: selectedPaymentStatus,
+        source: selectedSource,
         sortBy,
         page: currentPage,
         pageSize: itemsPerPage,
-        ...(diningEnabled
-          ? {
-              source: selectedSource,
-              kotStatus: selectedKotStatus,
-            }
-          : {}),
-        ...(posSendToProductionEnabled || selectedProductionStatus !== "all"
+        ...(diningEnabled ? { kotStatus: selectedKotStatus } : {}),
+        ...(posSendToProductionEnabled
           ? { productionStatus: selectedProductionStatus }
           : {}),
       });
-      setOrders(data.items ?? []);
+      setOrders(
+        (data.items ?? []).filter((o) => {
+          const src = String(o.source ?? "POS").toUpperCase();
+          if (src === "WEB" && !webEditorEnabled) return false;
+          if (src === "QR_MENU" && !diningEnabled) return false;
+          return true;
+        }),
+      );
       setTotalItems(data.total ?? 0);
       const pages = Math.max(1, data.totalPages || 1);
       setTotalPages(pages);
@@ -183,10 +384,12 @@ export function POSOrders() {
     selectedProductionStatus,
     posSendToProductionEnabled,
     diningEnabled,
+    webEditorEnabled,
     sortBy,
     branchRevision,
     currentPage,
     itemsPerPage,
+    language,
   ]);
 
   useEffect(() => {
@@ -194,30 +397,35 @@ export function POSOrders() {
   }, [loadItems]);
 
   useEffect(() => {
-    if (!diningEnabled || !(isAuthenticated || isDemo) || !canView) return;
+    if ((!diningEnabled && !webEditorEnabled) || !(isAuthenticated || isDemo) || !canView) return;
     const id = window.setInterval(() => {
       void loadItems({ silent: true });
     }, 8000);
     return () => window.clearInterval(id);
-  }, [diningEnabled, isAuthenticated, isDemo, canView, loadItems]);
+  }, [diningEnabled, webEditorEnabled, isAuthenticated, isDemo, canView, loadItems]);
 
   useEffect(() => {
     const orderId = searchParams.get("orderId");
     if (!orderId) return;
-    setSelectedOrderId(orderId);
-    setIsSaleDetailModalOpen(true);
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (!openMenuId) return;
-    const close = () => closeActionMenu();
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const detail = await fetchPosOrder(orderId);
+        if (cancelled) return;
+        if (detail.source === "WEB") {
+          setWebDetailOrder(webOrderFromPosDetail(detail));
+        } else {
+          setSelectedOrderId(orderId);
+          setIsSaleDetailModalOpen(true);
+        }
+      } catch (err) {
+        if (!cancelled) notifyFromError(err);
+      }
+    })();
     return () => {
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
+      cancelled = true;
     };
-  }, [openMenuId]);
+  }, [searchParams]);
 
   const getStatusBadgeColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -237,7 +445,8 @@ export function POSOrders() {
   };
 
   const getPaymentStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    const key = status.toLowerCase().replace(/\s+/g, "_");
+    switch (key) {
       case "paid":
         return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
       case "overdue":
@@ -246,10 +455,30 @@ export function POSOrders() {
         return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
       case "unpaid":
         return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
+      case "refunded":
+        return "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300";
+      case "partially_refunded":
+        return "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
       default:
         return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400";
     }
   };
+
+  const getProductionStatusColor = (status: string) => {
+    switch (status) {
+      case "IN_PROCESSING":
+        return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
+      case "IN_PRODUCTION":
+        return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
+      case "COMPLETED":
+        return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
+      default:
+        return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400";
+    }
+  };
+
+  const statusPillClass =
+    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight";
 
   const translateStatus = (status: string) => {
     const key = status.toLowerCase();
@@ -266,12 +495,14 @@ export function POSOrders() {
   };
 
   const translatePaymentStatus = (status: string) => {
-    const key = status.toLowerCase();
+    const key = status.toLowerCase().replace(/\s+/g, "_");
     const statusMap: Record<string, string> = {
       paid: tr("Ödənilib", "Paid"),
       unpaid: tr("Ödənilməyib", "Unpaid"),
       overdue: tr("Gecikmiş", "Overdue"),
       partial: tr("Qismən", "Partial"),
+      refunded: tr("Qaytarılıb", "Refunded"),
+      partially_refunded: tr("Qismən qaytarılıb", "Partially Refunded"),
     };
     return statusMap[key] || status;
   };
@@ -304,30 +535,6 @@ export function POSOrders() {
     }
   };
 
-  const closeActionMenu = () => {
-    setOpenMenuId(null);
-    setMenuPosition(null);
-  };
-
-  const openActionMenu = (orderId: string, button: HTMLButtonElement) => {
-    if (openMenuId === orderId) {
-      closeActionMenu();
-      return;
-    }
-    const rect = button.getBoundingClientRect();
-    const menuWidth = 192;
-    const menuHeight = menuRef.current?.offsetHeight ?? 280;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openUp = spaceBelow < menuHeight + 8 && rect.top > menuHeight + 8;
-    setMenuPosition({
-      top: openUp ? rect.top - menuHeight - 4 : rect.bottom + 4,
-      left: Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8)),
-    });
-    setOpenMenuId(orderId);
-  };
-
-  const openMenuOrder = openMenuId ? orders.find((o) => o.id === openMenuId) : null;
-
   const loadExportRows = async () => {
     const data = await fetchPosOrders({
       search: debouncedSearch.trim() || undefined,
@@ -346,15 +553,16 @@ export function POSOrders() {
       const exportOrders = await loadExportRows();
       const doc = new jsPDF();
       doc.setFontSize(16);
-      doc.text(tr("POS Sifarişləri", "POS Orders"), 14, 15);
+      doc.text(tr("Sifarişlər", "Orders"), 14, 15);
       doc.setFontSize(10);
       doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDate(language)}`, 14, 22);
       autoTable(doc, {
         head: [
           [
             tr("Müştəri", "Customer"),
-            tr("İstinad", "Reference"),
+            "ID",
             tr("Tarix", "Date"),
+            tr("Mənbə", "Source"),
             tr("Status", "Status"),
             tr("Ümumi", "Total"),
             tr("Ödənilib", "Paid"),
@@ -365,8 +573,9 @@ export function POSOrders() {
         ],
         body: exportOrders.map((order) => [
           order.customerName,
-          order.reference,
+          formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
           formatSalesDate(order.date),
+          orderSourceTag(order.source, !!order.table),
           order.status,
           String(order.grandTotal),
           String(order.paid),
@@ -379,7 +588,7 @@ export function POSOrders() {
         headStyles: { fillColor: [20, 184, 166], fontSize: 8 },
         bodyStyles: { fontSize: 7 },
       });
-      doc.save(`pos_orders_${new Date().toISOString().split("T")[0]}.pdf`);
+      doc.save(`orders_${new Date().toISOString().split("T")[0]}.pdf`);
     } catch (err) {
       notifyFromError(err);
     }
@@ -390,19 +599,21 @@ export function POSOrders() {
       const exportOrders = await loadExportRows();
       const headers = [
         tr("Müştəri", "Customer"),
-        tr("İstinad", "Reference"),
+        "ID",
         tr("Tarix", "Date"),
+        tr("Mənbə", "Source"),
         tr("Status", "Status"),
-        tr("Ümumi Cəmi", "Grand Total"),
+        tr("Ümumi", "Total"),
         tr("Ödənilib", "Paid"),
         tr("Borc", "Due"),
-        tr("Ödəniş Statusu", "Payment Status"),
+        tr("Ödəniş", "Payment"),
         tr("Kassir", "Biller"),
       ];
       const rows = exportOrders.map((order) => [
         order.customerName,
-        order.reference,
+        formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
         formatSalesDate(order.date),
+        orderSourceTag(order.source, !!order.table),
         order.status,
         order.grandTotal,
         order.paid,
@@ -417,7 +628,7 @@ export function POSOrders() {
       const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `pos_orders_${new Date().toISOString().split("T")[0]}.csv`;
+      link.download = `orders_${new Date().toISOString().split("T")[0]}.csv`;
       link.click();
       URL.revokeObjectURL(link.href);
     } catch (err) {
@@ -437,8 +648,98 @@ export function POSOrders() {
   };
 
   const handleViewSaleDetail = (orderId: string) => {
+    const row = orders.find((o) => o.id === orderId);
+    if (row && isWebOrder(row)) {
+      void (async () => {
+        try {
+          const detail = await fetchPosOrder(orderId);
+          setWebDetailOrder(webOrderFromPosDetail(detail, row));
+        } catch (err) {
+          notifyFromError(err, tr("Sifariş detalları yüklənmədi", "Failed to load order detail"));
+        }
+      })();
+      return;
+    }
     setSelectedOrderId(orderId);
     setIsSaleDetailModalOpen(true);
+  };
+
+  const handleWebStatusChange = async (id: string, status: WebOrder["status"]) => {
+    try {
+      const updated = await updateWebOrderApi(id, { status });
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === id
+            ? {
+                ...o,
+                web: {
+                  status: updated.status,
+                  paymentStatus: updated.paymentStatus,
+                  paymentMethod: updated.paymentMethod,
+                  customer: updated.customer,
+                  shipping: updated.shipping,
+                },
+                customerName: updated.customer.name || o.customerName,
+              }
+            : o,
+        ),
+      );
+      setWebDetailOrder((prev) =>
+        prev?.id === id
+          ? {
+              ...prev,
+              status: updated.status,
+              paymentStatus: updated.paymentStatus,
+              paymentMethod: updated.paymentMethod,
+              customer: updated.customer,
+              shipping: updated.shipping,
+              items: updated.items,
+              grandTotal: updated.grandTotal,
+            }
+          : prev,
+      );
+      notifySuccess(tr("Status yeniləndi", "Status updated"));
+    } catch (err) {
+      notifyFromError(err, tr("Status yenilənmədi", "Failed to update status"));
+    }
+  };
+
+  const handleWebPaymentStatusChange = async (
+    id: string,
+    paymentStatus: WebOrder["paymentStatus"],
+  ) => {
+    try {
+      const updated = await updateWebOrderApi(id, { paymentStatus });
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === id
+            ? {
+                ...o,
+                web: {
+                  status: updated.status,
+                  paymentStatus: updated.paymentStatus,
+                  paymentMethod: updated.paymentMethod,
+                  customer: updated.customer,
+                  shipping: updated.shipping,
+                },
+              }
+            : o,
+        ),
+      );
+      setWebDetailOrder((prev) =>
+        prev?.id === id
+          ? {
+              ...prev,
+              status: updated.status,
+              paymentStatus: updated.paymentStatus,
+              paymentMethod: updated.paymentMethod,
+            }
+          : prev,
+      );
+      notifySuccess(tr("Ödəniş statusu yeniləndi", "Payment status updated"));
+    } catch (err) {
+      notifyFromError(err, tr("Ödəniş statusu yenilənmədi", "Failed to update payment status"));
+    }
   };
 
   const closeSaleDetailModal = () => {
@@ -456,17 +757,19 @@ export function POSOrders() {
     setIsEditSaleModalOpen(true);
   };
 
-  const handleShowPayments = (orderId: string) => {
-    setSelectedOrderId(orderId);
-    setIsShowPaymentsModalOpen(true);
-  };
-
   const handleCreatePayment = (orderId: string) => {
     if (!canCreate || isDemo) return;
     const row = orders.find((o) => o.id === orderId);
     if (row && isDraftOrderStatus(row.status)) {
       notifyFromError(
         new Error(tr("Əvvəlcə qaralamanı tamamlayın", "Finalize the draft before recording a payment")),
+      );
+      return;
+    }
+    const payKey = (row?.paymentStatus ?? "").toLowerCase().replace(/\s+/g, "_");
+    if (payKey === "refunded") {
+      notifyFromError(
+        new Error(tr("Tam qaytarılmış sifarişə ödəniş yazıla bilməz", "Cannot record payment on a fully refunded order")),
       );
       return;
     }
@@ -496,7 +799,6 @@ export function POSOrders() {
         note: paymentData.note || null,
       });
       notifySuccess(tr("Ödəniş uğurla yaradıldı", "Payment created successfully"));
-      setPaymentsReloadKey((k) => k + 1);
       await loadItems();
     } catch (err) {
       notifyFromError(err, tr("Ödəniş yaradıla bilmədi", "Failed to create payment"));
@@ -522,121 +824,9 @@ export function POSOrders() {
     }
   };
 
-  const handleDownloadPDF = async (order: PosOrderListRow) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      notifyFromError(
-        null,
-        tr("Popup bloklandı. Popup bloklayıcınızı deaktiv edin.", "Popup blocked. Please disable your popup blocker."),
-      );
-      return;
-    }
-
-    let itemsHtml = `<tr><td colspan="4" style="text-align: center; color: #999; padding: 20px;">${tr("Məhsul detalları mövcud deyil", "Product details not available")}</td></tr>`;
-    let vehicleHtml = "";
-    try {
-      const detail = await fetchPosOrder(order.id);
-      if (detail.vehicleLabel) {
-        vehicleHtml = `
-          <p>${tr("Avtomobil", "Vehicle")}: ${detail.vehicleLabel}</p>
-          ${detail.mileageAtService != null ? `<p>${tr("Yürüş", "Mileage")}: ${detail.mileageAtService} km</p>` : ""}
-        `;
-      }
-      if (detail.items.length > 0) {
-        itemsHtml = detail.items
-          .map(
-            (item) => `
-            <tr>
-              <td>${item.productName}</td>
-              <td>${item.quantity}</td>
-              <td>₼${parseFloat(item.price).toFixed(2)}</td>
-              <td style="text-align: right">₼${(parseFloat(item.price) * item.quantity).toFixed(2)}</td>
-            </tr>`,
-          )
-          .join("");
-      }
-    } catch {
-      // keep fallback row
-    }
-
-    const invoiceHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>${tr("Satış Qaiməsi", "Sales Invoice")} - ${order.reference}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-          .invoice-header { border-bottom: 3px solid #14b8a6; padding-bottom: 20px; margin-bottom: 30px; }
-          .invoice-header h1 { color: #14b8a6; font-size: 28px; margin-bottom: 5px; }
-          .invoice-header p { color: #666; font-size: 14px; }
-          .invoice-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
-          .info-block { flex: 1; }
-          .info-block h3 { font-size: 12px; text-transform: uppercase; color: #666; margin-bottom: 10px; }
-          .info-block p { font-size: 14px; margin-bottom: 5px; }
-          .invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-          .invoice-table th { background-color: #f5f5f5; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #ddd; }
-          .invoice-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-          .totals { margin-left: auto; width: 300px; }
-          .totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
-          .totals-row.grand-total { border-top: 2px solid #14b8a6; padding-top: 12px; margin-top: 8px; font-size: 18px; font-weight: bold; color: #14b8a6; }
-          .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="invoice-header">
-          <h1>${tr("SATIŞ QAİMƏSİ", "SALES INVOICE")}</h1>
-          <p>${tr("Qaimə Nömrəsi", "Invoice Number")}: ${order.reference}</p>
-        </div>
-        <div class="invoice-info">
-          <div class="info-block">
-            <h3>${tr("Müştəri Məlumatları", "Customer Information")}</h3>
-            <p><strong>${order.customerName}</strong></p>
-            ${vehicleHtml}
-          </div>
-          <div class="info-block">
-            <h3>${tr("Qaimə Detalları", "Invoice Details")}</h3>
-            <p>${tr("Tarix", "Date")}: ${formatSalesDate(order.date)}</p>
-            <p>${tr("Status", "Status")}: ${order.status}</p>
-            <p>${tr("Kassir", "Biller")}: ${order.biller}</p>
-          </div>
-        </div>
-        <table class="invoice-table">
-          <thead>
-            <tr>
-              <th>${tr("Məhsul", "Product")}</th>
-              <th>${tr("Miqdar", "Quantity")}</th>
-              <th>${tr("Qiymət", "Price")}</th>
-              <th style="text-align: right">${tr("Cəmi", "Total")}</th>
-            </tr>
-          </thead>
-          <tbody>${itemsHtml}</tbody>
-        </table>
-        <div class="totals">
-          <div class="totals-row grand-total">
-            <span>${tr("Ümumi Cəmi", "Grand Total")}:</span>
-            <span>₼${order.grandTotal.toFixed(2)}</span>
-          </div>
-          <div class="totals-row">
-            <span>${tr("Ödənilib", "Paid")}:</span>
-            <span style="color: #28a745;">₼${order.paid.toFixed(2)}</span>
-          </div>
-          <div class="totals-row">
-            <span>${tr("Qalan Borc", "Due")}:</span>
-            <span style="color: #dc3545;">₼${order.due.toFixed(2)}</span>
-          </div>
-        </div>
-        <div class="footer">
-          <p>${tr("Təşəkkür edirik!", "Thank you for your business!")}</p>
-        </div>
-        <script>window.onload = function() { window.print(); };</script>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(invoiceHTML);
-    printWindow.document.close();
+  const handleOpenInvoicePreview = (order: PosOrderListRow) => {
+    setInvoicePreviewOrderId(order.id);
+    setIsInvoicePreviewOpen(true);
   };
 
   const emptyMessage = tr("Sifariş tapılmadı.", "No orders found.");
@@ -646,17 +836,17 @@ export function POSOrders() {
       <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
         <div className="mb-4">
           <h1 className="text-lg sm:text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 dark:text-white">
-            {tr("POS Sifarişləri", "POS Orders")}
+            {tr("Sifarişlər", "Orders")}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {tr("POS sifarişlərinizi idarə edin", "Manage your POS orders")}
+            {tr("Sifarişlərinizi idarə edin", "Manage your orders")}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-sm sm:min-w-[220px] shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder={tr("Axtar...", "Search...")}
@@ -666,122 +856,46 @@ export function POSOrders() {
               />
             </div>
 
-            <div className="flex gap-2 flex-wrap">
-              <div className="relative">
-                <select
-                  value={selectedCustomer}
-                  onChange={(e) => setSelectedCustomer(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
+            <div className="flex gap-2 flex-wrap sm:justify-end shrink-0">
+              <div className="relative" ref={columnsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setColumnsOpen((v) => !v)}
+                  className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  title={tr("Sütunlar", "Columns")}
                 >
-                  <option value="all">{tr("Müştəri", "Customer")}</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Status", "Status")}</option>
-                  <option value="completed">{tr("Tamamlandı", "Completed")}</option>
-                  <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                  <option value="cancelled">{tr("Ləğv Edildi", "Cancelled")}</option>
-                  <option value="held">{tr("Qaralama", "Draft")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-
-              <div className="relative">
-                <select
-                  value={selectedPaymentStatus}
-                  onChange={(e) => setSelectedPaymentStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Ödəniş Statusu", "Payment Status")}</option>
-                  <option value="paid">{tr("Ödənilib", "Paid")}</option>
-                  <option value="overdue">{tr("Gecikmiş", "Overdue")}</option>
-                  <option value="unpaid">{tr("Ödənilməyib", "Unpaid")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-
-              {diningEnabled && (
-                <>
-                  <div className="relative">
-                    <select
-                      value={selectedSource}
-                      onChange={(e) => setSelectedSource(e.target.value)}
-                      className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                    >
-                      <option value="all">{tr("Mənbə", "Source")}</option>
-                      <option value="POS">POS</option>
-                      <option value="QR_MENU">{tr("QR Menyü", "QR Menu")}</option>
-                    </select>
-                    <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <Columns3 className="w-3.5 h-3.5" />
+                </button>
+                {columnsOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-30 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 max-h-72 overflow-y-auto">
+                    <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400">
+                      {tr("Sütunlar", "Columns")}
+                    </p>
+                    {columnLabels
+                      .filter((c) => c.available)
+                      .map((c) => (
+                        <label
+                          key={c.key}
+                          className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={visibleColumns[c.key]}
+                            onChange={() => toggleColumn(c.key)}
+                            className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                          />
+                          {c.label}
+                        </label>
+                      ))}
                   </div>
-                  <div className="relative">
-                    <select
-                      value={selectedKotStatus}
-                      onChange={(e) => setSelectedKotStatus(e.target.value)}
-                      className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                    >
-                      <option value="all">{tr("KOT Status", "KOT Status")}</option>
-                      <option value="none">{tr("KOT yox", "No KOT")}</option>
-                      <option value="PENDING">PENDING</option>
-                      <option value="PREPARING">PREPARING</option>
-                      <option value="READY">READY</option>
-                      <option value="SERVED">SERVED</option>
-                    </select>
-                    <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                </>
-              )}
-
-              {posSendToProductionEnabled && (
-                <div className="relative">
-                  <select
-                    value={selectedProductionStatus}
-                    onChange={(e) => setSelectedProductionStatus(e.target.value)}
-                    className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                  >
-                    <option value="all">{tr("İstehsal statusu", "Production")}</option>
-                    <option value="none">{tr("İstehsal yox", "No production")}</option>
-                    <option value="IN_PROCESSING">{tr("Emaldadır", "In Processing")}</option>
-                    <option value="IN_PRODUCTION">{tr("İstehsaldadır", "In Production")}</option>
-                    <option value="COMPLETED">{tr("Tamamlandı", "Completed")}</option>
-                  </select>
-                  <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-              )}
-
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="last7days">{tr("Sırala : Son 7 Gün", "Sort By : Last 7 Days")}</option>
-                  <option value="last30days">{tr("Sırala : Son 30 Gün", "Sort By : Last 30 Days")}</option>
-                  <option value="last90days">{tr("Sırala : Son 90 Gün", "Sort By : Last 90 Days")}</option>
-                  <option value="thisyear">{tr("Sırala : Bu İl", "Sort By : This Year")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                )}
               </div>
-            </div>
 
-            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={handleExportPDF}
                 disabled={orders.length === 0}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
                 title={tr("PDF İxrac Et", "Export PDF")}
               >
                 <FileText className="w-3.5 h-3.5 text-red-500" />
@@ -791,7 +905,7 @@ export function POSOrders() {
                 type="button"
                 onClick={handleExportExcel}
                 disabled={orders.length === 0}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
                 title={tr("Excel İxrac Et", "Export Excel")}
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
@@ -801,7 +915,7 @@ export function POSOrders() {
                 type="button"
                 onClick={() => void handleRefresh()}
                 disabled={isRefreshing}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
                 title={tr("Yenilə", "Refresh")}
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
@@ -820,6 +934,114 @@ export function POSOrders() {
               )}
             </div>
           </div>
+
+          <div className="flex gap-2 flex-wrap items-center">
+              <ModernSelect
+                value={selectedCustomer}
+                onChange={setSelectedCustomer}
+                placeholder={tr("Müştəri", "Customer")}
+                options={[
+                  { value: "all", label: tr("Müştəri", "Customer") },
+                  ...customers.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+              />
+
+              <ModernSelect
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                placeholder={tr("Status", "Status")}
+                options={[
+                  { value: "all", label: tr("Status", "Status") },
+                  { value: "completed", label: tr("Tamamlandı", "Completed") },
+                  { value: "pending", label: tr("Gözləyir", "Pending") },
+                  { value: "cancelled", label: tr("Ləğv Edildi", "Cancelled") },
+                  { value: "held", label: tr("Qaralama", "Draft") },
+                ]}
+              />
+
+              <ModernSelect
+                value={selectedPaymentStatus}
+                onChange={setSelectedPaymentStatus}
+                placeholder={tr("Ödəniş", "Payment")}
+                minWidth={140}
+                options={[
+                  { value: "all", label: tr("Ödəniş", "Payment") },
+                  { value: "paid", label: tr("Ödənilib", "Paid") },
+                  { value: "partial", label: tr("Qismən", "Partial") },
+                  { value: "overdue", label: tr("Gecikmiş", "Overdue") },
+                  { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
+                  { value: "partially_refunded", label: tr("Qismən qaytarılıb", "Partially Refunded") },
+                  { value: "refunded", label: tr("Qaytarılıb", "Refunded") },
+                ]}
+              />
+
+              <ModernSelect
+                value={selectedSource}
+                onChange={setSelectedSource}
+                placeholder={tr("Mənbə", "Source")}
+                options={[
+                  { value: "all", label: tr("Mənbə", "Source") },
+                  { value: "POS", label: "POS" },
+                  ...(webEditorEnabled
+                    ? [{ value: "WEB", label: "Web" }]
+                    : []),
+                  ...(diningEnabled
+                    ? [{ value: "QR_MENU", label: tr("QR Menyu", "QR Menu") }]
+                    : []),
+                ]}
+              />
+              {diningEnabled && (
+                <ModernSelect
+                  value={selectedKotStatus}
+                  onChange={setSelectedKotStatus}
+                  placeholder={tr("KOT Status", "KOT Status")}
+                  minWidth={130}
+                  options={[
+                    { value: "all", label: tr("KOT Status", "KOT Status") },
+                    { value: "none", label: tr("KOT yox", "No KOT") },
+                    { value: "PENDING", label: "PENDING" },
+                    { value: "PREPARING", label: "PREPARING" },
+                    { value: "READY", label: "READY" },
+                    { value: "SERVED", label: "SERVED" },
+                  ]}
+                />
+              )}
+
+              {posSendToProductionEnabled && (
+                <ModernSelect
+                  value={selectedProductionStatus}
+                  onChange={setSelectedProductionStatus}
+                  placeholder={tr("İstehsal statusu", "Production")}
+                  minWidth={140}
+                  options={[
+                    { value: "all", label: tr("İstehsal statusu", "Production") },
+                    { value: "none", label: tr("İstehsal yox", "No production") },
+                    {
+                      value: "IN_PROCESSING",
+                      label: tr("Emaldadır", "In Processing"),
+                    },
+                    {
+                      value: "IN_PRODUCTION",
+                      label: tr("İstehsaldadır", "In Production"),
+                    },
+                    { value: "COMPLETED", label: tr("Tamamlandı", "Completed") },
+                  ]}
+                />
+              )}
+
+              <ModernSelect
+                value={sortBy}
+                onChange={setSortBy}
+                placeholder={tr("Sırala", "Sort")}
+                minWidth={140}
+                options={[
+                  { value: "last7days", label: tr("Sırala: 7 gün", "Sort: 7 days") },
+                  { value: "last30days", label: tr("Sırala: 30 gün", "Sort: 30 days") },
+                  { value: "last90days", label: tr("Sırala: 90 gün", "Sort: 90 days") },
+                  { value: "thisyear", label: tr("Sırala: Bu il", "Sort: This year") },
+                ]}
+              />
+          </div>
         </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
@@ -827,179 +1049,350 @@ export function POSOrders() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("MÜŞTƏRİ", "CUSTOMER")}
-                  </th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("İSTİNAD", "REFERENCE")}
-                  </th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("TARİX", "DATE")}
-                  </th>
-                  {diningEnabled && (
-                    <>
-                      <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                        {tr("MƏNBƏ", "SOURCE")}
-                      </th>
-                      <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                        {tr("MASA", "TABLE")}
-                      </th>
-                      <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                        KOT
-                      </th>
-                    </>
+                  {col("customer") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("MÜŞTƏRİ", "CUSTOMER")}
+                    </th>
+                  )}
+                  {col("id") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      ID
+                    </th>
+                  )}
+                  {col("date") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("TARİX", "DATE")}
+                    </th>
+                  )}
+                  {col("source") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("MƏNBƏ", "SOURCE")}
+                    </th>
+                  )}
+                  {diningEnabled && col("table") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("MASA", "TABLE")}
+                    </th>
+                  )}
+                  {diningEnabled && col("kot") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      KOT
+                    </th>
                   )}
                   {showProductionColumn && (
                     <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
                       {tr("İSTEHSAL", "PRODUCTION")}
                     </th>
                   )}
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("STATUS", "STATUS")}
+                  {col("status") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("STATUS", "STATUS")}
+                    </th>
+                  )}
+                  {col("grandTotal") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("ÜMUMİ", "TOTAL")}
+                    </th>
+                  )}
+                  {col("paid") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("ÖDƏNİLİB", "PAID")}
+                    </th>
+                  )}
+                  {col("due") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("BORC", "DUE")}
+                    </th>
+                  )}
+                  {col("paymentStatus") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("ÖDƏNİŞ", "PAYMENT")}
+                    </th>
+                  )}
+                  {col("biller") && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                      {tr("KASSİR", "BILLER")}
+                    </th>
+                  )}
+                  <th className="text-right text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
+                    {tr("ƏMƏLİYYATLAR", "ACTIONS")}
                   </th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("ÜMUMİ CƏMI", "GRAND TOTAL")}
-                  </th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("ÖDƏNİLİB", "PAID")}
-                  </th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("BORC", "DUE")}
-                  </th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("ÖDƏNİŞ STATUSU", "PAYMENT STATUS")}
-                  </th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                    {tr("KASSİR", "BILLER")}
-                  </th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td
-                      colSpan={(diningEnabled ? 13 : 10) + (showProductionColumn ? 1 : 0)}
-                      className="px-4 py-8 text-center text-xs text-gray-500"
-                    >
+                    <td colSpan={visibleColCount} className="px-4 py-8 text-center text-xs text-gray-500">
                       {tr("Yüklənir...", "Loading...")}
                     </td>
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={(diningEnabled ? 13 : 10) + (showProductionColumn ? 1 : 0)}
-                      className="px-4 py-8 text-center text-xs text-gray-500"
-                    >
+                    <td colSpan={visibleColCount} className="px-4 py-8 text-center text-xs text-gray-500">
                       {emptyMessage}
                     </td>
                   </tr>
                 ) : (
-                  orders.map((order, index) => (
+                  orders.map((order, index) => {
+                    const sourceTag = orderSourceTag(order.source);
+                    const sourceBadgeClass =
+                      sourceTag === "POS"
+                        ? "bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-200 border-teal-200 dark:border-teal-800"
+                        : sourceTag === "QR Menu"
+                          ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border-amber-200 dark:border-amber-800"
+                          : "bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200 border-sky-200 dark:border-sky-800";
+                    const iconBtn =
+                      "inline-flex items-center justify-center w-7 h-7 rounded-lg border border-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors disabled:opacity-40";
+
+                    return (
                     <tr
                       key={order.id}
                       className={`border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-all duration-75 ${
                         index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/30 dark:bg-gray-800/10"
                       }`}
                     >
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="text-xs text-gray-900 dark:text-white font-medium">
-                          {order.customerName}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                        {order.reference}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                        {formatSalesDate(order.date)}
-                      </td>
-                      {diningEnabled && (
-                        <>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                              {order.source === "QR_MENU" ? tr("QR Menyü", "QR Menu") : "POS"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                            {order.table ? `#${order.table.number}` : "—"}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                              {order.kotStatus ?? "—"}
-                            </span>
-                          </td>
-                        </>
+                      {col("customer") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {isWebOrder(order)
+                            ? order.web?.customer.name || order.customerName
+                            : order.customerName}
+                          {isWebOrder(order) && order.web?.customer.phone ? (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              {order.web.customer.phone}
+                            </p>
+                          ) : null}
+                        </td>
+                      )}
+                      {col("id") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {formatOrderDisplayId(order.reference, order.storeName, order.storeCode)}
+                        </td>
+                      )}
+                      {col("date") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {formatSalesDate(order.date)}
+                        </td>
+                      )}
+                      {col("source") && (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight border",
+                              sourceBadgeClass,
+                            )}
+                          >
+                            {sourceTag === "QR Menu"
+                              ? tr("QR Menyu", "QR Menu")
+                              : sourceTag === "Web"
+                                ? "Web"
+                                : "POS"}
+                          </span>
+                        </td>
+                      )}
+                      {diningEnabled && col("table") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {order.table ? `#${order.table.number}` : "—"}
+                        </td>
+                      )}
+                      {diningEnabled && col("kot") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {order.kotStatus ?? "—"}
+                        </td>
                       )}
                       {showProductionColumn && (
                         <td className="px-4 py-3 whitespace-nowrap">
                           {order.productionStatus && canEdit && !isDemo ? (
-                            <select
-                              value={order.productionStatus}
+                            <StatusPillDropdown
+                              value={order.productionStatus as ProductionStatusApi}
                               disabled={updatingProductionId === order.id}
-                              onChange={(e) =>
-                                void handleProductionStatusChange(
-                                  order.id,
-                                  e.target.value as ProductionStatusApi,
-                                )
+                              title={tr(
+                                "İstehsal statusunu dəyişmək üçün klikləyin",
+                                "Click to change production status",
+                              )}
+                              options={productionStatusOptions(order.productionStatus).map(
+                                (s): StatusPillOption<ProductionStatusApi> => ({
+                                  value: s,
+                                  label: translateProductionStatus(s),
+                                  colorClass: getProductionStatusColor(s),
+                                }),
+                              )}
+                              onChange={(next) =>
+                                void handleProductionStatusChange(order.id, next)
                               }
-                              className="appearance-none max-w-[140px] pl-2 pr-6 py-1 text-[10px] font-medium bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 rounded-lg text-teal-800 dark:text-teal-200 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-50"
-                            >
-                              {productionStatusOptions(order.productionStatus).map((s) => (
-                                <option key={s} value={s}>
-                                  {translateProductionStatus(s)}
-                                </option>
-                              ))}
-                            </select>
+                            />
                           ) : (
-                            <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                            <span
+                              className={cn(
+                                statusPillClass,
+                                order.productionStatus
+                                  ? getProductionStatusColor(order.productionStatus)
+                                  : "text-gray-600 dark:text-gray-400",
+                              )}
+                            >
                               {translateProductionStatus(order.productionStatus)}
                             </span>
                           )}
                         </td>
                       )}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2.5 py-1 rounded text-[10px] font-medium",
-                            getStatusBadgeColor(order.status),
+                      {col("status") && (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isWebOrder(order) ? (
+                            <WebStatusPill
+                              orderId={order.id}
+                              status={webStatusFromOrder(order)}
+                              onChange={handleWebStatusChange}
+                              disabled={!canEdit || isDemo}
+                            />
+                          ) : (
+                            <span
+                              className={cn(
+                                statusPillClass,
+                                getStatusBadgeColor(order.status),
+                              )}
+                            >
+                              {translateStatus(order.status)}
+                            </span>
                           )}
-                        >
-                          {translateStatus(order.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
-                        {order.grandTotal} ₼
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
-                        {order.paid} ₼
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
-                        {order.due.toFixed(2)} ₼
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2.5 py-1 rounded text-[10px] font-medium",
-                            getPaymentStatusBadgeColor(order.paymentStatus),
+                        </td>
+                      )}
+                      {col("grandTotal") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {order.grandTotal} ₼
+                        </td>
+                      )}
+                      {col("paid") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {order.paid} ₼
+                        </td>
+                      )}
+                      {col("due") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {order.due.toFixed(2)} ₼
+                        </td>
+                      )}
+                      {col("paymentStatus") && (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isWebOrder(order) ? (
+                            <WebPaymentStatusPill
+                              orderId={order.id}
+                              paymentStatus={webPaymentStatusFromOrder(order)}
+                              paymentMethod={order.web?.paymentMethod ?? "cod"}
+                              onChange={handleWebPaymentStatusChange}
+                              disabled={!canEdit || isDemo}
+                            />
+                          ) : (
+                            <span
+                              className={cn(
+                                statusPillClass,
+                                getPaymentStatusBadgeColor(order.paymentStatus),
+                              )}
+                            >
+                              {translatePaymentStatus(order.paymentStatus)}
+                            </span>
                           )}
-                        >
-                          {translatePaymentStatus(order.paymentStatus)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                        {order.biller}
-                      </td>
+                        </td>
+                      )}
+                      {col("biller") && (
+                        <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                          {isWebOrder(order)
+                            ? order.web?.customer.name || order.customerName
+                            : order.biller}
+                        </td>
+                      )}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={(e) => openActionMenu(order.id, e.currentTarget)}
-                          className="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition bg-gray-500/10 dark:bg-gray-500/20 border border-gray-500/20 dark:border-gray-500/30"
-                        >
-                          <MoreVertical className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-                        </button>
+                        <div className="flex items-center justify-end gap-0.5">
+                          <button
+                            type="button"
+                            className={iconBtn}
+                            title={
+                              isWebOrder(order)
+                                ? tr("Veb sifariş detalları", "Web order detail")
+                                : tr("Satış Detalları", "Sale Detail")
+                            }
+                            onClick={() => handleViewSaleDetail(order.id)}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          {!isWebOrder(order) && posEnabled && canEdit && isDraftOrderStatus(order.status) && (
+                            <button
+                              type="button"
+                              className={cn(iconBtn, "text-[#0f766e] dark:text-[#5eead4]")}
+                              title={tr("Tamamla", "Finalize")}
+                              onClick={() => handleViewSaleDetail(order.id)}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {!isWebOrder(order) &&
+                            diningEnabled &&
+                            posEnabled &&
+                            canEdit &&
+                            isDraftOrderStatus(order.status) &&
+                            !order.kotStatus && (
+                              <button
+                                type="button"
+                                className={cn(iconBtn, "text-[#0f766e] dark:text-[#5eead4]")}
+                                title={tr("KOT-a göndər", "Send to KOT")}
+                                onClick={() => {
+                                  void (async () => {
+                                    try {
+                                      await sendHeldPosOrderToKot(order.id, {
+                                        tableId: order.table?.id ?? null,
+                                      });
+                                      notifySuccess(tr("KOT-a göndərildi", "Sent to KOT"));
+                                      await loadItems();
+                                    } catch (err) {
+                                      notifyFromError(err);
+                                    }
+                                  })();
+                                }}
+                              >
+                                <ChefHat className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          {!isWebOrder(order) && posEnabled && canEdit && (
+                            <button
+                              type="button"
+                              className={iconBtn}
+                              title={tr("Satışı Redaktə Et", "Edit Sale")}
+                              onClick={() => handleEditSale(order.id)}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {!isWebOrder(order) && canCreate && !isDraftOrderStatus(order.status) && (
+                            <button
+                              type="button"
+                              className={iconBtn}
+                              title={tr("Ödəniş Yarat", "Create Payment")}
+                              onClick={() => handleCreatePayment(order.id)}
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className={iconBtn}
+                            title={tr("Qaiməni yüklə", "Download Invoice")}
+                            onClick={() => handleOpenInvoicePreview(order)}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              className={cn(iconBtn, "text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20")}
+                              title={tr("Satışı Sil", "Delete Sale")}
+                              onClick={() => void handleDeleteSale(order)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1039,17 +1432,6 @@ export function POSOrders() {
         onSaved={() => void loadItems()}
       />
 
-      <ShowPaymentsModal
-        orderId={selectedOrderId}
-        isOpen={isShowPaymentsModalOpen}
-        onClose={() => setIsShowPaymentsModalOpen(false)}
-        reloadKey={paymentsReloadKey}
-        onCreatePayment={() => {
-          setIsShowPaymentsModalOpen(false);
-          if (selectedOrderId) handleCreatePayment(selectedOrderId);
-        }}
-      />
-
       <CreatePaymentModal
         orderId={selectedOrderId}
         isOpen={isCreatePaymentModalOpen}
@@ -1057,139 +1439,30 @@ export function POSOrders() {
         onSaved={handleSavePayment}
       />
 
-      {openMenuOrder &&
-        menuPosition &&
-        createPortal(
-          <>
-            <div className="fixed inset-0 z-[100]" onClick={closeActionMenu} aria-hidden />
-            <div
-              ref={menuRef}
-              className="fixed z-[110] w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1"
-              style={{ top: menuPosition.top, left: menuPosition.left }}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  closeActionMenu();
-                  handleViewSaleDetail(openMenuOrder.id);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-75 text-left"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>{tr("Satış Detalları", "Sale Detail")}</span>
-              </button>
+      <InvoicePreviewModal
+        orderId={invoicePreviewOrderId}
+        isOpen={isInvoicePreviewOpen}
+        onClose={() => {
+          setIsInvoicePreviewOpen(false);
+          setInvoicePreviewOrderId(null);
+        }}
+      />
 
-              {posEnabled && canEdit && isDraftOrderStatus(openMenuOrder.status) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeActionMenu();
-                    handleViewSaleDetail(openMenuOrder.id);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#0f766e] dark:text-[#5eead4] hover:bg-[#f0fdfa] dark:hover:bg-[#14b8a6]/10 transition-all duration-75 text-left font-medium"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{tr("Tamamla", "Finalize")}</span>
-                </button>
-              )}
-
-              {diningEnabled &&
-                posEnabled &&
-                canEdit &&
-                isDraftOrderStatus(openMenuOrder.status) &&
-                !openMenuOrder.kotStatus && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeActionMenu();
-                      void (async () => {
-                        try {
-                          await sendHeldPosOrderToKot(openMenuOrder.id, {
-                            tableId: openMenuOrder.table?.id ?? null,
-                          });
-                          notifySuccess(tr("KOT-a göndərildi", "Sent to KOT"));
-                          await loadItems();
-                        } catch (err) {
-                          notifyFromError(err);
-                        }
-                      })();
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#0f766e] dark:text-[#5eead4] hover:bg-[#f0fdfa] dark:hover:bg-[#14b8a6]/10 transition-all duration-75 text-left font-medium"
-                  >
-                    <ChefHat className="w-3.5 h-3.5" />
-                    <span>{tr("KOT-a göndər", "Send to KOT")}</span>
-                  </button>
-                )}
-
-              {posEnabled && canEdit && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeActionMenu();
-                    handleEditSale(openMenuOrder.id);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-75 text-left"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  <span>{tr("Satışı Redaktə Et", "Edit Sale")}</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  closeActionMenu();
-                  handleShowPayments(openMenuOrder.id);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-75 text-left"
-              >
-                <DollarSign className="w-3.5 h-3.5" />
-                <span>{tr("Ödənişləri Göstər", "Show Payments")}</span>
-              </button>
-
-              {canCreate && !isDraftOrderStatus(openMenuOrder.status) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeActionMenu();
-                    handleCreatePayment(openMenuOrder.id);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-75 text-left"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{tr("Ödəniş Yarat", "Create Payment")}</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  closeActionMenu();
-                  void handleDownloadPDF(openMenuOrder);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-75 text-left"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{tr("PDF Yüklə", "Download pdf")}</span>
-              </button>
-
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeActionMenu();
-                    void handleDeleteSale(openMenuOrder);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-75 text-left"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{tr("Satışı Sil", "Delete Sale")}</span>
-                </button>
-              )}
-            </div>
-          </>,
-          document.body,
-        )}
+      {webDetailOrder && (
+        <WebOrderDetailModal
+          order={webDetailOrder}
+          onClose={() => {
+            setWebDetailOrder(null);
+            if (searchParams.get("orderId")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("orderId");
+              setSearchParams(next, { replace: true });
+            }
+          }}
+          onStatusChange={handleWebStatusChange}
+          onPaymentStatusChange={handleWebPaymentStatusChange}
+        />
+      )}
     </div>
   );
 }

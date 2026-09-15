@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { toast } from "sonner";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface AddMoneyTransferModalProps {
@@ -154,23 +155,20 @@ export function AddMoneyTransferModal({
               {tr("Göndərən Hesab", "From Account")}{" "}
               <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={formData.fromAccount}
-              onChange={(e) =>
-                setFormData({ ...formData, fromAccount: e.target.value })
-              }
-              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-              required
-            >
-              <option value="">
-                {tr("Hesab seçin", "Select account")}
-              </option>
-              <option value="3298784309485">Bank of America - 3298784309485</option>
-              <option value="5475878970090">Chase Bank - 5475878970090</option>
-              <option value="3255465758698">Wells Fargo - 3255465758698</option>
-              <option value="4353689870544">Citibank - 4353689870544</option>
-              <option value="4324356677889">Capital Bank - 4324356677889</option>
-            </select>
+              onChange={(value) => setFormData({ ...formData, fromAccount: value })}
+              className="w-full"
+              placeholder={tr("Hesab seçin", "Select account")}
+              options={[
+                { value: "", label: tr("Hesab seçin", "Select account") },
+                { value: "3298784309485", label: "Bank of America - 3298784309485" },
+                { value: "5475878970090", label: "Chase Bank - 5475878970090" },
+                { value: "3255465758698", label: "Wells Fargo - 3255465758698" },
+                { value: "4353689870544", label: "Citibank - 4353689870544" },
+                { value: "4324356677889", label: "Capital Bank - 4324356677889" },
+              ]}
+            />
           </div>
 
           {/* To Account */}
@@ -179,23 +177,20 @@ export function AddMoneyTransferModal({
               {tr("Alan Hesab", "To Account")}{" "}
               <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={formData.toAccount}
-              onChange={(e) =>
-                setFormData({ ...formData, toAccount: e.target.value })
-              }
-              className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-              required
-            >
-              <option value="">
-                {tr("Hesab seçin", "Select account")}
-              </option>
-              <option value="4598489498498">PNC Bank - 4598489498498</option>
-              <option value="4494048448994">TD Bank - 4494048448994</option>
-              <option value="6599481186468">US Bank - 6599481186468</option>
-              <option value="1948948498149">HSBC - 1948948498149</option>
-              <option value="1686941868478">Santander - 1686941868478</option>
-            </select>
+              onChange={(value) => setFormData({ ...formData, toAccount: value })}
+              className="w-full"
+              placeholder={tr("Hesab seçin", "Select account")}
+              options={[
+                { value: "", label: tr("Hesab seçin", "Select account") },
+                { value: "4598489498498", label: "PNC Bank - 4598489498498" },
+                { value: "4494048448994", label: "TD Bank - 4494048448994" },
+                { value: "6599481186468", label: "US Bank - 6599481186468" },
+                { value: "1948948498149", label: "HSBC - 1948948498149" },
+                { value: "1686941868478", label: "Santander - 1686941868478" },
+              ]}
+            />
           </div>
 
           {/* Amount */}

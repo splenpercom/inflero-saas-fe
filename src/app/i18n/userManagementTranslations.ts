@@ -108,7 +108,7 @@ export const userManagementTranslations = {
     stocktransfer: "Stock Transfer",
 
     // Sales sub-items
-    posorders: "POS Orders",
+    posorders: "Orders",
     invoices: "Invoices",
     salesreturn: "Sales Return",
     pos: "POS",
@@ -306,7 +306,7 @@ export const userManagementTranslations = {
     stocktransfer: "Anbar Transferi",
 
     // Sales sub-items
-    posorders: "POS Sifarişləri",
+    posorders: "Sifarişlər",
     invoices: "Qaimələr",
     salesreturn: "Satış Qaytarması",
     pos: "POS",

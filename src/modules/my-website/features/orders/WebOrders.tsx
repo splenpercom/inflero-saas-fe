@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "../../ui";
 import {
   Search,
@@ -19,10 +20,13 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useLanguage, useTr } from "../../i18n";
+import { pickLang } from "../../../../app/i18n/pickLang";
 import { DataPagination, dataPaginationShowText } from "../../../../app/components/ui/DataPagination";
 import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../../app/hooks/usePagination";
+import { ModernSelect } from "../../../../app/components/ui/ModernSelect";
+import { fetchWebOrders, updateWebOrderApi, type WebOrderDto } from "../../../../app/api/website";
+import { notifyFromError, notifySuccess } from "../../../../app/lib/toast";
 import type { WebOrder } from "./types";
-import { DUMMY_ORDERS } from "./data";
 import {
   STATUS_COLORS,
   STATUS_ICONS,
@@ -33,28 +37,96 @@ import {
   PAYMENT_STATUS_LABELS,
 } from "./constants";
 
+function formatOrderDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function mapDto(dto: WebOrderDto): WebOrder {
+  return {
+    id: dto.id,
+    reference: dto.reference,
+    date: formatOrderDate(dto.date),
+    status: dto.status,
+    paymentStatus: dto.paymentStatus,
+    paymentMethod: dto.paymentMethod,
+    grandTotal: dto.grandTotal,
+    customer: dto.customer,
+    shipping: dto.shipping,
+    items: dto.items,
+  };
+}
+
+function useAnchoredMenu(open: boolean) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const updatePos = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const menuH = menuRef.current?.offsetHeight ?? 200;
+    const spaceBelow = window.innerHeight - r.bottom;
+    const openUp = spaceBelow < menuH + 8 && r.top > spaceBelow;
+    setPos({
+      top: openUp ? r.top - 4 : r.bottom + 4,
+      left: Math.min(r.left, window.innerWidth - 180),
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    updatePos();
+    const onScroll = () => updatePos();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [open, updatePos]);
+
+  return { triggerRef, menuRef, pos };
+}
+
 function StatusPill({ orderId, status, onChange }: {
   orderId: string;
   status: WebOrder["status"];
-  onChange: (id: string, s: WebOrder["status"]) => void;
+  onChange: (id: string, s: WebOrder["status"]) => void | Promise<void>;
 }) {
   const { language } = useLanguage();
   const tr = useTr();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { triggerRef, menuRef, pos } = useAnchoredMenu(open);
   const Icon = STATUS_ICONS[status];
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [open, menuRef]);
 
   return (
-    <div ref={ref} className="relative inline-block">
+    <div ref={rootRef} className="relative inline-block">
       <button
-        onClick={() => setOpen(v => !v)}
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
         className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium cursor-pointer hover:opacity-80 transition-opacity select-none", STATUS_COLORS[status])}
         title={tr("Statusu dəyişmək üçün klikləyin", "Click to change status")}
       >
@@ -63,17 +135,28 @@ function StatusPill({ orderId, status, onChange }: {
         <ChevronDown className="w-2 h-2 ml-0.5 opacity-60" />
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl py-1 overflow-hidden">
-          {ALL_STATUSES.map(s => {
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            transform: pos.top < (triggerRef.current?.getBoundingClientRect().top ?? 0) ? "translateY(-100%)" : undefined,
+            zIndex: 9999,
+          }}
+          className="w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl py-1 overflow-hidden"
+        >
+          {ALL_STATUSES.map((s) => {
             const SI = STATUS_ICONS[s];
             return (
               <button
                 key={s}
-                onClick={() => { onChange(orderId, s); setOpen(false); }}
+                type="button"
+                onClick={() => { void onChange(orderId, s); setOpen(false); }}
                 className={cn(
                   "w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors",
-                  s === status ? "bg-gray-50 dark:bg-gray-700/50" : "hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                  s === status ? "bg-gray-50 dark:bg-gray-700/50" : "hover:bg-gray-50 dark:hover:bg-gray-700/40",
                 )}
               >
                 <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium w-full", STATUS_COLORS[s])}>
@@ -83,7 +166,8 @@ function StatusPill({ orderId, status, onChange }: {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -93,24 +177,31 @@ function PaymentStatusPill({ orderId, paymentStatus, paymentMethod, onChange }: 
   orderId: string;
   paymentStatus: WebOrder["paymentStatus"];
   paymentMethod: WebOrder["paymentMethod"];
-  onChange: (id: string, s: WebOrder["paymentStatus"]) => void;
+  onChange: (id: string, s: WebOrder["paymentStatus"]) => void | Promise<void>;
 }) {
   const { language } = useLanguage();
   const tr = useTr();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { triggerRef, menuRef, pos } = useAnchoredMenu(open);
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [open, menuRef]);
 
   return (
-    <div ref={ref} className="relative inline-block">
+    <div ref={rootRef} className="relative inline-block">
       <button
-        onClick={() => setOpen(v => !v)}
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
         className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium cursor-pointer hover:opacity-80 transition-opacity select-none", PAYMENT_STATUS_COLORS[paymentStatus])}
         title={tr("Ödəniş statusunu dəyişmək üçün klikləyin", "Click to change payment status")}
       >
@@ -121,15 +212,26 @@ function PaymentStatusPill({ orderId, paymentStatus, paymentMethod, onChange }: 
         {paymentMethod === "epoint" ? "Epoint" : tr("Nağd ödəniş", "Cash on Delivery")}
       </p>
 
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-36 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl py-1 overflow-hidden">
-          {ALL_PAYMENT_STATUSES.map(s => (
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            transform: pos.top < (triggerRef.current?.getBoundingClientRect().top ?? 0) ? "translateY(-100%)" : undefined,
+            zIndex: 9999,
+          }}
+          className="w-36 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl py-1 overflow-hidden"
+        >
+          {ALL_PAYMENT_STATUSES.map((s) => (
             <button
               key={s}
-              onClick={() => { onChange(orderId, s); setOpen(false); }}
+              type="button"
+              onClick={() => { void onChange(orderId, s); setOpen(false); }}
               className={cn(
                 "w-full flex items-center px-3 py-1.5 text-left transition-colors",
-                s === paymentStatus ? "bg-gray-50 dark:bg-gray-700/50" : "hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                s === paymentStatus ? "bg-gray-50 dark:bg-gray-700/50" : "hover:bg-gray-50 dark:hover:bg-gray-700/40",
               )}
             >
               <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium w-full", PAYMENT_STATUS_COLORS[s])}>
@@ -137,7 +239,8 @@ function PaymentStatusPill({ orderId, paymentStatus, paymentMethod, onChange }: 
               </span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -146,8 +249,8 @@ function PaymentStatusPill({ orderId, paymentStatus, paymentMethod, onChange }: 
 function OrderDetailModal({ order, onClose, onStatusChange, onPaymentStatusChange }: {
   order: WebOrder;
   onClose: () => void;
-  onStatusChange: (id: string, status: WebOrder["status"]) => void;
-  onPaymentStatusChange: (id: string, s: WebOrder["paymentStatus"]) => void;
+  onStatusChange: (id: string, s: WebOrder["status"]) => void | Promise<void>;
+  onPaymentStatusChange: (id: string, s: WebOrder["paymentStatus"]) => void | Promise<void>;
 }) {
   const tr = useTr();
 
@@ -162,13 +265,12 @@ function OrderDetailModal({ order, onClose, onStatusChange, onPaymentStatusChang
             <p className="text-sm font-semibold text-gray-900 dark:text-white">{order.reference}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">{order.date}</p>
           </div>
-          <div className="flex items-center gap-2 mr-4">
+          <div className="flex items-center gap-2">
             <StatusPill orderId={order.id} status={order.status} onChange={onStatusChange} />
-            <PaymentStatusPill orderId={order.id} paymentStatus={order.paymentStatus} paymentMethod={order.paymentMethod} onChange={onPaymentStatusChange} />
+            <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0">
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
         </div>
 
         <div className="p-5 space-y-5">
@@ -264,25 +366,92 @@ function OrderDetailModal({ order, onClose, onStatusChange, onPaymentStatusChang
 
 export function WebOrders() {
   const tr = useTr();
+  const { language } = useLanguage();
 
-  const [orders, setOrders] = useState<WebOrder[]>(DUMMY_ORDERS);
+  const [orders, setOrders] = useState<WebOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPayment, setFilterPayment] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [detailOrder, setDetailOrder] = useState<WebOrder | null>(null);
 
-  const handleStatusChange = (id: string, status: WebOrder["status"]) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-    setDetailOrder(prev => prev?.id === id ? { ...prev, status } : prev);
+  // Stable loader: do not depend on `tr` (new fn every render) or this re-fetches forever.
+  const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    try {
+      const data = await fetchWebOrders({ page: 1, pageSize: 200 });
+      const mapped = (data.items ?? []).map(mapDto);
+      setOrders(mapped);
+      setDetailOrder((prev) => {
+        if (!prev) return prev;
+        const next = mapped.find((o) => o.id === prev.id);
+        return next ?? prev;
+      });
+    } catch (err) {
+      if (!opts?.silent) {
+        notifyFromError(
+          err,
+          pickLang(language, "Sifarişlər yüklənmədi", "Failed to load orders"),
+        );
+      }
+    } finally {
+      if (!opts?.silent) setLoading(false);
+      setRefreshing(false);
+    }
+  }, [language]);
+
+  useEffect(() => {
+    void loadOrders();
+  }, [loadOrders]);
+
+  // Realtime: silent poll every 8s
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void loadOrders({ silent: true });
+    }, 8000);
+    return () => window.clearInterval(id);
+  }, [loadOrders]);
+
+  const handleStatusChange = async (id: string, status: WebOrder["status"]) => {
+    const prev = orders;
+    setOrders((p) => p.map((o) => (o.id === id ? { ...o, status } : o)));
+    setDetailOrder((p) => (p?.id === id ? { ...p, status } : p));
+    try {
+      const updated = await updateWebOrderApi(id, { status });
+      setOrders((p) => p.map((o) => (o.id === id ? mapDto(updated) : o)));
+      setDetailOrder((p) => (p?.id === id ? mapDto(updated) : p));
+      notifySuccess(tr("Status yeniləndi", "Status updated"));
+    } catch (err) {
+      setOrders(prev);
+      notifyFromError(err, tr("Status yenilənmədi", "Failed to update status"));
+    }
   };
 
-  const handlePaymentStatusChange = (id: string, paymentStatus: WebOrder["paymentStatus"]) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus } : o));
-    setDetailOrder(prev => prev?.id === id ? { ...prev, paymentStatus } : prev);
+  const handlePaymentStatusChange = async (id: string, paymentStatus: WebOrder["paymentStatus"]) => {
+    const prev = orders;
+    setOrders((p) => p.map((o) => (o.id === id ? { ...o, paymentStatus } : o)));
+    setDetailOrder((p) => (p?.id === id ? { ...p, paymentStatus } : p));
+    try {
+      const updated = await updateWebOrderApi(id, { paymentStatus });
+      setOrders((p) => p.map((o) => (o.id === id ? mapDto(updated) : o)));
+      setDetailOrder((p) => (p?.id === id ? mapDto(updated) : p));
+      notifySuccess(tr("Ödəniş statusu yeniləndi", "Payment status updated"));
+    } catch (err) {
+      setOrders(prev);
+      notifyFromError(err, tr("Ödəniş statusu yenilənmədi", "Failed to update payment status"));
+    }
   };
 
-  const filtered = orders.filter(o => {
+  const sorted = [...orders].sort((a, b) => {
+    if (sortBy === "oldest") return a.date.localeCompare(b.date);
+    if (sortBy === "highest") return b.grandTotal - a.grandTotal;
+    if (sortBy === "lowest") return a.grandTotal - b.grandTotal;
+    return b.date.localeCompare(a.date);
+  });
+
+  const filtered = sorted.filter(o => {
     const matchSearch = search === "" ||
       o.customer.name.toLowerCase().includes(search.toLowerCase()) ||
       o.reference.toLowerCase().includes(search.toLowerCase()) ||
@@ -345,6 +514,11 @@ export function WebOrders() {
     ["lowest",  tr("Ən aşağı məbləğ",  "Lowest Total")],
   ];
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    void loadOrders();
+  };
+
   return (
     <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
       <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
@@ -397,13 +571,12 @@ export function WebOrders() {
                 { value: filterPayment, set: setFilterPayment, options: filterPaymentOptions },
                 { value: sortBy,        set: setSortBy,        options: sortOptions },
               ].map((f, fi) => (
-                <div key={fi} className="relative">
-                  <select value={f.value} onChange={e => f.set(e.target.value)}
-                    className="appearance-none pl-3 pr-7 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-400 cursor-pointer">
-                    {f.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                  </select>
-                  <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
+                <ModernSelect
+                  key={fi}
+                  value={f.value}
+                  onChange={f.set}
+                  options={f.options.map(([v, l]) => ({ value: v, label: l }))}
+                />
               ))}
               <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" title={tr("PDF ixrac et", "Export PDF")}>
                 <FileText className="w-3.5 h-3.5 text-red-500" />
@@ -411,8 +584,14 @@ export function WebOrders() {
               <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" title={tr("Excel ixrac et", "Export Excel")}>
                 <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
               </button>
-              <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" title={tr("Yenilə", "Refresh")}>
-                <RefreshCw className="w-3.5 h-3.5" />
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={refreshing || loading}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                title={tr("Yenilə", "Refresh")}
+              >
+                <RefreshCw className={cn("w-3.5 h-3.5", (refreshing || loading) && "animate-spin")} />
               </button>
             </div>
           </div>
@@ -430,7 +609,13 @@ export function WebOrders() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center">
+                      <p className="text-xs text-gray-400">{tr("Yüklənir...", "Loading...")}</p>
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-10 text-center">
                       <ShoppingBag className="w-8 h-8 text-gray-300 dark:text-gray-700 mx-auto mb-2" />

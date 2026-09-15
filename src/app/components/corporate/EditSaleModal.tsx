@@ -15,6 +15,7 @@ import {
 } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 import { pickLang } from "../../i18n/pickLang";
 import { fetchCustomerVehicles, type CustomerVehicle } from "../../api/people";
 
@@ -24,6 +25,8 @@ interface ProductItem {
   unitPrice: number;
   stock: number;
   qty: number;
+  /** Units already returned for this product (locked floor). */
+  returnedQty: number;
 }
 
 interface EditSaleModalProps {
@@ -65,6 +68,8 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
   const [showProductList, setShowProductList] = useState(false);
   const [stockDeducted, setStockDeducted] = useState(false);
   const [paidAmount, setPaidAmount] = useState(0);
+  const [refundedAmount, setRefundedAmount] = useState(0);
+  const [paymentStatusLabel, setPaymentStatusLabel] = useState("");
   const linesLocked = stockEnabled && stockDeducted;
 
   const { customers } = useSalesCustomers(customerSearch, isOpen);
@@ -100,15 +105,28 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
         setTaxPercent(data.taxPercent ? parseFloat(data.taxPercent) : 0);
         setStockDeducted(Boolean(data.stockDeducted));
         setPaidAmount(parseFloat(data.paid) || 0);
-        setProducts(
-          data.items.map((item) => ({
-            id: item.productId,
-            name: item.productName,
-            unitPrice: parseFloat(item.price) || 0,
-            stock: 0,
-            qty: item.quantity,
-          })),
-        );
+        setRefundedAmount(parseFloat(data.refunded ?? "0") || 0);
+        setPaymentStatusLabel(data.paymentStatus ?? "");
+
+        const byProduct = new Map<string, ProductItem>();
+        for (const item of data.items) {
+          const returnedQty = item.returnedQty ?? 0;
+          const prev = byProduct.get(item.productId);
+          if (prev) {
+            prev.qty += item.quantity;
+            prev.returnedQty = Math.max(prev.returnedQty, returnedQty);
+          } else {
+            byProduct.set(item.productId, {
+              id: item.productId,
+              name: item.productName,
+              unitPrice: parseFloat(item.price) || 0,
+              stock: 0,
+              qty: item.quantity,
+              returnedQty,
+            });
+          }
+        }
+        setProducts([...byProduct.values()]);
         setProductSearch("");
         setShowProductList(false);
       })
@@ -145,8 +163,18 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
     setCustomerId(nextId);
   };
 
+  const payKey = paymentStatusLabel.toLowerCase().replace(/\s+/g, "_");
+  const isFullyRefunded =
+    payKey === "refunded" ||
+    (products.length > 0 && products.every((p) => p.returnedQty > 0 && p.qty <= p.returnedQty));
+  const hasAnyReturns = products.some((p) => p.returnedQty > 0);
+  const itemsEditable = !linesLocked && !isFullyRefunded;
+
+  const isLineFullyRefunded = (product: ProductItem) =>
+    product.returnedQty > 0 && product.qty <= product.returnedQty;
+
   const handleAddProduct = async (productId: string) => {
-    if (linesLocked) return;
+    if (!itemsEditable) return;
     if (products.find((p) => p.id === productId)) return;
     try {
       const detail = await fetchProduct(productId);
@@ -158,6 +186,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
           unitPrice: parseFloat(detail.price) || 0,
           stock: detail.quantity,
           qty: 1,
+          returnedQty: 0,
         },
       ]);
       setProductSearch("");
@@ -167,13 +196,26 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
     }
   };
 
-  const handleUpdateProduct = (id: string, field: keyof ProductItem, value: number) => {
-    if (linesLocked) return;
-    setProducts(products.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+  const handleUpdateProduct = (id: string, field: "unitPrice" | "qty", value: number) => {
+    if (!itemsEditable) return;
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        if (isLineFullyRefunded(p)) return p;
+        if (field === "qty") {
+          const floor = p.returnedQty > 0 ? p.returnedQty : 1;
+          return { ...p, qty: Math.max(floor, value) };
+        }
+        if (field === "unitPrice" && p.returnedQty > 0) return p;
+        return { ...p, unitPrice: value };
+      }),
+    );
   };
 
   const handleRemoveProduct = (id: string) => {
-    if (linesLocked) return;
+    if (!itemsEditable) return;
+    const row = products.find((p) => p.id === id);
+    if (row && row.returnedQty > 0) return;
     setProducts(products.filter((p) => p.id !== id));
   };
 
@@ -192,6 +234,17 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!orderId || !(isAuthenticated || isDemo)) return;
+    if (isFullyRefunded) {
+      notifyFromError(
+        new Error(
+          tr(
+            "Tam qaytarılmış sifariş redaktə edilə bilməz",
+            "A fully refunded order cannot be edited",
+          ),
+        ),
+      );
+      return;
+    }
     if (!date || products.length === 0 || !status) return;
     if (!billerId) {
       notifyFromError(new Error(tr("Kassir seçin", "Please select an employee / biller")));
@@ -216,7 +269,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
         shipping,
         serviceFee,
       };
-      if (!linesLocked) {
+      if (itemsEditable) {
         body.items = products.map((p) => ({
           productId: p.id,
           quantity: p.qty,
@@ -241,6 +294,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
     !loading &&
     !saving &&
     !isDemo &&
+    !isFullyRefunded &&
     Boolean(order);
 
   return (
@@ -248,12 +302,12 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
     >
       <div
-        className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-5xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-4xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
               {tr("Satışı Redaktə Et", "Edit Sale")}
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">{order?.reference ?? "—"}</p>
@@ -261,9 +315,9 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
@@ -273,7 +327,23 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
           <p className="p-6 text-center text-sm text-gray-500">{tr("Satış tapılmadı", "Sale not found")}</p>
         ) : (
           <div className="p-4 space-y-3">
-            {linesLocked && (
+            {isFullyRefunded && (
+              <p className="text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                {tr(
+                  "Bu sifariş tam qaytarılıb. Məhsul sətirləri və sifariş redaktə edilə bilməz.",
+                  "This order is fully refunded. Line items and the order cannot be edited.",
+                )}
+              </p>
+            )}
+            {!isFullyRefunded && hasAnyReturns && (
+              <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                {tr(
+                  "Qaytarılmış məhsullar kilidlənib. Yalnız qalan miqdar üzərində dəyişiklik edilə bilər.",
+                  "Refunded items are locked. You can only change remaining (non-refunded) quantities.",
+                )}
+              </p>
+            )}
+            {linesLocked && !isFullyRefunded && (
               <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
                 {tr(
                   "Stok çıxıldığı üçün məhsul sətirləri dəyişdirilə bilməz. Digər sahələr redaktə oluna bilər.",
@@ -282,6 +352,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
               </p>
             )}
 
+            <fieldset disabled={isFullyRefunded} className="space-y-3 disabled:opacity-70">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
@@ -294,21 +365,19 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   placeholder={tr("Müştəri axtar...", "Search customer...")}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white mb-1"
                 />
-                <select
+                <ModernSelect
                   value={customerId}
-                  onChange={(e) => handleCustomerChange(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-                >
-                  <option value="">{tr("Müştəri Seç", "Choose Customer")}</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                  {customerId && !customers.some((c) => c.id === customerId) && order.customerName && (
-                    <option value={customerId}>{order.customerName}</option>
-                  )}
-                </select>
+                  onChange={handleCustomerChange}
+                  className="w-full"
+                  placeholder={tr("Müştəri Seç", "Choose Customer")}
+                  options={[
+                    { value: "", label: tr("Müştəri Seç", "Choose Customer") },
+                    ...customers.map((c) => ({ value: c.id, label: c.name })),
+                    ...(customerId && !customers.some((c) => c.id === customerId) && order.customerName
+                      ? [{ value: customerId, label: order.customerName }]
+                      : []),
+                  ]}
+                />
               </div>
 
               {autoEnabled && customerId && (
@@ -317,24 +386,27 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                     <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                       {tr("Avtomobil", "Vehicle")}
                     </label>
-                    <select
+                    <ModernSelect
                       value={vehicleId}
-                      onChange={(e) => {
-                        setVehicleId(e.target.value);
-                        if (!e.target.value) setMileageAtService("");
+                      onChange={(value) => {
+                        setVehicleId(value);
+                        if (!value) setMileageAtService("");
                       }}
-                      className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    >
-                      <option value="">{tr("Avtomobil seçilməyib", "No vehicle")}</option>
-                      {customerVehicles.map((vehicle) => (
-                        <option key={vehicle.id} value={vehicle.id}>
-                          {[vehicle.make, vehicle.model, vehicle.plate].filter(Boolean).join(" · ")}
-                        </option>
-                      ))}
-                      {vehicleId && !customerVehicles.some((vehicle) => vehicle.id === vehicleId) && order.vehicleLabel && (
-                        <option value={vehicleId}>{order.vehicleLabel}</option>
-                      )}
-                    </select>
+                      className="w-full"
+                      placeholder={tr("Avtomobil seçilməyib", "No vehicle")}
+                      options={[
+                        { value: "", label: tr("Avtomobil seçilməyib", "No vehicle") },
+                        ...customerVehicles.map((vehicle) => ({
+                          value: vehicle.id,
+                          label: [vehicle.make, vehicle.model, vehicle.plate].filter(Boolean).join(" · "),
+                        })),
+                        ...(vehicleId &&
+                        !customerVehicles.some((vehicle) => vehicle.id === vehicleId) &&
+                        order.vehicleLabel
+                          ? [{ value: vehicleId, label: order.vehicleLabel }]
+                          : []),
+                      ]}
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
@@ -356,22 +428,20 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                   {tr("Kassir", "Biller")} <span className="text-red-500">*</span>
                 </label>
-                <select
+                <ModernSelect
                   value={billerId}
-                  onChange={(e) => setBillerId(e.target.value)}
+                  onChange={setBillerId}
                   disabled={billersLoading}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer disabled:opacity-60"
-                >
-                  <option value="">{tr("Kassir Seç", "Choose Biller")}</option>
-                  {billers.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                  {billerId && !billers.some((b) => b.id === billerId) && order.billerName && (
-                    <option value={billerId}>{order.billerName}</option>
-                  )}
-                </select>
+                  className="w-full"
+                  placeholder={tr("Kassir Seç", "Choose Biller")}
+                  options={[
+                    { value: "", label: tr("Kassir Seç", "Choose Biller") },
+                    ...billers.map((b) => ({ value: b.id, label: b.name })),
+                    ...(billerId && !billers.some((b) => b.id === billerId) && order.billerName
+                      ? [{ value: billerId, label: order.billerName }]
+                      : []),
+                  ]}
+                />
                 {!billersLoading && billers.length === 0 && user && (
                   <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
                     {tr(
@@ -409,38 +479,40 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                   {tr("Ödəniş Üsulu", "Payment Method")}
                 </label>
-                <select
+                <ModernSelect
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as PosUiPaymentMethod)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-                >
-                  <option value="cash">{tr("Nağd", "Cash")}</option>
-                  <option value="card">{tr("Kart", "Card")}</option>
-                  <option value="bank">{tr("Bank Transferi", "Bank Transfer")}</option>
-                </select>
+                  onChange={(value) => setPaymentMethod(value as PosUiPaymentMethod)}
+                  className="w-full"
+                  options={[
+                    { value: "cash", label: tr("Nağd", "Cash") },
+                    { value: "card", label: tr("Kart", "Card") },
+                    { value: "bank", label: tr("Bank Transferi", "Bank Transfer") },
+                  ]}
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                   {tr("Status", "Status")} <span className="text-red-500">*</span>
                 </label>
-                <select
+                <ModernSelect
                   value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-                >
-                  <option value="completed">{tr("Tamamlandı", "Completed")}</option>
-                  {status === "held" || status === "draft" ? null : (
-                    <>
-                      <option value="pending">{tr("Gözləyir", "Pending")}</option>
-                      <option value="processing">{tr("İşlənir", "Processing")}</option>
-                    </>
-                  )}
-                  <option value="cancelled">{tr("Ləğv Edildi", "Cancelled")}</option>
-                  {(status === "held" || status === "draft" || status === "pending") && (
-                    <option value="held">{tr("Qaralama", "Draft")}</option>
-                  )}
-                </select>
+                  onChange={setStatus}
+                  className="w-full"
+                  options={[
+                    { value: "completed", label: tr("Tamamlandı", "Completed") },
+                    ...(status === "held" || status === "draft"
+                      ? []
+                      : [
+                          { value: "pending", label: tr("Gözləyir", "Pending") },
+                          { value: "processing", label: tr("İşlənir", "Processing") },
+                        ]),
+                    { value: "cancelled", label: tr("Ləğv Edildi", "Cancelled") },
+                    ...(status === "held" || status === "draft" || status === "pending"
+                      ? [{ value: "held", label: tr("Qaralama", "Draft") }]
+                      : []),
+                  ]}
+                />
               </div>
             </div>
 
@@ -457,13 +529,13 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                     setShowProductList(true);
                   }}
                   onFocus={() => setShowProductList(true)}
-                  disabled={linesLocked}
+                  disabled={!itemsEditable}
                   placeholder={tr("Məhsul kodu daxil edin və seçin", "Please type product code and select")}
                   className="w-full px-2.5 py-1.5 pr-10 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
                 />
                 <Scan className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
 
-                {!linesLocked && showProductList && productSearch && (
+                {itemsEditable && showProductList && productSearch && (
                   <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                     {productsLoading ? (
                       <p className="px-3 py-2 text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</p>
@@ -516,11 +588,40 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                       </td>
                     </tr>
                   ) : (
-                    products.map((product) => (
-                      <tr key={product.id} className="border-t border-gray-200 dark:border-gray-700">
-                        <td className="px-2 py-2 text-gray-900 dark:text-white">{product.name}</td>
+                    products.map((product) => {
+                      const fullyRefundedLine = isLineFullyRefunded(product);
+                      const partiallyRefunded =
+                        product.returnedQty > 0 && product.qty > product.returnedQty;
+                      const priceLocked =
+                        !itemsEditable || fullyRefundedLine || product.returnedQty > 0;
+                      const qtyLocked = !itemsEditable || fullyRefundedLine;
+                      const remainingQty = Math.max(0, product.qty - product.returnedQty);
+                      return (
+                      <tr
+                        key={product.id}
+                        className={`border-t border-gray-200 dark:border-gray-700 ${
+                          fullyRefundedLine ? "bg-gray-50 dark:bg-gray-800/40 opacity-70" : ""
+                        }`}
+                      >
+                        <td className="px-2 py-2 text-gray-900 dark:text-white">
+                          <div className="flex flex-col gap-0.5">
+                            <span>{product.name}</span>
+                            {fullyRefundedLine ? (
+                              <span className="inline-flex w-fit px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                                {tr("Qaytarılıb", "Refunded")}
+                              </span>
+                            ) : partiallyRefunded ? (
+                              <span className="inline-flex w-fit px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200">
+                                {tr(
+                                  `${product.returnedQty} qaytarılıb · ${remainingQty} qalıb`,
+                                  `${product.returnedQty} refunded · ${remainingQty} left`,
+                                )}
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
                         <td className="px-2 py-2">
-                          {linesLocked ? (
+                          {priceLocked ? (
                             <span className="text-gray-900 dark:text-white">₼{product.unitPrice.toFixed(2)}</span>
                           ) : (
                             <input
@@ -536,10 +637,10 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                           )}
                         </td>
                         {stockEnabled && <td className="px-2 py-2 text-gray-900 dark:text-white">
-                          {linesLocked ? "—" : product.stock}
+                          {qtyLocked ? "—" : product.stock}
                         </td>}
                         <td className="px-2 py-2">
-                          {linesLocked ? (
+                          {qtyLocked ? (
                             <span className="text-gray-900 dark:text-white">{product.qty}</span>
                           ) : (
                             <input
@@ -548,7 +649,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                               onChange={(e) =>
                                 handleUpdateProduct(product.id, "qty", Number(e.target.value))
                               }
-                              min="1"
+                              min={product.returnedQty > 0 ? product.returnedQty : 1}
                               className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                             />
                           )}
@@ -557,7 +658,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                           ₼{calculateLineTotal(product).toFixed(2)}
                         </td>
                         <td className="px-2 py-2">
-                          {!linesLocked && (
+                          {itemsEditable && product.returnedQty === 0 && (
                             <button
                               type="button"
                               onClick={() => handleRemoveProduct(product.id)}
@@ -568,7 +669,8 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                           )}
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -659,6 +761,12 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                   <span className="text-gray-600 dark:text-gray-400">{tr("Ödənilib", "Paid")}</span>
                   <span className="text-green-600 dark:text-green-400">₼ {paidAmount.toFixed(2)}</span>
                 </div>
+                {refundedAmount > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">{tr("Qaytarılıb", "Refunded")}</span>
+                    <span className="text-red-600 dark:text-red-400">-₼ {refundedAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-600 dark:text-gray-400">{tr("Borc", "Due")}</span>
                   <span className="text-[#14b8a6] dark:text-[#14b8a6]">
@@ -667,26 +775,29 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 </div>
               </div>
             </div>
+            </fieldset>
           </div>
         )}
 
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-3 sticky bottom-0 bg-white dark:bg-gray-900">
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2 sticky bottom-0 bg-white dark:bg-gray-900">
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-3 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
-            {tr("Ləğv Et", "Cancel")}
+            {isFullyRefunded ? tr("Bağla", "Close") : tr("Ləğv Et", "Cancel")}
           </button>
+          {!isFullyRefunded && (
           <button
             type="button"
             onClick={() => void handleSubmit()}
             disabled={!canSave}
-            className="flex items-center gap-2 px-6 py-3 text-sm bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
+            <Save className="w-3.5 h-3.5" />
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Yadda saxla", "Save Changes")}
           </button>
+          )}
         </div>
       </div>
     </div>

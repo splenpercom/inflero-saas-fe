@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { X, User, Calendar, Package, FileText, CreditCard } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -14,8 +14,10 @@ import {
 } from "../../lib/purchaseMappers";
 import type { PosUiPaymentMethod } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
+
 interface PurchaseDetailModalProps {
   purchaseId: string | null;
   isOpen: boolean;
@@ -23,6 +25,38 @@ interface PurchaseDetailModalProps {
   canEdit?: boolean;
   onChanged?: () => void;
   overlayZIndexClass?: string;
+}
+
+function Field({
+  label,
+  value,
+  required,
+}: {
+  label: string;
+  value: ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-900 dark:text-white mb-1.5">
+        {label}
+        {required ? <span className="text-red-500"> *</span> : null}
+      </p>
+      <div className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/60 text-gray-900 dark:text-white min-h-[30px] flex items-center">
+        {value ?? "—"}
+      </div>
+    </div>
+  );
+}
+
+function lineTaxAmount(price: number, qty: number, discount: number, taxPercent: number) {
+  const base = price * qty - discount;
+  return (base * taxPercent) / 100;
+}
+
+function lineTotalCost(price: number, qty: number, discount: number, taxPercent: number) {
+  const base = price * qty - discount;
+  return base + lineTaxAmount(price, qty, discount, taxPercent);
 }
 
 export function PurchaseDetailModal({
@@ -55,7 +89,10 @@ export function PurchaseDetailModal({
       setPaymentReference("");
       setPaymentMethod("cash");
     } catch (err) {
-      notifyFromError(err, tr("Satınalma detalları yüklənə bilmədi", "Failed to load purchase details"));
+      notifyFromError(
+        err,
+        tr("Satınalma detalları yüklənə bilmədi", "Failed to load purchase details"),
+      );
       setPurchase(null);
     } finally {
       setLoading(false);
@@ -75,11 +112,28 @@ export function PurchaseDetailModal({
   const total = purchase ? parsePurchaseAmount(purchase.total) : 0;
   const paid = purchase ? parsePurchaseAmount(purchase.paid) : 0;
   const due = purchase ? parsePurchaseAmount(purchase.due) : 0;
-  const discount = purchase?.discount ? parsePurchaseAmount(purchase.discount) : 0;
-  const shippingCost = purchase?.shipping ? parsePurchaseAmount(purchase.shipping) : 0;
-  const orderTax = purchase?.orderTax ? parsePurchaseAmount(purchase.orderTax) : 0;
-  const itemsSubtotal =
-    purchase?.items.reduce((sum, item) => sum + parsePurchaseAmount(item.totalCost), 0) ?? 0;
+  const discount = purchase ? parsePurchaseAmount(purchase.discount ?? 0) : 0;
+  const shippingCost = purchase ? parsePurchaseAmount(purchase.shipping ?? 0) : 0;
+  const orderTax = purchase ? parsePurchaseAmount(purchase.orderTax ?? 0) : 0;
+
+  const linesSubtotal =
+    purchase?.items.reduce((sum, item) => {
+      const price = parsePurchaseAmount(item.purchasePrice);
+      const lineDiscount = parsePurchaseAmount(item.discount);
+      const taxPercent = parsePurchaseAmount(item.taxPercent);
+      return sum + lineTotalCost(price, item.quantity, lineDiscount, taxPercent);
+    }, 0) ?? 0;
+
+  const grandTotal = linesSubtotal + orderTax - discount + shippingCost;
+
+  const statusLabel = (() => {
+    if (!purchase) return "—";
+    const key = purchase.status.toLowerCase();
+    if (key === "ordered") return tr("Sifariş edildi", "Ordered");
+    if (key === "pending") return tr("Gözləyir", "Pending");
+    if (key === "received") return tr("Qəbul edildi", "Received");
+    return purchase.statusLabel || purchase.status;
+  })();
 
   const handleRecordPayment = async () => {
     if (!purchase || isDemo || !canEdit) return;
@@ -108,96 +162,96 @@ export function PurchaseDetailModal({
   };
 
   return (
-    <div className={`fixed inset-0 ${overlayZIndexClass} flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`}>
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#14b8a6] flex items-center justify-center">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {tr("Satınalma Detalları", "Purchase Details")}
-              </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {purchase?.reference ?? purchase?.documentNo ?? "—"}
-              </p>
-            </div>
-          </div>
-          <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+    <div
+      className={`fixed inset-0 ${overlayZIndexClass} flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`}
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-5xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10 shrink-0">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+            {tr("Satınalma Detalları", "Purchase Details")}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-white bg-red-500 hover:bg-red-600 rounded-full p-1"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="overflow-y-auto max-h-[calc(90vh-80px)] p-6 space-y-6">
+        <div className="overflow-y-auto p-4 space-y-3 flex-1 min-h-0">
           {loading ? (
-            <p className="text-center text-sm text-gray-500 py-8">{tr("Yüklənir...", "Loading...")}</p>
+            <p className="text-center text-sm text-gray-500 py-8">
+              {tr("Yüklənir...", "Loading...")}
+            </p>
           ) : !purchase ? (
-            <p className="text-center text-sm text-gray-500 py-8">{tr("Satınalma tapılmadı", "Purchase not found")}</p>
+            <p className="text-center text-sm text-gray-500 py-8">
+              {tr("Satınalma tapılmadı", "Purchase not found")}
+            </p>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Təchizatçı", "Supplier")}</span>
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{purchase.supplierName ?? "—"}</p>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                      <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Tarix", "Date")}</span>
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatPurchaseDate(purchase.date)}</p>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                      <Package className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Status", "Status")}</span>
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{purchase.statusLabel}</p>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                      <CreditCard className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{tr("Ödəniş Statusu", "Payment Status")}</span>
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{purchase.paymentStatus}</p>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <Field
+                  label={tr("Filial", "Branch")}
+                  value={purchase.storeName || "—"}
+                  required
+                />
+                <Field
+                  label={tr("Təchizatçı", "Supplier")}
+                  value={purchase.supplierName || "—"}
+                  required
+                />
+                <Field
+                  label={tr("Tarix", "Date")}
+                  value={formatPurchaseDate(purchase.date)}
+                  required
+                />
+                <Field
+                  label={tr("İstinad", "Reference")}
+                  value={purchase.reference || purchase.documentNo || "—"}
+                />
               </div>
 
-              <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Package className="w-4 h-4" />
-                  {tr("Məhsullar", "Products")}
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Field
+                  label={tr("Ödəniş statusu", "Payment status")}
+                  value={purchase.paymentStatus || "—"}
+                />
+                <Field label={tr("Ödənilib", "Paid")} value={`₼ ${paid.toFixed(2)}`} />
+                <Field
+                  label={tr("Borc", "Due")}
+                  value={
+                    <span className={due > 0 ? "text-[#14b8a6] font-semibold" : undefined}>
+                      ₼ {due.toFixed(2)}
+                    </span>
+                  }
+                />
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-900 dark:text-white mb-1.5">
+                  {tr("Məhsul", "Product")} <span className="text-red-500">*</span>
+                </p>
+                <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-x-auto">
+                  <table className="w-full text-xs min-w-[700px]">
+                    <thead className="bg-gray-100 dark:bg-gray-800">
+                      <tr>
+                        <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
                           {tr("Məhsul", "Product")}
                         </th>
-                        <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">SKU</th>
-                        <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
+                        <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
                           {tr("Miqdar", "Qty")}
                         </th>
-                        <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
+                        <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
                           {tr("Qiymət", "Price")}
                         </th>
-                        <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
+                        <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                          {tr("Endirim", "Discount")}
+                        </th>
+                        <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                          {tr("Vergi %", "Tax %")}
+                        </th>
+                        <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
                           {tr("Cəmi", "Total")}
                         </th>
                       </tr>
@@ -205,21 +259,45 @@ export function PurchaseDetailModal({
                     <tbody>
                       {purchase.items.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-4 text-center text-xs text-gray-500">
+                          <td colSpan={6} className="px-2 py-4 text-center text-gray-500">
                             {tr("Məhsul yoxdur", "No items")}
                           </td>
                         </tr>
                       ) : (
                         purchase.items.map((item) => {
                           const price = parsePurchaseAmount(item.purchasePrice);
-                          const lineTotal = parsePurchaseAmount(item.totalCost);
+                          const lineDiscount = parsePurchaseAmount(item.discount);
+                          const taxPercent = parsePurchaseAmount(item.taxPercent);
+                          const lineTotal = lineTotalCost(
+                            price,
+                            item.quantity,
+                            lineDiscount,
+                            taxPercent,
+                          );
                           return (
-                            <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800">
-                              <td className="py-2 px-3 text-xs text-gray-900 dark:text-white">{item.productName}</td>
-                              <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">{item.sku ?? "—"}</td>
-                              <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{item.quantity}</td>
-                              <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">₼{price.toFixed(2)}</td>
-                              <td className="py-2 px-3 text-xs text-right font-semibold text-gray-900 dark:text-white">
+                            <tr
+                              key={item.id}
+                              className="border-t border-gray-200 dark:border-gray-700"
+                            >
+                              <td className="px-2 py-2 text-gray-900 dark:text-white">
+                                {item.productName}
+                                {item.sku ? (
+                                  <span className="text-gray-400 ml-1">({item.sku})</span>
+                                ) : null}
+                              </td>
+                              <td className="px-2 py-2 text-gray-900 dark:text-white">
+                                {item.quantity}
+                              </td>
+                              <td className="px-2 py-2 text-gray-900 dark:text-white">
+                                {price.toFixed(2)}
+                              </td>
+                              <td className="px-2 py-2 text-gray-900 dark:text-white">
+                                {lineDiscount.toFixed(2)}
+                              </td>
+                              <td className="px-2 py-2 text-gray-900 dark:text-white">
+                                {taxPercent}
+                              </td>
+                              <td className="px-2 py-2 text-gray-900 dark:text-white">
                                 ₼{lineTotal.toFixed(2)}
                               </td>
                             </tr>
@@ -231,131 +309,133 @@ export function PurchaseDetailModal({
                 </div>
               </div>
 
-              <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                <div className="flex justify-end">
-                  <div className="w-full md:w-1/2 space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-600 dark:text-gray-400">{tr("Ara Cəmi", "Subtotal")}:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">₼{itemsSubtotal.toFixed(2)}</span>
-                    </div>
-                    {discount > 0 && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-600 dark:text-gray-400">{tr("Endirim", "Discount")}:</span>
-                        <span className="font-medium text-red-600 dark:text-red-400">-₼{discount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {orderTax > 0 && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-600 dark:text-gray-400">{tr("Sifariş vergisi", "Order tax")}:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">₼{orderTax.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {shippingCost > 0 && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-600 dark:text-gray-400">{tr("Göndərmə", "Shipping")}:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">₼{shippingCost.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2" />
-                    <div className="flex justify-between text-sm">
-                      <span className="font-semibold text-gray-900 dark:text-white">{tr("Ümumi Cəmi", "Grand Total")}:</span>
-                      <span className="font-bold text-lg text-[#14b8a6] dark:text-[#14b8a6]">₼{total.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-600 dark:text-gray-400">{tr("Ödənilib", "Paid")}:</span>
-                      <span className="font-medium text-green-600 dark:text-green-400">₼{paid.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-600 dark:text-gray-400">{tr("Borc", "Due")}:</span>
-                      <span className="font-medium text-[#14b8a6] dark:text-[#14b8a6]">₼{due.toFixed(2)}</span>
-                    </div>
+              <div className="flex justify-end">
+                <div className="w-72 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {tr("Məhsul cəmi", "Lines subtotal")}
+                    </span>
+                    <span>₼ {linesSubtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t pt-2">
+                    <span>{tr("Ümumi məbləğ", "Grand total")}</span>
+                    <span>₼ {(total || grandTotal).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              {purchase.payments.length > 0 && (
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                    {tr("Ödənişlər", "Payments")}
-                  </h3>
-                  <div className="space-y-2">
-                    {purchase.payments.map((p) => (
-                      <div
-                        key={p.paymentId}
-                        className="flex justify-between text-xs border-b border-gray-100 dark:border-gray-800 pb-2"
-                      >
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {formatPurchaseDate(p.date)} — {p.method}
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          ₼{parsePurchaseAmount(p.allocatedAmount).toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Field
+                  label={tr("Sifariş vergisi", "Order tax")}
+                  value={`₼ ${orderTax.toFixed(2)}`}
+                />
+                <Field
+                  label={tr("Endirim", "Discount")}
+                  value={`₼ ${discount.toFixed(2)}`}
+                />
+                <Field
+                  label={tr("Çatdırılma", "Shipping")}
+                  value={`₼ ${shippingCost.toFixed(2)}`}
+                />
+                <Field label={tr("Status", "Status")} value={statusLabel} required />
+              </div>
 
-              {due > 0 && !isDemo && canEdit && (
-                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10 space-y-2">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {tr("Ödəniş qeyd et", "Record payment")}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      max={due}
-                      step="0.01"
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                      placeholder={tr("Məbləğ", "Amount")}
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                    <select
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value as PosUiPaymentMethod)}
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              <Field
+                label={tr("Təsvir", "Description")}
+                value={purchase.description?.trim() ? purchase.description : "—"}
+              />
+
+              {purchase.payments.length > 0 && (
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                    {tr("Ödənişlər", "Payments")}
+                  </p>
+                  {purchase.payments.map((p) => (
+                    <div
+                      key={p.paymentId}
+                      className="flex justify-between text-xs border-b border-gray-100 dark:border-gray-800 pb-2 last:border-0 last:pb-0"
                     >
-                      <option value="cash">{tr("Nağd", "Cash")}</option>
-                      <option value="card">{tr("Kart", "Card")}</option>
-                      <option value="bank">{tr("Bank köçürməsi", "Bank transfer")}</option>
-                    </select>
-                    <input
-                      type="text"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      placeholder={tr("İstinad (istəyə bağlı)", "Reference (optional)")}
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                    <input
-                      type="text"
-                      value={paymentNote}
-                      onChange={(e) => setPaymentNote(e.target.value)}
-                      placeholder={tr("Qeyd (istəyə bağlı)", "Note (optional)")}
-                      className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    disabled={
-                      recordingPayment ||
-                      !paymentAmount ||
-                      parseFloat(paymentAmount) <= 0 ||
-                      parseFloat(paymentAmount) > due
-                    }
-                    onClick={() => void handleRecordPayment()}
-                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#14b8a6] text-white disabled:opacity-50"
-                  >
-                    {recordingPayment
-                      ? tr("Qeyd edilir...", "Recording...")
-                      : tr("Ödənişi qeyd et", "Record payment")}
-                  </button>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {formatPurchaseDate(p.date)} — {p.method}
+                        {p.reference ? ` · ${p.reference}` : ""}
+                        {p.note ? ` · ${p.note}` : ""}
+                      </span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        ₼{parsePurchaseAmount(p.allocatedAmount).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </>
           )}
         </div>
+
+        {purchase && due > 0 && !isDemo && canEdit && (
+          <div className="shrink-0 border-t border-[#14b8a6]/30 bg-[#f0fdfa] dark:bg-[#134e4a]/30 px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                {tr("Ödəniş qeyd et", "Record payment")}
+              </p>
+              <p className="text-xs text-[#0f766e] dark:text-[#5eead4] font-medium">
+                {tr("Borc", "Due")}: ₼ {due.toFixed(2)}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <input
+                type="number"
+                min={0}
+                max={due}
+                step="0.01"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                placeholder={tr("Məbləğ", "Amount")}
+                className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+              <ModernSelect
+                value={paymentMethod}
+                onChange={(value) => setPaymentMethod(value as PosUiPaymentMethod)}
+                className="w-full"
+                options={[
+                  { value: "cash", label: tr("Nağd", "Cash") },
+                  { value: "card", label: tr("Kart", "Card") },
+                  { value: "bank", label: tr("Bank köçürməsi", "Bank transfer") },
+                ]}
+              />
+              <input
+                type="text"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                placeholder={tr("İstinad (istəyə bağlı)", "Reference (optional)")}
+                className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+              <input
+                type="text"
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                placeholder={tr("Qeyd (istəyə bağlı)", "Note (optional)")}
+                className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={
+                  recordingPayment ||
+                  !paymentAmount ||
+                  parseFloat(paymentAmount) <= 0 ||
+                  parseFloat(paymentAmount) > due
+                }
+                onClick={() => void handleRecordPayment()}
+                className="px-4 py-1.5 text-xs font-medium rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white disabled:opacity-50"
+              >
+                {recordingPayment
+                  ? tr("Qeyd edilir...", "Recording...")
+                  : tr("Ödənişi qeyd et", "Record payment")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

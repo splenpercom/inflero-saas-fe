@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { DataPagination } from "../../ui/DataPagination";
+import { ModernSelect } from "../../ui/ModernSelect";
 import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagination";
-import { FileText, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { FileText, FileSpreadsheet } from "lucide-react";
 import { useReportDateRange } from "../../../hooks/useReportDateRange";
 import { ReportDateRangeFilter } from "./ReportDateRangeFilter";
 import { useLanguage } from "../../../i18n/LanguageContext";
@@ -177,47 +178,42 @@ export function ExpenseReport() {
             />
 
             {/* Expense Category Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedExpenseCategory}
-                onChange={(e) => setSelectedExpenseCategory(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[140px]"
-              >
-                <option value="all">Expense Category</option>
-                <option value="repairs">Repairs & Maintenance</option>
-                <option value="travel">Travel Expenses</option>
-                <option value="utilities">Utilities</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedExpenseCategory}
+                minWidth={140}
+                placeholder="Expense Category"
+                options={[
+                  { value: "all", label: "Expense Category" },
+                  { value: "repairs", label: "Repairs & Maintenance" },
+                  { value: "travel", label: "Travel Expenses" },
+                  { value: "utilities", label: "Utilities" }
+                ]}
+              />
 
             {/* Payment Method Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedPaymentMethod}
-                onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Payment Method</option>
-                <option value="cash">Cash</option>
-                <option value="card">Credit Card</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedPaymentMethod}
+                placeholder="Payment Method"
+                options={[
+                  { value: "all", label: "Payment Method" },
+                  { value: "cash", label: "Cash" },
+                  { value: "card", label: "Credit Card" }
+                ]}
+              />
 
             {/* Status Filter */}
-            <div className="relative">
-              <select
+            <ModernSelect
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer min-w-[120px]"
-              >
-                <option value="all">Status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-              </select>
-              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+                onChange={setSelectedStatus}
+                placeholder="Status"
+                options={[
+                  { value: "all", label: "Status" },
+                  { value: "pending", label: "Pending" },
+                  { value: "approved", label: "Approved" }
+                ]}
+              />
 
             {/* Generate Button */}
             <button

@@ -490,7 +490,7 @@ export function WebReport() {
           title={tr("Son Sifarişlər", "Recent Orders")}
           action={
             <a
-              href="/dashboard/my-website/orders"
+              href="/dashboard/sales/pos-orders?source=WEB"
               className="text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
             >
               {tr("Hamısına bax →", "View all →")}

@@ -1,9 +1,7 @@
 import { pickLang } from "../../i18n/pickLang";
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router";
-import { ArrowLeft, User, Mail, Phone, MapPin, Building, Calendar, Shield, Lock, Eye, EyeOff, Image } from "lucide-react";
+import { User, Mail, Phone, MapPin, Building, Calendar, Shield, Lock, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { useTheme } from "../../i18n/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import {
   changePassword,
@@ -11,13 +9,11 @@ import {
   updateProfile,
   verifyEmailChange,
 } from "../../api/auth";
-import { getUserDisplayName, getUserInitials, formatMemberSince, getCompanyLogoUrl } from "../../lib/userDisplay";
+import { formatMemberSince } from "../../lib/userDisplay";
 import { notifyFromError, notifyInfo, notifySuccess } from "../../lib/toast";
 
 export function Profile() {
-  const navigate = useNavigate();
   const { language } = useLanguage();
-  const { theme } = useTheme();
   const { user, isDemo, isAuthenticated, refresh } = useAuth();
   const [activeTab, setActiveTab] = useState<"profile" | "security">("profile");
 
@@ -50,16 +46,7 @@ export function Profile() {
     setAddress(user.address ?? "");
   }, [user]);
 
-  const displayName = getUserDisplayName(user, pt("Demo User", "Demo İstifadəçi"));
-  const initials = getUserInitials(displayName, user?.email);
-  const roleName =
-    user?.isTenantOwner || user?.role?.name === "Administrator"
-      ? "Admin"
-      : (user?.role?.name ?? pt("Administrator", "Administrator"));
-  const statusLabel =
-    user?.status === "ACTIVE" ? pt("Active", "Aktiv") : user?.status ?? pt("Active", "Aktiv");
   const companyName = user?.tenant?.name ?? pt("Inflero", "Inflero");
-  const companyLogo = getCompanyLogoUrl(user?.tenant, theme === "dark");
   const memberSince = formatMemberSince(user?.createdAt, language);
 
   const requireSignedIn = () => {
@@ -167,87 +154,6 @@ export function Profile() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-[#f0fdfa]/20 to-gray-100 dark:from-gray-950 dark:via-[#115e59]/10 dark:to-gray-900 p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-1.5 rounded-lg hover:bg-white/50 dark:hover:bg-white/5 smooth-transition"
-        >
-          <ArrowLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-        </button>
-        <div>
-          <h1 className="text-base font-bold text-gray-900 dark:text-white">{pt("Profile", "Profil")}</h1>
-          <p className="text-[10px] text-gray-600 dark:text-gray-400">
-            {pt("Manage your account information", "Hesab məlumatlarınızı idarə edin")}
-          </p>
-        </div>
-      </div>
-
-      <div className="glass-card p-4 mb-3">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-14 h-14 rounded-full bg-[#14b8a6] flex items-center justify-center overflow-hidden">
-              {user?.avatar ? (
-                <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-lg font-bold text-white">{initials}</span>
-              )}
-            </div>
-          </div>
-          <div className="flex-1">
-            <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-0.5">{displayName}</h2>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1.5">
-              {user?.email ?? (isDemo ? "demo@sample.local" : "—")}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              <span className="px-2 py-0.5 bg-[#ccfbf1]0/10 dark:bg-[#ccfbf1]0/20 border border-[#14b8a6]/20 rounded text-[10px] font-medium text-[#14b8a6] dark:text-[#14b8a6]">
-                {roleName}
-              </span>
-              <span className="px-2 py-0.5 bg-green-500/10 dark:bg-green-500/20 border border-green-500/20 rounded text-[10px] font-medium text-green-600 dark:text-green-400">
-                {statusLabel}
-              </span>
-              {isDemo && (
-                <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                  {pt("Demo", "Demo")}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-card p-4 mb-3">
-        <div className="flex items-start gap-3">
-          <div className="w-14 h-14 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0">
-            {companyLogo ? (
-              <img src={companyLogo} alt={companyName} className="w-full h-full object-cover" />
-            ) : (
-              <Building className="w-6 h-6 text-gray-400" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <Image className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6]" />
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                {pt("Company Logo", "Şirkət Loqosu")}
-              </h3>
-            </div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">{companyName}</p>
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">
-              {pt(
-                "To change your company logo, go to Settings → Company Images → Company Logo.",
-                "Şirkət loqosunu dəyişmək üçün Parametrlər → Şirkət Şəkilləri → Şirkət Loqosu bölməsinə keçin.",
-              )}
-            </p>
-            <Link
-              to="/dashboard/settings"
-              className="inline-flex mt-2 text-[10px] font-medium text-[#14b8a6] dark:text-[#14b8a6] hover:underline"
-            >
-              {pt("Open Settings", "Parametrləri aç")}
-            </Link>
-          </div>
-        </div>
-      </div>
-
       <div className="flex gap-2 mb-3">
         <button
           onClick={() => setActiveTab("profile")}

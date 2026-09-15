@@ -6,7 +6,6 @@ import {
   FileText,
   FileSpreadsheet,
   RefreshCw,
-  ChevronDown,
   ChevronUp,
   MoreVertical,
   Edit2,
@@ -33,6 +32,7 @@ import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { CreateBankAccountModal, type BankAccountFormData } from "./CreateBankAccountModal";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
+import { ModernSelect } from "../ui/ModernSelect";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -318,34 +318,29 @@ export function BankAccounts() {
               />
             </div>
             <div className="flex gap-2 ml-auto">
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="all">{tr("Status", "Status")}</option>
-                  <option value="active">{tr("Aktiv", "Active")}</option>
-                  <option value="inactive">{tr("Qeyri-aktiv", "Inactive")}</option>
-                  <option value="closed">{tr("Bağlı", "Closed")}</option>
-                  <option value="suspended">{tr("Dayandırılıb", "Suspended")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-              <div className="relative">
-                <select
-                  value={selectedSort}
-                  onChange={(e) =>
-                    setSelectedSort(e.target.value as "latest" | "oldest" | "name")
-                  }
-                  className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="latest">{tr("Sırala : Ən Yeni", "Sort By : Latest")}</option>
-                  <option value="oldest">{tr("Sırala : Ən Köhnə", "Sort By : Oldest")}</option>
-                  <option value="name">{tr("Sırala : Ad", "Sort By : Name")}</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                options={[
+                  { value: "all", label: tr("Status", "Status") },
+                  { value: "active", label: tr("Aktiv", "Active") },
+                  { value: "inactive", label: tr("Qeyri-aktiv", "Inactive") },
+                  { value: "closed", label: tr("Bağlı", "Closed") },
+                  { value: "suspended", label: tr("Dayandırılıb", "Suspended") },
+                ]}
+                placeholder={tr("Status", "Status")}
+              />
+              <ModernSelect
+                value={selectedSort}
+                onChange={(v) => setSelectedSort(v as "latest" | "oldest" | "name")}
+                options={[
+                  { value: "latest", label: tr("Sırala : Ən Yeni", "Sort By : Latest") },
+                  { value: "oldest", label: tr("Sırala : Ən Köhnə", "Sort By : Oldest") },
+                  { value: "name", label: tr("Sırala : Ad", "Sort By : Name") },
+                ]}
+                placeholder={tr("Sırala : Ən Yeni", "Sort By : Latest")}
+                minWidth={150}
+              />
             </div>
           </div>
         </div>

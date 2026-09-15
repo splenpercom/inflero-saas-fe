@@ -15,7 +15,6 @@ import {
   Minus,
   Settings,
   Save,
-  ChevronDown,
   Loader2,
 } from "lucide-react";
 import {
@@ -28,6 +27,7 @@ import {
   type DiningTable,
 } from "../../../../app/api/dining";
 import { ApiError } from "../../../../app/api/client";
+import { ModernSelect } from "../../../../app/components/ui/ModernSelect";
 import { useBranchRevision } from "../../../../app/hooks/useBranchRevision";
 
 type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
@@ -228,37 +228,21 @@ function BookingSettingsModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>{tr("Açılış", "Open Time")}</label>
-                <div className="relative">
-                  <select
-                    value={settings.openTime}
-                    onChange={(e) => sel("openTime", e.target.value)}
-                    className={`${inputCls} cursor-pointer pr-7 appearance-none`}
-                  >
-                    {TIME_OPTIONS.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-                </div>
+                <ModernSelect
+                  value={settings.openTime}
+                  onChange={(value) => sel("openTime", value)}
+                  className="w-full"
+                  options={TIME_OPTIONS.map((t) => ({ value: t, label: t }))}
+                />
               </div>
               <div>
                 <label className={labelCls}>{tr("Bağlanış", "Close Time")}</label>
-                <div className="relative">
-                  <select
-                    value={settings.closeTime}
-                    onChange={(e) => sel("closeTime", e.target.value)}
-                    className={`${inputCls} cursor-pointer pr-7 appearance-none`}
-                  >
-                    {TIME_OPTIONS.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-                </div>
+                <ModernSelect
+                  value={settings.closeTime}
+                  onChange={(value) => sel("closeTime", value)}
+                  className="w-full"
+                  options={TIME_OPTIONS.map((t) => ({ value: t, label: t }))}
+                />
               </div>
             </div>
           </div>
@@ -889,18 +873,16 @@ function NewBookingModal({
               <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                 {tr("Vaxt", "Time")} <span className="text-red-500">*</span>
               </label>
-              <select
+              <ModernSelect
                 value={form.time}
-                onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                className={`${inputCls(errors.time)} cursor-pointer`}
-              >
-                <option value="">{tr("Seçin", "Select")}</option>
-                {timeOptions.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setForm((f) => ({ ...f, time: value }))}
+                className="w-full"
+                placeholder={tr("Seçin", "Select")}
+                options={[
+                  { value: "", label: tr("Seçin", "Select") },
+                  ...timeOptions.map((t) => ({ value: t, label: t })),
+                ]}
+              />
               {errors.time && <p className="text-[10px] text-red-500 mt-0.5">{errors.time}</p>}
             </div>
             <div className="col-span-2">

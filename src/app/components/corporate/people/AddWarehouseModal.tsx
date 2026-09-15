@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import type { StoreRecord, StoreManagerCandidate } from "../../../api/stores";
 import type { UiPeopleStatus } from "../../../api/people";
+import { ModernSelect } from "../../ui/ModernSelect";
 
 import { pickLang } from "../../../i18n/pickLang";
 export type BranchFormData = {
@@ -114,10 +115,15 @@ export function AddWarehouseModal({
             </div>
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Status", "Status")} <span className="text-red-500">*</span></label>
-              <select value={status} onChange={(e) => setStatus(e.target.value as UiPeopleStatus)} className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
-                <option value="Active">{tr("Aktiv", "Active")}</option>
-                <option value="Inactive">{tr("Qeyri-aktiv", "Inactive")}</option>
-              </select>
+              <ModernSelect
+                value={status}
+                onChange={(value) => setStatus(value as UiPeopleStatus)}
+                className="w-full"
+                options={[
+                  { value: "Active", label: tr("Aktiv", "Active") },
+                  { value: "Inactive", label: tr("Qeyri-aktiv", "Inactive") },
+                ]}
+              />
             </div>
           </div>
           {!isEdit && requireBranchManager && (
@@ -125,18 +131,19 @@ export function AddWarehouseModal({
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                 {tr("Filial Meneceri", "Branch Manager")} <span className="text-red-500">*</span>
               </label>
-              <select
+              <ModernSelect
                 value={branchManagerUserId}
-                onChange={(e) => setBranchManagerUserId(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              >
-                <option value="">{tr("Seç", "Select")}</option>
-                {managers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.firstName} {m.lastName} ({m.roleName})
-                  </option>
-                ))}
-              </select>
+                onChange={setBranchManagerUserId}
+                className="w-full"
+                placeholder={tr("Seç", "Select")}
+                options={[
+                  { value: "", label: tr("Seç", "Select") },
+                  ...managers.map((m) => ({
+                    value: m.id,
+                    label: `${m.firstName} ${m.lastName} (${m.roleName})`,
+                  })),
+                ]}
+              />
               {managers.length === 0 && (
                 <p className="text-[10px] text-amber-600 mt-1">
                   {tr("Filial meneceri üçün uyğun istifadəçi yoxdur (Manager/Administrator, başqa filialı idarə etmir).", "No eligible branch manager (active Manager/Administrator not already managing another branch).")}

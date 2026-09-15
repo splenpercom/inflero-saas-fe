@@ -5,7 +5,6 @@ import {
   Plus,
   FileText,
   FileSpreadsheet,
-  ChevronDown,
   Edit2,
   Trash2,
   FolderTree,
@@ -23,6 +22,7 @@ import { AddIncomeModal, type IncomeFormData } from "./AddIncomeModal";
 import { DateInput } from "../ui/DateInput";
 import { ManageIncomeCategoriesModal } from "./ManageIncomeCategoriesModal";
 import { CreateBankAccountModal, type BankAccountFormData } from "./CreateBankAccountModal";
+import { ModernSelect } from "../ui/ModernSelect";
 import {
   createBankAccount,
   createIncome,
@@ -303,20 +303,24 @@ export function Income() {
             <div className="flex gap-2 ml-auto flex-wrap">
               <DateInput value={dateFrom} onChange={setDateFrom} className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
               <DateInput value={dateTo} onChange={setDateTo} className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
-              <div className="relative">
-                <select value={selectedStore} onChange={(e) => setSelectedStore(e.target.value)} className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer">
-                  <option value="all">{tr("Mağaza", "Store")}</option>
-                  {branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-              <div className="relative">
-                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer">
-                  <option value="all">{tr("Kateqoriya", "Category")}</option>
-                  {categories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedStore}
+                onChange={setSelectedStore}
+                options={[
+                  { value: "all", label: tr("Mağaza", "Store") },
+                  ...branches.map((b) => ({ value: b.id, label: b.name })),
+                ]}
+                placeholder={tr("Mağaza", "Store")}
+              />
+              <ModernSelect
+                value={selectedCategory}
+                onChange={setSelectedCategory}
+                options={[
+                  { value: "all", label: tr("Kateqoriya", "Category") },
+                  ...categories.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                placeholder={tr("Kateqoriya", "Category")}
+              />
             </div>
           </div>
         </div>

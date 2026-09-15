@@ -17,6 +17,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { AppBrandLogo } from "./ui/AppBrandLogo";
+import { ModernSelect } from "./ui/ModernSelect";
 
 interface Package {
   id: string;
@@ -490,23 +491,23 @@ export function RegistrationFlow({ onClose }: RegistrationFlowProps) {
                       </label>
                       <div className="flex gap-3">
                         {/* Country Code Selector */}
-                        <div className="relative">
-                          <select
-                            value={formData.countryCode || "+994"}
-                            onChange={(e) =>
-                              setFormData({ ...formData, countryCode: e.target.value })
-                            }
-                            className="h-full px-4 py-4 backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl text-white focus:bg-white/15 focus:border-blue-400 outline-none transition-all appearance-none pr-10 cursor-pointer"
-                          >
-                            <option value="+994" className="bg-slate-800">🇦🇿 +994</option>
-                            <option value="+90" className="bg-slate-800">🇹🇷 +90</option>
-                            <option value="+7" className="bg-slate-800">🇷🇺 +7</option>
-                            <option value="+1" className="bg-slate-800">🇺🇸 +1</option>
-                            <option value="+44" className="bg-slate-800">🇬🇧 +44</option>
-                            <option value="+49" className="bg-slate-800">🇩🇪 +49</option>
-                            <option value="+33" className="bg-slate-800">🇫🇷 +33</option>
-                          </select>
-                        </div>
+                        <ModernSelect
+                          value={formData.countryCode || "+994"}
+                          onChange={(value) =>
+                            setFormData({ ...formData, countryCode: value })
+                          }
+                          minWidth={120}
+                          buttonClassName="h-full !px-4 !py-4 backdrop-blur-xl !bg-white/10 !border-white/20 !rounded-xl !text-white hover:!border-blue-400 focus:!ring-blue-400"
+                          options={[
+                            { value: "+994", label: "🇦🇿 +994" },
+                            { value: "+90", label: "🇹🇷 +90" },
+                            { value: "+7", label: "🇷🇺 +7" },
+                            { value: "+1", label: "🇺🇸 +1" },
+                            { value: "+44", label: "🇬🇧 +44" },
+                            { value: "+49", label: "🇩🇪 +49" },
+                            { value: "+33", label: "🇫🇷 +33" },
+                          ]}
+                        />
                         
                         {/* Phone Input */}
                         <div className="relative flex-1">

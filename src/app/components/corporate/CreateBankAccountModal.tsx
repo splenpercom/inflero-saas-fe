@@ -9,6 +9,7 @@ import {
   type BankAccountTypeApi,
 } from "../../lib/financeMappers";
 import { notifyFromError } from "../../lib/toast";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 export interface BankAccountFormData {
@@ -151,18 +152,19 @@ export function CreateBankAccountModal({
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Hesab Növü", "Account Type")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={accountType}
-              onChange={(e) => setAccountType(e.target.value as BankAccountTypeApi)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              <option value="">{tr("Seçin", "Select")}</option>
-              {(["SAVINGS", "CURRENT", "SALARY", "BUSINESS", "INVESTMENT"] as const).map((t) => (
-                <option key={t} value={t}>
-                  {mapBankAccountTypeLabel(t, tr)}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setAccountType(value as BankAccountTypeApi)}
+              className="w-full"
+              placeholder={tr("Seçin", "Select")}
+              options={[
+                { value: "", label: tr("Seçin", "Select") },
+                ...(["SAVINGS", "CURRENT", "SALARY", "BUSINESS", "INVESTMENT"] as const).map((t) => ({
+                  value: t,
+                  label: mapBankAccountTypeLabel(t, tr),
+                })),
+              ]}
+            />
           </div>
 
           {!isEdit && (
@@ -198,17 +200,15 @@ export function CreateBankAccountModal({
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
               {tr("Hesab Statusu", "Account Status")} <span className="text-red-500">*</span>
             </label>
-            <select
+            <ModernSelect
               value={status}
-              onChange={(e) => setStatus(e.target.value as BankAccountStatusApi)}
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] appearance-none cursor-pointer"
-            >
-              {(["ACTIVE", "INACTIVE", "SUSPENDED", "CLOSED"] as const).map((s) => (
-                <option key={s} value={s}>
-                  {mapBankAccountStatusLabel(s, tr)}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setStatus(value as BankAccountStatusApi)}
+              className="w-full"
+              options={(["ACTIVE", "INACTIVE", "SUSPENDED", "CLOSED"] as const).map((s) => ({
+                value: s,
+                label: mapBankAccountStatusLabel(s, tr),
+              }))}
+            />
           </div>
         </div>
 

@@ -4,6 +4,7 @@ import { Calendar } from "lucide-react";
 import { format, parse, isValid } from "date-fns";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useFloatingPosition } from "./useFloatingPosition";
+import { ModernSelect } from "./ModernSelect";
 import {
   AZ_MONTHS_LONG,
   AZ_WEEKDAYS_SHORT,
@@ -188,30 +189,26 @@ export function DateInput({
       style={{ top: position.top, left: position.left }}
     >
       <div className="flex items-center gap-2 mb-3">
-        <select
-          value={viewMonth}
-          onChange={(e) => setViewMonth(Number(e.target.value))}
-          className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-          aria-label={pickLang(language, "Ay", "Month")}
-        >
-          {monthNames.map((name, i) => (
-            <option key={name} value={i}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={viewYear}
-          onChange={(e) => setViewYear(Number(e.target.value))}
-          className="w-[88px] shrink-0 px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-          aria-label={pickLang(language, "İl", "Year")}
-        >
-          {yearOptions.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
+        <ModernSelect
+          value={String(viewMonth)}
+          onChange={(value) => setViewMonth(Number(value))}
+          className="flex-1 min-w-0"
+          minWidth={120}
+          options={monthNames.map((name, i) => ({
+            value: String(i),
+            label: name,
+          }))}
+        />
+        <ModernSelect
+          value={String(viewYear)}
+          onChange={(value) => setViewYear(Number(value))}
+          className="w-[88px] shrink-0"
+          minWidth={88}
+          options={yearOptions.map((y) => ({
+            value: String(y),
+            label: String(y),
+          }))}
+        />
       </div>
 
       <div className="grid grid-cols-7 gap-1 mb-2">

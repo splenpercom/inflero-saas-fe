@@ -5,10 +5,10 @@ import {
   FileText,
   FileSpreadsheet,
   RefreshCw,
-  ChevronDown,
   ChevronUp,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
 interface AccountStatementItem {
@@ -232,19 +232,19 @@ export function AccountStatement() {
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 {tr("Hesab", "Account")}
               </label>
-              <div className="relative">
-                <select
-                  value={selectedAccount}
-                  onChange={(e) => setSelectedAccount(e.target.value)}
-                  className="appearance-none w-full pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] cursor-pointer"
-                >
-                  <option value="">{tr("Seçin", "Select")}</option>
-                  <option value="HBSC - 3298784309485">HBSC - 3298784309485</option>
-                  <option value="NBC - 4324356677889">NBC - 4324356677889</option>
-                  <option value="SWIZ - 5475878970090">SWIZ - 5475878970090</option>
-                </select>
-                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={selectedAccount}
+                onChange={setSelectedAccount}
+                className="w-full"
+                minWidth={200}
+                placeholder={tr("Seçin", "Select")}
+                options={[
+                  { value: "", label: tr("Seçin", "Select") },
+                  { value: "HBSC - 3298784309485", label: "HBSC - 3298784309485" },
+                  { value: "NBC - 4324356677889", label: "NBC - 4324356677889" },
+                  { value: "SWIZ - 5475878970090", label: "SWIZ - 5475878970090" },
+                ]}
+              />
             </div>
 
             {/* Submit Button */}
