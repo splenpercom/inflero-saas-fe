@@ -69,7 +69,7 @@ USB / Bluetooth wedge gun
 ### POS hardening
 
 - Abort previous lookup only when a **different** code arrives; same code while in-flight → `"ignored"`.
-- Same-code debounce ~**2000ms** after a lookup starts / succeeds.
+- Same-code debounce ~**500ms** after a lookup starts / succeeds.
 - `addToCart` returns **boolean** (stock rejects do not fake success).
 - Sequence counter ignores stale responses.
 - Network / 404 / 409 / 429 surfaced via toasts.

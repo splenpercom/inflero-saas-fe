@@ -671,7 +671,7 @@ export function CorporatePOS() {
       const now = Date.now();
       if (
         lastLookupCodeRef.current.code === trimmed &&
-        now - lastLookupCodeRef.current.at < 2000
+        now - lastLookupCodeRef.current.at < 500
       ) {
         return "ignored";
       }
