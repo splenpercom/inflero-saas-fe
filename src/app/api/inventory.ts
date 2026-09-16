@@ -72,6 +72,8 @@ export interface ProductListItem {
   status: UiStatus;
   quantityAlert: number | null;
   expiryDate: string | null;
+  /** Optional barcode printed on labels; used by POS scanners. */
+  itemBarcode?: string | null;
 }
 
 export interface PagedProducts {
@@ -363,6 +365,19 @@ export async function fetchExpiredProducts(query: ProductListQuery = {}) {
 export async function fetchProduct(id: string) {
   const res = await apiGet<{ success: boolean; data: ProductDetail }>(
     `/tenant/inventory/products/${id}`,
+  );
+  return res.data;
+}
+
+/** Exact match for barcode scanners: itemBarcode first, then sku. */
+export async function lookupProductByCode(
+  code: string,
+  options?: { signal?: AbortSignal },
+) {
+  const qs = new URLSearchParams({ code: code.trim() });
+  const res = await apiGet<{ success: boolean; data: ProductListItem }>(
+    `/tenant/inventory/products/lookup?${qs.toString()}`,
+    { signal: options?.signal },
   );
   return res.data;
 }

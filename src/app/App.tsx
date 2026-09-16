@@ -406,7 +406,7 @@ export default function App() {
           <AppShell />
         </ThemeProvider>
       </LanguageProvider>
-      <Toaster position="top-right" richColors closeButton />
+      <Toaster position="top-right" richColors closeButton style={{ zIndex: 100000 }} />
     </BrowserRouter>
   );
 }

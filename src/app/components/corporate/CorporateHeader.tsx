@@ -280,9 +280,7 @@ export const CorporateHeader = memo(function CorporateHeader({
         )}
 
         {/* Language Switcher */}
-        <div className="hidden md:block">
-          <LanguageSwitcherDropdown variant="light" />
-        </div>
+        <LanguageSwitcherDropdown variant="light" />
 
         {/* Subscription Status */}
         {subscriptionBadge && (

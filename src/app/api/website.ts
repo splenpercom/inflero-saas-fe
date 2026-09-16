@@ -84,7 +84,9 @@ export async function updateWebOrderApi(
   return res.data;
 }
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api/v1";
+import { resolveApiBaseUrl } from "./apiBase";
+
+const API_URL = resolveApiBaseUrl();
 
 export async function fetchPublicStorefront(
   slug: string,

@@ -1,5 +1,6 @@
 import { isDemoSession } from "../lib/demoSession";
 import { resolveDemoApiResponse } from "./demoMocks";
+import { resolveApiBaseUrl } from "./apiBase";
 
 export class ApiError extends Error {
   statusCode: number;
@@ -16,7 +17,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api/v1";
+const API_URL = resolveApiBaseUrl();
 
 let accessToken: string | null = null;
 let branchStoreId: string | null | undefined = undefined;

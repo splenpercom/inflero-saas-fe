@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
 function figmaAssetResolver() {
   return {
@@ -23,11 +23,25 @@ export default defineConfig({
     // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
+    // HTTPS so mobile browsers allow getUserMedia on the LAN Network URL
+    basicSsl(),
   ],
   resolve: {
     alias: {
       // Alias @ to the src directory
       '@': path.resolve(__dirname, './src'),
+    },
+  },
+
+  // Expose Vite on the LAN so phones can open the Network URL
+  server: {
+    host: true,
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:4000',
+        changeOrigin: true,
+      },
     },
   },
 

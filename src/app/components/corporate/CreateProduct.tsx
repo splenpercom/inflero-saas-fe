@@ -26,20 +26,16 @@ import {
   Upload,
   X,
   ArrowLeft,
-  Bold,
-  Italic,
-  Underline,
-  Link2,
-  List,
-  ListOrdered,
-  Type,
   Image as ImageIcon,
   Check,
   Printer,
   Plus,
+  Camera,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import JsBarcode from "jsbarcode";
+import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
+import { BarcodeScanModal } from "../ui/BarcodeScanModal";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface ProductImage {
@@ -97,6 +93,7 @@ export function CreateProduct() {
       expiryDate: { en: "Expiry On", az: "Son İstifadə Tarixi" },
       cancel: { en: "Cancel", az: "Ləğv et" },
       submit: { en: "Submit", az: "Təsdiq et" },
+      saveAndScan: { en: "Save and Scan", az: "Saxla və Skan et" },
       select: { en: "Select", az: "Seç" },
       productCreated: { en: "Product/Service created successfully!", az: "Məhsul/Xidmət uğurla yaradıldı!" },
       scan: { en: "Scan", az: "Skan et" },
@@ -117,8 +114,7 @@ export function CreateProduct() {
   // Section collapse states
   const [productInfoOpen, setProductInfoOpen] = useState(true);
   const [pricingStocksOpen, setPricingStocksOpen] = useState(true);
-  const [imagesOpen, setImagesOpen] = useState(true);
-  const [customFieldsOpen, setCustomFieldsOpen] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(true);
 
   // Active tab in custom fields
   const [activeCustomTab, setActiveCustomTab] = useState("customField1");
@@ -132,6 +128,7 @@ export function CreateProduct() {
   const [itemBarcode, setItemBarcode] = useState("");
   const [barcodeMode, setBarcodeMode] = useState<"scan" | "generate">("generate");
   const [scannerConnected, setScannerConnected] = useState(false);
+  const [barcodeScanOpen, setBarcodeScanOpen] = useState(false);
   const [description, setDescription] = useState("");
   const barcodeCanvasRef = useRef<SVGSVGElement>(null);
   const [quantity, setQuantity] = useState("");
@@ -220,6 +217,14 @@ export function CreateProduct() {
     const randomBarcode = Math.floor(Math.random() * 1000000000000).toString();
     setItemBarcode(randomBarcode);
   };
+
+  const applyScannedBarcode = useCallback((code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setItemBarcode(trimmed);
+  }, []);
+
+  const { handleKeyDown: handleBarcodeWedgeKeyDown } = useBarcodeWedge(applyScannedBarcode);
 
   const handleAddCategory = async () => {
     const errors = { name: "" };
@@ -405,7 +410,33 @@ export function CreateProduct() {
     return null;
   };
 
-  const handleSubmit = async () => {
+  const resetProductForm = useCallback(() => {
+    setProductName("");
+    setCategory("");
+    setSubCategory("");
+    setBrand("");
+    setUnit("");
+    setItemBarcode("");
+    setDescription("");
+    setQuantity("");
+    setPrice("");
+    setDiscountType("");
+    setDiscountValue("");
+    setQuantityAlert("");
+    setManufacturedDate("");
+    setExpiryDate("");
+    setImages((prev) => {
+      prev.forEach((img) => {
+        if (img.url.startsWith("blob:")) URL.revokeObjectURL(img.url);
+      });
+      return [];
+    });
+    if (barcodeCanvasRef.current) {
+      barcodeCanvasRef.current.innerHTML = "";
+    }
+  }, []);
+
+  const handleSubmit = async (opts?: { andScan?: boolean }) => {
     if (isDemo || !isAuthenticated || !canCreate) return;
     if (!productName.trim()) {
       notifyFromError(new Error(tr("Məhsul/Xidmət adı tələb olunur", "Product/Service name is required")));
@@ -451,7 +482,13 @@ export function CreateProduct() {
       });
 
       notifySuccess(pt("productCreated"));
-      navigate("/dashboard/inventory/products");
+
+      if (opts?.andScan) {
+        resetProductForm();
+        setBarcodeScanOpen(true);
+      } else {
+        navigate("/dashboard/inventory/products");
+      }
     } catch (err) {
       notifyFromError(err);
     } finally {
@@ -491,11 +528,11 @@ export function CreateProduct() {
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-visible">
             <button
               onClick={() => setProductInfoOpen(!productInfoOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors rounded-t-lg"
+              className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors rounded-t-lg"
             >
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-orange-500" viewBox="0 0 24 24" fill="none">
+                <div className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <svg className="w-2.5 h-2.5 text-orange-500" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                     <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
@@ -512,28 +549,28 @@ export function CreateProduct() {
             </button>
 
             {productInfoOpen && (
-              <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-800">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-2.5 gap-y-2.5 mt-3">
                   {/* Product Name */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  <div className="col-span-2 md:col-span-1 xl:col-span-1">
+                    <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
                       {pt("productName")} <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={productName}
                       onChange={(e) => setProductName(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      className="w-full px-2.5 py-1 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
 
                   {/* Category */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
                       {pt("category")} <span className="text-red-500">*</span>
                     </label>
-                    <div className="flex gap-1.5 items-center">
-                      <div className="flex-1">
+                    <div className="flex gap-1 items-center">
+                      <div className="flex-1 min-w-0">
                         <ModernSelect
                           value={category}
                           onChange={(e) => setCategory(e)}
@@ -546,9 +583,9 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddCategoryModalOpen(true)}
                         title="Add new category"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
+                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md transition-colors"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3 h-3" />
                       </button>
                       )}
                     </div>
@@ -556,11 +593,11 @@ export function CreateProduct() {
 
                   {/* Sub Category */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
                       {pt("subCategory")}
                     </label>
-                    <div className="flex gap-1.5 items-center">
-                      <div className="flex-1">
+                    <div className="flex gap-1 items-center">
+                      <div className="flex-1 min-w-0">
                         <ModernSelect
                           value={subCategory}
                           onChange={(e) => setSubCategory(e)}
@@ -573,9 +610,9 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddSubCategoryModalOpen(true)}
                         title="Add new sub category"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
+                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md transition-colors"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3 h-3" />
                       </button>
                       )}
                     </div>
@@ -583,11 +620,11 @@ export function CreateProduct() {
 
                   {/* Brand */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
                       {pt("brand")}
                     </label>
-                    <div className="flex gap-1.5 items-center">
-                      <div className="flex-1">
+                    <div className="flex gap-1 items-center">
+                      <div className="flex-1 min-w-0">
                         <ModernSelect
                           value={brand}
                           onChange={(e) => setBrand(e)}
@@ -600,9 +637,9 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddBrandModalOpen(true)}
                         title="Add new brand"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
+                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md transition-colors"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3 h-3" />
                       </button>
                       )}
                     </div>
@@ -610,11 +647,11 @@ export function CreateProduct() {
 
                   {/* Unit */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
                       {pt("unit")}
                     </label>
-                    <div className="flex gap-1.5 items-center">
-                      <div className="flex-1">
+                    <div className="flex gap-1 items-center">
+                      <div className="flex-1 min-w-0">
                         <ModernSelect
                           value={unit}
                           onChange={(e) => setUnit(e)}
@@ -627,116 +664,154 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddUnitModalOpen(true)}
                         title="Add new unit"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
+                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md transition-colors"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3 h-3" />
                       </button>
                       )}
                     </div>
                   </div>
 
                   {/* Item Barcode */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  <div className="col-span-2 md:col-span-2 xl:col-span-2">
+                    <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
                       {pt("itemBarcode")}
                     </label>
-
-                    {/* Barcode Input */}
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 items-center">
                       <input
                         type="text"
                         value={itemBarcode}
                         onChange={(e) => setItemBarcode(e.target.value)}
-                        className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                        placeholder={pickLang(language, "Barkodu daxil edin və ya yaradın", "Enter barcode or click generate")}
+                        onKeyDown={handleBarcodeWedgeKeyDown}
+                        autoComplete="off"
+                        className="flex-1 min-w-0 h-[30px] px-2.5 py-1 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                        placeholder={pickLang(language, "Barkodu daxil edin, skan edin və ya yaradın", "Enter, scan, or generate barcode")}
                       />
-                      <button
-                        type="button"
-                        onClick={generateBarcode}
-                        className="px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
-                      >
-                        {pt("generate")}
-                      </button>
+                      <div className="flex flex-col sm:flex-row gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setBarcodeScanOpen(true)}
+                          className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 sm:py-1 text-[11px] bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md font-medium transition-colors"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          {pt("scan")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={generateBarcode}
+                          className="inline-flex items-center justify-center px-2.5 py-1.5 sm:py-1 text-[11px] bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md font-medium transition-colors"
+                        >
+                          {pt("generate")}
+                        </button>
+                      </div>
                     </div>
-
-                    {/* Barcode Display */}
                     {itemBarcode && (
-                      <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="flex flex-col items-center gap-2">
-                          <svg ref={barcodeCanvasRef}></svg>
-                          <button
-                            type="button"
-                            onClick={handlePrintBarcode}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            {pt("print")}
-                          </button>
+                      <div className="mt-1.5 p-1.5 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
+                        <div className="overflow-x-auto max-w-full">
+                          <svg ref={barcodeCanvasRef} className="max-h-10" />
                         </div>
+                        <button
+                          type="button"
+                          onClick={handlePrintBarcode}
+                          className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <Printer className="w-2.5 h-2.5" />
+                          {pt("print")}
+                        </button>
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* Description */}
-                <div className="mt-4">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    {pt("description")}
-                  </label>
-                  <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
-                    {/* Toolbar */}
-                    <div className="flex items-center gap-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-300 dark:border-gray-700">
-                      <ModernSelect
-                        value="normal"
-                        onChange={() => {}}
-                        minWidth={100}
-                        options={[
-                          { value: "normal", label: pickLang(language, "Normal", "Normal") },
-                          { value: "h1", label: pickLang(language, "Başlıq 1", "Heading 1") },
-                          { value: "h2", label: pickLang(language, "Başlıq 2", "Heading 2") },
-                        ]}
-                      />
-                      <div className="w-px h-4 bg-gray-300 dark:bg-gray-700 mx-1" />
-                      <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-                        <Bold className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-                        <Italic className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-                        <Underline className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-                        <Link2 className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-                      </button>
-                      <div className="w-px h-4 bg-gray-300 dark:bg-gray-700 mx-1" />
-                      <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-                        <List className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-                        <ListOrdered className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
-                        <Type className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-                      </button>
-                    </div>
-                    {/* Editor */}
-                    <textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none resize-none"
-                      rows={4}
-                    />
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-1">{pickLang(language, "Maksimum 60 söz", "Maximum 60 Words")}</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Pricing & Stocks Section */}
+          {/* Description (left) + Images (right) */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-visible">
             <button
+              type="button"
+              onClick={() => setDetailsOpen(!detailsOpen)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors rounded-t-lg"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <ImageIcon className="w-3 h-3 text-orange-500" />
+                </div>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {pt("description")} & {pt("images")}
+                </span>
+              </div>
+              {detailsOpen ? (
+                <ChevronUp className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              )}
+            </button>
+
+            {detailsOpen && (
+              <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                  <div className="min-w-0">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      {pt("description")}
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none"
+                      rows={5}
+                      placeholder={pickLang(language, "Qısa təsvir...", "Short description...")}
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {pickLang(language, "Maksimum 60 söz", "Maximum 60 Words")}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      {pt("images")}
+                    </label>
+                    <div className="flex flex-wrap gap-2 content-start min-h-[7.5rem] p-2 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+                      <label className="w-16 h-16 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#14b8a6] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                        <Upload className="w-4 h-4 text-gray-400 mb-0.5" />
+                        <span className="text-[9px] text-gray-400 text-center px-0.5 leading-tight">
+                          {pt("uploadImages")}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {images.map((image) => (
+                        <div key={image.id} className="relative w-16 h-16">
+                          <img
+                            src={image.url}
+                            alt={pt("productService")}
+                            className="w-full h-full object-cover rounded-lg border border-gray-300 dark:border-gray-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(image.id)}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pricing & Stocks Section (+ dates / alerts from custom fields) */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-visible">
+            <button
+              type="button"
               onClick={() => setPricingStocksOpen(!pricingStocksOpen)}
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors rounded-t-lg"
             >
@@ -760,36 +835,35 @@ export function CreateProduct() {
 
             {pricingStocksOpen && (
               <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6 mt-4">
-                  {/* Quantity */}
-                  {stockEnabled && <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      {pt("quantity")}
-                    </label>
-                    <input
-                      type="number"
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                    />
-                  </div>}
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-3 mt-4">
+                  {stockEnabled && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {pt("quantity")}
+                      </label>
+                      <input
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      />
+                    </div>
+                  )}
 
-                  {/* Price */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {pt("price")} <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
 
-                  {/* Discount Type */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {pt("discountType")}
                     </label>
                     <ModernSelect
@@ -804,146 +878,54 @@ export function CreateProduct() {
                     />
                   </div>
 
-                  {/* Discount Value */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {pt("discountValue")}
                     </label>
                     <input
                       type="number"
                       value={discountValue}
                       onChange={(e) => setDiscountValue(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
-                </div>
 
-                {/* Quantity Alert */}
-                {stockEnabled && <div className="mt-6">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    {pt("quantityAlert")}
-                  </label>
-                  <input
-                    type="number"
-                    value={quantityAlert}
-                    onChange={(e) => setQuantityAlert(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                  />
-                </div>}
-              </div>
-            )}
-          </div>
-
-          {/* Images Section */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setImagesOpen(!imagesOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <ImageIcon className="w-3 h-3 text-orange-500" />
-                </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{pt("images")}</span>
-              </div>
-              {imagesOpen ? (
-                <ChevronUp className="w-4 h-4 text-gray-400" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-              )}
-            </button>
-
-            {imagesOpen && (
-              <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800">
-                <div className="flex flex-wrap gap-3 mt-4">
-                  {/* Upload Box */}
-                  <label className="w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#14b8a6] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                    <Upload className="w-5 h-5 text-gray-400 mb-1" />
-                    <span className="text-[10px] text-gray-400">{pt("uploadImages")}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-
-                  {/* Image Previews */}
-                  {images.map((image) => (
-                    <div key={image.id} className="relative w-20 h-20">
-                      <img
-                        src={image.url}
-                        alt={pt("productService")}
-                        className="w-full h-full object-cover rounded-lg border border-gray-300 dark:border-gray-700"
-                      />
-                      <button
-                        onClick={() => removeImage(image.id)}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Custom Fields Section */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setCustomFieldsOpen(!customFieldsOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-orange-500" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M4 6h16M4 12h16M4 18h16"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {pt("customFields")}
-                </span>
-              </div>
-              {customFieldsOpen ? (
-                <ChevronUp className="w-4 h-4 text-gray-400" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-              )}
-            </button>
-
-            {customFieldsOpen && (
-              <div className="border-t border-gray-200 dark:border-gray-800">
-                <div className="px-4 pb-4 pt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {stockEnabled && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                        {pt("manufacturedDate")}
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {pt("quantityAlert")}
                       </label>
-                      <DateInput
-                        value={manufacturedDate}
-                        onChange={setManufacturedDate}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                        placeholder={pt("datePlaceholder")}
+                      <input
+                        type="number"
+                        value={quantityAlert}
+                        onChange={(e) => setQuantityAlert(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                        {pt("expiryDate")}
-                      </label>
-                      <DateInput
-                        value={expiryDate}
-                        onChange={setExpiryDate}
-                        className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                        placeholder={pt("datePlaceholder")}
-                      />
-                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {pt("manufacturedDate")}
+                    </label>
+                    <DateInput
+                      value={manufacturedDate}
+                      onChange={setManufacturedDate}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      placeholder={pt("datePlaceholder")}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {pt("expiryDate")}
+                    </label>
+                    <DateInput
+                      value={expiryDate}
+                      onChange={setExpiryDate}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      placeholder={pt("datePlaceholder")}
+                    />
                   </div>
                 </div>
               </div>
@@ -951,15 +933,25 @@ export function CreateProduct() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2 flex-wrap">
             <button
+              type="button"
               onClick={handleCancel}
               className="px-4 py-2 text-xs bg-gray-900 dark:bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
             >
               {pt("cancel")}
             </button>
             <button
-              onClick={handleSubmit}
+              type="button"
+              onClick={() => void handleSubmit({ andScan: true })}
+              disabled={submitting || optionsLoading}
+              className="px-4 py-2 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? tr("Göndərilir...", "Submitting...") : pt("saveAndScan")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
               disabled={submitting || optionsLoading}
               className="px-4 py-2 text-xs bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -1245,6 +1237,13 @@ export function CreateProduct() {
           </div>
         </div>
       )}
+
+      <BarcodeScanModal
+        open={barcodeScanOpen}
+        onClose={() => setBarcodeScanOpen(false)}
+        onScan={applyScannedBarcode}
+        title={pt("scanBarcode")}
+      />
     </div>
   );
 }

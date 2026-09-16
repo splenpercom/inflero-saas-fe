@@ -4,6 +4,7 @@ import React, {
   isValidElement,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactElement,
@@ -12,6 +13,8 @@ import { createPortal } from "react-dom";
 import { useFloatingPosition } from "./useFloatingPosition";
 
 const DropdownCtx = createContext<{ close: () => void } | null>(null);
+const VIEWPORT_PAD = 8;
+const MIN_MENU_WIDTH = 200;
 
 interface DropdownProps {
   trigger: React.ReactNode;
@@ -32,6 +35,28 @@ export function SimpleDropdown({
 
   const position = useFloatingPosition(anchorRef, isOpen, estimatedHeight);
   const close = () => setIsOpen(false);
+
+  const menuStyle = useMemo(() => {
+    const menuWidth = Math.max(position.width, MIN_MENU_WIDTH);
+    let left =
+      align === "end"
+        ? position.left + position.width - menuWidth
+        : position.left;
+
+    const maxLeft = Math.max(VIEWPORT_PAD, window.innerWidth - menuWidth - VIEWPORT_PAD);
+    left = Math.min(Math.max(left, VIEWPORT_PAD), maxLeft);
+
+    let top = position.top;
+    const maxTop = Math.max(VIEWPORT_PAD, window.innerHeight - estimatedHeight - VIEWPORT_PAD);
+    top = Math.min(Math.max(top, VIEWPORT_PAD), maxTop);
+
+    return {
+      top,
+      left,
+      width: menuWidth,
+      maxWidth: `calc(100vw - ${VIEWPORT_PAD * 2}px)`,
+    };
+  }, [align, estimatedHeight, position.left, position.top, position.width]);
 
   const triggerElement = isValidElement(trigger)
     ? cloneElement(trigger as ReactElement<{ onClick?: (e: React.MouseEvent) => void; disabled?: boolean }>, {
@@ -68,11 +93,7 @@ export function SimpleDropdown({
             <div
               ref={portalRef}
               className="fixed z-[9999] min-w-[200px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1.5 shadow-xl"
-              style={{
-                top: position.top,
-                left: align === "end" ? position.left + position.width - Math.max(position.width, 200) : position.left,
-                width: Math.max(position.width, 200),
-              }}
+              style={menuStyle}
             >
               {children}
             </div>

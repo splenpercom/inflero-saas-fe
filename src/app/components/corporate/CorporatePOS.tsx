@@ -22,14 +22,17 @@ import {
   ChefHat,
   Armchair,
   Factory,
+  Camera,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
+import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { formatCurrency } from "../../utils/currency";
-import { fetchProducts } from "../../api/inventory";
+import { fetchProducts, lookupProductByCode, type ProductListItem } from "../../api/inventory";
+import { BarcodeScanModal } from "../ui/BarcodeScanModal";
 import {
   fetchCustomers,
   fetchCustomerVehicles,
@@ -42,7 +45,7 @@ import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
 import { parsePrice } from "../../lib/inventoryMappers";
 import { formatDateTime } from "../../lib/dateFormat";
-import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
+import { notifyFromError, notifySuccess, notifyWarning, isAbortError, isNetworkError, notifyError } from "../../lib/toast";
 import { mapPaymentMethodToApi } from "../../lib/salesMappers";
 import { APP_LOGO_LIGHT, getBrandLogoUrl } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
@@ -407,6 +410,20 @@ export function CorporatePOS() {
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [scanModalOpen, setScanModalOpen] = useState(false);
+  const lookupAbortRef = useRef<AbortController | null>(null);
+  const lookupSeqRef = useRef(0);
+  const lastLookupCodeRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+
+  const mapListItemToProduct = useCallback((item: ProductListItem): Product => ({
+    id: item.id,
+    name: item.name,
+    price: parsePrice(item.price),
+    image: item.image || "📦",
+    category: item.category || "",
+    stock: item.quantity,
+    code: item.sku,
+  }), []);
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -438,24 +455,14 @@ export function CorporatePOS() {
     setProductsLoading(true);
     try {
       const data = await fetchProducts({ pageSize: 100 });
-      setProducts(
-        data.items.map((item) => ({
-          id: item.id,
-          name: item.name,
-          price: parsePrice(item.price),
-          image: item.image || "📦",
-          category: item.category || "",
-          stock: item.quantity,
-          code: item.sku,
-        })),
-      );
+      setProducts(data.items.map(mapListItemToProduct));
     } catch (err) {
       notifyFromError(err, tr("Məhsulları yükləmək alınmadı", "Failed to load products"));
       setProducts([]);
     } finally {
       setProductsLoading(false);
     }
-  }, [isDemo, isAuthenticated, branchRevision, language]);
+  }, [isDemo, isAuthenticated, branchRevision, language, mapListItemToProduct]);
 
   const loadCustomers = useCallback(async () => {
     if (!(isAuthenticated || isDemo)) {
@@ -641,6 +648,69 @@ export function CorporatePOS() {
       ];
     });
   };
+
+  const addToCartRef = useRef(addToCart);
+  addToCartRef.current = addToCart;
+
+  const handleBarcodeScan = useCallback(
+    async (code: string): Promise<boolean> => {
+      const trimmed = code.trim();
+      if (!trimmed) return false;
+
+      if (!canCreate) {
+        notifyWarning(tr("Sifariş yaratmaq icazəniz yoxdur", "You do not have permission to add items"));
+        return false;
+      }
+      if (receipt) return false;
+
+      // Soft debounce for identical rapid rescans (gun bounce).
+      const now = Date.now();
+      if (
+        lastLookupCodeRef.current.code === trimmed &&
+        now - lastLookupCodeRef.current.at < 300
+      ) {
+        return false;
+      }
+      lastLookupCodeRef.current = { code: trimmed, at: now };
+
+      // Cancel any in-flight lookup so out-of-order responses cannot double-add
+      lookupAbortRef.current?.abort();
+      const ac = new AbortController();
+      lookupAbortRef.current = ac;
+      const seq = ++lookupSeqRef.current;
+
+      try {
+        const item = await lookupProductByCode(trimmed, { signal: ac.signal });
+        if (seq !== lookupSeqRef.current || ac.signal.aborted) return false;
+        addToCartRef.current(mapListItemToProduct(item));
+        setSearchQuery("");
+        setScanModalOpen(false);
+        notifySuccess(
+          tr(`Əlavə olundu: ${item.name}`, `Added: ${item.name}`),
+        );
+        return true;
+      } catch (err) {
+        if (seq !== lookupSeqRef.current || isAbortError(err) || ac.signal.aborted) return false;
+        if (isNetworkError(err)) {
+          notifyError(
+            tr(
+              "Şəbəkə xətası — bağlantını yoxlayın və ya SKU-nu axtarışda əl ilə daxil edin",
+              "Network error — check connection, or type the SKU in search manually",
+            ),
+          );
+          return false;
+        }
+        notifyFromError(
+          err,
+          tr("Məhsul tapılmadı", "Product not found for this barcode"),
+        );
+        return false;
+      }
+    },
+    [canCreate, receipt, mapListItemToProduct, language],
+  );
+
+  const { handleKeyDown: handleSearchBarcodeKeyDown } = useBarcodeWedge(handleBarcodeScan);
 
   const removeFromCart = (id: string) => {
     if (!canCreate) return;
@@ -1103,15 +1173,30 @@ export function CorporatePOS() {
           {/* ── Left: Products ── */}
           <div className="lg:col-span-7 xl:col-span-8 flex flex-col min-h-[40vh] lg:min-h-0 overflow-hidden">
             <div className="shrink-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder={tr("Məhsul/xidmət axtar...", "Search product or service...")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder={tr("Məhsul/xidmət axtar və ya skan et...", "Search or scan product...")}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={handleSearchBarcodeKeyDown}
+                    autoComplete="off"
+                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                  />
+                </div>
+                {canCreate && (
+                  <button
+                    type="button"
+                    onClick={() => setScanModalOpen(true)}
+                    title={tr("Kamerayla skan et", "Scan with camera")}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    {tr("Skan", "Scan")}
+                  </button>
+                )}
               </div>
               <div className="flex gap-2 overflow-x-auto mt-3 pb-1">
                 {categories.map((cat) => (
@@ -1662,6 +1747,13 @@ export function CorporatePOS() {
 
       {/* Thermal Receipt Modal */}
       {receipt && <ThermalReceipt data={receipt} onClose={() => setReceipt(null)} />}
+
+      <BarcodeScanModal
+        open={scanModalOpen}
+        onClose={() => setScanModalOpen(false)}
+        onScan={handleBarcodeScan}
+        title={tr("Barkod skan et", "Scan barcode")}
+      />
     </div>
   );
 }
