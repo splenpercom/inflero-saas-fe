@@ -30,12 +30,10 @@ import {
   Check,
   Printer,
   Plus,
-  Camera,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import JsBarcode from "jsbarcode";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
-import { BarcodeScanModal } from "../ui/BarcodeScanModal";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface ProductImage {
@@ -93,14 +91,9 @@ export function CreateProduct() {
       expiryDate: { en: "Expiry On", az: "Son İstifadə Tarixi" },
       cancel: { en: "Cancel", az: "Ləğv et" },
       submit: { en: "Submit", az: "Təsdiq et" },
-      saveAndScan: { en: "Save and Scan", az: "Saxla və Skan et" },
+      saveAndNew: { en: "Save and New", az: "Saxla və Yenisi" },
       select: { en: "Select", az: "Seç" },
       productCreated: { en: "Product/Service created successfully!", az: "Məhsul/Xidmət uğurla yaradıldı!" },
-      scan: { en: "Scan", az: "Skan et" },
-      scanBarcode: { en: "Scan Barcode", az: "Barkod Skan et" },
-      connectScanner: { en: "Please connect a barcode scanner device", az: "Zəhmət olmasa barkod skan cihazını qoşun" },
-      scannerReady: { en: "Scanner ready - scan a barcode", az: "Skan cihazı hazırdır - barkodu skan edin" },
-      testConnection: { en: "Test Connection", az: "Bağlantını Yoxla" },
       print: { en: "Print", az: "Çap et" },
       addNewCategory: { en: "Add New Category", az: "Yeni Kateqoriya Əlavə et" },
       categoryName: { en: "Category Name", az: "Kateqoriya Adı" },
@@ -126,9 +119,6 @@ export function CreateProduct() {
   const [brand, setBrand] = useState("");
   const [unit, setUnit] = useState("");
   const [itemBarcode, setItemBarcode] = useState("");
-  const [barcodeMode, setBarcodeMode] = useState<"scan" | "generate">("generate");
-  const [scannerConnected, setScannerConnected] = useState(false);
-  const [barcodeScanOpen, setBarcodeScanOpen] = useState(false);
   const [description, setDescription] = useState("");
   const barcodeCanvasRef = useRef<SVGSVGElement>(null);
   const [quantity, setQuantity] = useState("");
@@ -436,7 +426,7 @@ export function CreateProduct() {
     }
   }, []);
 
-  const handleSubmit = async (opts?: { andScan?: boolean }) => {
+  const handleSubmit = async (opts?: { andNew?: boolean }) => {
     if (isDemo || !isAuthenticated || !canCreate) return;
     if (!productName.trim()) {
       notifyFromError(new Error(tr("Məhsul/Xidmət adı tələb olunur", "Product/Service name is required")));
@@ -483,9 +473,8 @@ export function CreateProduct() {
 
       notifySuccess(pt("productCreated"));
 
-      if (opts?.andScan) {
+      if (opts?.andNew) {
         resetProductForm();
-        setBarcodeScanOpen(true);
       } else {
         navigate("/dashboard/inventory/products");
       }
@@ -687,23 +676,13 @@ export function CreateProduct() {
                         className="flex-1 min-w-0 h-[30px] px-2.5 py-1 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                         placeholder={pickLang(language, "Barkodu daxil edin, skan edin və ya yaradın", "Enter, scan, or generate barcode")}
                       />
-                      <div className="flex flex-col sm:flex-row gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setBarcodeScanOpen(true)}
-                          className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 sm:py-1 text-[11px] bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md font-medium transition-colors"
-                        >
-                          <Camera className="w-3.5 h-3.5" />
-                          {pt("scan")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={generateBarcode}
-                          className="inline-flex items-center justify-center px-2.5 py-1.5 sm:py-1 text-[11px] bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md font-medium transition-colors"
-                        >
-                          {pt("generate")}
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={generateBarcode}
+                        className="shrink-0 inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md font-medium transition-colors"
+                      >
+                        {pt("generate")}
+                      </button>
                     </div>
                     {itemBarcode && (
                       <div className="mt-1.5 p-1.5 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
@@ -943,11 +922,11 @@ export function CreateProduct() {
             </button>
             <button
               type="button"
-              onClick={() => void handleSubmit({ andScan: true })}
+              onClick={() => void handleSubmit({ andNew: true })}
               disabled={submitting || optionsLoading}
               className="px-4 py-2 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? tr("Göndərilir...", "Submitting...") : pt("saveAndScan")}
+              {submitting ? tr("Göndərilir...", "Submitting...") : pt("saveAndNew")}
             </button>
             <button
               type="button"
@@ -1237,13 +1216,6 @@ export function CreateProduct() {
           </div>
         </div>
       )}
-
-      <BarcodeScanModal
-        open={barcodeScanOpen}
-        onClose={() => setBarcodeScanOpen(false)}
-        onScan={applyScannedBarcode}
-        title={pt("scanBarcode")}
-      />
     </div>
   );
 }

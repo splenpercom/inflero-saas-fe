@@ -22,7 +22,6 @@ import {
   ChefHat,
   Armchair,
   Factory,
-  Camera,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -32,7 +31,6 @@ import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { formatCurrency } from "../../utils/currency";
 import { fetchProducts, lookupProductByCode, type ProductListItem } from "../../api/inventory";
-import { BarcodeScanModal } from "../ui/BarcodeScanModal";
 import {
   fetchCustomers,
   fetchCustomerVehicles,
@@ -410,10 +408,10 @@ export function CorporatePOS() {
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
-  const [scanModalOpen, setScanModalOpen] = useState(false);
   const lookupAbortRef = useRef<AbortController | null>(null);
   const lookupSeqRef = useRef(0);
   const lastLookupCodeRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+  const lookupInFlightCodeRef = useRef<string | null>(null);
 
   const mapListItemToProduct = useCallback((item: ProductListItem): Product => ({
     id: item.id,
@@ -614,18 +612,18 @@ export function CorporatePOS() {
     );
   };
 
-  const addToCart = (product: Product) => {
-    if (!canCreate) return;
+  const addToCart = (product: Product): boolean => {
+    if (!canCreate) return false;
     const existing = cart.find((i) => i.id === product.id);
     const nextQty = existing ? existing.quantity + 1 : 1;
 
     if (stockEnabled && product.stock <= 0) {
       warnOutOfStock(product);
-      return;
+      return false;
     }
     if (stockEnabled && nextQty > product.stock) {
       warnInsufficientStock(product, product.stock);
-      return;
+      return false;
     }
 
     playBeep();
@@ -647,50 +645,59 @@ export function CorporatePOS() {
         },
       ];
     });
+    return true;
   };
 
   const addToCartRef = useRef(addToCart);
   addToCartRef.current = addToCart;
 
   const handleBarcodeScan = useCallback(
-    async (code: string): Promise<boolean> => {
+    async (code: string): Promise<boolean | "ignored"> => {
       const trimmed = code.trim();
-      if (!trimmed) return false;
+      if (!trimmed) return "ignored";
 
       if (!canCreate) {
         notifyWarning(tr("Sifariş yaratmaq icazəniz yoxdur", "You do not have permission to add items"));
         return false;
       }
-      if (receipt) return false;
+      if (receipt) return "ignored";
+
+      // Same code already looking up → ignore (do not abort; abort races can double-add).
+      if (lookupInFlightCodeRef.current === trimmed) {
+        return "ignored";
+      }
 
       // Soft debounce for identical rapid rescans (gun bounce).
       const now = Date.now();
       if (
         lastLookupCodeRef.current.code === trimmed &&
-        now - lastLookupCodeRef.current.at < 300
+        now - lastLookupCodeRef.current.at < 2000
       ) {
-        return false;
+        return "ignored";
       }
       lastLookupCodeRef.current = { code: trimmed, at: now };
 
-      // Cancel any in-flight lookup so out-of-order responses cannot double-add
+      // Abort only when a *different* code supersedes an in-flight lookup.
       lookupAbortRef.current?.abort();
       const ac = new AbortController();
       lookupAbortRef.current = ac;
       const seq = ++lookupSeqRef.current;
+      lookupInFlightCodeRef.current = trimmed;
 
       try {
         const item = await lookupProductByCode(trimmed, { signal: ac.signal });
-        if (seq !== lookupSeqRef.current || ac.signal.aborted) return false;
-        addToCartRef.current(mapListItemToProduct(item));
+        if (seq !== lookupSeqRef.current || ac.signal.aborted) return "ignored";
+        const added = addToCartRef.current(mapListItemToProduct(item));
+        if (!added) return false;
         setSearchQuery("");
-        setScanModalOpen(false);
         notifySuccess(
           tr(`Əlavə olundu: ${item.name}`, `Added: ${item.name}`),
         );
+        // Refresh debounce clock after success so a late second hit can't slip in.
+        lastLookupCodeRef.current = { code: trimmed, at: Date.now() };
         return true;
       } catch (err) {
-        if (seq !== lookupSeqRef.current || isAbortError(err) || ac.signal.aborted) return false;
+        if (seq !== lookupSeqRef.current || isAbortError(err) || ac.signal.aborted) return "ignored";
         if (isNetworkError(err)) {
           notifyError(
             tr(
@@ -705,6 +712,10 @@ export function CorporatePOS() {
           tr("Məhsul tapılmadı", "Product not found for this barcode"),
         );
         return false;
+      } finally {
+        if (lookupInFlightCodeRef.current === trimmed) {
+          lookupInFlightCodeRef.current = null;
+        }
       }
     },
     [canCreate, receipt, mapListItemToProduct, language],
@@ -1186,17 +1197,6 @@ export function CorporatePOS() {
                     className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                   />
                 </div>
-                {canCreate && (
-                  <button
-                    type="button"
-                    onClick={() => setScanModalOpen(true)}
-                    title={tr("Kamerayla skan et", "Scan with camera")}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    {tr("Skan", "Scan")}
-                  </button>
-                )}
               </div>
               <div className="flex gap-2 overflow-x-auto mt-3 pb-1">
                 {categories.map((cat) => (
@@ -1747,13 +1747,6 @@ export function CorporatePOS() {
 
       {/* Thermal Receipt Modal */}
       {receipt && <ThermalReceipt data={receipt} onClose={() => setReceipt(null)} />}
-
-      <BarcodeScanModal
-        open={scanModalOpen}
-        onClose={() => setScanModalOpen(false)}
-        onScan={handleBarcodeScan}
-        title={tr("Barkod skan et", "Scan barcode")}
-      />
     </div>
   );
 }

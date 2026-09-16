@@ -25,7 +25,10 @@ export function isBarcodeLikeCode(value: string): boolean {
  * Scanners type characters quickly and finish with Enter.
  * Also treats Enter on a code-like field value as a scan (paste + Enter / gun).
  */
-export function useBarcodeWedge(onScan: (code: string) => void, opts?: BarcodeWedgeOptions) {
+export function useBarcodeWedge(
+  onScan: (code: string) => void | Promise<unknown>,
+  opts?: BarcodeWedgeOptions,
+) {
   const minLength = opts?.minLength ?? 4;
   const maxKeyGapMs = opts?.maxKeyGapMs ?? DEFAULT_WEDGE_MAX_KEY_GAP_MS;
   const bufferRef = useRef("");

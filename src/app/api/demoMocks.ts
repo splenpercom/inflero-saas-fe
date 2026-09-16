@@ -1008,6 +1008,26 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
     const pageSize = Number(params.get("pageSize") ?? 10);
     return ok(paged(productListItems(), page, pageSize));
   }
+  if (pathname === "/tenant/inventory/products/lookup") {
+    const code = (params.get("code") ?? "").trim().toLowerCase();
+    if (code.length < 1) throw new ApiError(400, "code is required");
+    const items = productListItems().map((p) => ({
+      ...p,
+      // Demo barcodes mirror SKU so camera/wedge tests work without a separate barcode field
+      itemBarcode: p.sku,
+    }));
+    const byBarcode = items.filter((p) => p.itemBarcode.toLowerCase() === code);
+    if (byBarcode.length > 1) {
+      throw new ApiError(409, "Multiple products match this barcode", undefined, "AMBIGUOUS_PRODUCT_CODE");
+    }
+    if (byBarcode.length === 1) return ok(byBarcode[0]);
+    const bySku = items.filter((p) => p.sku.toLowerCase() === code);
+    if (bySku.length > 1) {
+      throw new ApiError(409, "Multiple products match this SKU", undefined, "AMBIGUOUS_PRODUCT_CODE");
+    }
+    if (bySku.length === 1) return ok(bySku[0]);
+    throw new ApiError(404, "Product not found");
+  }
   const productMatch = pathname.match(/^\/tenant\/inventory\/products\/([^/]+)$/);
   if (productMatch) return ok(productDetail(productMatch[1]));
 

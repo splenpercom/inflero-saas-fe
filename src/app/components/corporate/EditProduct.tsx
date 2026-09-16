@@ -37,12 +37,10 @@ import {
   Image as ImageIcon,
   Printer,
   Plus,
-  Camera,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import JsBarcode from "jsbarcode";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
-import { BarcodeScanModal } from "../ui/BarcodeScanModal";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 const LIST_PATH = "/dashboard/inventory/products";
@@ -112,8 +110,6 @@ export function EditProduct() {
       select: { en: "Select", az: "Seç" },
       productUpdated: { en: "Product/Service updated successfully!", az: "Məhsul/Xidmət uğurla yeniləndi!" },
       generate: { en: "Generate", az: "Yarat" },
-      scan: { en: "Scan", az: "Skan et" },
-      scanBarcode: { en: "Scan Barcode", az: "Barkod Skan et" },
       print: { en: "Print", az: "Çap et" },
       datePlaceholder: { en: "dd/mm/yyyy", az: "gün/ay/il" },
     };
@@ -133,7 +129,6 @@ export function EditProduct() {
   const [brand, setBrand] = useState("");
   const [unit, setUnit] = useState("");
   const [itemBarcode, setItemBarcode] = useState("");
-  const [barcodeScanOpen, setBarcodeScanOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
@@ -578,15 +573,8 @@ export function EditProduct() {
                         onKeyDown={handleBarcodeWedgeKeyDown}
                         autoComplete="off"
                         className="flex-1 px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+                        placeholder={pickLang(language, "Barkodu daxil edin, skan edin və ya yaradın", "Enter, scan, or generate barcode")}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setBarcodeScanOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        {pt("scan")}
-                      </button>
                       <button type="button" onClick={generateBarcode} className="px-3 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg">
                         {pt("generate")}
                       </button>
@@ -792,13 +780,6 @@ export function EditProduct() {
           </div>
         </div>
       )}
-
-      <BarcodeScanModal
-        open={barcodeScanOpen}
-        onClose={() => setBarcodeScanOpen(false)}
-        onScan={applyScannedBarcode}
-        title={pt("scanBarcode")}
-      />
     </div>
   );
 }
