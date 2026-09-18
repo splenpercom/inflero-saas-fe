@@ -54,7 +54,13 @@ import { mapPaymentMethodToApi } from "../../lib/salesMappers";
 import { APP_LOGO_LIGHT, getBrandLogoUrl } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { useIsDarkMode } from "../../hooks/useIsDarkMode";
-import { BrandLogo, brandLogoReceiptHtml } from "../ui/BrandLogo";
+import { BrandLogo } from "../ui/BrandLogo";
+import {
+  THERMAL_RECEIPT_PRINT_CSS,
+  brandLogoThermalHtml,
+  receiptPrintText,
+  thermalReceiptLabels,
+} from "../../lib/thermalReceipt";
 import { useNavigate } from "react-router";
 import { pickCurrentUserBillerId } from "../../lib/salesBiller";
 
@@ -179,28 +185,21 @@ interface ReceiptData {
   total: number;
   paymentMethod: string;
   paymentStatusLabel: string;
-  /** When DINING module is on: customer + kitchen copies for two printers. */
-  printCopies?: number;
+  /** Auto-open browser print once for the customer/counter receipt. */
+  autoPrintReceipt?: boolean;
+  /** Show optional kitchen paper reprint (kitchen primary path is digital KOT). */
+  allowKitchenReprint?: boolean;
   tableLabel?: string;
 }
 
-function latinize(str: string): string {
-  return str
-    .replace(/ə/g, "e").replace(/Ə/g, "E")
-    .replace(/ö/g, "o").replace(/Ö/g, "O")
-    .replace(/ğ/g, "g").replace(/Ğ/g, "G")
-    .replace(/ı/g, "i").replace(/İ/g, "I")
-    .replace(/ü/g, "u").replace(/Ü/g, "U")
-    .replace(/ç/g, "c").replace(/Ç/g, "C")
-    .replace(/ş/g, "s").replace(/Ş/g, "S");
-}
-
 function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
+  const { language } = useLanguage();
+  const labels = thermalReceiptLabels(language);
+  const p = (value: string) => receiptPrintText(language, value);
   const isDark = useIsDarkMode();
   const { user } = useAuth();
   const companyName = user?.tenant?.name?.trim() || "Inflero";
   const previewLogoSrc = getBrandLogoUrl(user?.tenant, isDark);
-  // Print on white paper — prefer light company logo, then dark company logo, then app fallback.
   const printLogoSrc =
     getCompanyLogoUrl(user?.tenant, false) ??
     getCompanyLogoUrl(user?.tenant, true) ??
@@ -214,136 +213,137 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
     if (!printWin) return;
     const d = {
       ...data,
-      orderNo: latinize(data.orderNo),
-      customer: latinize(data.customer),
+      orderNo: p(data.orderNo),
+      customer: p(data.customer),
       customerPhone: data.customerPhone,
-      vehicle: data.vehicle ? latinize(data.vehicle) : undefined,
-      employee: latinize(data.employee),
-      paymentMethod: latinize(data.paymentMethod),
-      paymentStatusLabel: latinize(data.paymentStatusLabel),
-      discountLabel: latinize(data.discountLabel),
-      tableLabel: data.tableLabel ? latinize(data.tableLabel) : undefined,
-      items: data.items.map((it) => ({ ...it, name: latinize(it.name) })),
+      vehicle: data.vehicle ? p(data.vehicle) : undefined,
+      employee: p(data.employee),
+      paymentMethod: p(data.paymentMethod),
+      paymentStatusLabel: p(data.paymentStatusLabel),
+      discountLabel: p(data.discountLabel),
+      tableLabel: data.tableLabel ? p(data.tableLabel) : undefined,
+      items: data.items.map((it) => ({ ...it, name: p(it.name) })),
+    };
+    const L = {
+      order: p(labels.order),
+      date: p(labels.date),
+      table: p(labels.table),
+      customer: p(labels.customer),
+      phone: p(labels.phone),
+      vehicle: p(labels.vehicle),
+      mileage: p(labels.mileage),
+      employee: p(labels.employee),
+      products: p(labels.products),
+      orderItems: p(labels.orderItems),
+      subtotal: p(labels.subtotal),
+      shipping: p(labels.shipping),
+      serviceFee: p(labels.serviceFee),
+      total: p(labels.total),
+      payment: p(labels.payment),
+      status: p(labels.status),
+      thanks: p(labels.thanks),
+      kitchenBanner: p(labels.kitchenBanner),
+      kitchenCopy: p(labels.kitchenCopy),
     };
     const titleSuffix = isKitchen ? "KITCHEN" : d.orderNo;
     const headerBanner = isKitchen
-      ? `<div class="center bold big" style="margin:6px 0;">*** METBEX / KITCHEN ***</div>
-         <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `Masa: ${d.tableLabel}` : ""}</div>`
+      ? `<div class="center bold big" style="margin:6px 0;">${L.kitchenBanner}</div>
+         <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `${L.table}: ${d.tableLabel}` : ""}</div>`
       : "";
     const content = `
       <!DOCTYPE html>
-      <html>
+      <html lang="${language}">
       <head>
         <meta charset="utf-8" />
-        <title>${latinize(companyName)} - ${titleSuffix}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            width: 80mm;
-            max-width: 80mm;
-            padding: 6mm 4mm;
-            color: #000;
-            background: #fff;
-          }
-          .center { text-align: center; }
-          .bold { font-weight: bold; }
-          .big { font-size: 16px; font-weight: bold; letter-spacing: 2px; }
-          .divider { border-top: 1px dashed #000; margin: 4px 0; }
-          .divider-solid { border-top: 1px solid #000; margin: 4px 0; }
-          .row { display: flex; justify-content: space-between; margin: 2px 0; }
-          .row-item { margin: 3px 0; }
-          .row-item .name { width: 100%; }
-          .row-item .nums { display: flex; justify-content: space-between; padding-left: 4px; color: #333; }
-          .total-row { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin-top: 4px; }
-          .label { color: #555; }
-          .thanks { text-align: center; margin-top: 6px; font-size: 10px; }
-          .logo-area { text-align: center; margin-bottom: 4px; }
-          @media print {
-            body { width: 80mm; }
-            @page { size: 80mm auto; margin: 0; }
-          }
-        </style>
+        <title>${p(companyName)} - ${titleSuffix}</title>
+        <style>${THERMAL_RECEIPT_PRINT_CSS}</style>
       </head>
       <body>
-        ${isKitchen ? "" : brandLogoReceiptHtml(printLogoSrc, latinize(companyName))}
+        ${isKitchen ? "" : brandLogoThermalHtml(printLogoSrc, p(companyName))}
         ${headerBanner}
         <div class="divider-solid"></div>
 
-        <div class="row"><span class="label">Siferis:</span><span class="bold">${d.orderNo}</span></div>
-        <div class="row"><span class="label">Tarix:</span><span>${d.date}</span></div>
-        ${d.tableLabel && !isKitchen ? `<div class="row"><span class="label">Masa:</span><span class="bold">${d.tableLabel}</span></div>` : ""}
+        <div class="row"><span class="label">${L.order}:</span><span class="bold">${d.orderNo}</span></div>
+        <div class="row"><span class="label">${L.date}:</span><span>${d.date}</span></div>
+        ${d.tableLabel && !isKitchen ? `<div class="row"><span class="label">${L.table}:</span><span class="bold">${d.tableLabel}</span></div>` : ""}
         <div class="divider"></div>
 
-        <div class="row"><span class="label">Musteri:</span><span class="bold">${d.customer}</span></div>
-        ${!isKitchen ? `<div class="row"><span class="label">Telefon:</span><span>${d.customerPhone}</span></div>` : ""}
-        ${d.vehicle && !isKitchen ? `<div class="row"><span class="label">Avtomobil:</span><span>${d.vehicle}</span></div>` : ""}
-        ${d.mileage != null && !isKitchen ? `<div class="row"><span class="label">Yurus:</span><span>${d.mileage} km</span></div>` : ""}
-        <div class="row"><span class="label">Isci:</span><span>${d.employee}</span></div>
+        <div class="row"><span class="label">${L.customer}:</span><span class="bold">${d.customer}</span></div>
+        ${!isKitchen ? `<div class="row"><span class="label">${L.phone}:</span><span>${d.customerPhone}</span></div>` : ""}
+        ${d.vehicle && !isKitchen ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
+        ${d.mileage != null && !isKitchen ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
+        <div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>
         <div class="divider-solid"></div>
 
-        <div style="font-size:10px;font-weight:bold;margin-bottom:3px;">${isKitchen ? "SIFARIS" : "MEHSUL / XIDMET"}</div>
-        ${d.items.map(it => `
+        <div class="section-title">${isKitchen ? L.orderItems : L.products}</div>
+        ${d.items
+          .map(
+            (it) => `
           <div class="row-item">
-            <div class="name bold">${it.name}</div>
+            <div class="name">${it.name}</div>
             <div class="nums">
               <span>${isKitchen ? `x ${it.qty}` : `${it.qty} x ${it.price.toFixed(2)} AZN`}</span>
               ${isKitchen ? "" : `<span class="bold">${(it.qty * it.price).toFixed(2)} AZN</span>`}
             </div>
           </div>
-        `).join("")}
+        `,
+          )
+          .join("")}
         <div class="divider"></div>
 
-        ${isKitchen ? "" : `
-        <div class="row"><span class="label">Ara cem:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
-        <div class="row"><span class="label">Catdirilma:</span><span>${d.shipping.toFixed(2)} AZN</span></div>
-        ${d.serviceFee > 0 ? `<div class="row"><span class="label">Xidmet haqqi:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
+        ${
+          isKitchen
+            ? ""
+            : `
+        <div class="row"><span class="label">${L.subtotal}:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
+        <div class="row"><span class="label">${L.shipping}:</span><span>${d.shipping.toFixed(2)} AZN</span></div>
+        ${d.serviceFee > 0 ? `<div class="row"><span class="label">${L.serviceFee}:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
         ${d.discount > 0 ? `<div class="row"><span class="label">${d.discountLabel}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
         <div class="divider-solid"></div>
 
-        <div class="total-row"><span>CEMI:</span><span>${d.total.toFixed(2)} AZN</span></div>
-        <div class="row" style="margin-top:4px;"><span class="label">Odenis:</span><span class="bold">${d.paymentMethod}</span></div>
-        <div class="row"><span class="label">Status:</span><span class="bold">${d.paymentStatusLabel}</span></div>
+        <div class="total-row"><span>${L.total}:</span><span>${d.total.toFixed(2)} AZN</span></div>
+        <div class="row" style="margin-top:4px;"><span class="label">${L.payment}:</span><span class="bold">${d.paymentMethod}</span></div>
+        <div class="row"><span class="label">${L.status}:</span><span class="bold">${d.paymentStatusLabel}</span></div>
         <div class="divider-solid"></div>
 
         <div class="thanks">
-          <div>Muracietiniz ucun teshekkur edirik!</div>
+          <div>${L.thanks}</div>
           <div style="margin-top:3px;color:#555;">app.inflero.com</div>
         </div>
-        `}
-        ${isKitchen ? `<div class="center bold" style="margin-top:8px;">*** METBEX KOPYASI ***</div>` : ""}
+        `
+        }
+        ${isKitchen ? `<div class="center bold" style="margin-top:8px;">${L.kitchenCopy}</div>` : ""}
       </body>
       </html>
     `;
     printWin.document.write(content);
     printWin.document.close();
     printWin.focus();
-    setTimeout(() => { printWin.print(); printWin.close(); }, 400);
+    setTimeout(() => {
+      printWin.print();
+      printWin.close();
+    }, 400);
   };
 
   useEffect(() => {
     if (autoPrintedRef.current) return;
-    const copies = data.printCopies ?? 1;
-    // DINING module: auto dual-print (customer + kitchen) for two printers.
-    if (copies < 2) return;
+    // Dining/production path: one counter receipt only. Kitchen uses digital KOT.
+    if (!data.autoPrintReceipt) return;
     autoPrintedRef.current = true;
     handlePrint({ copy: "customer" });
-    window.setTimeout(() => handlePrint({ copy: "kitchen" }), 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <Printer className="w-4 h-4 text-[#14b8a6] dark:text-[#14b8a6]" />
-            Qəbz — {data.orderNo}
-            {(data.printCopies ?? 1) >= 2 && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
-                2x
+            {labels.receipt} — {data.orderNo}
+            {data.allowKitchenReprint && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300">
+                KOT
               </span>
             )}
           </h3>
@@ -352,41 +352,43 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
           </button>
         </div>
 
-        {/* Preview */}
-        <div className="p-4 font-mono text-[11px] leading-relaxed text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 mx-4 mt-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 max-h-80 overflow-y-auto">
+        <div className="p-4 font-mono text-[12px] leading-[1.35] text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 mx-4 mt-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 max-h-80 overflow-y-auto">
           <BrandLogo src={previewLogoSrc} alt={companyName} size="receipt" />
           <hr className="border-dashed border-gray-300 dark:border-gray-600 my-1" />
-          <div className="flex justify-between"><span className="text-gray-400">Sifariş:</span><span className="font-bold">{data.orderNo}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">Tarix:</span><span>{data.date}</span></div>
+          <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.order}:</span><span className="font-bold text-right break-words">{data.orderNo}</span></div>
+          <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.date}:</span><span className="text-right">{data.date}</span></div>
+          {data.tableLabel && (
+            <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.table}:</span><span className="font-semibold text-right">{data.tableLabel}</span></div>
+          )}
           <hr className="border-dashed border-gray-300 dark:border-gray-600 my-1" />
-          <div className="flex justify-between"><span className="text-gray-400">Müştəri:</span><span className="font-semibold">{data.customer}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">Telefon:</span><span>{data.customerPhone}</span></div>
-          {data.vehicle && <div className="flex justify-between"><span className="text-gray-400">Avtomobil:</span><span>{data.vehicle}</span></div>}
-          {data.mileage != null && <div className="flex justify-between"><span className="text-gray-400">Yürüş:</span><span>{data.mileage} km</span></div>}
-          <div className="flex justify-between"><span className="text-gray-400">İşçi:</span><span>{data.employee}</span></div>
+          <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.customer}:</span><span className="font-semibold text-right break-words">{data.customer}</span></div>
+          <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.phone}:</span><span className="text-right">{data.customerPhone}</span></div>
+          {data.vehicle && <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.vehicle}:</span><span className="text-right break-words">{data.vehicle}</span></div>}
+          {data.mileage != null && <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.mileage}:</span><span>{data.mileage} km</span></div>}
+          <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.employee}:</span><span className="text-right break-words">{data.employee}</span></div>
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
-          <p className="text-[9px] font-bold mb-1">MƏHSUL / XİDMƏT</p>
+          <p className="text-[11px] font-bold mb-1 uppercase">{labels.products}</p>
           {data.items.map((it, i) => (
             <div key={i} className="mb-1">
-              <p className="truncate">{it.name}</p>
-              <div className="flex justify-between text-gray-400 pl-2">
+              <p className="break-words font-semibold">{it.name}</p>
+              <div className="flex justify-between text-gray-400 pl-2 text-[11px]">
                 <span>{it.qty} x {it.price.toFixed(2)} ₼</span>
                 <span className="text-gray-800 dark:text-gray-200 font-semibold">{(it.qty * it.price).toFixed(2)} ₼</span>
               </div>
             </div>
           ))}
           <hr className="border-dashed border-gray-300 dark:border-gray-600 my-1" />
-          <div className="flex justify-between"><span className="text-gray-400">Ara cəm:</span><span>{data.subtotal.toFixed(2)} ₼</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">Çatdırılma:</span><span>{data.shipping.toFixed(2)} ₼</span></div>
-          {data.serviceFee > 0 && <div className="flex justify-between"><span className="text-gray-400">Xidmət haqqı:</span><span>{data.serviceFee.toFixed(2)} ₼</span></div>}
+          <div className="flex justify-between"><span className="text-gray-400">{labels.subtotal}:</span><span>{data.subtotal.toFixed(2)} ₼</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">{labels.shipping}:</span><span>{data.shipping.toFixed(2)} ₼</span></div>
+          {data.serviceFee > 0 && <div className="flex justify-between"><span className="text-gray-400">{labels.serviceFee}:</span><span>{data.serviceFee.toFixed(2)} ₼</span></div>}
           {data.discount > 0 && <div className="flex justify-between"><span className="text-gray-400">{data.discountLabel}:</span><span>-{data.discount.toFixed(2)} ₼</span></div>}
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
-          <div className="flex justify-between text-sm font-bold"><span>CƏMİ:</span><span>{data.total.toFixed(2)} ₼</span></div>
-          <div className="flex justify-between mt-1"><span className="text-gray-400">Ödəniş:</span><span className="font-semibold">{data.paymentMethod}</span></div>
-          <div className="flex justify-between mt-1"><span className="text-gray-400">Status:</span><span className="font-semibold">{data.paymentStatusLabel}</span></div>
+          <div className="flex justify-between text-[13px] font-bold"><span>{labels.total}:</span><span>{data.total.toFixed(2)} ₼</span></div>
+          <div className="flex justify-between mt-1"><span className="text-gray-400">{labels.payment}:</span><span className="font-semibold">{data.paymentMethod}</span></div>
+          <div className="flex justify-between mt-1"><span className="text-gray-400">{labels.status}:</span><span className="font-semibold">{data.paymentStatusLabel}</span></div>
           <hr className="border-gray-400 dark:border-gray-500 my-2" />
-          <p className="text-center text-[9px] text-gray-400">Müraciətiniz üçün təşəkkür edirik!</p>
-          <p className="text-center text-[9px] text-gray-400">app.inflero.com</p>
+          <p className="text-center text-[11px] text-gray-400">{labels.thanks}</p>
+          <p className="text-center text-[11px] text-gray-400">app.inflero.com</p>
         </div>
 
         <div className="flex gap-2 p-4">
@@ -394,22 +396,27 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
             onClick={onClose}
             className="flex-1 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           >
-            Bağla
+            {labels.close}
           </button>
           <button
             onClick={() => handlePrint({ copy: "customer" })}
             className="flex-1 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors flex items-center justify-center gap-1.5"
           >
             <Printer className="w-3.5 h-3.5" />
-            Çap Et
+            {labels.print}
           </button>
-          {(data.printCopies ?? 1) >= 2 && (
+          {data.allowKitchenReprint && (
             <button
               onClick={() => handlePrint({ copy: "kitchen" })}
               className="flex-1 py-2 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+              title={pickLang(
+                language,
+                "İstəyə bağlı kağız mətbəx bileti — əsas yol rəqəmsal KOT ekranıdır",
+                "Optional paper kitchen ticket — primary path is the digital KOT screen",
+              )}
             >
               <Printer className="w-3.5 h-3.5" />
-              Mətbəx
+              {labels.kitchen}
             </button>
           )}
         </div>
@@ -1035,15 +1042,16 @@ export function CorporatePOS() {
         discount: apiDiscount,
         discountLabel: appliedDiscount
           ? appliedDiscount.type === "percent"
-            ? `Endirim (${appliedDiscount.value}%)`
-            : "Endirim"
-          : "Endirim",
+            ? tr(`Endirim (${appliedDiscount.value}%)`, `Discount (${appliedDiscount.value}%)`)
+            : tr("Endirim", "Discount")
+          : tr("Endirim", "Discount"),
         total: apiTotal,
         paymentMethod: pmLabel[selectedPaymentMethod],
         paymentStatusLabel: serverPaymentStatusLabel,
         ...(diningEnabled
           ? {
-              printCopies: 2,
+              autoPrintReceipt: true,
+              allowKitchenReprint: true,
               ...(selectedTableId
                 ? {
                     tableLabel:
@@ -1054,6 +1062,15 @@ export function CorporatePOS() {
             }
           : {}),
       });
+
+      if (diningEnabled && selectedTableId) {
+        notifySuccess(
+          tr(
+            "Sifariş tamamlandı — mətbəx KOT ekranında",
+            "Order completed — on the kitchen KOT screen",
+          ),
+        );
+      }
 
       resetCartAfterSave();
     } catch (err) {
@@ -1069,7 +1086,7 @@ export function CorporatePOS() {
     receiptCustomer: string,
     receiptPhone: string,
     receiptBiller: string,
-    opts?: { diningPrint?: boolean; tableLabel?: string },
+    opts?: { diningFlow?: boolean; tableLabel?: string },
   ) => {
     const orderDate = new Date(detail.date);
     const dateStr = Number.isNaN(orderDate.getTime())
@@ -1111,14 +1128,18 @@ export function CorporatePOS() {
       discount: apiDiscount,
       discountLabel: appliedDiscount
         ? appliedDiscount.type === "percent"
-          ? `Endirim (${appliedDiscount.value}%)`
-          : "Endirim"
-        : "Endirim",
+          ? tr(`Endirim (${appliedDiscount.value}%)`, `Discount (${appliedDiscount.value}%)`)
+          : tr("Endirim", "Discount")
+        : tr("Endirim", "Discount"),
       total: apiTotal,
       paymentMethod: selectedPaymentMethod ? pmLabel[selectedPaymentMethod] : "—",
       paymentStatusLabel: serverPaymentStatusLabel,
-      ...(opts?.diningPrint
-        ? { printCopies: 2, tableLabel: opts.tableLabel }
+      ...(opts?.diningFlow
+        ? {
+            autoPrintReceipt: true,
+            allowKitchenReprint: true,
+            tableLabel: opts.tableLabel,
+          }
         : {}),
     };
   };
@@ -1127,10 +1148,6 @@ export function CorporatePOS() {
     if (!canCreate || isDemo || !isAuthenticated || !diningEnabled) return;
     if (cart.length === 0) {
       alert(tr("Səbəti doldurun", "Please add items to cart"));
-      return;
-    }
-    if (!selectedTableId) {
-      alert(tr("Masa seçin", "Please select a table"));
       return;
     }
     if (!selectedPaymentMethod) {
@@ -1189,18 +1206,29 @@ export function CorporatePOS() {
         discount: discountAmount > 0 ? discountAmount : undefined,
         items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
         ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
-        tableId: selectedTableId,
+        ...(selectedTableId ? { tableId: selectedTableId } : {}),
       });
 
       setReceipt(
         buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
-          diningPrint: true,
-          tableLabel:
-            diningTables.find((t) => t.id === selectedTableId)?.name ??
-            diningTables.find((t) => t.id === selectedTableId)?.number?.toString(),
+          diningFlow: true,
+          tableLabel: selectedTableId
+            ? diningTables.find((t) => t.id === selectedTableId)?.name ??
+              diningTables.find((t) => t.id === selectedTableId)?.number?.toString()
+            : tr("Gələn müştəri", "Walk-in"),
         }),
       );
-      notifySuccess(tr("KOT-a göndərildi", "Sent to KOT"));
+      notifySuccess(
+        selectedTableId
+          ? tr(
+              "KOT-a göndərildi — mətbəx ekranında görünür",
+              "Sent to KOT — visible on the kitchen screen",
+            )
+          : tr(
+              "KOT-a göndərildi (gələn müştəri) — mətbəx ekranında görünür",
+              "Sent to KOT (walk-in) — visible on the kitchen screen",
+            ),
+      );
       resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
@@ -1542,7 +1570,7 @@ export function CorporatePOS() {
                     value={selectedTableId}
                     onChange={setSelectedTableId}
                     options={tableOptions}
-                    placeholder={tr("Masa seçin...", "Select table...")}
+                    placeholder={tr("Masa (istəyə bağlı)", "Table (optional)")}
                     icon={Armchair}
                   />
                 )}
@@ -1831,8 +1859,7 @@ export function CorporatePOS() {
                       sendingToKot ||
                       sendingToProduction ||
                       isGlobalMode ||
-                      !branchId ||
-                      !selectedTableId
+                      !branchId
                     }
                     className="w-full px-3 py-2.5 text-xs font-medium text-white bg-[#0f766e] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
