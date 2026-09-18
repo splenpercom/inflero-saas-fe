@@ -2,7 +2,7 @@ import type { SalesReportItem } from "../api/reports";
 import type { ProfitLossItem, AnnualReportRow } from "../api/reports";
 import type { ExpenseReportItem } from "../api/reports";
 
-export type DateRangePreset = "week" | "month" | "quarter" | "year" | "custom";
+export type DateRangePreset = "today" | "week" | "month" | "quarter" | "year" | "custom";
 
 export function isoDateInputToRange(dateFrom: string, dateTo: string): { dateFrom: string; dateTo: string } {
   const parseYmd = (ymd: string) => {
@@ -49,6 +49,9 @@ export function dateRangePreset(preset: DateRangePreset): { dateFrom: string; da
   const to = endOfDayUtc(now);
   let from: Date;
   switch (preset) {
+    case "today":
+      from = startOfDayUtc(now);
+      break;
     case "week":
       from = startOfDayUtc(new Date(now.getTime() - 6 * 24 * 3600 * 1000));
       break;

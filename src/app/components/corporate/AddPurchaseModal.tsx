@@ -22,15 +22,16 @@ import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
+import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
 
 interface ProductLine {
   productId: string;
   name: string;
   sku: string;
-  qty: number;
-  purchasePrice: number;
-  discount: number;
-  taxPercent: number;
+  qty: number | "";
+  purchasePrice: number | "";
+  discount: number | "";
+  taxPercent: number | "";
 }
 
 interface AddPurchaseModalProps {
@@ -72,9 +73,9 @@ function resetFormState(setters: {
   setReference: (v: string) => void;
   setProductSearch: (v: string) => void;
   setProducts: (v: ProductLine[]) => void;
-  setOrderTax: (v: number) => void;
-  setDiscount: (v: number) => void;
-  setShipping: (v: number) => void;
+  setOrderTax: (v: number | "") => void;
+  setDiscount: (v: number | "") => void;
+  setShipping: (v: number | "") => void;
   setStatus: (v: string) => void;
   setDescription: (v: string) => void;
   setStoreId: (v: string) => void;
@@ -92,9 +93,9 @@ function resetFormState(setters: {
   setters.setReference("");
   setters.setProductSearch("");
   setters.setProducts([]);
-  setters.setOrderTax(0);
-  setters.setDiscount(0);
-  setters.setShipping(0);
+  setters.setOrderTax("");
+  setters.setDiscount("");
+  setters.setShipping("");
   setters.setStatus("pending");
   setters.setDescription("");
   setters.setStoreId("");
@@ -126,9 +127,9 @@ export function AddPurchaseModal({
   const [reference, setReference] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [products, setProducts] = useState<ProductLine[]>([]);
-  const [orderTax, setOrderTax] = useState(0);
-  const [discount, setDiscount] = useState(0);
-  const [shipping, setShipping] = useState(0);
+  const [orderTax, setOrderTax] = useState<number | "">("");
+  const [discount, setDiscount] = useState<number | "">("");
+  const [shipping, setShipping] = useState<number | "">("");
   const [status, setStatus] = useState("pending");
   const [description, setDescription] = useState("");
   const [storeId, setStoreId] = useState("");
@@ -239,7 +240,7 @@ export function AddPurchaseModal({
   const handleUpdateLine = (
     productId: string,
     field: keyof Pick<ProductLine, "qty" | "purchasePrice" | "discount" | "taxPercent">,
-    value: number,
+    value: number | "",
   ) => {
     if (linesLocked) return;
     setProducts(products.map((p) => (p.productId === productId ? { ...p, [field]: value } : p)));
@@ -309,17 +310,26 @@ export function AddPurchaseModal({
   ];
 
   const linesSubtotal = products.reduce(
-    (sum, p) => sum + lineTotalCost(p.purchasePrice, p.qty, p.discount, p.taxPercent),
+    (sum, p) =>
+      sum +
+      lineTotalCost(
+        asNumber(p.purchasePrice),
+        asNumber(p.qty),
+        asNumber(p.discount),
+        asNumber(p.taxPercent),
+      ),
     0,
   );
-  const grandTotal = linesSubtotal + orderTax - discount + shipping;
+  const grandTotal = linesSubtotal + asNumber(orderTax) - asNumber(discount) + asNumber(shipping);
 
   const handleSave = async () => {
     if (!(isAuthenticated || isDemo) || !supplierId || !date || products.length === 0 || !status) {
       return;
     }
 
-    const invalidLine = products.some((p) => p.qty <= 0 || p.purchasePrice < 0);
+    const invalidLine = products.some(
+      (p) => asNumber(p.qty) <= 0 || asNumber(p.purchasePrice) < 0,
+    );
     if (invalidLine) return;
 
     const resolvedStoreId = resolvePurchaseStoreIdForApi(isGlobalMode, branchId, storeId);
@@ -353,19 +363,19 @@ export function AddPurchaseModal({
       date,
       reference: reference.trim() || null,
       ...(resolvedStoreId ? { storeId: resolvedStoreId } : {}),
-      orderTax,
-      discount,
-      shipping,
+      orderTax: asNumber(orderTax),
+      discount: asNumber(discount),
+      shipping: asNumber(shipping),
       status: mapPurchaseStatusToApi(status),
       description: description.trim() || null,
       ...(!linesLocked
         ? {
             items: products.map((p) => ({
               productId: p.productId,
-              quantity: p.qty,
-              purchasePrice: p.purchasePrice,
-              discount: p.discount || undefined,
-              taxPercent: p.taxPercent || undefined,
+              quantity: asNumber(p.qty, 1),
+              purchasePrice: asNumber(p.purchasePrice),
+              discount: asNumber(p.discount) || undefined,
+              taxPercent: asNumber(p.taxPercent) || undefined,
             })),
           }
         : {}),
@@ -625,56 +635,63 @@ export function AddPurchaseModal({
                             <span>{product.qty}</span>
                           ) : (
                             <input
-                              type="number"
-                              value={product.qty}
-                              min={1}
-                              onChange={(e) =>
+                              type="text"
+                              inputMode="numeric"
+                              value={product.qty === "" ? "" : product.qty}
+                              onChange={(e) => {
+                                const s = sanitizeNumericTyping(e.target.value, {
+                                  allowDecimal: false,
+                                });
                                 handleUpdateLine(
                                   product.productId,
                                   "qty",
-                                  Number(e.target.value),
-                                )
-                              }
+                                  s === "" ? "" : Number(s),
+                                );
+                              }}
                               className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                             />
                           )}
                         </td>
                         <td className="px-2 py-2">
                           {linesLocked ? (
-                            <span>{product.purchasePrice.toFixed(2)}</span>
+                            <span>{asNumber(product.purchasePrice).toFixed(2)}</span>
                           ) : (
                             <input
-                              type="number"
-                              value={product.purchasePrice}
-                              min={0}
-                              step="0.01"
-                              onChange={(e) =>
+                              type="text"
+                              inputMode="decimal"
+                              value={product.purchasePrice === "" ? "" : product.purchasePrice}
+                              onChange={(e) => {
+                                const s = sanitizeNumericTyping(e.target.value, {
+                                  allowDecimal: true,
+                                });
                                 handleUpdateLine(
                                   product.productId,
                                   "purchasePrice",
-                                  Number(e.target.value),
-                                )
-                              }
+                                  s === "" ? "" : Number(s),
+                                );
+                              }}
                               className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                             />
                           )}
                         </td>
                         <td className="px-2 py-2">
                           {linesLocked ? (
-                            <span>{product.discount.toFixed(2)}</span>
+                            <span>{asNumber(product.discount).toFixed(2)}</span>
                           ) : (
                             <input
-                              type="number"
-                              value={product.discount}
-                              min={0}
-                              step="0.01"
-                              onChange={(e) =>
+                              type="text"
+                              inputMode="decimal"
+                              value={product.discount === "" ? "" : product.discount}
+                              onChange={(e) => {
+                                const s = sanitizeNumericTyping(e.target.value, {
+                                  allowDecimal: true,
+                                });
                                 handleUpdateLine(
                                   product.productId,
                                   "discount",
-                                  Number(e.target.value),
-                                )
-                              }
+                                  s === "" ? "" : Number(s),
+                                );
+                              }}
                               className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                             />
                           )}
@@ -684,17 +701,19 @@ export function AddPurchaseModal({
                             <span>{product.taxPercent}</span>
                           ) : (
                             <input
-                              type="number"
-                              value={product.taxPercent}
-                              min={0}
-                              step="0.01"
-                              onChange={(e) =>
+                              type="text"
+                              inputMode="decimal"
+                              value={product.taxPercent === "" ? "" : product.taxPercent}
+                              onChange={(e) => {
+                                const s = sanitizeNumericTyping(e.target.value, {
+                                  allowDecimal: true,
+                                });
                                 handleUpdateLine(
                                   product.productId,
                                   "taxPercent",
-                                  Number(e.target.value),
-                                )
-                              }
+                                  s === "" ? "" : Number(s),
+                                );
+                              }}
                               className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                             />
                           )}
@@ -702,10 +721,10 @@ export function AddPurchaseModal({
                         <td className="px-2 py-2 text-gray-900 dark:text-white">
                           ₼
                           {lineTotalCost(
-                            product.purchasePrice,
-                            product.qty,
-                            product.discount,
-                            product.taxPercent,
+                            asNumber(product.purchasePrice),
+                            asNumber(product.qty),
+                            asNumber(product.discount),
+                            asNumber(product.taxPercent),
                           ).toFixed(2)}
                         </td>
                         <td className="px-2 py-2">
@@ -747,11 +766,13 @@ export function AddPurchaseModal({
                   {tr("Sifariş vergisi", "Order tax")}
                 </label>
                 <input
-                  type="number"
-                  value={orderTax}
-                  min={0}
-                  step="0.01"
-                  onChange={(e) => setOrderTax(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  value={orderTax === "" ? "" : orderTax}
+                  onChange={(e) => {
+                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
+                    setOrderTax(s === "" ? "" : Number(s));
+                  }}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                 />
               </div>
@@ -760,11 +781,13 @@ export function AddPurchaseModal({
                   {tr("Endirim", "Discount")}
                 </label>
                 <input
-                  type="number"
-                  value={discount}
-                  min={0}
-                  step="0.01"
-                  onChange={(e) => setDiscount(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  value={discount === "" ? "" : discount}
+                  onChange={(e) => {
+                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
+                    setDiscount(s === "" ? "" : Number(s));
+                  }}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                 />
               </div>
@@ -773,11 +796,13 @@ export function AddPurchaseModal({
                   {tr("Çatdırılma", "Shipping")}
                 </label>
                 <input
-                  type="number"
-                  value={shipping}
-                  min={0}
-                  step="0.01"
-                  onChange={(e) => setShipping(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  value={shipping === "" ? "" : shipping}
+                  onChange={(e) => {
+                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
+                    setShipping(s === "" ? "" : Number(s));
+                  }}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                 />
               </div>

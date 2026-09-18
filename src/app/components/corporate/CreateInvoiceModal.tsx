@@ -11,12 +11,14 @@ import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
+import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+
 interface LineItem {
   key: string;
   productId: string | null;
   description: string;
-  quantity: number;
-  unitPrice: number;
+  quantity: number | "";
+  unitPrice: number | "";
 }
 
 interface CreateInvoiceModalProps {
@@ -31,7 +33,7 @@ function emptyLine(): LineItem {
     productId: null,
     description: "",
     quantity: 1,
-    unitPrice: 0,
+    unitPrice: "",
   };
 }
 
@@ -73,7 +75,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
 
   const handleSelectProduct = async (productId: string, productName: string) => {
     if (!activeLineKey) return;
-    let unitPrice = 0;
+    let unitPrice: number | "" = "";
     try {
       const detail = await fetchProduct(productId);
       unitPrice = parseFloat(detail.price) || 0;
@@ -95,7 +97,8 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
     if (!dueDate) return;
 
     const validLines = lines.filter(
-      (line) => line.description.trim() && line.quantity > 0 && line.unitPrice >= 0,
+      (line) =>
+        line.description.trim() && asNumber(line.quantity) > 0 && asNumber(line.unitPrice) >= 0,
     );
     if (validLines.length === 0) return;
 
@@ -108,8 +111,8 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
         items: validLines.map((line) => ({
           productId: line.productId,
           description: line.description.trim(),
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
+          quantity: asNumber(line.quantity, 1),
+          unitPrice: asNumber(line.unitPrice),
         })),
       });
       notifySuccess(tr("Qaimə yaradıldı", "Invoice created"));
@@ -124,10 +127,13 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
 
   if (!isOpen) return null;
 
-  const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
+  const subtotal = lines.reduce(
+    (sum, line) => sum + asNumber(line.quantity) * asNumber(line.unitPrice),
+    0,
+  );
   const canSubmit =
     !!dueDate &&
-    lines.some((line) => line.description.trim() && line.quantity > 0);
+    lines.some((line) => line.description.trim() && asNumber(line.quantity) > 0);
 
   return (
     <div
@@ -248,32 +254,41 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
                   </div>
                   <div className="col-span-4 sm:col-span-2">
                     <input
-                      type="number"
-                      min={1}
-                      value={line.quantity}
-                      onChange={(e) =>
-                        updateLine(line.key, { quantity: parseInt(e.target.value, 10) || 0 })
-                      }
+                      type="text"
+                      inputMode="numeric"
+                      value={line.quantity === "" ? "" : line.quantity}
+                      onChange={(e) => {
+                        const s = sanitizeNumericTyping(e.target.value, {
+                          allowDecimal: false,
+                        });
+                        updateLine(line.key, {
+                          quantity: s === "" ? "" : Number(s),
+                        });
+                      }}
                       className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       placeholder={tr("Miqdar", "Qty")}
                     />
                   </div>
                   <div className="col-span-6 sm:col-span-3">
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={line.unitPrice || ""}
-                      onChange={(e) =>
-                        updateLine(line.key, { unitPrice: parseFloat(e.target.value) || 0 })
-                      }
+                      type="text"
+                      inputMode="decimal"
+                      value={line.unitPrice === "" ? "" : line.unitPrice}
+                      onChange={(e) => {
+                        const s = sanitizeNumericTyping(e.target.value, {
+                          allowDecimal: true,
+                        });
+                        updateLine(line.key, {
+                          unitPrice: s === "" ? "" : Number(s),
+                        });
+                      }}
                       className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       placeholder={tr("Qiymət", "Price")}
                     />
                   </div>
                   <div className="col-span-2 sm:col-span-2 flex items-center justify-end gap-2">
                     <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {(line.quantity * line.unitPrice).toFixed(2)} ₼
+                      {(asNumber(line.quantity) * asNumber(line.unitPrice)).toFixed(2)} ₼
                     </span>
                     {lines.length > 1 && (
                       <button

@@ -157,7 +157,7 @@ export function UserManagement() {
       const rows = await fetchTenantUsers();
       // Defense-in-depth aligned with backend privacy rules.
       const visible = authUser?.isTenantOwner
-        ? rows.filter((u) => u.id === authUser.id || u.isBranchManager)
+        ? rows
         : rows.filter(
             (u) =>
               !u.isTenantOwner &&
@@ -322,20 +322,18 @@ export function UserManagement() {
       notifyFromError(null, ut("passwordMismatch"));
       return;
     }
-    const isOwnerCreate = authUser?.isTenantOwner === true;
-    if (isOwnerCreate && !data.storeId && branches.length > 0) {
+    const roleId = data.roleId;
+    if (!roleId) {
+      notifyFromError(null, tr("Rol seçilməlidir", "A role is required"));
+      return;
+    }
+    const selectedRoleName = roles.find((r) => r.id === roleId)?.name?.toLowerCase() ?? "";
+    const isManagerRole = selectedRoleName === "manager";
+    if (isManagerRole && !data.storeId && branches.length > 0) {
       notifyFromError(
         null,
         tr("Filial seçilməlidir", "A branch is required to create a branch manager"),
       );
-      return;
-    }
-    const managerRole = roles.find((r) => r.name.toLowerCase() === "manager");
-    const roleId = isOwnerCreate
-      ? managerRole?.id || data.roleId
-      : data.roleId;
-    if (!roleId) {
-      notifyFromError(null, tr("Rol seçilməlidir", "A role is required"));
       return;
     }
     setSaving(true);
@@ -487,8 +485,11 @@ export function UserManagement() {
     })
     .map((r) => ({ id: r.id, name: r.name }));
   const managerRoleId = roles.find((r) => r.name.toLowerCase() === "manager")?.id ?? "";
+  /** Owners (superadmin) may assign any role except Administrator; branch actors get staff roles only. */
   const addUserRoleOptions = isOwnerActor
-    ? roles.filter((r) => r.name.toLowerCase() === "manager").map((r) => ({ id: r.id, name: r.name }))
+    ? roles
+        .filter((r) => r.name.toLowerCase() !== "administrator")
+        .map((r) => ({ id: r.id, name: r.name }))
     : staffRoleOptions;
   /** Owners may assign any role; branch actors get staff roles only (plus current if already Manager). */
   const editUserRoleOptions = isOwnerActor
@@ -862,7 +863,6 @@ export function UserManagement() {
         roles={addUserRoleOptions}
         branches={branches}
         showBranchSelect={isOwnerActor && branches.length > 0}
-        createAsBranchManager={isOwnerActor}
         managerRoleId={managerRoleId}
         saving={saving}
       />

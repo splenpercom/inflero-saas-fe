@@ -35,6 +35,7 @@ export function ReportDateRangeFilter({
         onChange={(value) => onPresetChange(value as DateRangePreset)}
         minWidth={140}
         options={[
+          { value: "today", label: pt("Today", "Bu Gün") },
           { value: "week", label: pt("This Week", "Bu Həftə") },
           { value: "month", label: pt("This Month", "Bu Ay") },
           { value: "quarter", label: pt("This Quarter", "Bu Rüb") },

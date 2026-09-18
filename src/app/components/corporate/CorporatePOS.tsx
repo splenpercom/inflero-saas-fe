@@ -9,7 +9,6 @@ import {
   User,
   CreditCard,
   Wallet,
-  Building2,
   Trash2,
   ChevronDown,
   UserCheck,
@@ -22,7 +21,14 @@ import {
   ChefHat,
   Armchair,
   Factory,
+  Keyboard,
 } from "lucide-react";
+import { TouchKeyboard } from "../ui/TouchKeyboard";
+import {
+  useLastPointerType,
+  usePrefersTouchKeyboard,
+} from "../../hooks/usePrefersTouchKeyboard";
+import { sanitizeNumericTyping } from "../../lib/numericInput";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -70,7 +76,7 @@ interface CartItem {
   image: string;
 }
 
-type PaymentMethod = "cash" | "card" | "bank";
+type PaymentMethod = "cash" | "card";
 type PaymentStatusChoice = "paid" | "pending";
 
 function ProductThumb({ image, className }: { image: string; className?: string }) {
@@ -173,6 +179,9 @@ interface ReceiptData {
   total: number;
   paymentMethod: string;
   paymentStatusLabel: string;
+  /** When DINING module is on: customer + kitchen copies for two printers. */
+  printCopies?: number;
+  tableLabel?: string;
 }
 
 function latinize(str: string): string {
@@ -196,8 +205,11 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
     getCompanyLogoUrl(user?.tenant, false) ??
     getCompanyLogoUrl(user?.tenant, true) ??
     APP_LOGO_LIGHT;
+  const autoPrintedRef = useRef(false);
 
-  const handlePrint = () => {
+  const handlePrint = (opts?: { copy?: "customer" | "kitchen" }) => {
+    const copy = opts?.copy ?? "customer";
+    const isKitchen = copy === "kitchen";
     const printWin = window.open("", "_blank", "width=340,height=700");
     if (!printWin) return;
     const d = {
@@ -210,14 +222,20 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
       paymentMethod: latinize(data.paymentMethod),
       paymentStatusLabel: latinize(data.paymentStatusLabel),
       discountLabel: latinize(data.discountLabel),
+      tableLabel: data.tableLabel ? latinize(data.tableLabel) : undefined,
       items: data.items.map((it) => ({ ...it, name: latinize(it.name) })),
     };
+    const titleSuffix = isKitchen ? "KITCHEN" : d.orderNo;
+    const headerBanner = isKitchen
+      ? `<div class="center bold big" style="margin:6px 0;">*** METBEX / KITCHEN ***</div>
+         <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `Masa: ${d.tableLabel}` : ""}</div>`
+      : "";
     const content = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8" />
-        <title>${latinize(companyName)} - ${d.orderNo}</title>
+        <title>${latinize(companyName)} - ${titleSuffix}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body {
@@ -249,32 +267,35 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
         </style>
       </head>
       <body>
-        ${brandLogoReceiptHtml(printLogoSrc, latinize(companyName))}
+        ${isKitchen ? "" : brandLogoReceiptHtml(printLogoSrc, latinize(companyName))}
+        ${headerBanner}
         <div class="divider-solid"></div>
 
         <div class="row"><span class="label">Siferis:</span><span class="bold">${d.orderNo}</span></div>
         <div class="row"><span class="label">Tarix:</span><span>${d.date}</span></div>
+        ${d.tableLabel && !isKitchen ? `<div class="row"><span class="label">Masa:</span><span class="bold">${d.tableLabel}</span></div>` : ""}
         <div class="divider"></div>
 
         <div class="row"><span class="label">Musteri:</span><span class="bold">${d.customer}</span></div>
-        <div class="row"><span class="label">Telefon:</span><span>${d.customerPhone}</span></div>
-        ${d.vehicle ? `<div class="row"><span class="label">Avtomobil:</span><span>${d.vehicle}</span></div>` : ""}
-        ${d.mileage != null ? `<div class="row"><span class="label">Yurus:</span><span>${d.mileage} km</span></div>` : ""}
+        ${!isKitchen ? `<div class="row"><span class="label">Telefon:</span><span>${d.customerPhone}</span></div>` : ""}
+        ${d.vehicle && !isKitchen ? `<div class="row"><span class="label">Avtomobil:</span><span>${d.vehicle}</span></div>` : ""}
+        ${d.mileage != null && !isKitchen ? `<div class="row"><span class="label">Yurus:</span><span>${d.mileage} km</span></div>` : ""}
         <div class="row"><span class="label">Isci:</span><span>${d.employee}</span></div>
         <div class="divider-solid"></div>
 
-        <div style="font-size:10px;font-weight:bold;margin-bottom:3px;">MEHSUL / XIDMET</div>
+        <div style="font-size:10px;font-weight:bold;margin-bottom:3px;">${isKitchen ? "SIFARIS" : "MEHSUL / XIDMET"}</div>
         ${d.items.map(it => `
           <div class="row-item">
-            <div class="name">${it.name}</div>
+            <div class="name bold">${it.name}</div>
             <div class="nums">
-              <span>${it.qty} x ${it.price.toFixed(2)} AZN</span>
-              <span class="bold">${(it.qty * it.price).toFixed(2)} AZN</span>
+              <span>${isKitchen ? `x ${it.qty}` : `${it.qty} x ${it.price.toFixed(2)} AZN`}</span>
+              ${isKitchen ? "" : `<span class="bold">${(it.qty * it.price).toFixed(2)} AZN</span>`}
             </div>
           </div>
         `).join("")}
         <div class="divider"></div>
 
+        ${isKitchen ? "" : `
         <div class="row"><span class="label">Ara cem:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
         <div class="row"><span class="label">Catdirilma:</span><span>${d.shipping.toFixed(2)} AZN</span></div>
         ${d.serviceFee > 0 ? `<div class="row"><span class="label">Xidmet haqqi:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
@@ -290,6 +311,8 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
           <div>Muracietiniz ucun teshekkur edirik!</div>
           <div style="margin-top:3px;color:#555;">app.inflero.com</div>
         </div>
+        `}
+        ${isKitchen ? `<div class="center bold" style="margin-top:8px;">*** METBEX KOPYASI ***</div>` : ""}
       </body>
       </html>
     `;
@@ -299,6 +322,17 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
     setTimeout(() => { printWin.print(); printWin.close(); }, 400);
   };
 
+  useEffect(() => {
+    if (autoPrintedRef.current) return;
+    const copies = data.printCopies ?? 1;
+    // DINING module: auto dual-print (customer + kitchen) for two printers.
+    if (copies < 2) return;
+    autoPrintedRef.current = true;
+    handlePrint({ copy: "customer" });
+    window.setTimeout(() => handlePrint({ copy: "kitchen" }), 1200);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm">
@@ -307,6 +341,11 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <Printer className="w-4 h-4 text-[#14b8a6] dark:text-[#14b8a6]" />
             Qəbz — {data.orderNo}
+            {(data.printCopies ?? 1) >= 2 && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
+                2x
+              </span>
+            )}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
             <X className="w-4 h-4" />
@@ -358,12 +397,21 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
             Bağla
           </button>
           <button
-            onClick={handlePrint}
+            onClick={() => handlePrint({ copy: "customer" })}
             className="flex-1 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors flex items-center justify-center gap-1.5"
           >
             <Printer className="w-3.5 h-3.5" />
             Çap Et
           </button>
+          {(data.printCopies ?? 1) >= 2 && (
+            <button
+              onClick={() => handlePrint({ copy: "kitchen" })}
+              className="flex-1 py-2 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Mətbəx
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -381,6 +429,8 @@ export function CorporatePOS() {
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const { canCreate } = useModulePermissions("Sales");
+  const prefersTouchKeyboard = usePrefersTouchKeyboard();
+  const lastPointerType = useLastPointerType();
 
   // Translation helper — must come before any data that uses it
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -401,10 +451,14 @@ export function CorporatePOS() {
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState("");
   const [appliedDiscount, setAppliedDiscount] = useState<{ type: "percent" | "fixed"; value: number } | null>(null);
-  const [shippingInput, setShippingInput] = useState("0");
-  const [serviceFeeInput, setServiceFeeInput] = useState("0");
+  const [shippingInput, setShippingInput] = useState("");
+  const [serviceFeeInput, setServiceFeeInput] = useState("");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
+  const [touchKb, setTouchKb] = useState<null | {
+    mode: "full" | "numpad";
+    field: "search" | "shipping" | "serviceFee" | "mileage" | "discount";
+  }>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -575,7 +629,6 @@ export function CorporatePOS() {
   const paymentMethods: { id: PaymentMethod; name: string; icon: React.ElementType }[] = [
     { id: "cash", name: tr("Nağd", "Cash"), icon: Wallet },
     { id: "card", name: tr("Kart", "Card"), icon: CreditCard },
-    { id: "bank", name: tr("Bank Transferi", "Bank Transfer"), icon: Building2 },
   ];
 
   // Play beep sound when adding to cart
@@ -723,6 +776,21 @@ export function CorporatePOS() {
 
   const { handleKeyDown: handleSearchBarcodeKeyDown } = useBarcodeWedge(handleBarcodeScan);
 
+  const openTouchKb = useCallback(
+    (
+      mode: "full" | "numpad",
+      field: "search" | "shipping" | "serviceFee" | "mileage" | "discount",
+      force = false,
+    ) => {
+      const fromTouch =
+        lastPointerType.current === "touch" || lastPointerType.current === "pen";
+      if (force || prefersTouchKeyboard || fromTouch) {
+        setTouchKb({ mode, field });
+      }
+    },
+    [prefersTouchKeyboard, lastPointerType],
+  );
+
   const removeFromCart = (id: string) => {
     if (!canCreate) return;
     setCart((p) => p.filter((i) => i.id !== id));
@@ -775,12 +843,49 @@ export function CorporatePOS() {
     if (!isNaN(val) && val > 0) setAppliedDiscount({ type: discountType, value: val });
     setDiscountModalOpen(false);
     setDiscountValue("");
+    setTouchKb(null);
+  };
+
+  const touchKbValue =
+    touchKb?.field === "search"
+      ? searchQuery
+      : touchKb?.field === "shipping"
+        ? shippingInput
+        : touchKb?.field === "serviceFee"
+          ? serviceFeeInput
+          : touchKb?.field === "mileage"
+            ? mileageInput
+            : touchKb?.field === "discount"
+              ? discountValue
+              : "";
+
+  const handleTouchKbChange = (next: string) => {
+    if (!touchKb) return;
+    switch (touchKb.field) {
+      case "search":
+        setSearchQuery(next);
+        break;
+      case "shipping":
+        setShippingInput(sanitizeNumericTyping(next, { allowDecimal: true }));
+        break;
+      case "serviceFee":
+        setServiceFeeInput(sanitizeNumericTyping(next, { allowDecimal: true }));
+        break;
+      case "mileage":
+        setMileageInput(sanitizeNumericTyping(next, { allowDecimal: false }));
+        break;
+      case "discount":
+        setDiscountValue(
+          sanitizeNumericTyping(next, { allowDecimal: discountType !== "percent" }),
+        );
+        break;
+    }
   };
 
   const resetCartAfterSave = () => {
     setCart([]);
-    setShippingInput("0");
-    setServiceFeeInput("0");
+    setShippingInput("");
+    setServiceFeeInput("");
     setSelectedCustomerId("");
     setSelectedVehicleId("");
     setMileageInput("");
@@ -862,7 +967,7 @@ export function CorporatePOS() {
       return;
     }
 
-    const pmLabel: Record<PaymentMethod, string> = { cash: tr("Nağd", "Cash"), card: tr("Kart", "Card"), bank: tr("Bank Transferi", "Bank Transfer") };
+    const pmLabel: Record<PaymentMethod, string> = { cash: tr("Nağd", "Cash"), card: tr("Kart", "Card") };
 
     const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
     const receiptPhone = selectedCustomer?.phone ?? "—";
@@ -936,6 +1041,18 @@ export function CorporatePOS() {
         total: apiTotal,
         paymentMethod: pmLabel[selectedPaymentMethod],
         paymentStatusLabel: serverPaymentStatusLabel,
+        ...(diningEnabled
+          ? {
+              printCopies: 2,
+              ...(selectedTableId
+                ? {
+                    tableLabel:
+                      diningTables.find((t) => t.id === selectedTableId)?.name ??
+                      diningTables.find((t) => t.id === selectedTableId)?.number?.toString(),
+                  }
+                : {}),
+            }
+          : {}),
       });
 
       resetCartAfterSave();
@@ -952,6 +1069,7 @@ export function CorporatePOS() {
     receiptCustomer: string,
     receiptPhone: string,
     receiptBiller: string,
+    opts?: { diningPrint?: boolean; tableLabel?: string },
   ) => {
     const orderDate = new Date(detail.date);
     const dateStr = Number.isNaN(orderDate.getTime())
@@ -999,6 +1117,9 @@ export function CorporatePOS() {
       total: apiTotal,
       paymentMethod: selectedPaymentMethod ? pmLabel[selectedPaymentMethod] : "—",
       paymentStatusLabel: serverPaymentStatusLabel,
+      ...(opts?.diningPrint
+        ? { printCopies: 2, tableLabel: opts.tableLabel }
+        : {}),
     };
   };
 
@@ -1047,7 +1168,6 @@ export function CorporatePOS() {
     const pmLabel: Record<PaymentMethod, string> = {
       cash: tr("Nağd", "Cash"),
       card: tr("Kart", "Card"),
-      bank: tr("Bank Transferi", "Bank Transfer"),
     };
     const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
     const receiptPhone = selectedCustomer?.phone ?? "—";
@@ -1073,7 +1193,12 @@ export function CorporatePOS() {
       });
 
       setReceipt(
-        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller),
+        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
+          diningPrint: true,
+          tableLabel:
+            diningTables.find((t) => t.id === selectedTableId)?.name ??
+            diningTables.find((t) => t.id === selectedTableId)?.number?.toString(),
+        }),
       );
       notifySuccess(tr("KOT-a göndərildi", "Sent to KOT"));
       resetCartAfterSave();
@@ -1121,7 +1246,6 @@ export function CorporatePOS() {
     const pmLabel: Record<PaymentMethod, string> = {
       cash: tr("Nağd", "Cash"),
       card: tr("Kart", "Card"),
-      bank: tr("Bank Transferi", "Bank Transfer"),
     };
     const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
     const receiptPhone = selectedCustomer?.phone ?? "—";
@@ -1189,13 +1313,23 @@ export function CorporatePOS() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   <input
                     type="text"
+                    inputMode="none"
                     placeholder={tr("Məhsul/xidmət axtar və ya skan et...", "Search or scan product...")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleSearchBarcodeKeyDown}
+                    onFocus={() => openTouchKb("full", "search")}
                     autoComplete="off"
-                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                    className="w-full pl-9 pr-10 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                   />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-gray-400 hover:text-[#14b8a6]"
+                    title={tr("Klaviatura", "Keyboard")}
+                    onClick={() => openTouchKb("full", "search", true)}
+                  >
+                    <Keyboard className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
               <div className="flex gap-2 overflow-x-auto mt-3 pb-1">
@@ -1326,7 +1460,7 @@ export function CorporatePOS() {
                   <button
                     onClick={() => {
                       setCart([]);
-                      setShippingInput("0");
+                      setShippingInput("");
                     }}
                     className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-colors"
                   >
@@ -1362,15 +1496,31 @@ export function CorporatePOS() {
                       placeholder={tr("Avtomobil (istəyə bağlı)", "Vehicle (optional)")}
                       icon={Car}
                     />
-                    <input
-                      type="number"
-                      min="0"
-                      value={mileageInput}
-                      onChange={(e) => setMileageInput(e.target.value)}
-                      disabled={!selectedVehicleId}
-                      placeholder={tr("KM (istəyə bağlı)", "KM (optional)")}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="none"
+                        value={mileageInput}
+                        onChange={(e) =>
+                          setMileageInput(
+                            sanitizeNumericTyping(e.target.value, { allowDecimal: false }),
+                          )
+                        }
+                        onFocus={() => openTouchKb("numpad", "mileage")}
+                        disabled={!selectedVehicleId}
+                        placeholder={tr("KM (istəyə bağlı)", "KM (optional)")}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-xs text-gray-900 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-gray-400 hover:text-[#14b8a6] disabled:opacity-40"
+                        title={tr("Klaviatura", "Keyboard")}
+                        disabled={!selectedVehicleId}
+                        onClick={() => openTouchKb("numpad", "mileage", true)}
+                      >
+                        <Keyboard className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -1498,11 +1648,15 @@ export function CorporatePOS() {
                       </span>
                       <div className="relative w-28">
                         <input
-                          type="number"
-                          min="0"
-                          step="0.01"
+                          type="text"
+                          inputMode="none"
                           value={shippingInput}
-                          onChange={(e) => setShippingInput(e.target.value)}
+                          onChange={(e) =>
+                            setShippingInput(
+                              sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                            )
+                          }
+                          onFocus={() => openTouchKb("numpad", "shipping")}
                           className="w-full pr-7 pl-2 py-1 text-xs text-right bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                         />
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
@@ -1517,11 +1671,15 @@ export function CorporatePOS() {
                         </span>
                         <div className="relative w-28">
                           <input
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
+                            inputMode="none"
                             value={serviceFeeInput}
-                            onChange={(e) => setServiceFeeInput(e.target.value)}
+                            onChange={(e) =>
+                              setServiceFeeInput(
+                                sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                              )
+                            }
+                            onFocus={() => openTouchKb("numpad", "serviceFee")}
                             className="w-full pr-7 pl-2 py-1 text-xs text-right bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
@@ -1721,16 +1879,29 @@ export function CorporatePOS() {
             </div>
             <div className="relative mb-4">
               <input
-                type="number"
-                min="0"
-                step={discountType === "percent" ? "1" : "0.01"}
-                max={discountType === "percent" ? "100" : undefined}
+                type="text"
+                inputMode="none"
                 placeholder={discountType === "percent" ? "0 – 100" : "0.00"}
                 value={discountValue}
-                onChange={(e) => setDiscountValue(e.target.value)}
+                onChange={(e) =>
+                  setDiscountValue(
+                    sanitizeNumericTyping(e.target.value, {
+                      allowDecimal: discountType !== "percent",
+                    }),
+                  )
+                }
+                onFocus={() => openTouchKb("numpad", "discount")}
                 autoFocus
-                className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                className="w-full px-3 py-2 pr-16 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
+              <button
+                type="button"
+                className="absolute right-8 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-[#14b8a6]"
+                title={tr("Klaviatura", "Keyboard")}
+                onClick={() => openTouchKb("numpad", "discount", true)}
+              >
+                <Keyboard className="w-3.5 h-3.5" />
+              </button>
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{discountType === "percent" ? "%" : "₼"}</span>
             </div>
             <div className="flex gap-2">
@@ -1747,6 +1918,27 @@ export function CorporatePOS() {
 
       {/* Thermal Receipt Modal */}
       {receipt && <ThermalReceipt data={receipt} onClose={() => setReceipt(null)} />}
+
+      {touchKb && (
+        <TouchKeyboard
+          open
+          mode={touchKb.mode}
+          value={touchKbValue}
+          onChange={handleTouchKbChange}
+          onClose={() => setTouchKb(null)}
+          title={
+            touchKb.field === "search"
+              ? tr("Axtarış", "Search")
+              : touchKb.field === "shipping"
+                ? tr("Çatdırılma", "Shipping")
+                : touchKb.field === "serviceFee"
+                  ? tr("Xidmət haqqı", "Service fee")
+                  : touchKb.field === "mileage"
+                    ? tr("Km göstərici", "Mileage")
+                    : tr("Endirim", "Discount")
+          }
+        />
+      )}
     </div>
   );
 }

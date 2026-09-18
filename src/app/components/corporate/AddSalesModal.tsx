@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Scan, Trash2, Search } from "lucide-react";
+import { X, Scan, Trash2, Search, Keyboard } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { createPosOrder } from "../../api/sales";
@@ -11,14 +11,21 @@ import { mapOrderStatusToApi } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
+import { TouchKeyboard } from "../ui/TouchKeyboard";
+import {
+  useLastPointerType,
+  usePrefersTouchKeyboard,
+} from "../../hooks/usePrefersTouchKeyboard";
 
 import { pickLang } from "../../i18n/pickLang";
+import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+
 interface ProductItem {
   id: string;
   name: string;
   unitPrice: number;
   stock: number;
-  qty: number;
+  qty: number | "";
 }
 
 interface AddSalesModalProps {
@@ -27,9 +34,24 @@ interface AddSalesModalProps {
   onSaved: () => void;
 }
 
+type TouchKbTarget =
+  | { kind: "customer" | "product" }
+  | { kind: "taxPercent" | "discount" | "shipping" }
+  | { kind: "lineQty"; productId: string };
+
+const NUMPAD_KINDS = new Set(["taxPercent", "discount", "shipping", "lineQty"]);
+
+function bufferToNumber(s: string): number | "" {
+  if (s === "") return "";
+  const n = Number(s);
+  return Number.isFinite(n) ? n : "";
+}
+
 export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user } = useAuth();
+  const prefersTouchKeyboard = usePrefersTouchKeyboard();
+  const lastPointerType = useLastPointerType();
   const [customerId, setCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
@@ -37,13 +59,16 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
   const [date, setDate] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [products, setProducts] = useState<ProductItem[]>([]);
-  const [taxPercent, setTaxPercent] = useState(0);
-  const [discount, setDiscount] = useState(0);
-  const [shipping, setShipping] = useState(0);
+  const [taxPercent, setTaxPercent] = useState<number | "">("");
+  const [discount, setDiscount] = useState<number | "">("");
+  const [shipping, setShipping] = useState<number | "">("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [showProductList, setShowProductList] = useState(false);
+  const [touchKb, setTouchKb] = useState<
+    (TouchKbTarget & { mode: "full" | "numpad"; buffer: string }) | null
+  >(null);
 
   const { customers, loading: customersLoading } = useSalesCustomers(customerSearch, isOpen);
   const { products: searchResults, loading: productsLoading } = useSalesProductSearch(productSearch, isOpen);
@@ -66,13 +91,100 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
       setDate("");
       setProductSearch("");
       setProducts([]);
-      setTaxPercent(0);
-      setDiscount(0);
-      setShipping(0);
+      setTaxPercent("");
+      setDiscount("");
+      setShipping("");
       setStatus("");
       setShowProductList(false);
+      setTouchKb(null);
     }
   }, [isOpen]);
+
+  const touchKbValueFor = (target: TouchKbTarget): string => {
+    switch (target.kind) {
+      case "customer":
+        return customerSearch;
+      case "product":
+        return productSearch;
+      case "taxPercent":
+        return taxPercent === "" ? "" : String(taxPercent);
+      case "discount":
+        return discount === "" ? "" : String(discount);
+      case "shipping":
+        return shipping === "" ? "" : String(shipping);
+      case "lineQty": {
+        const line = products.find((p) => p.id === target.productId);
+        return line == null || line.qty === "" ? "" : String(line.qty);
+      }
+    }
+  };
+
+  const openTouchKb = (target: TouchKbTarget, force = false) => {
+    const fromTouch =
+      lastPointerType.current === "touch" || lastPointerType.current === "pen";
+    if (!force && !prefersTouchKeyboard && !fromTouch) return;
+    setTouchKb({
+      ...target,
+      mode: NUMPAD_KINDS.has(target.kind) ? "numpad" : "full",
+      buffer: touchKbValueFor(target),
+    });
+  };
+
+  const handleUpdateProduct = (id: string, field: "qty", value: number | "") => {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+  };
+
+  const handleTouchKbChange = (next: string) => {
+    if (!touchKb) return;
+    setTouchKb({ ...touchKb, buffer: next });
+    switch (touchKb.kind) {
+      case "customer":
+        setCustomerSearch(next);
+        setCustomerId("");
+        setCustomerMenuOpen(true);
+        break;
+      case "product":
+        setProductSearch(next);
+        setShowProductList(true);
+        setCustomerMenuOpen(false);
+        break;
+      case "taxPercent":
+        setTaxPercent(bufferToNumber(next));
+        break;
+      case "discount":
+        setDiscount(bufferToNumber(next));
+        break;
+      case "shipping":
+        setShipping(bufferToNumber(next));
+        break;
+      case "lineQty":
+        handleUpdateProduct(
+          touchKb.productId,
+          "qty",
+          bufferToNumber(sanitizeNumericTyping(next, { allowDecimal: false })),
+        );
+        break;
+    }
+  };
+
+  const touchKbTitle = (): string => {
+    switch (touchKb?.kind) {
+      case "customer":
+        return tr("Müştəri", "Customer");
+      case "product":
+        return tr("Məhsul axtar", "Search product");
+      case "taxPercent":
+        return tr("Vergi %", "Tax %");
+      case "discount":
+        return tr("Endirim", "Discount");
+      case "shipping":
+        return tr("Çatdırılma", "Shipping");
+      case "lineQty":
+        return tr("Miqdar", "Qty");
+      default:
+        return tr("Klaviatura", "Keyboard");
+    }
+  };
 
   const handleSelectCustomer = (id: string, name: string) => {
     setCustomerId(id);
@@ -101,20 +213,17 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
     }
   };
 
-  const handleUpdateProduct = (id: string, field: keyof ProductItem, value: number) => {
-    setProducts(products.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
-  };
-
   const handleRemoveProduct = (id: string) => {
     setProducts(products.filter((p) => p.id !== id));
   };
 
-  const calculateLineTotal = (product: ProductItem) => product.unitPrice * product.qty;
+  const calculateLineTotal = (product: ProductItem) =>
+    product.unitPrice * asNumber(product.qty);
 
   const calculateTotals = () => {
     const subtotal = products.reduce((sum, p) => sum + calculateLineTotal(p), 0);
-    const taxAmount = (subtotal * taxPercent) / 100;
-    const grandTotal = subtotal + taxAmount - discount + shipping;
+    const taxAmount = (subtotal * asNumber(taxPercent)) / 100;
+    const grandTotal = subtotal + taxAmount - asNumber(discount) + asNumber(shipping);
     return { subtotal, taxAmount, grandTotal };
   };
 
@@ -126,12 +235,12 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
     status: mapOrderStatusToApi(orderStatus),
     ...(date ? { date } : {}),
     reference: null,
-    taxPercent,
-    discount,
-    shipping,
+    taxPercent: asNumber(taxPercent),
+    discount: asNumber(discount),
+    shipping: asNumber(shipping),
     items: products.map((p) => ({
       productId: p.id,
-      quantity: p.qty,
+      quantity: asNumber(p.qty, 1),
       price: p.unitPrice,
     })),
   });
@@ -215,16 +324,28 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                 <input
                   type="text"
+                  inputMode="none"
                   value={customerSearch}
                   onChange={(e) => {
                     setCustomerSearch(e.target.value);
                     setCustomerId("");
                     setCustomerMenuOpen(true);
                   }}
-                  onFocus={() => setCustomerMenuOpen(true)}
+                  onFocus={() => {
+                    setCustomerMenuOpen(true);
+                    openTouchKb({ kind: "customer" });
+                  }}
                   placeholder={tr("Müştəri axtar və seç", "Search and select customer")}
-                  className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                  className="w-full pl-8 pr-9 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-[#14b8a6]"
+                  title={tr("Klaviatura", "Keyboard")}
+                  onClick={() => openTouchKb({ kind: "customer" }, true)}
+                >
+                  <Keyboard className="w-3.5 h-3.5" />
+                </button>
               </div>
               {customerMenuOpen && (
                 <div className="absolute z-20 w-full mt-1 max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
@@ -304,6 +425,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
             <div className="relative">
               <input
                 type="text"
+                inputMode="none"
                 value={productSearch}
                 onChange={(e) => {
                   setProductSearch(e.target.value);
@@ -313,10 +435,19 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 onFocus={() => {
                   setShowProductList(true);
                   setCustomerMenuOpen(false);
+                  openTouchKb({ kind: "product" });
                 }}
                 placeholder={tr("Məhsul kodu daxil edin və seçin", "Please type product code and select")}
-                className="w-full px-2.5 py-1.5 pr-10 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                className="w-full px-2.5 py-1.5 pr-16 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
+              <button
+                type="button"
+                className="absolute right-8 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-[#14b8a6]"
+                title={tr("Klaviatura", "Keyboard")}
+                onClick={() => openTouchKb({ kind: "product" }, true)}
+              >
+                <Keyboard className="w-3.5 h-3.5" />
+              </button>
               <Scan className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
 
               {showProductList && productSearch && (
@@ -379,11 +510,16 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                       <td className="px-2 py-2 text-gray-900 dark:text-white">{product.stock}</td>
                       <td className="px-2 py-2">
                         <input
-                          type="number"
-                          value={product.qty}
-                          onChange={(e) => handleUpdateProduct(product.id, "qty", Number(e.target.value))}
-                          min="1"
-                          max={product.stock}
+                          type="text"
+                          inputMode="none"
+                          value={product.qty === "" ? "" : product.qty}
+                          onChange={(e) => {
+                            const s = sanitizeNumericTyping(e.target.value, {
+                              allowDecimal: false,
+                            });
+                            handleUpdateProduct(product.id, "qty", s === "" ? "" : Number(s));
+                          }}
+                          onFocus={() => openTouchKb({ kind: "lineQty", productId: product.id })}
                           className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         />
                       </td>
@@ -412,11 +548,11 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600 dark:text-gray-400">{tr("Endirim", "Discount")}</span>
-                <span className="text-gray-900 dark:text-white">₼ {discount.toFixed(2)}</span>
+                <span className="text-gray-900 dark:text-white">₼ {asNumber(discount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600 dark:text-gray-400">{tr("Çatdırılma", "Shipping")}</span>
-                <span className="text-gray-900 dark:text-white">₼ {shipping.toFixed(2)}</span>
+                <span className="text-gray-900 dark:text-white">₼ {asNumber(shipping).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-xs font-semibold pt-2 border-t border-gray-300 dark:border-gray-700">
                 <span className="text-gray-900 dark:text-white">{tr("Ümumi Məbləğ", "Grand Total")}</span>
@@ -431,10 +567,14 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 {tr("Vergi %", "Tax %")}
               </label>
               <input
-                type="number"
-                value={taxPercent}
-                onChange={(e) => setTaxPercent(Number(e.target.value))}
-                min="0"
+                type="text"
+                inputMode="none"
+                value={taxPercent === "" ? "" : taxPercent}
+                onChange={(e) => {
+                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
+                  setTaxPercent(s === "" ? "" : Number(s));
+                }}
+                onFocus={() => openTouchKb({ kind: "taxPercent" })}
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
@@ -444,10 +584,14 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 {tr("Endirim", "Discount")}
               </label>
               <input
-                type="number"
-                value={discount}
-                onChange={(e) => setDiscount(Number(e.target.value))}
-                min="0"
+                type="text"
+                inputMode="none"
+                value={discount === "" ? "" : discount}
+                onChange={(e) => {
+                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
+                  setDiscount(s === "" ? "" : Number(s));
+                }}
+                onFocus={() => openTouchKb({ kind: "discount" })}
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
@@ -457,10 +601,14 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                 {tr("Çatdırılma", "Shipping")}
               </label>
               <input
-                type="number"
-                value={shipping}
-                onChange={(e) => setShipping(Number(e.target.value))}
-                min="0"
+                type="text"
+                inputMode="none"
+                value={shipping === "" ? "" : shipping}
+                onChange={(e) => {
+                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
+                  setShipping(s === "" ? "" : Number(s));
+                }}
+                onFocus={() => openTouchKb({ kind: "shipping" })}
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
@@ -515,6 +663,17 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
           </button>
         </div>
       </div>
+
+      {touchKb && (
+        <TouchKeyboard
+          open
+          mode={touchKb.mode}
+          value={touchKb.buffer}
+          onChange={handleTouchKbChange}
+          onClose={() => setTouchKb(null)}
+          title={touchKbTitle()}
+        />
+      )}
     </div>
   );
 }

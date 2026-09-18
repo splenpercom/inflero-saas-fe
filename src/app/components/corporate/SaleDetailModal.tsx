@@ -386,12 +386,11 @@ export function SaleDetailModal({
                     <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                       {tr("Ödəniş üsulu", "Payment method")}
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {(
                         [
                           { id: "cash" as const, name: tr("Nağd", "Cash") },
                           { id: "card" as const, name: tr("Kart", "Card") },
-                          { id: "bank" as const, name: tr("Bank", "Bank") },
                         ] as const
                       ).map((m) => (
                         <button

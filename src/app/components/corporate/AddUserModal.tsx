@@ -39,9 +39,7 @@ interface AddUserModalProps {
   roles?: { id: string; name: string }[];
   branches?: { id: string; name: string }[];
   showBranchSelect?: boolean;
-  /** Owner Add User: create/replace branch manager (fixed Manager role + required branch). */
-  createAsBranchManager?: boolean;
-  /** Manager role id when createAsBranchManager (backend also forces Manager). */
+  /** When this role is selected, branch is required and user is pinned as branch manager. */
   managerRoleId?: string;
   saving?: boolean;
 }
@@ -53,7 +51,6 @@ export function AddUserModal({
   roles = [],
   branches = [],
   showBranchSelect = false,
-  createAsBranchManager = false,
   managerRoleId = "",
   saving,
 }: AddUserModalProps) {
@@ -65,17 +62,13 @@ export function AddUserModal({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState<AddUserFormData>(emptyForm());
 
+  const createAsBranchManager =
+    !!managerRoleId && formData.roleId === managerRoleId;
+
   useEffect(() => {
     if (!isOpen) return;
-    const next = emptyForm();
-    if (createAsBranchManager && managerRoleId) {
-      next.roleId = managerRoleId;
-    }
-    if (createAsBranchManager && branches.length === 1) {
-      next.storeId = branches[0].id;
-    }
-    setFormData(next);
-  }, [isOpen, createAsBranchManager, managerRoleId, branches]);
+    setFormData(emptyForm());
+  }, [isOpen]);
 
   const resetForm = () => setFormData(emptyForm());
 
@@ -86,11 +79,7 @@ export function AddUserModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      ...formData,
-      roleId: createAsBranchManager && managerRoleId ? managerRoleId : formData.roleId,
-    };
-    onSave?.(payload);
+    onSave?.(formData);
   };
 
   if (!isOpen) return null;
@@ -102,9 +91,7 @@ export function AddUserModal({
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-[#14b8a6]" />
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-              {createAsBranchManager
-                ? pickLang(language, "Filial meneceri əlavə et", "Add branch manager")
-                : t("addNewUser")}
+              {t("addNewUser")}
             </h2>
           </div>
           <button type="button" onClick={handleClose} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors">
@@ -184,32 +171,24 @@ export function AddUserModal({
                 <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
                   {t("role")} <span className="text-red-500">*</span>
                 </label>
-                {createAsBranchManager ? (
-                  <input
-                    type="text"
-                    readOnly
-                    className="w-full px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
-                    value="Manager"
-                  />
-                ) : (
-                  <CustomSelect
-                    value={formData.roleId}
-                    onChange={(value) => setFormData({ ...formData, roleId: value })}
-                    options={roles.map((role) => ({
-                      value: role.id,
-                      label: role.name === "Administrator" ? "Admin" : role.name,
-                    }))}
-                    placeholder={t("selectRole")}
-                    required
-                  />
-                )}
+                <CustomSelect
+                  value={formData.roleId}
+                  onChange={(value) => setFormData({ ...formData, roleId: value })}
+                  options={roles.map((role) => ({
+                    value: role.id,
+                    label: role.name === "Administrator" ? "Admin" : role.name,
+                  }))}
+                  placeholder={t("selectRole")}
+                  required
+                />
               </div>
             </div>
 
             {showBranchSelect && (
               <div>
                 <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
-                  {t("branch")} {createAsBranchManager ? <span className="text-red-500">*</span> : null}
+                  {t("branch")}{" "}
+                  {createAsBranchManager ? <span className="text-red-500">*</span> : null}
                 </label>
                 <CustomSelect
                   value={formData.storeId}
@@ -268,8 +247,9 @@ export function AddUserModal({
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     className="w-full px-3 py-1.5 pr-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                    placeholder={t("confirmPasswordPlaceholder")}
+                    placeholder={t("confirmPassword")}
                     required
+                    minLength={8}
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   />
@@ -282,11 +262,19 @@ export function AddUserModal({
           </div>
 
           <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-            <button type="button" onClick={handleClose} className="px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
               {t("cancel")}
             </button>
-            <button type="submit" disabled={saving} className="px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
-              {t("addUser")}
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50"
+            >
+              {saving ? t("saving") : t("addUser")}
             </button>
           </div>
         </form>

@@ -7,6 +7,8 @@ import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
+import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+
 export interface PaymentFormData {
   date: string;
   amount: number;
@@ -44,9 +46,15 @@ export function CreatePaymentModal({
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState<PaymentFormData>({
+  const [formData, setFormData] = useState<{
+    date: string;
+    amount: number | "";
+    paymentMethod: string;
+    reference: string;
+    note: string;
+  }>({
     date: new Date().toISOString().split("T")[0],
-    amount: 0,
+    amount: "",
     paymentMethod: "Cash",
     reference: "",
     note: "",
@@ -62,7 +70,7 @@ export function CreatePaymentModal({
       setLoading(false);
       setFormData({
         date: new Date().toISOString().split("T")[0],
-        amount: paymentSummary.due > 0 ? paymentSummary.due : 0,
+        amount: "",
         paymentMethod: "Cash",
         reference: "",
         note: "",
@@ -77,10 +85,9 @@ export function CreatePaymentModal({
     fetchPosOrder(orderId)
       .then((data) => {
         setOrder(data);
-        const due = parseFloat(data.due);
         setFormData({
           date: new Date().toISOString().split("T")[0],
-          amount: due > 0 ? due : 0,
+          amount: "",
           paymentMethod: "Cash",
           reference: "",
           note: "",
@@ -109,11 +116,18 @@ export function CreatePaymentModal({
     e.preventDefault();
     if (!summary) return;
     const due = summary.due;
-    if (formData.amount <= 0 || formData.amount > due) return;
+    const amount = asNumber(formData.amount);
+    if (amount <= 0 || amount > due) return;
 
     setSaving(true);
     try {
-      await onSaved(formData);
+      await onSaved({
+        date: formData.date,
+        amount,
+        paymentMethod: formData.paymentMethod,
+        reference: formData.reference,
+        note: formData.note,
+      });
       onClose();
     } catch {
       // parent shows error toast
@@ -191,19 +205,23 @@ export function CreatePaymentModal({
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={due}
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.amount === "" ? "" : formData.amount}
+                  onChange={(e) => {
+                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
+                    setFormData({
+                      ...formData,
+                      amount: s === "" ? "" : Number(s),
+                    });
+                  }}
                   className="w-full px-3 py-2 pr-12 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                   placeholder="0.00"
                   required
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-gray-400">₼</span>
               </div>
-              {formData.amount > due && (
+              {asNumber(formData.amount) > due && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                   {tr("Məbləğ borcdan çox ola bilməz", "Amount cannot exceed due amount")}
                 </p>
@@ -238,7 +256,6 @@ export function CreatePaymentModal({
                 options={[
                   { value: "Cash", label: tr("Nağd", "Cash") },
                   { value: "Card", label: tr("Kart", "Card") },
-                  { value: "Bank Transfer", label: tr("Bank Transferi", "Bank Transfer") },
                 ]}
               />
             </div>
@@ -283,7 +300,13 @@ export function CreatePaymentModal({
           <button
             type="button"
             onClick={(e) => void handleSubmit(e)}
-            disabled={loading || !summary || saving || formData.amount <= 0 || formData.amount > due}
+            disabled={
+              loading ||
+              !summary ||
+              saving ||
+              asNumber(formData.amount) <= 0 ||
+              asNumber(formData.amount) > due
+            }
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-3.5 h-3.5" />
