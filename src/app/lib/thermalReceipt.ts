@@ -27,41 +27,50 @@ export function receiptPrintText(language: Language, value: string): string {
 
 /**
  * Shared 80mm thermal receipt CSS — keep identical across SAAS + Inflero Auto POS.
- * Content width ~72mm with padding so text does not clip on typical ESC/POS printers.
+ * Sized for browser→thermal print: larger pt sizes, pure black (grays wash out).
  */
 export const THERMAL_RECEIPT_PRINT_CSS = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: "Courier New", Courier, monospace;
-    font-size: 12px;
-    line-height: 1.35;
+  html, body {
+    font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+    font-size: 13pt;
+    line-height: 1.45;
+    font-weight: 600;
     width: 72mm;
     max-width: 72mm;
     margin: 0 auto;
-    padding: 3mm 2.5mm;
+    padding: 3mm 2mm;
     color: #000;
     background: #fff;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   .center { text-align: center; }
-  .bold { font-weight: 700; }
-  .big { font-size: 14px; font-weight: 700; letter-spacing: 0.5px; }
-  .divider { border-top: 1px dashed #000; margin: 5px 0; }
-  .divider-solid { border-top: 1px solid #000; margin: 5px 0; }
-  .row { display: flex; justify-content: space-between; gap: 6px; margin: 2px 0; }
-  .row > span:last-child { text-align: right; word-break: break-word; }
-  .row-item { margin: 4px 0; }
-  .row-item .name { width: 100%; word-break: break-word; font-weight: 700; }
-  .row-item .nums { display: flex; justify-content: space-between; gap: 6px; padding-left: 2px; color: #222; font-size: 11px; }
-  .section-title { font-size: 11px; font-weight: 700; margin: 2px 0 4px; text-transform: uppercase; }
-  .total-row { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; font-weight: 700; margin-top: 4px; }
-  .label { color: #333; flex-shrink: 0; }
-  .thanks { text-align: center; margin-top: 8px; font-size: 11px; line-height: 1.4; }
-  .logo-area { text-align: center; margin-bottom: 4px; }
+  .bold { font-weight: 800; }
+  .big { font-size: 15pt; font-weight: 800; letter-spacing: 0.4px; }
+  .divider { border-top: 1.5px dashed #000; margin: 6px 0; }
+  .divider-solid { border-top: 2px solid #000; margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin: 3px 0; font-size: 12pt; }
+  .row > span:last-child { text-align: right; word-break: break-word; font-weight: 700; }
+  .row-item { margin: 5px 0; }
+  .row-item .name { width: 100%; word-break: break-word; font-weight: 800; font-size: 12.5pt; }
+  .row-item .nums { display: flex; justify-content: space-between; gap: 8px; padding-left: 2px; color: #000; font-size: 12pt; font-weight: 700; margin-top: 2px; }
+  .section-title { font-size: 11.5pt; font-weight: 800; margin: 4px 0 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .total-row { display: flex; justify-content: space-between; gap: 8px; font-size: 15pt; font-weight: 800; margin-top: 6px; }
+  .label { color: #000; flex-shrink: 0; font-weight: 700; }
+  .thanks { text-align: center; margin-top: 10px; font-size: 11pt; line-height: 1.45; font-weight: 700; }
+  .logo-area { text-align: center; margin-bottom: 6px; }
   img { max-width: 100%; height: auto; }
   @media print {
-    html, body { width: 72mm; margin: 0; padding: 2mm 2mm; }
+    html, body {
+      width: 72mm !important;
+      max-width: 72mm !important;
+      margin: 0 auto !important;
+      padding: 2mm 1.5mm !important;
+      font-size: 13pt !important;
+    }
     @page { size: 80mm auto; margin: 0; }
   }
 `.trim();
@@ -102,7 +111,7 @@ export function thermalReceiptLabels(language: Language) {
 /** Compact logo block sized for 80mm rolls (shared print + preview scale). */
 export function brandLogoThermalHtml(src: string, alt: string): string {
   const safeAlt = alt.replace(/"/g, "&quot;");
-  return `<div class="logo-area" style="height:48px;max-width:56mm;margin:0 auto 4px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
-  <img src="${src}" alt="${safeAlt}" style="max-height:48px;max-width:100%;width:auto;object-fit:contain;object-position:center;" />
+  return `<div class="logo-area" style="height:52px;max-width:58mm;margin:0 auto 6px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+  <img src="${src}" alt="${safeAlt}" style="max-height:52px;max-width:100%;width:auto;object-fit:contain;object-position:center;" />
 </div>`;
 }

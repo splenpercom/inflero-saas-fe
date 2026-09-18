@@ -308,7 +308,7 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
 
         <div class="thanks">
           <div>${L.thanks}</div>
-          <div style="margin-top:3px;color:#555;">app.inflero.com</div>
+          <div style="margin-top:3px;font-weight:700;">app.inflero.com</div>
         </div>
         `
         }
