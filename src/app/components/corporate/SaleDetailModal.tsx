@@ -18,7 +18,7 @@ import {
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { APP_LOGO_LIGHT } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
-import { posOrderToThermalPayload, printPosTicket } from "../../lib/posPrint";
+import { printPosOrderTicket } from "../../lib/posPrint";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 
 import { pickLang } from "../../i18n/pickLang";
@@ -118,18 +118,20 @@ export function SaleDetailModal({
 
   const handleThermalPrint = async (role: "receipt" | "kot") => {
     if (!order || isDemo) return;
+    if (role === "kot" && !diningEnabled) return;
     setPrinting(role);
     try {
       const logoSrc =
         getCompanyLogoUrl(user?.tenant, false) ??
         getCompanyLogoUrl(user?.tenant, true) ??
         APP_LOGO_LIGHT;
-      const payload = posOrderToThermalPayload(order, {
+      const result = await printPosOrderTicket({
+        order,
+        role,
         language,
         companyName: user?.tenant?.name?.trim() || "Inflero",
         logoSrc,
       });
-      const result = await printPosTicket({ role, language, payload });
       notifySuccess(
         result.channel === "qz"
           ? tr(`Çap edildi → ${result.printer}`, `Printed → ${result.printer}`)

@@ -390,7 +390,7 @@ export async function posCheckout(body: CreatePosOrderBody) {
   return res.data;
 }
 
-/** Complete sale + kitchen ticket (DINING). */
+/** Complete sale and send to digital kitchen board (DINING). Paper KOT is printed by the client. */
 export async function sendPosOrderToKot(body: CreatePosOrderBody) {
   const res = await apiPost<{ success: boolean; data: PosOrderDetail }>("/tenant/sales/pos/send-to-kot", body);
   return res.data;

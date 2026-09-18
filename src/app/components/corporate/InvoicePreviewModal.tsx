@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Download, Printer, X } from "lucide-react";
+import { Download, Loader2, Printer, Receipt, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useAuth } from "../../context/AuthContext";
 import { pickLang } from "../../i18n/pickLang";
 import {
   fetchInvoice,
@@ -14,7 +15,10 @@ import {
   invoiceDetailFromPosOrder,
   printInvoiceDocument,
 } from "../../lib/invoicePdf";
-import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { APP_LOGO_LIGHT } from "../../lib/branding";
+import { getCompanyLogoUrl } from "../../lib/userDisplay";
+import { printPosOrderTicket } from "../../lib/posPrint";
+import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 
 function parseAmount(value: string | number): number {
   if (typeof value === "number") return value;
@@ -29,11 +33,13 @@ interface InvoicePreviewModalProps {
 
 export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreviewModalProps) {
   const { language } = useLanguage();
+  const { user } = useAuth();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [sourceOrder, setSourceOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [printingBill, setPrintingBill] = useState(false);
 
   const load = useCallback(async () => {
     if (!orderId) {
@@ -94,6 +100,36 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
     }
   };
 
+  const handlePrintBill = async () => {
+    if (!sourceOrder || sourceOrder.items.length === 0) {
+      notifyWarning(tr("Sifariş tapılmadı", "Order not found"));
+      return;
+    }
+    setPrintingBill(true);
+    try {
+      const logoSrc =
+        getCompanyLogoUrl(user?.tenant, false) ??
+        getCompanyLogoUrl(user?.tenant, true) ??
+        APP_LOGO_LIGHT;
+      const result = await printPosOrderTicket({
+        order: sourceOrder,
+        role: "receipt",
+        language,
+        companyName: user?.tenant?.name?.trim() || "Inflero",
+        logoSrc,
+      });
+      notifySuccess(
+        result.channel === "qz"
+          ? tr(`Qəbz çap edildi → ${result.printer}`, `Bill printed → ${result.printer}`)
+          : tr("Brauzer çap dialoqu açıldı", "Browser print dialog opened"),
+      );
+    } catch (err) {
+      notifyFromError(err, tr("Qəbz çapı alınmadı", "Failed to print bill"));
+    } finally {
+      setPrintingBill(false);
+    }
+  };
+
   const customer = invoice?.customer;
   const total = invoice ? parseAmount(invoice.total) : 0;
   const subtotal = invoice ? parseAmount(invoice.subtotal) : 0;
@@ -120,9 +156,24 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
+              disabled={!sourceOrder || loading || printingBill || !sourceOrder.items.length}
+              onClick={() => void handlePrintBill()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              title={tr("POS qəbzini çap et", "Print POS thermal bill")}
+            >
+              {printingBill ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Receipt className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">{tr("Qəbz çapı", "Print Bill")}</span>
+            </button>
+            <button
+              type="button"
               disabled={!invoice || loading}
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+              title={tr("A4 qaimə çapı", "Print A4 invoice")}
             >
               <Printer className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{tr("Çap et", "Print")}</span>
@@ -131,7 +182,7 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
               type="button"
               disabled={!invoice || loading}
               onClick={() => void handleDownload()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{tr("Yüklə", "Download")}</span>

@@ -10,6 +10,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useAuth } from "../../context/AuthContext";
 import { pickLang } from "../../i18n/pickLang";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { NoAccessPanel } from "../permissions/NoAccessPanel";
@@ -66,6 +67,9 @@ export function PosPrinterSettings({
   accessModule?: "Settings" | "Sales";
 }) {
   const { language } = useLanguage();
+  const { hasModule } = useAuth();
+  /** Dual printers (receipt + KOT) only when Dining plugin is enabled. */
+  const diningEnabled = hasModule("DINING");
   const { canView, canEdit } = useModulePermissions(accessModule);
   /** Terminal printer map is local — Sales users with view can configure this PC. */
   const canMutate = accessModule === "Sales" ? canView : canEdit;
@@ -103,11 +107,28 @@ export function PosPrinterSettings({
     void refreshQz();
   }, [refreshQz]);
 
+  // Drop stale KOT printer when Dining is not enabled for this tenant.
+  useEffect(() => {
+    if (diningEnabled) return;
+    if (!settings.kotPrinter.trim()) return;
+    const cleared = { ...settings, kotPrinter: "" };
+    setSettings(cleared);
+    try {
+      savePosPrinterSettings(cleared);
+    } catch {
+      // ignore persist errors
+    }
+  }, [diningEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSave = () => {
     if (!canMutate) return;
     setSaving(true);
     try {
-      savePosPrinterSettings(settings);
+      savePosPrinterSettings({
+        ...settings,
+        // Non-dining tenants only use the bill printer.
+        kotPrinter: diningEnabled ? settings.kotPrinter : "",
+      });
       notifySuccess(tr("Printer parametrləri saxlanıldı", "Printer settings saved"));
     } catch (err) {
       notifyFromError(err, tr("Saxlanılmadı", "Failed to save"));
@@ -117,7 +138,19 @@ export function PosPrinterSettings({
   };
 
   const handleTest = async (role: "receipt" | "kot") => {
-    const printer = role === "receipt" ? settings.receiptPrinter : settings.kotPrinter;
+    if (role === "kot" && !diningEnabled) {
+      notifyWarning(
+        tr(
+          "KOT çapı yalnız Dining plagini üçün aktivdir",
+          "KOT printing is only available with the Dining plugin",
+        ),
+      );
+      return;
+    }
+    const printer =
+      role === "receipt"
+        ? settings.receiptPrinter
+        : settings.kotPrinter || settings.receiptPrinter;
     if (!printer.trim()) {
       notifyWarning(
         tr(
@@ -127,7 +160,10 @@ export function PosPrinterSettings({
       );
       return;
     }
-    savePosPrinterSettings(settings);
+    savePosPrinterSettings({
+      ...settings,
+      kotPrinter: diningEnabled ? settings.kotPrinter : "",
+    });
     setTesting(role);
     try {
       const result = await printPosTicket({
@@ -161,7 +197,8 @@ export function PosPrinterSettings({
     ...(settings.receiptPrinter && !printers.includes(settings.receiptPrinter)
       ? [{ value: settings.receiptPrinter, label: `${settings.receiptPrinter} (saved)` }]
       : []),
-    ...(settings.kotPrinter &&
+    ...(diningEnabled &&
+    settings.kotPrinter &&
     settings.kotPrinter !== settings.receiptPrinter &&
     !printers.includes(settings.kotPrinter)
       ? [{ value: settings.kotPrinter, label: `${settings.kotPrinter} (saved)` }]
@@ -185,10 +222,15 @@ export function PosPrinterSettings({
                 {tr("POS Printerlər", "POS Printers")}
               </h1>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {tr(
-                  "Bu kompüter/terminal üçün qəbz və KOT printerlərini təyin edin. QZ Tray ilə səssiz çap.",
-                  "Map receipt and KOT printers for this PC/terminal. Silent print via QZ Tray.",
-                )}
+                {diningEnabled
+                  ? tr(
+                      "Bu kompüter/terminal üçün qəbz və KOT printerlərini təyin edin. QZ Tray ilə səssiz çap.",
+                      "Map receipt and KOT printers for this PC/terminal. Silent print via QZ Tray.",
+                    )
+                  : tr(
+                      "Bu kompüter/terminal üçün qəbz printerini təyin edin. QZ Tray ilə səssiz çap.",
+                      "Map the receipt printer for this PC/terminal. Silent print via QZ Tray.",
+                    )}
               </p>
             </div>
           </div>
@@ -238,7 +280,7 @@ export function PosPrinterSettings({
             </p>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className={`grid grid-cols-1 ${diningEnabled ? "sm:grid-cols-2" : ""} gap-3`}>
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                 {tr("Qəbz / Bill printeri", "Receipt / Bill printer")}
@@ -252,27 +294,29 @@ export function PosPrinterSettings({
                 disabled={!canMutate}
               />
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("KOT / Mətbəx printeri", "KOT / Kitchen printer")}
-              </label>
-              <ModernSelect
-                value={settings.kotPrinter}
-                onChange={(value) => setSettings((s) => ({ ...s, kotPrinter: value }))}
-                options={printerOptions}
-                className="w-full"
-                placeholder={tr("Printer seçin", "Select printer")}
-                disabled={!canMutate}
-              />
-              {settings.receiptPrinter.trim() && !settings.kotPrinter.trim() && (
-                <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-1">
-                  {tr(
-                    "KOT boşdursa qəbz printerindən istifadə olunur.",
-                    "If KOT is empty, the receipt printer is used.",
-                  )}
-                </p>
-              )}
-            </div>
+            {diningEnabled && (
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("KOT / Mətbəx printeri", "KOT / Kitchen printer")}
+                </label>
+                <ModernSelect
+                  value={settings.kotPrinter}
+                  onChange={(value) => setSettings((s) => ({ ...s, kotPrinter: value }))}
+                  options={printerOptions}
+                  className="w-full"
+                  placeholder={tr("Printer seçin", "Select printer")}
+                  disabled={!canMutate}
+                />
+                {settings.receiptPrinter.trim() && !settings.kotPrinter.trim() && (
+                  <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-1">
+                    {tr(
+                      "KOT boşdursa qəbz printerindən istifadə olunur.",
+                      "If KOT is empty, the receipt printer is used.",
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -324,15 +368,17 @@ export function PosPrinterSettings({
               {testing === "receipt" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
               {tr("Test qəbz", "Test receipt")}
             </button>
-            <button
-              type="button"
-              onClick={() => void handleTest("kot")}
-              disabled={!!testing || !canMutate}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50"
-            >
-              {testing === "kot" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
-              {tr("Test KOT", "Test KOT")}
-            </button>
+            {diningEnabled && (
+              <button
+                type="button"
+                onClick={() => void handleTest("kot")}
+                disabled={!!testing || !canMutate}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50"
+              >
+                {testing === "kot" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+                {tr("Test KOT", "Test KOT")}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSave}

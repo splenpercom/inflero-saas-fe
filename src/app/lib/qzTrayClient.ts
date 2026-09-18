@@ -1,3 +1,5 @@
+import { thermalQzPageWidthMm } from "./thermalReceipt";
+
 /**
  * Thin wrapper around QZ Tray (must be installed on the POS PC).
  * Unsigned mode: QZ may show an allow prompt until certificates are configured.
@@ -71,7 +73,7 @@ export async function qzPrintHtml(
     throw new Error("Printer name is required");
   }
   // Match CSS usable width so QZ does not scale a wider page onto a narrow roll.
-  const pageWidthMm = paperWidthMm === 58 ? 48 : 68;
+  const pageWidthMm = thermalQzPageWidthMm(paperWidthMm);
   const qz = await ensureQzConnected();
   const config = qz.configs.create(printerName, {
     scaleContent: true,

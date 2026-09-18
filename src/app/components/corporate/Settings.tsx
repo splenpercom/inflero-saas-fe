@@ -64,6 +64,7 @@ export function Settings() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, refresh, hasModule } = useAuth();
   const posEnabled = hasModule("POS");
+  const diningEnabled = hasModule("DINING");
   const { canView, canEdit } = useModulePermissions("Settings");
   const branchRevision = useBranchRevision();
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
@@ -71,14 +72,16 @@ export function Settings() {
   // Nav: sidebar section selection (Company group is collapsible)
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
-    searchParams.get("section") === "printers" && posEnabled ? "printers" : "companyInfo",
+    searchParams.get("section") === "printers" && posEnabled && diningEnabled
+      ? "printers"
+      : "companyInfo",
   );
 
   useEffect(() => {
-    if (searchParams.get("section") === "printers" && posEnabled) {
+    if (searchParams.get("section") === "printers" && posEnabled && diningEnabled) {
       setActiveSection("printers");
     }
-  }, [searchParams, posEnabled]);
+  }, [searchParams, posEnabled, diningEnabled]);
 
   const selectSection = (section: SettingsSection) => {
     setActiveSection(section);
@@ -484,11 +487,14 @@ export function Settings() {
   };
 
   useEffect(() => {
-    if (!posEnabled && (activeSection === "addons" || activeSection === "printers")) {
+    if (!posEnabled && activeSection === "addons") {
+      setActiveSection("companyInfo");
+    }
+    if ((!posEnabled || !diningEnabled) && activeSection === "printers") {
       setActiveSection("companyInfo");
       if (searchParams.has("section")) setSearchParams({}, { replace: true });
     }
-  }, [posEnabled, activeSection, searchParams, setSearchParams]);
+  }, [posEnabled, diningEnabled, activeSection, searchParams, setSearchParams]);
 
   const navItemClass = (section: SettingsSection) =>
     `w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
@@ -579,7 +585,7 @@ export function Settings() {
               </button>
             )}
 
-            {posEnabled && (
+            {posEnabled && diningEnabled && (
               <button
                 type="button"
                 onClick={() => selectSection("printers")}
@@ -1049,7 +1055,7 @@ export function Settings() {
               </div>
             )}
 
-            {posEnabled && activeSection === "printers" && (
+            {posEnabled && diningEnabled && activeSection === "printers" && (
               <div>
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">

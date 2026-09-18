@@ -157,3 +157,25 @@ export function posOrderToThermalPayload(
     siteFooter: "app.inflero.com",
   };
 }
+
+/** Convenience: map order detail → thermal print (receipt or KOT). */
+export async function printPosOrderTicket(opts: {
+  order: PosOrderDetail;
+  role: PosPrintRole;
+  language: Language;
+  companyName: string;
+  logoSrc?: string | null;
+  customerPhone?: string;
+}): Promise<{ channel: "qz" | "browser"; printer?: string }> {
+  const payload = posOrderToThermalPayload(opts.order, {
+    language: opts.language,
+    companyName: opts.companyName,
+    logoSrc: opts.logoSrc,
+    customerPhone: opts.customerPhone,
+  });
+  return printPosTicket({
+    role: opts.role,
+    language: opts.language,
+    payload,
+  });
+}

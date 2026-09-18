@@ -56,7 +56,7 @@ import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { useIsDarkMode } from "../../hooks/useIsDarkMode";
 import { BrandLogo } from "../ui/BrandLogo";
 import { thermalReceiptLabels, type ThermalReceiptPayload } from "../../lib/thermalReceipt";
-import { printPosTicket } from "../../lib/posPrint";
+import { printPosTicket, printPosOrderTicket } from "../../lib/posPrint";
 import { loadPosPrinterSettings } from "../../lib/posPrinterSettings";
 import { PosPrinterSettings } from "./PosPrinterSettings";
 import { useNavigate } from "react-router";
@@ -185,6 +185,8 @@ interface ReceiptData {
   paymentStatusLabel: string;
   /** Auto-print customer/counter receipt once (QZ when mapped, else browser). */
   autoPrintReceipt?: boolean;
+  /** Auto-print kitchen/KOT ticket once (dining Send KOT & Print). */
+  autoPrintKitchen?: boolean;
   /** Show optional kitchen paper reprint (kitchen primary path is digital KOT). */
   allowKitchenReprint?: boolean;
   tableLabel?: string;
@@ -194,10 +196,12 @@ function ThermalReceipt({
   data,
   onClose,
   onConfigurePrinters,
+  diningEnabled = false,
 }: {
   data: ReceiptData;
   onClose: () => void;
   onConfigurePrinters?: () => void;
+  diningEnabled?: boolean;
 }) {
   const { language } = useLanguage();
   const labels = thermalReceiptLabels(language);
@@ -258,6 +262,11 @@ function ThermalReceipt({
 
   useEffect(() => {
     if (autoPrintedRef.current) return;
+    if (data.autoPrintKitchen) {
+      autoPrintedRef.current = true;
+      void handlePrint({ copy: "kitchen" });
+      return;
+    }
     if (!data.autoPrintReceipt) return;
     autoPrintedRef.current = true;
     void handlePrint({ copy: "customer" });
@@ -282,23 +291,29 @@ function ThermalReceipt({
           </button>
         </div>
 
-        <div className="px-4 pt-3">
-          <button
-            type="button"
-            onClick={() => onConfigurePrinters?.()}
-            className="text-[10px] text-[#14b8a6] hover:underline text-left"
-          >
-            {pickLang(
-              language,
-              printerMap.receiptPrinter
-                ? `Printerlər: ${printerMap.receiptPrinter}${printerMap.kotPrinter ? ` / ${printerMap.kotPrinter}` : ""}`
-                : "Printerləri təyin et (QZ Tray)",
-              printerMap.receiptPrinter
-                ? `Printers: ${printerMap.receiptPrinter}${printerMap.kotPrinter ? ` / ${printerMap.kotPrinter}` : ""}`
-                : "Configure printers (QZ Tray)",
-            )}
-          </button>
-        </div>
+        {diningEnabled && onConfigurePrinters && (
+          <div className="px-4 pt-3">
+            <button
+              type="button"
+              onClick={() => onConfigurePrinters()}
+              className="text-[10px] text-[#14b8a6] hover:underline text-left"
+            >
+              {pickLang(
+                language,
+                printerMap.receiptPrinter
+                  ? printerMap.kotPrinter
+                    ? `Printerlər: ${printerMap.receiptPrinter} / ${printerMap.kotPrinter}`
+                    : `Printer: ${printerMap.receiptPrinter}`
+                  : "Printerləri təyin et (QZ Tray)",
+                printerMap.receiptPrinter
+                  ? printerMap.kotPrinter
+                    ? `Printers: ${printerMap.receiptPrinter} / ${printerMap.kotPrinter}`
+                    : `Printer: ${printerMap.receiptPrinter}`
+                  : "Configure printers (QZ Tray)",
+              )}
+            </button>
+          </div>
+        )}
 
         <div className="p-4 font-mono text-[12px] leading-[1.35] text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 mx-4 mt-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 max-h-80 overflow-y-auto">
           <BrandLogo src={previewLogoSrc} alt={companyName} size="receipt" />
@@ -900,6 +915,8 @@ export function CorporatePOS() {
 
   const handlePlaceOrder = async () => {
     if (!canCreate || isDemo || !isAuthenticated) return;
+    // Dining tenants use Send KOT & Print instead.
+    if (diningEnabled) return;
     if (cart.length === 0) { alert(tr("Səbəti doldurun", "Please add items to cart")); return; }
     if (!selectedPaymentMethod) { alert(tr("Ödəniş üsulunu seçin", "Please select a payment method")); return; }
     if (!selectedBillerId) { alert(tr("Kassir seçin", "Please select an employee / biller")); return; }
@@ -1000,7 +1017,7 @@ export function CorporatePOS() {
         paymentMethod: pmLabel[selectedPaymentMethod],
         paymentStatusLabel: serverPaymentStatusLabel,
         autoPrintReceipt: true,
-        allowKitchenReprint: diningEnabled,
+        allowKitchenReprint: false,
         ...(diningEnabled && selectedTableId
           ? {
               tableLabel:
@@ -1009,15 +1026,6 @@ export function CorporatePOS() {
             }
           : {}),
       });
-
-      if (diningEnabled && selectedTableId) {
-        notifySuccess(
-          tr(
-            "Sifariş tamamlandı — mətbəx KOT ekranında",
-            "Order completed — on the kitchen KOT screen",
-          ),
-        );
-      }
 
       resetCartAfterSave();
     } catch (err) {
@@ -1081,8 +1089,9 @@ export function CorporatePOS() {
       total: apiTotal,
       paymentMethod: selectedPaymentMethod ? pmLabel[selectedPaymentMethod] : "—",
       paymentStatusLabel: serverPaymentStatusLabel,
-      autoPrintReceipt: true,
-      allowKitchenReprint: !!opts?.diningFlow || diningEnabled,
+      autoPrintReceipt: !opts?.diningFlow,
+      autoPrintKitchen: false,
+      allowKitchenReprint: !!opts?.diningFlow,
       ...(opts?.diningFlow || opts?.tableLabel
         ? { tableLabel: opts.tableLabel }
         : {}),
@@ -1154,25 +1163,50 @@ export function CorporatePOS() {
         ...(selectedTableId ? { tableId: selectedTableId } : {}),
       });
 
+      const tableLabel = selectedTableId
+        ? diningTables.find((t) => t.id === selectedTableId)?.name ??
+          diningTables.find((t) => t.id === selectedTableId)?.number?.toString()
+        : tr("Gələn müştəri", "Walk-in");
+
+      try {
+        const logoSrc =
+          getCompanyLogoUrl(user?.tenant, false) ??
+          getCompanyLogoUrl(user?.tenant, true) ??
+          APP_LOGO_LIGHT;
+        await printPosOrderTicket({
+          order: detail,
+          role: "kot",
+          language,
+          companyName: user?.tenant?.name?.trim() || "Inflero",
+          logoSrc,
+          customerPhone: receiptPhone,
+        });
+        notifySuccess(
+          selectedTableId
+            ? tr(
+                "KOT-a göndərildi və mətbəx çapı göndərildi",
+                "Sent to KOT and kitchen ticket printed",
+              )
+            : tr(
+                "KOT-a göndərildi (gələn müştəri) və mətbəx çapı göndərildi",
+                "Sent to KOT (walk-in) and kitchen ticket printed",
+              ),
+        );
+      } catch (printErr) {
+        notifyWarning(
+          tr(
+            "KOT-a göndərildi, amma mətbəx çapı alınmadı",
+            "Sent to KOT, but kitchen print failed",
+          ),
+        );
+        notifyFromError(printErr);
+      }
+
       setReceipt(
         buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
           diningFlow: true,
-          tableLabel: selectedTableId
-            ? diningTables.find((t) => t.id === selectedTableId)?.name ??
-              diningTables.find((t) => t.id === selectedTableId)?.number?.toString()
-            : tr("Gələn müştəri", "Walk-in"),
+          tableLabel,
         }),
-      );
-      notifySuccess(
-        selectedTableId
-          ? tr(
-              "KOT-a göndərildi — mətbəx ekranında görünür",
-              "Sent to KOT — visible on the kitchen screen",
-            )
-          : tr(
-              "KOT-a göndərildi (gələn müştəri) — mətbəx ekranında görünür",
-              "Sent to KOT (walk-in) — visible on the kitchen screen",
-            ),
       );
       resetCartAfterSave();
     } catch (err) {
@@ -1274,14 +1308,16 @@ export function CorporatePOS() {
       >
         <ArrowLeft className="w-3.5 h-3.5" />
       </button>
-      <button
-        type="button"
-        onClick={() => setPrinterSettingsOpen(true)}
-        className="fixed top-2 left-12 z-50 p-2 rounded-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-[#14b8a6] hover:bg-white dark:hover:bg-gray-900 transition-all opacity-50 hover:opacity-100"
-        title={tr("POS Printerlər", "POS Printers")}
-      >
-        <Printer className="w-3.5 h-3.5" />
-      </button>
+      {diningEnabled && (
+        <button
+          type="button"
+          onClick={() => setPrinterSettingsOpen(true)}
+          className="fixed top-2 left-12 z-50 p-2 rounded-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-[#14b8a6] hover:bg-white dark:hover:bg-gray-900 transition-all opacity-50 hover:opacity-100"
+          title={tr("POS Printerlər", "POS Printers")}
+        >
+          <Printer className="w-3.5 h-3.5" />
+        </button>
+      )}
 
       <div className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8">
 
@@ -1770,15 +1806,37 @@ export function CorporatePOS() {
                       ? tr("Saxlanılır...", "Saving...")
                       : tr("Qaralama olaraq saxla", "Save as Draft")}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void handlePlaceOrder()}
-                    disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToProduction || isGlobalMode || !branchId}
-                    className="px-3 py-2.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    {placingOrder ? tr("Göndərilir...", "Processing...") : tr("Ödənişi Tamamla", "Complete & Print")}
-                  </button>
+                  {diningEnabled ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleSendToKot()}
+                      disabled={
+                        cart.length === 0 ||
+                        placingOrder ||
+                        savingDraft ||
+                        sendingToKot ||
+                        sendingToProduction ||
+                        isGlobalMode ||
+                        !branchId
+                      }
+                      className="px-3 py-2.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    >
+                      <ChefHat className="w-3.5 h-3.5" />
+                      {sendingToKot
+                        ? tr("Göndərilir...", "Sending...")
+                        : tr("KOT & Çap", "Send KOT & Print")}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handlePlaceOrder()}
+                      disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToProduction || isGlobalMode || !branchId}
+                      className="px-3 py-2.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      {placingOrder ? tr("Göndərilir...", "Processing...") : tr("Ödənişi Tamamla", "Complete & Print")}
+                    </button>
+                  )}
                 </div>
                 {posSendToProductionEnabled && (
                   <button
@@ -1799,27 +1857,6 @@ export function CorporatePOS() {
                     {sendingToProduction
                       ? tr("İstehsala göndərilir...", "Sending to production...")
                       : tr("İstehsala göndər", "Send to Production")}
-                  </button>
-                )}
-                {diningEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => void handleSendToKot()}
-                    disabled={
-                      cart.length === 0 ||
-                      placingOrder ||
-                      savingDraft ||
-                      sendingToKot ||
-                      sendingToProduction ||
-                      isGlobalMode ||
-                      !branchId
-                    }
-                    className="w-full px-3 py-2.5 text-xs font-medium text-white bg-[#0f766e] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                  >
-                    <ChefHat className="w-3.5 h-3.5" />
-                    {sendingToKot
-                      ? tr("KOT-a göndərilir...", "Sending to KOT...")
-                      : tr("KOT-a göndər", "Send to KOT")}
                   </button>
                 )}
               </div>
@@ -1901,10 +1938,13 @@ export function CorporatePOS() {
         <ThermalReceipt
           data={receipt}
           onClose={() => setReceipt(null)}
-          onConfigurePrinters={() => setPrinterSettingsOpen(true)}
+          onConfigurePrinters={
+            diningEnabled ? () => setPrinterSettingsOpen(true) : undefined
+          }
+          diningEnabled={diningEnabled}
         />
       )}
-      {printerSettingsOpen && (
+      {diningEnabled && printerSettingsOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">

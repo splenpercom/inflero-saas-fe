@@ -25,13 +25,21 @@ export function receiptPrintText(language: Language, value: string): string {
   return language === "az" ? latinize(value) : value;
 }
 
+/** Usable content / QZ page widths (narrower than paper due to head margins). */
+export function thermalPrintContentWidthMm(paperWidthMm: 58 | 80): number {
+  return paperWidthMm === 58 ? 46 : 64;
+}
+
+export function thermalQzPageWidthMm(paperWidthMm: 58 | 80): number {
+  return paperWidthMm === 58 ? 48 : 68;
+}
+
 /**
  * Shared thermal receipt CSS for browser + QZ Tray pixel/html.
  * Keep weights light — heavy bold expands glyphs and clips on narrow rolls.
  */
 export function thermalReceiptPrintCss(paperWidthMm: 58 | 80 = 80): string {
-  // Usable print area is narrower than paper width (feed margins / head width).
-  const contentMm = paperWidthMm === 58 ? 46 : 64;
+  const contentMm = thermalPrintContentWidthMm(paperWidthMm);
   const bodyPt = paperWidthMm === 58 ? "9.5pt" : "10.5pt";
   const rowPt = paperWidthMm === 58 ? "9pt" : "10pt";
   const titlePt = paperWidthMm === 58 ? "9pt" : "10pt";

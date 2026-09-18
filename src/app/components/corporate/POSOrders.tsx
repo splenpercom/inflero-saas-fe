@@ -50,7 +50,10 @@ import {
   orderSourceTag,
   type PosUiPaymentMethod,
 } from "../../lib/salesMappers";
-import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
+import { APP_LOGO_LIGHT } from "../../lib/branding";
+import { getCompanyLogoUrl } from "../../lib/userDisplay";
+import { printPosOrderTicket } from "../../lib/posPrint";
 import { updateWebOrderApi } from "../../api/website";
 import type { WebOrder } from "../../../modules/my-website/features/orders/types";
 import {
@@ -179,7 +182,7 @@ function loadOrdersColumns(): Record<OrdersColumnKey, boolean> {
 }
 export function POSOrders() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const { isDemo, isAuthenticated, hasModule, user } = useAuth();
   const posEnabled = hasModule("POS");
   const diningEnabled = hasModule("DINING");
   const webEditorEnabled = hasModule("WEB_EDITOR");
@@ -1362,10 +1365,36 @@ export function POSOrders() {
                                 onClick={() => {
                                   void (async () => {
                                     try {
-                                      await sendHeldPosOrderToKot(order.id, {
+                                      const detail = await sendHeldPosOrderToKot(order.id, {
                                         tableId: order.table?.id ?? null,
                                       });
-                                      notifySuccess(tr("KOT-a göndərildi", "Sent to KOT"));
+                                      try {
+                                        const logoSrc =
+                                          getCompanyLogoUrl(user?.tenant, false) ??
+                                          getCompanyLogoUrl(user?.tenant, true) ??
+                                          APP_LOGO_LIGHT;
+                                        await printPosOrderTicket({
+                                          order: detail,
+                                          role: "kot",
+                                          language,
+                                          companyName: user?.tenant?.name?.trim() || "Inflero",
+                                          logoSrc,
+                                        });
+                                        notifySuccess(
+                                          tr(
+                                            "KOT-a göndərildi və mətbəx çapı göndərildi",
+                                            "Sent to KOT and kitchen ticket printed",
+                                          ),
+                                        );
+                                      } catch (printErr) {
+                                        notifyWarning(
+                                          tr(
+                                            "KOT-a göndərildi, amma çap alınmadı",
+                                            "Sent to KOT, but print failed",
+                                          ),
+                                        );
+                                        notifyFromError(printErr);
+                                      }
                                       await loadItems();
                                     } catch (err) {
                                       notifyFromError(err);
