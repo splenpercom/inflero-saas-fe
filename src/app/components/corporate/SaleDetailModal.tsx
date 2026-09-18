@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car } from "lucide-react";
+import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car, Printer, ChefHat, Loader2 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useAuth } from "../../context/AuthContext";
 import {
   fetchPosOrder,
   recordPosOrderPayment,
@@ -15,6 +16,10 @@ import {
   type PosUiPaymentMethod,
 } from "../../lib/salesMappers";
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
+import { APP_LOGO_LIGHT } from "../../lib/branding";
+import { getCompanyLogoUrl } from "../../lib/userDisplay";
+import { posOrderToThermalPayload, printPosTicket } from "../../lib/posPrint";
+import { useModulePermissions } from "../../hooks/useModulePermissions";
 
 import { pickLang } from "../../i18n/pickLang";
 
@@ -36,10 +41,14 @@ export function SaleDetailModal({
   onFinalized,
 }: SaleDetailModalProps) {
   const { language } = useLanguage();
+  const { user, hasModule } = useAuth();
+  const diningEnabled = hasModule("DINING");
+  const { canView: canViewSales } = useModulePermissions("Sales");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [printing, setPrinting] = useState<"receipt" | "kot" | null>(null);
   const [finalizePaymentMethod, setFinalizePaymentMethod] = useState<PosUiPaymentMethod>("cash");
   const [finalizePaid, setFinalizePaid] = useState(true);
 
@@ -107,6 +116,32 @@ export function SaleDetailModal({
     }
   };
 
+  const handleThermalPrint = async (role: "receipt" | "kot") => {
+    if (!order || isDemo) return;
+    setPrinting(role);
+    try {
+      const logoSrc =
+        getCompanyLogoUrl(user?.tenant, false) ??
+        getCompanyLogoUrl(user?.tenant, true) ??
+        APP_LOGO_LIGHT;
+      const payload = posOrderToThermalPayload(order, {
+        language,
+        companyName: user?.tenant?.name?.trim() || "Inflero",
+        logoSrc,
+      });
+      const result = await printPosTicket({ role, language, payload });
+      notifySuccess(
+        result.channel === "qz"
+          ? tr(`Çap edildi → ${result.printer}`, `Printed → ${result.printer}`)
+          : tr("Brauzer çap dialoqu açıldı", "Browser print dialog opened"),
+      );
+    } catch (err) {
+      notifyFromError(err, tr("Çap alınmadı", "Print failed"));
+    } finally {
+      setPrinting(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
@@ -122,9 +157,47 @@ export function SaleDetailModal({
               <p className="text-xs text-gray-500 dark:text-gray-400">{order?.reference ?? "—"}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-          </button>
+          <div className="flex items-center gap-2">
+            {order && !loading && canViewSales && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleThermalPrint("receipt")}
+                  disabled={!!printing || isDemo || order.items.length === 0}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg disabled:opacity-50"
+                >
+                  {printing === "receipt" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Printer className="w-3.5 h-3.5" />
+                  )}
+                  {tr("Qəbz", "Receipt")}
+                </button>
+                {diningEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => void handleThermalPrint("kot")}
+                    disabled={!!printing || isDemo || order.items.length === 0}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50"
+                    title={tr(
+                      "Kağız KOT — əsas yol rəqəmsal KOT ekranıdır",
+                      "Paper KOT — primary path is the digital KOT screen",
+                    )}
+                  >
+                    {printing === "kot" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ChefHat className="w-3.5 h-3.5" />
+                    )}
+                    {tr("KOT", "KOT")}
+                  </button>
+                )}
+              </>
+            )}
+            <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+              <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-y-auto max-h-[calc(90vh-80px)] p-6 space-y-6">

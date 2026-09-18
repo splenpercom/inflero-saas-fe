@@ -376,6 +376,10 @@ function AppShell() {
               />
               <Route path="plugins" element={<Plugins />} />
               <Route path="settings" element={<CorporateSettings />} />
+              <Route
+                path="pos-printers"
+                element={<Navigate to="/dashboard/settings?section=printers" replace />}
+              />
               <Route path="billing/result" element={<BillingResultPage />} />
 
               {diningDashboardRouteElements}

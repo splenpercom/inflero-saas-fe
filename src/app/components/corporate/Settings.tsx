@@ -1,6 +1,7 @@
 import { pickLang } from "../../i18n/pickLang";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronUp, Upload, X, MapPin, Loader2 } from "lucide-react";
+import { useSearchParams } from "react-router";
+import { ChevronDown, ChevronUp, Upload, X, MapPin, Loader2, Printer } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
@@ -16,13 +17,15 @@ import { fetchSalesBillers, updateSalesBiller, type SalesBillerRow } from "../..
 import { notifyFromError, notifyInfo, notifySuccess } from "../../lib/toast";
 import { ModernSelect } from "../ui/ModernSelect";
 import { LocationMapPicker } from "../ui/LocationMapPicker";
+import { PosPrinterSettings } from "./PosPrinterSettings";
 
 type SettingsSection =
   | "companyInfo"
   | "companyImages"
   | "address"
   | "socials"
-  | "addons";
+  | "addons"
+  | "printers";
 
 type CommissionDraft = {
   commissionType: "FIXED" | "PERCENT" | "";
@@ -66,7 +69,25 @@ export function Settings() {
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
   // Nav: sidebar section selection (Company group is collapsible)
-  const [activeSection, setActiveSection] = useState<SettingsSection>("companyInfo");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
+    searchParams.get("section") === "printers" && posEnabled ? "printers" : "companyInfo",
+  );
+
+  useEffect(() => {
+    if (searchParams.get("section") === "printers" && posEnabled) {
+      setActiveSection("printers");
+    }
+  }, [searchParams, posEnabled]);
+
+  const selectSection = (section: SettingsSection) => {
+    setActiveSection(section);
+    if (section === "printers") {
+      setSearchParams({ section: "printers" }, { replace: true });
+    } else if (searchParams.has("section")) {
+      setSearchParams({}, { replace: true });
+    }
+  };
   const [companyNavOpen, setCompanyNavOpen] = useState(true);
 
   const [loading, setLoading] = useState(true);
@@ -463,10 +484,11 @@ export function Settings() {
   };
 
   useEffect(() => {
-    if (!posEnabled && activeSection === "addons") {
+    if (!posEnabled && (activeSection === "addons" || activeSection === "printers")) {
       setActiveSection("companyInfo");
+      if (searchParams.has("section")) setSearchParams({}, { replace: true });
     }
-  }, [posEnabled, activeSection]);
+  }, [posEnabled, activeSection, searchParams, setSearchParams]);
 
   const navItemClass = (section: SettingsSection) =>
     `w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
@@ -516,21 +538,21 @@ export function Settings() {
                 <div className="mt-0.5 space-y-0.5 pl-1">
                   <button
                     type="button"
-                    onClick={() => setActiveSection("companyInfo")}
+                    onClick={() => selectSection("companyInfo")}
                     className={navItemClass("companyInfo")}
                   >
                     {pt("Company Information", "Şirkət Məlumatı")}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveSection("companyImages")}
+                    onClick={() => selectSection("companyImages")}
                     className={navItemClass("companyImages")}
                   >
                     {pt("Company Images", "Şirkət Şəkilləri")}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveSection("address")}
+                    onClick={() => selectSection("address")}
                     className={navItemClass("address")}
                   >
                     {pt("Address Information", "Ünvan Məlumatı")}
@@ -541,7 +563,7 @@ export function Settings() {
 
             <button
               type="button"
-              onClick={() => setActiveSection("socials")}
+              onClick={() => selectSection("socials")}
               className={`mt-0.5 ${navItemClass("socials")}`}
             >
               {pt("Social Media & Links", "Sosial Media & Linklər")}
@@ -550,10 +572,21 @@ export function Settings() {
             {posEnabled && (
               <button
                 type="button"
-                onClick={() => setActiveSection("addons")}
+                onClick={() => selectSection("addons")}
                 className={`mt-0.5 ${navItemClass("addons")}`}
               >
                 {pt("Add-ons", "Əlavələr")}
+              </button>
+            )}
+
+            {posEnabled && (
+              <button
+                type="button"
+                onClick={() => selectSection("printers")}
+                className={`mt-0.5 ${navItemClass("printers")} flex items-center gap-1.5`}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                {pt("POS Printers", "POS Printerlər")}
               </button>
             )}
           </nav>
@@ -1015,11 +1048,29 @@ export function Settings() {
                 </div>
               </div>
             )}
+
+            {posEnabled && activeSection === "printers" && (
+              <div>
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Printer className="w-4 h-4 text-[#14b8a6]" />
+                    {pt("POS Printers", "POS Printerlər")}
+                  </h2>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    {pt(
+                      "Map receipt and KOT printers for this PC/terminal. Silent print via QZ Tray.",
+                      "Bu kompüter/terminal üçün qəbz və KOT printerlərini təyin edin. QZ Tray ilə səssiz çap.",
+                    )}
+                  </p>
+                </div>
+                <PosPrinterSettings embedded />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Action Buttons */}
-        {canEdit && (
+        {canEdit && activeSection !== "printers" && (
           <div className="flex items-center justify-end gap-3 pt-3">
             <button
               type="button"

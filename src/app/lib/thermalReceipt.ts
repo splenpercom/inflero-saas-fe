@@ -26,54 +26,124 @@ export function receiptPrintText(language: Language, value: string): string {
 }
 
 /**
- * Shared 80mm thermal receipt CSS — keep identical across SAAS + Inflero Auto POS.
- * Sized for browser→thermal print: larger pt sizes, pure black (grays wash out).
+ * Shared thermal receipt CSS for browser + QZ Tray pixel/html.
+ * Keep weights light — heavy bold expands glyphs and clips on narrow rolls.
  */
-export const THERMAL_RECEIPT_PRINT_CSS = `
+export function thermalReceiptPrintCss(paperWidthMm: 58 | 80 = 80): string {
+  // Usable print area is narrower than paper width (feed margins / head width).
+  const contentMm = paperWidthMm === 58 ? 46 : 64;
+  const bodyPt = paperWidthMm === 58 ? "9.5pt" : "10.5pt";
+  const rowPt = paperWidthMm === 58 ? "9pt" : "10pt";
+  const titlePt = paperWidthMm === 58 ? "9pt" : "10pt";
+  const totalPt = paperWidthMm === 58 ? "11pt" : "12pt";
+  return `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
     font-family: Arial, Helvetica, "Segoe UI", sans-serif;
-    font-size: 13pt;
-    line-height: 1.45;
-    font-weight: 600;
-    width: 72mm;
-    max-width: 72mm;
+    font-size: ${bodyPt};
+    line-height: 1.35;
+    font-weight: 400;
+    width: ${contentMm}mm;
+    max-width: ${contentMm}mm;
     margin: 0 auto;
-    padding: 3mm 2mm;
+    padding: 2mm 1.5mm;
     color: #000;
     background: #fff;
+    overflow: hidden;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
   .center { text-align: center; }
-  .bold { font-weight: 800; }
-  .big { font-size: 15pt; font-weight: 800; letter-spacing: 0.4px; }
-  .divider { border-top: 1.5px dashed #000; margin: 6px 0; }
-  .divider-solid { border-top: 2px solid #000; margin: 6px 0; }
-  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin: 3px 0; font-size: 12pt; }
-  .row > span:last-child { text-align: right; word-break: break-word; font-weight: 700; }
-  .row-item { margin: 5px 0; }
-  .row-item .name { width: 100%; word-break: break-word; font-weight: 800; font-size: 12.5pt; }
-  .row-item .nums { display: flex; justify-content: space-between; gap: 8px; padding-left: 2px; color: #000; font-size: 12pt; font-weight: 700; margin-top: 2px; }
-  .section-title { font-size: 11.5pt; font-weight: 800; margin: 4px 0 6px; text-transform: uppercase; letter-spacing: 0.3px; }
-  .total-row { display: flex; justify-content: space-between; gap: 8px; font-size: 15pt; font-weight: 800; margin-top: 6px; }
-  .label { color: #000; flex-shrink: 0; font-weight: 700; }
-  .thanks { text-align: center; margin-top: 10px; font-size: 11pt; line-height: 1.45; font-weight: 700; }
-  .logo-area { text-align: center; margin-bottom: 6px; }
+  .bold { font-weight: 600; }
+  .big { font-size: ${totalPt}; font-weight: 600; letter-spacing: 0; }
+  .divider { border-top: 1px dashed #000; margin: 4px 0; }
+  .divider-solid { border-top: 1.5px solid #000; margin: 4px 0; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 4px;
+    margin: 2px 0;
+    font-size: ${rowPt};
+    font-weight: 400;
+  }
+  .row > span:last-child {
+    text-align: right;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    min-width: 0;
+    flex: 1 1 auto;
+    font-weight: 400;
+  }
+  .row-item { margin: 3px 0; }
+  .row-item .name {
+    width: 100%;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    font-weight: 600;
+    font-size: ${rowPt};
+  }
+  .row-item .nums {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    padding-left: 0;
+    color: #000;
+    font-size: ${rowPt};
+    font-weight: 400;
+    margin-top: 1px;
+  }
+  .row-item .nums > span:last-child {
+    min-width: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .section-title {
+    font-size: ${titlePt};
+    font-weight: 600;
+    margin: 3px 0 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+  }
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    font-size: ${totalPt};
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .total-row > span:last-child {
+    min-width: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .label { color: #000; flex-shrink: 0; max-width: 42%; font-weight: 400; }
+  .thanks {
+    text-align: center;
+    margin-top: 8px;
+    font-size: ${paperWidthMm === 58 ? "8.5pt" : "9pt"};
+    line-height: 1.35;
+    font-weight: 400;
+  }
+  .logo-area { text-align: center; margin-bottom: 4px; }
   img { max-width: 100%; height: auto; }
   @media print {
     html, body {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: ${contentMm}mm !important;
+      max-width: ${contentMm}mm !important;
       margin: 0 auto !important;
-      padding: 2mm 1.5mm !important;
-      font-size: 13pt !important;
+      padding: 1.5mm 1mm !important;
     }
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: ${paperWidthMm}mm auto; margin: 0; }
   }
 `.trim();
+}
+
+/** @deprecated Prefer thermalReceiptPrintCss(paperWidthMm) */
+export const THERMAL_RECEIPT_PRINT_CSS = thermalReceiptPrintCss(80);
 
 export function thermalReceiptLabels(language: Language) {
   const t = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -104,14 +174,162 @@ export function thermalReceiptLabels(language: Language) {
     kitchen: t("Mətbəx", "Kitchen"),
     kitchenBanner: t("*** MƏTBƏX / KITCHEN ***", "*** KITCHEN ***"),
     kitchenCopy: t("*** MƏTBƏX KOPYASI ***", "*** KITCHEN COPY ***"),
-    dualCopies: "2x",
   };
 }
 
-/** Compact logo block sized for 80mm rolls (shared print + preview scale). */
+/** Compact logo block sized for thermal rolls. */
 export function brandLogoThermalHtml(src: string, alt: string): string {
   const safeAlt = alt.replace(/"/g, "&quot;");
   return `<div class="logo-area" style="height:52px;max-width:58mm;margin:0 auto 6px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
   <img src="${src}" alt="${safeAlt}" style="max-height:52px;max-width:100%;width:auto;object-fit:contain;object-position:center;" />
 </div>`;
+}
+
+export type ThermalReceiptPayload = {
+  orderNo: string;
+  date: string;
+  customer: string;
+  customerPhone: string;
+  vehicle?: string;
+  mileage?: number;
+  employee: string;
+  items: { name: string; qty: number; price: number }[];
+  subtotal: number;
+  shipping: number;
+  serviceFee: number;
+  discount: number;
+  discountLabel: string;
+  total: number;
+  paymentMethod: string;
+  paymentStatusLabel: string;
+  tableLabel?: string;
+  companyName: string;
+  logoSrc?: string | null;
+  siteFooter?: string;
+};
+
+export type BuildThermalReceiptOpts = {
+  language: Language;
+  copy: "customer" | "kitchen";
+  paperWidthMm?: 58 | 80;
+};
+
+/** Full HTML document for browser print or QZ Tray pixel/html. */
+export function buildThermalReceiptHtml(
+  data: ThermalReceiptPayload,
+  opts: BuildThermalReceiptOpts,
+): string {
+  const language = opts.language;
+  const isKitchen = opts.copy === "kitchen";
+  const paperWidthMm = opts.paperWidthMm ?? 80;
+  const labels = thermalReceiptLabels(language);
+  const p = (value: string) => receiptPrintText(language, value);
+
+  const d = {
+    orderNo: p(data.orderNo),
+    customer: p(data.customer),
+    customerPhone: data.customerPhone,
+    vehicle: data.vehicle ? p(data.vehicle) : undefined,
+    employee: p(data.employee),
+    paymentMethod: p(data.paymentMethod),
+    paymentStatusLabel: p(data.paymentStatusLabel),
+    discountLabel: p(data.discountLabel),
+    tableLabel: data.tableLabel ? p(data.tableLabel) : undefined,
+    items: data.items.map((it) => ({ ...it, name: p(it.name) })),
+    date: data.date,
+    mileage: data.mileage,
+    subtotal: data.subtotal,
+    shipping: data.shipping,
+    serviceFee: data.serviceFee,
+    discount: data.discount,
+    total: data.total,
+  };
+
+  const L = {
+    order: p(labels.order),
+    date: p(labels.date),
+    table: p(labels.table),
+    customer: p(labels.customer),
+    phone: p(labels.phone),
+    vehicle: p(labels.vehicle),
+    mileage: p(labels.mileage),
+    employee: p(labels.employee),
+    products: p(labels.products),
+    orderItems: p(labels.orderItems),
+    subtotal: p(labels.subtotal),
+    shipping: p(labels.shipping),
+    serviceFee: p(labels.serviceFee),
+    total: p(labels.total),
+    payment: p(labels.payment),
+    status: p(labels.status),
+    thanks: p(labels.thanks),
+    kitchenBanner: p(labels.kitchenBanner),
+    kitchenCopy: p(labels.kitchenCopy),
+  };
+
+  const company = p(data.companyName);
+  const titleSuffix = isKitchen ? "KITCHEN" : d.orderNo;
+  const headerBanner = isKitchen
+    ? `<div class="center bold big" style="margin:6px 0;">${L.kitchenBanner}</div>
+       <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `${L.table}: ${d.tableLabel}` : ""}</div>`
+    : "";
+  const footer = receiptPrintText(language, data.siteFooter ?? "app.inflero.com");
+  const logo =
+    !isKitchen && data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
+
+  return `<!DOCTYPE html>
+<html lang="${language}">
+<head>
+  <meta charset="utf-8" />
+  <title>${company} - ${titleSuffix}</title>
+  <style>${thermalReceiptPrintCss(paperWidthMm)}</style>
+</head>
+<body>
+  ${logo}
+  ${headerBanner}
+  <div class="divider-solid"></div>
+  <div class="row"><span class="label">${L.order}:</span><span>${d.orderNo}</span></div>
+  <div class="row"><span class="label">${L.date}:</span><span>${d.date}</span></div>
+  ${d.tableLabel && !isKitchen ? `<div class="row"><span class="label">${L.table}:</span><span>${d.tableLabel}</span></div>` : ""}
+  <div class="divider"></div>
+  <div class="row"><span class="label">${L.customer}:</span><span>${d.customer}</span></div>
+  ${!isKitchen ? `<div class="row"><span class="label">${L.phone}:</span><span>${d.customerPhone}</span></div>` : ""}
+  ${d.vehicle && !isKitchen ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
+  ${d.mileage != null && !isKitchen ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
+  <div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>
+  <div class="divider-solid"></div>
+  <div class="section-title">${isKitchen ? L.orderItems : L.products}</div>
+  ${d.items
+    .map(
+      (it) => `
+    <div class="row-item">
+      <div class="name">${it.name}</div>
+      <div class="nums">
+        <span>${isKitchen ? `x ${it.qty}` : `${it.qty} x ${it.price.toFixed(2)} AZN`}</span>
+        ${isKitchen ? "" : `<span>${(it.qty * it.price).toFixed(2)} AZN</span>`}
+      </div>
+    </div>`,
+    )
+    .join("")}
+  <div class="divider"></div>
+  ${
+    isKitchen
+      ? `<div class="center" style="margin-top:8px;font-weight:600;">${L.kitchenCopy}</div>`
+      : `
+  <div class="row"><span class="label">${L.subtotal}:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
+  <div class="row"><span class="label">${L.shipping}:</span><span>${d.shipping.toFixed(2)} AZN</span></div>
+  ${d.serviceFee > 0 ? `<div class="row"><span class="label">${L.serviceFee}:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
+  ${d.discount > 0 ? `<div class="row"><span class="label">${d.discountLabel}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
+  <div class="divider-solid"></div>
+  <div class="total-row"><span>${L.total}:</span><span>${d.total.toFixed(2)} AZN</span></div>
+  <div class="row" style="margin-top:4px;"><span class="label">${L.payment}:</span><span>${d.paymentMethod}</span></div>
+  <div class="row"><span class="label">${L.status}:</span><span>${d.paymentStatusLabel}</span></div>
+  <div class="divider-solid"></div>
+  <div class="thanks">
+    <div>${L.thanks}</div>
+    <div style="margin-top:3px;">${footer}</div>
+  </div>`
+  }
+</body>
+</html>`;
 }

@@ -55,12 +55,10 @@ import { APP_LOGO_LIGHT, getBrandLogoUrl } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { useIsDarkMode } from "../../hooks/useIsDarkMode";
 import { BrandLogo } from "../ui/BrandLogo";
-import {
-  THERMAL_RECEIPT_PRINT_CSS,
-  brandLogoThermalHtml,
-  receiptPrintText,
-  thermalReceiptLabels,
-} from "../../lib/thermalReceipt";
+import { thermalReceiptLabels, type ThermalReceiptPayload } from "../../lib/thermalReceipt";
+import { printPosTicket } from "../../lib/posPrint";
+import { loadPosPrinterSettings } from "../../lib/posPrinterSettings";
+import { PosPrinterSettings } from "./PosPrinterSettings";
 import { useNavigate } from "react-router";
 import { pickCurrentUserBillerId } from "../../lib/salesBiller";
 
@@ -185,17 +183,24 @@ interface ReceiptData {
   total: number;
   paymentMethod: string;
   paymentStatusLabel: string;
-  /** Auto-open browser print once for the customer/counter receipt. */
+  /** Auto-print customer/counter receipt once (QZ when mapped, else browser). */
   autoPrintReceipt?: boolean;
   /** Show optional kitchen paper reprint (kitchen primary path is digital KOT). */
   allowKitchenReprint?: boolean;
   tableLabel?: string;
 }
 
-function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
+function ThermalReceipt({
+  data,
+  onClose,
+  onConfigurePrinters,
+}: {
+  data: ReceiptData;
+  onClose: () => void;
+  onConfigurePrinters?: () => void;
+}) {
   const { language } = useLanguage();
   const labels = thermalReceiptLabels(language);
-  const p = (value: string) => receiptPrintText(language, value);
   const isDark = useIsDarkMode();
   const { user } = useAuth();
   const companyName = user?.tenant?.name?.trim() || "Inflero";
@@ -205,132 +210,57 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
     getCompanyLogoUrl(user?.tenant, true) ??
     APP_LOGO_LIGHT;
   const autoPrintedRef = useRef(false);
+  const [printing, setPrinting] = useState(false);
+  const printerMap = loadPosPrinterSettings();
 
-  const handlePrint = (opts?: { copy?: "customer" | "kitchen" }) => {
+  const toPayload = (): ThermalReceiptPayload => ({
+    orderNo: data.orderNo,
+    date: data.date,
+    customer: data.customer,
+    customerPhone: data.customerPhone,
+    vehicle: data.vehicle,
+    mileage: data.mileage,
+    employee: data.employee,
+    items: data.items,
+    subtotal: data.subtotal,
+    shipping: data.shipping,
+    serviceFee: data.serviceFee,
+    discount: data.discount,
+    discountLabel: data.discountLabel,
+    total: data.total,
+    paymentMethod: data.paymentMethod,
+    paymentStatusLabel: data.paymentStatusLabel,
+    tableLabel: data.tableLabel,
+    companyName,
+    logoSrc: printLogoSrc,
+    siteFooter: "app.inflero.com",
+  });
+
+  const handlePrint = async (opts?: { copy?: "customer" | "kitchen" }) => {
     const copy = opts?.copy ?? "customer";
-    const isKitchen = copy === "kitchen";
-    const printWin = window.open("", "_blank", "width=340,height=700");
-    if (!printWin) return;
-    const d = {
-      ...data,
-      orderNo: p(data.orderNo),
-      customer: p(data.customer),
-      customerPhone: data.customerPhone,
-      vehicle: data.vehicle ? p(data.vehicle) : undefined,
-      employee: p(data.employee),
-      paymentMethod: p(data.paymentMethod),
-      paymentStatusLabel: p(data.paymentStatusLabel),
-      discountLabel: p(data.discountLabel),
-      tableLabel: data.tableLabel ? p(data.tableLabel) : undefined,
-      items: data.items.map((it) => ({ ...it, name: p(it.name) })),
-    };
-    const L = {
-      order: p(labels.order),
-      date: p(labels.date),
-      table: p(labels.table),
-      customer: p(labels.customer),
-      phone: p(labels.phone),
-      vehicle: p(labels.vehicle),
-      mileage: p(labels.mileage),
-      employee: p(labels.employee),
-      products: p(labels.products),
-      orderItems: p(labels.orderItems),
-      subtotal: p(labels.subtotal),
-      shipping: p(labels.shipping),
-      serviceFee: p(labels.serviceFee),
-      total: p(labels.total),
-      payment: p(labels.payment),
-      status: p(labels.status),
-      thanks: p(labels.thanks),
-      kitchenBanner: p(labels.kitchenBanner),
-      kitchenCopy: p(labels.kitchenCopy),
-    };
-    const titleSuffix = isKitchen ? "KITCHEN" : d.orderNo;
-    const headerBanner = isKitchen
-      ? `<div class="center bold big" style="margin:6px 0;">${L.kitchenBanner}</div>
-         <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `${L.table}: ${d.tableLabel}` : ""}</div>`
-      : "";
-    const content = `
-      <!DOCTYPE html>
-      <html lang="${language}">
-      <head>
-        <meta charset="utf-8" />
-        <title>${p(companyName)} - ${titleSuffix}</title>
-        <style>${THERMAL_RECEIPT_PRINT_CSS}</style>
-      </head>
-      <body>
-        ${isKitchen ? "" : brandLogoThermalHtml(printLogoSrc, p(companyName))}
-        ${headerBanner}
-        <div class="divider-solid"></div>
-
-        <div class="row"><span class="label">${L.order}:</span><span class="bold">${d.orderNo}</span></div>
-        <div class="row"><span class="label">${L.date}:</span><span>${d.date}</span></div>
-        ${d.tableLabel && !isKitchen ? `<div class="row"><span class="label">${L.table}:</span><span class="bold">${d.tableLabel}</span></div>` : ""}
-        <div class="divider"></div>
-
-        <div class="row"><span class="label">${L.customer}:</span><span class="bold">${d.customer}</span></div>
-        ${!isKitchen ? `<div class="row"><span class="label">${L.phone}:</span><span>${d.customerPhone}</span></div>` : ""}
-        ${d.vehicle && !isKitchen ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
-        ${d.mileage != null && !isKitchen ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
-        <div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>
-        <div class="divider-solid"></div>
-
-        <div class="section-title">${isKitchen ? L.orderItems : L.products}</div>
-        ${d.items
-          .map(
-            (it) => `
-          <div class="row-item">
-            <div class="name">${it.name}</div>
-            <div class="nums">
-              <span>${isKitchen ? `x ${it.qty}` : `${it.qty} x ${it.price.toFixed(2)} AZN`}</span>
-              ${isKitchen ? "" : `<span class="bold">${(it.qty * it.price).toFixed(2)} AZN</span>`}
-            </div>
-          </div>
-        `,
-          )
-          .join("")}
-        <div class="divider"></div>
-
-        ${
-          isKitchen
-            ? ""
-            : `
-        <div class="row"><span class="label">${L.subtotal}:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
-        <div class="row"><span class="label">${L.shipping}:</span><span>${d.shipping.toFixed(2)} AZN</span></div>
-        ${d.serviceFee > 0 ? `<div class="row"><span class="label">${L.serviceFee}:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
-        ${d.discount > 0 ? `<div class="row"><span class="label">${d.discountLabel}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
-        <div class="divider-solid"></div>
-
-        <div class="total-row"><span>${L.total}:</span><span>${d.total.toFixed(2)} AZN</span></div>
-        <div class="row" style="margin-top:4px;"><span class="label">${L.payment}:</span><span class="bold">${d.paymentMethod}</span></div>
-        <div class="row"><span class="label">${L.status}:</span><span class="bold">${d.paymentStatusLabel}</span></div>
-        <div class="divider-solid"></div>
-
-        <div class="thanks">
-          <div>${L.thanks}</div>
-          <div style="margin-top:3px;font-weight:700;">app.inflero.com</div>
-        </div>
-        `
-        }
-        ${isKitchen ? `<div class="center bold" style="margin-top:8px;">${L.kitchenCopy}</div>` : ""}
-      </body>
-      </html>
-    `;
-    printWin.document.write(content);
-    printWin.document.close();
-    printWin.focus();
-    setTimeout(() => {
-      printWin.print();
-      printWin.close();
-    }, 400);
+    const role = copy === "kitchen" ? "kot" : "receipt";
+    setPrinting(true);
+    try {
+      await printPosTicket({
+        role,
+        language,
+        payload: toPayload(),
+      });
+    } catch (err) {
+      notifyFromError(
+        err,
+        pickLang(language, "Çap alınmadı", "Print failed"),
+      );
+    } finally {
+      setPrinting(false);
+    }
   };
 
   useEffect(() => {
     if (autoPrintedRef.current) return;
-    // Dining/production path: one counter receipt only. Kitchen uses digital KOT.
     if (!data.autoPrintReceipt) return;
     autoPrintedRef.current = true;
-    handlePrint({ copy: "customer" });
+    void handlePrint({ copy: "customer" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -352,7 +282,25 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
           </button>
         </div>
 
-        <div className="p-4 font-mono text-[12px] leading-[1.35] text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 mx-4 mt-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 max-h-80 overflow-y-auto">
+        <div className="px-4 pt-3">
+          <button
+            type="button"
+            onClick={() => onConfigurePrinters?.()}
+            className="text-[10px] text-[#14b8a6] hover:underline text-left"
+          >
+            {pickLang(
+              language,
+              printerMap.receiptPrinter
+                ? `Printerlər: ${printerMap.receiptPrinter}${printerMap.kotPrinter ? ` / ${printerMap.kotPrinter}` : ""}`
+                : "Printerləri təyin et (QZ Tray)",
+              printerMap.receiptPrinter
+                ? `Printers: ${printerMap.receiptPrinter}${printerMap.kotPrinter ? ` / ${printerMap.kotPrinter}` : ""}`
+                : "Configure printers (QZ Tray)",
+            )}
+          </button>
+        </div>
+
+        <div className="p-4 font-mono text-[12px] leading-[1.35] text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 mx-4 mt-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 max-h-80 overflow-y-auto">
           <BrandLogo src={previewLogoSrc} alt={companyName} size="receipt" />
           <hr className="border-dashed border-gray-300 dark:border-gray-600 my-1" />
           <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.order}:</span><span className="font-bold text-right break-words">{data.orderNo}</span></div>
@@ -372,18 +320,18 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
             <div key={i} className="mb-1">
               <p className="break-words font-semibold">{it.name}</p>
               <div className="flex justify-between text-gray-400 pl-2 text-[11px]">
-                <span>{it.qty} x {it.price.toFixed(2)} ₼</span>
-                <span className="text-gray-800 dark:text-gray-200 font-semibold">{(it.qty * it.price).toFixed(2)} ₼</span>
+                <span>{it.qty} x {it.price.toFixed(2)} AZN</span>
+                <span className="text-gray-800 dark:text-gray-200 font-semibold">{(it.qty * it.price).toFixed(2)} AZN</span>
               </div>
             </div>
           ))}
           <hr className="border-dashed border-gray-300 dark:border-gray-600 my-1" />
-          <div className="flex justify-between"><span className="text-gray-400">{labels.subtotal}:</span><span>{data.subtotal.toFixed(2)} ₼</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">{labels.shipping}:</span><span>{data.shipping.toFixed(2)} ₼</span></div>
-          {data.serviceFee > 0 && <div className="flex justify-between"><span className="text-gray-400">{labels.serviceFee}:</span><span>{data.serviceFee.toFixed(2)} ₼</span></div>}
-          {data.discount > 0 && <div className="flex justify-between"><span className="text-gray-400">{data.discountLabel}:</span><span>-{data.discount.toFixed(2)} ₼</span></div>}
+          <div className="flex justify-between"><span className="text-gray-400">{labels.subtotal}:</span><span>{data.subtotal.toFixed(2)} AZN</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">{labels.shipping}:</span><span>{data.shipping.toFixed(2)} AZN</span></div>
+          {data.serviceFee > 0 && <div className="flex justify-between"><span className="text-gray-400">{labels.serviceFee}:</span><span>{data.serviceFee.toFixed(2)} AZN</span></div>}
+          {data.discount > 0 && <div className="flex justify-between"><span className="text-gray-400">{data.discountLabel}:</span><span>-{data.discount.toFixed(2)} AZN</span></div>}
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
-          <div className="flex justify-between text-[13px] font-bold"><span>{labels.total}:</span><span>{data.total.toFixed(2)} ₼</span></div>
+          <div className="flex justify-between text-[13px] font-bold"><span>{labels.total}:</span><span>{data.total.toFixed(2)} AZN</span></div>
           <div className="flex justify-between mt-1"><span className="text-gray-400">{labels.payment}:</span><span className="font-semibold">{data.paymentMethod}</span></div>
           <div className="flex justify-between mt-1"><span className="text-gray-400">{labels.status}:</span><span className="font-semibold">{data.paymentStatusLabel}</span></div>
           <hr className="border-gray-400 dark:border-gray-500 my-2" />
@@ -399,20 +347,22 @@ function ThermalReceipt({ data, onClose }: { data: ReceiptData; onClose: () => v
             {labels.close}
           </button>
           <button
-            onClick={() => handlePrint({ copy: "customer" })}
-            className="flex-1 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors flex items-center justify-center gap-1.5"
+            onClick={() => void handlePrint({ copy: "customer" })}
+            disabled={printing}
+            className="flex-1 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <Printer className="w-3.5 h-3.5" />
             {labels.print}
           </button>
           {data.allowKitchenReprint && (
             <button
-              onClick={() => handlePrint({ copy: "kitchen" })}
-              className="flex-1 py-2 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+              onClick={() => void handlePrint({ copy: "kitchen" })}
+              disabled={printing}
+              className="flex-1 py-2 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
               title={pickLang(
                 language,
-                "İstəyə bağlı kağız mətbəx bileti — əsas yol rəqəmsal KOT ekranıdır",
-                "Optional paper kitchen ticket — primary path is the digital KOT screen",
+                "Kağız KOT — əsas yol rəqəmsal KOT ekranıdır",
+                "Paper KOT — primary path is the digital KOT screen",
               )}
             >
               <Printer className="w-3.5 h-3.5" />
@@ -467,6 +417,7 @@ export function CorporatePOS() {
     field: "search" | "shipping" | "serviceFee" | "mileage" | "discount";
   }>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const lookupAbortRef = useRef<AbortController | null>(null);
@@ -1048,17 +999,13 @@ export function CorporatePOS() {
         total: apiTotal,
         paymentMethod: pmLabel[selectedPaymentMethod],
         paymentStatusLabel: serverPaymentStatusLabel,
-        ...(diningEnabled
+        autoPrintReceipt: true,
+        allowKitchenReprint: diningEnabled,
+        ...(diningEnabled && selectedTableId
           ? {
-              autoPrintReceipt: true,
-              allowKitchenReprint: true,
-              ...(selectedTableId
-                ? {
-                    tableLabel:
-                      diningTables.find((t) => t.id === selectedTableId)?.name ??
-                      diningTables.find((t) => t.id === selectedTableId)?.number?.toString(),
-                  }
-                : {}),
+              tableLabel:
+                diningTables.find((t) => t.id === selectedTableId)?.name ??
+                diningTables.find((t) => t.id === selectedTableId)?.number?.toString(),
             }
           : {}),
       });
@@ -1134,12 +1081,10 @@ export function CorporatePOS() {
       total: apiTotal,
       paymentMethod: selectedPaymentMethod ? pmLabel[selectedPaymentMethod] : "—",
       paymentStatusLabel: serverPaymentStatusLabel,
-      ...(opts?.diningFlow
-        ? {
-            autoPrintReceipt: true,
-            allowKitchenReprint: true,
-            tableLabel: opts.tableLabel,
-          }
+      autoPrintReceipt: true,
+      allowKitchenReprint: !!opts?.diningFlow || diningEnabled,
+      ...(opts?.diningFlow || opts?.tableLabel
+        ? { tableLabel: opts.tableLabel }
         : {}),
     };
   };
@@ -1328,6 +1273,14 @@ export function CorporatePOS() {
         title={tr("Əsas Səhifə", "Back to Dashboard")}
       >
         <ArrowLeft className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setPrinterSettingsOpen(true)}
+        className="fixed top-2 left-12 z-50 p-2 rounded-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-[#14b8a6] hover:bg-white dark:hover:bg-gray-900 transition-all opacity-50 hover:opacity-100"
+        title={tr("POS Printerlər", "POS Printers")}
+      >
+        <Printer className="w-3.5 h-3.5" />
       </button>
 
       <div className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8">
@@ -1944,7 +1897,33 @@ export function CorporatePOS() {
       )}
 
       {/* Thermal Receipt Modal */}
-      {receipt && <ThermalReceipt data={receipt} onClose={() => setReceipt(null)} />}
+      {receipt && (
+        <ThermalReceipt
+          data={receipt}
+          onClose={() => setReceipt(null)}
+          onConfigurePrinters={() => setPrinterSettingsOpen(true)}
+        />
+      )}
+      {printerSettingsOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Printer className="w-4 h-4 text-[#14b8a6]" />
+                {tr("POS Printerlər", "POS Printers")}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPrinterSettingsOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <PosPrinterSettings embedded accessModule="Sales" />
+          </div>
+        </div>
+      )}
 
       {touchKb && (
         <TouchKeyboard
