@@ -57,7 +57,8 @@ export interface ProductListItem {
   sku: string;
   name: string;
   slug: string;
-  productType: "SINGLE" | "VARIABLE";
+  productType: "SINGLE" | "VARIABLE" | "SERVICE";
+  trackStock?: boolean;
   image: string;
   /** Present on list + detail responses. */
   categoryId?: string | null;
@@ -66,7 +67,7 @@ export interface ProductListItem {
   price: string;
   purchasePrice: string | null;
   unit: string;
-  quantity: number;
+  quantity: number | null;
   createdBy: string;
   createdById: string;
   status: UiStatus;
@@ -124,6 +125,8 @@ export type ProductListQuery = {
   status?: "ACTIVE" | "INACTIVE" | "all";
   sortBy?: "createdAt" | "name" | "sku" | "price" | "category" | "brand" | "createdBy";
   sortOrder?: "asc" | "desc";
+  forPos?: boolean;
+  productType?: "SINGLE" | "VARIABLE" | "SERVICE";
 };
 
 export type ProductCreateBody = {
@@ -131,7 +134,7 @@ export type ProductCreateBody = {
   name: string;
   slug?: string | null;
   description?: string | null;
-  productType?: "SINGLE" | "VARIABLE";
+  productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   categoryId?: string | null;
   subCategoryId?: string | null;
   brandId?: string | null;
@@ -179,6 +182,8 @@ function productQueryString(q: ProductListQuery = {}): string {
   if (q.status && q.status !== "all") params.set("status", q.status);
   if (q.sortBy) params.set("sortBy", q.sortBy);
   if (q.sortOrder) params.set("sortOrder", q.sortOrder);
+  if (q.forPos) params.set("forPos", "true");
+  if (q.productType) params.set("productType", q.productType);
   const s = params.toString();
   return s ? `?${s}` : "";
 }

@@ -49,7 +49,7 @@ import { AnnualReport } from "./components/corporate/reports/AnnualReport";
 import { EmployeeSalesReport } from "./components/corporate/reports/EmployeeSalesReport";
 import { Login } from "./components/Login";
 import { Reservations } from "./components/corporate/Reservations";
-import { ServiceTypes } from "./components/corporate/ServiceTypes";
+import { Services } from "./components/corporate/Services";
 import { CustomerLandingPage } from "./components/customer/CustomerLandingPage";
 import { PublicStorefront } from "./components/storefront/PublicStorefront";
 import {
@@ -281,6 +281,7 @@ function AppShell() {
               <Route path="inventory/products/:id/edit" element={<EditProduct />} />
               <Route path="inventory/products/:id" element={<ProductDetails />} />
               <Route path="inventory/products" element={<Products />} />
+              <Route path="inventory/services" element={<Services />} />
               <Route path="inventory/products/low-stocks" element={<ModuleRouteGuard module="STOCK"><LowStocks /></ModuleRouteGuard>} />
               <Route path="inventory/products/expired" element={<ModuleRouteGuard module="STOCK"><ExpiredProducts /></ModuleRouteGuard>} />
               <Route path="inventory/category" element={<Category />} />
@@ -349,7 +350,7 @@ function AppShell() {
 
               {/* Settings */}
               <Route path="reservations" element={<ModuleRouteGuard module="RESERVATIONS"><Reservations /></ModuleRouteGuard>} />
-              <Route path="reservations/service-types" element={<ModuleRouteGuard module="RESERVATIONS"><ServiceTypes /></ModuleRouteGuard>} />
+              <Route path="reservations/service-types" element={<Navigate to="/dashboard/inventory/services" replace />} />
               <Route
                 path="my-website"
                 element={

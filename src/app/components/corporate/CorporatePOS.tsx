@@ -21,7 +21,14 @@ import {
   ChefHat,
   Armchair,
   Factory,
+  Wine,
   Keyboard,
+  Wrench,
+  GripVertical,
+  ListOrdered,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -43,7 +50,7 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { createPosOrder, posCheckout, sendPosOrderToKot, sendPosOrderToProduction } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction } from "../../api/sales";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -70,6 +77,8 @@ interface Product {
   category: string;
   stock: number;
   code: string;
+  productType?: "SINGLE" | "VARIABLE" | "SERVICE";
+  trackStock?: boolean;
 }
 
 interface CartItem {
@@ -78,10 +87,49 @@ interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  productType?: "SINGLE" | "VARIABLE" | "SERVICE";
+  trackStock?: boolean;
 }
 
 type PaymentMethod = "cash" | "card";
 type PaymentStatusChoice = "paid" | "pending";
+
+type PosCategoryChip = { id: string; name: string; pinned?: boolean };
+
+const POS_CATEGORY_ORDER_KEY = "inflero-pos-category-order";
+
+function loadPosCategoryOrder(storageKey: string): string[] {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePosCategoryOrder(storageKey: string, order: string[]) {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(order));
+  } catch {
+    /* ignore */
+  }
+}
+
+function sortCategoriesByOrder(
+  cats: PosCategoryChip[],
+  order: string[],
+): PosCategoryChip[] {
+  if (order.length === 0) return cats;
+  const index = new Map(order.map((id, i) => [id, i]));
+  return [...cats].sort((a, b) => {
+    const ai = index.has(a.id) ? (index.get(a.id) as number) : Number.MAX_SAFE_INTEGER;
+    const bi = index.has(b.id) ? (index.get(b.id) as number) : Number.MAX_SAFE_INTEGER;
+    if (ai !== bi) return ai - bi;
+    return a.name.localeCompare(b.name);
+  });
+}
 
 function ProductThumb({ image, className }: { image: string; className?: string }) {
   if (image.startsWith("http") || image.startsWith("/")) {
@@ -409,6 +457,9 @@ export function CorporatePOS() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [categoryReorderMode, setCategoryReorderMode] = useState(false);
+  const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
+  const [dragCategoryId, setDragCategoryId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
@@ -427,6 +478,8 @@ export function CorporatePOS() {
   const [serviceFeeInput, setServiceFeeInput] = useState("");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
+  const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
+  const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [touchKb, setTouchKb] = useState<null | {
     mode: "full" | "numpad";
     field: "search" | "shipping" | "serviceFee" | "mileage" | "discount";
@@ -440,19 +493,25 @@ export function CorporatePOS() {
   const lastLookupCodeRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const lookupInFlightCodeRef = useRef<string | null>(null);
 
-  const mapListItemToProduct = useCallback((item: ProductListItem): Product => ({
-    id: item.id,
-    name: item.name,
-    price: parsePrice(item.price),
-    image: item.image || "📦",
-    category: item.category || "",
-    stock: item.quantity,
-    code: item.sku,
-  }), []);
+  const mapListItemToProduct = useCallback((item: ProductListItem): Product => {
+    const isService = item.productType === "SERVICE" || item.trackStock === false;
+    return {
+      id: item.id,
+      name: item.name,
+      price: parsePrice(item.price),
+      image: item.image || "📦",
+      category: item.category || "",
+      stock: isService ? Number.MAX_SAFE_INTEGER : (item.quantity ?? 0),
+      code: item.sku,
+      productType: item.productType,
+      trackStock: !isService,
+    };
+  }, []);
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [sendingToKot, setSendingToKot] = useState(false);
+  const [sendingToBar, setSendingToBar] = useState(false);
   const [sendingToProduction, setSendingToProduction] = useState(false);
   const { billers, defaultBillerId } = useSalesBillers((isAuthenticated || isDemo));
   const isEmployee = !isDemo && user?.role?.name.trim().toLowerCase() === "employee";
@@ -479,7 +538,7 @@ export function CorporatePOS() {
     }
     setProductsLoading(true);
     try {
-      const data = await fetchProducts({ pageSize: 100 });
+      const data = await fetchProducts({ pageSize: 100, forPos: true });
       setProducts(data.items.map(mapListItemToProduct));
     } catch (err) {
       notifyFromError(err, tr("Məhsulları yükləmək alınmadı", "Failed to load products"));
@@ -551,6 +610,8 @@ export function CorporatePOS() {
     if (!(isAuthenticated || isDemo)) {
       setPosServiceFeeEnabled(false);
       setPosSendToProductionEnabled(false);
+      setPosSendToBarEnabled(false);
+      setInventoryServicesEnabled(false);
       return;
     }
     let cancelled = false;
@@ -559,12 +620,16 @@ export function CorporatePOS() {
         if (!cancelled) {
           setPosServiceFeeEnabled(s.posServiceFeeEnabled === true);
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
+          setPosSendToBarEnabled(s.posSendToBarEnabled === true);
+          setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setPosServiceFeeEnabled(false);
           setPosSendToProductionEnabled(false);
+          setPosSendToBarEnabled(false);
+          setInventoryServicesEnabled(false);
         }
       });
     return () => {
@@ -591,13 +656,95 @@ export function CorporatePOS() {
     setSelectedCustomerId(id);
   };
 
+  const categoryOrderStorageKey = useMemo(() => {
+    const tenant = user?.tenant?.id ?? "demo";
+    const branch = isGlobalMode ? "global" : branchId || "none";
+    return `${POS_CATEGORY_ORDER_KEY}:${tenant}:${branch}`;
+  }, [user?.tenant?.id, branchId, isGlobalMode]);
+
+  useEffect(() => {
+    setCategoryOrder(loadPosCategoryOrder(categoryOrderStorageKey));
+  }, [categoryOrderStorageKey]);
+
+  const persistCategoryOrder = useCallback(
+    (next: string[]) => {
+      setCategoryOrder(next);
+      savePosCategoryOrder(categoryOrderStorageKey, next);
+    },
+    [categoryOrderStorageKey],
+  );
+
   const categories = useMemo(() => {
-    const unique = [...new Set(products.map((p) => p.category).filter(Boolean))];
-    return [
-      { id: "all", name: tr("Hamısı", "All") },
-      ...unique.map((name) => ({ id: name, name })),
+    const uniqueNames = [
+      ...new Set(
+        products
+          .filter((p) => p.productType !== "SERVICE" && p.trackStock !== false)
+          .map((p) => p.category)
+          .filter(Boolean),
+      ),
     ];
-  }, [products, language]);
+    const hasServices =
+      inventoryServicesEnabled &&
+      products.some((p) => p.productType === "SERVICE" || p.trackStock === false);
+
+    const reorderable = sortCategoriesByOrder(
+      uniqueNames.map((name) => ({ id: name, name })),
+      categoryOrder,
+    );
+
+    const pinned: PosCategoryChip[] = [
+      { id: "all", name: tr("Hamısı", "All"), pinned: true },
+      ...(hasServices
+        ? [{ id: "services", name: tr("Xidmətlər", "Services"), pinned: true }]
+        : []),
+    ];
+    return [...pinned, ...reorderable];
+  }, [products, language, inventoryServicesEnabled, categoryOrder]);
+
+  const moveCategory = useCallback(
+    (categoryId: string, direction: -1 | 1) => {
+      const reorderableIds = categories.filter((c) => !c.pinned).map((c) => c.id);
+      const from = reorderableIds.indexOf(categoryId);
+      if (from < 0) return;
+      const to = from + direction;
+      if (to < 0 || to >= reorderableIds.length) return;
+      const next = [...reorderableIds];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      persistCategoryOrder(next);
+    },
+    [categories, persistCategoryOrder],
+  );
+
+  const onCategoryDragStart = (categoryId: string) => {
+    if (!categoryReorderMode) return;
+    setDragCategoryId(categoryId);
+  };
+
+  const onCategoryDrop = (targetId: string) => {
+    if (!categoryReorderMode || !dragCategoryId || dragCategoryId === targetId) {
+      setDragCategoryId(null);
+      return;
+    }
+    const reorderableIds = categories.filter((c) => !c.pinned).map((c) => c.id);
+    const from = reorderableIds.indexOf(dragCategoryId);
+    const to = reorderableIds.indexOf(targetId);
+    if (from < 0 || to < 0) {
+      setDragCategoryId(null);
+      return;
+    }
+    const next = [...reorderableIds];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    persistCategoryOrder(next);
+    setDragCategoryId(null);
+  };
+
+  useEffect(() => {
+    if (selectedCategory === "services" && !inventoryServicesEnabled) {
+      setSelectedCategory("all");
+    }
+  }, [inventoryServicesEnabled, selectedCategory]);
 
   const paymentMethods: { id: PaymentMethod; name: string; icon: React.ElementType }[] = [
     { id: "cash", name: tr("Nağd", "Cash"), icon: Wallet },
@@ -640,14 +787,15 @@ export function CorporatePOS() {
 
   const addToCart = (product: Product): boolean => {
     if (!canCreate) return false;
+    const isService = !product.trackStock || product.productType === "SERVICE";
     const existing = cart.find((i) => i.id === product.id);
     const nextQty = existing ? existing.quantity + 1 : 1;
 
-    if (stockEnabled && product.stock <= 0) {
+    if (!isService && stockEnabled && product.stock <= 0) {
       warnOutOfStock(product);
       return false;
     }
-    if (stockEnabled && nextQty > product.stock) {
+    if (!isService && stockEnabled && nextQty > product.stock) {
       warnInsufficientStock(product, product.stock);
       return false;
     }
@@ -668,6 +816,8 @@ export function CorporatePOS() {
           price: product.price,
           quantity: 1,
           image: product.image,
+          productType: product.productType,
+          trackStock: product.trackStock,
         },
       ];
     });
@@ -774,9 +924,14 @@ export function CorporatePOS() {
     const product = products.find((p) => p.id === id);
     const item = cart.find((i) => i.id === id);
     if (!item) return;
+    const isService =
+      !item.trackStock ||
+      item.productType === "SERVICE" ||
+      !product?.trackStock ||
+      product?.productType === "SERVICE";
 
     const next = item.quantity + delta;
-    if (delta > 0) {
+    if (delta > 0 && !isService) {
       if (stockEnabled && product && product.stock <= 0) {
         warnOutOfStock(product);
         return;
@@ -922,6 +1077,8 @@ export function CorporatePOS() {
     if (!selectedBillerId) { alert(tr("Kassir seçin", "Please select an employee / biller")); return; }
 
     const stockIssue = stockEnabled && cart.find((item) => {
+      const isService = !item.trackStock || item.productType === "SERVICE";
+      if (isService) return false;
       const product = products.find((p) => p.id === item.id);
       return !product || product.stock <= 0 || item.quantity > product.stock;
     });
@@ -1118,6 +1275,8 @@ export function CorporatePOS() {
     }
 
     const stockIssue = stockEnabled && cart.find((item) => {
+      const isService = !item.trackStock || item.productType === "SERVICE";
+      if (isService) return false;
       const product = products.find((p) => p.id === item.id);
       return !product || product.stock <= 0 || item.quantity > product.stock;
     });
@@ -1216,6 +1375,121 @@ export function CorporatePOS() {
     }
   };
 
+  const handleSendToBar = async () => {
+    if (!canCreate || isDemo || !isAuthenticated || !diningEnabled || !posSendToBarEnabled) return;
+    if (cart.length === 0) {
+      alert(tr("Səbəti doldurun", "Please add items to cart"));
+      return;
+    }
+    if (!selectedPaymentMethod) {
+      alert(tr("Ödəniş üsulunu seçin", "Please select a payment method"));
+      return;
+    }
+    if (!selectedBillerId) {
+      alert(tr("Kassir seçin", "Please select an employee / biller"));
+      return;
+    }
+    if (isGlobalMode || !branchId) {
+      notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
+      return;
+    }
+
+    const stockIssue = stockEnabled && cart.find((item) => {
+      const isService = !item.trackStock || item.productType === "SERVICE";
+      if (isService) return false;
+      const product = products.find((p) => p.id === item.id);
+      return !product || product.stock <= 0 || item.quantity > product.stock;
+    });
+    if (stockIssue) {
+      const product = products.find((p) => p.id === stockIssue.id);
+      if (product && product.stock <= 0) warnOutOfStock(product);
+      else if (product) warnInsufficientStock(product, product.stock);
+      else {
+        notifyWarning(
+          tr(
+            "Səbətdə stokda olmayan məhsullar var",
+            "Some items in the cart are out of stock or exceed available quantity",
+          ),
+        );
+      }
+      return;
+    }
+
+    const pmLabel: Record<PaymentMethod, string> = {
+      cash: tr("Nağd", "Cash"),
+      card: tr("Kart", "Card"),
+    };
+    const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
+    const receiptPhone = selectedCustomer?.phone ?? "—";
+    const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
+
+    setSendingToBar(true);
+    try {
+      const detail = await sendPosOrderToBar({
+        status: "COMPLETED",
+        customerId: selectedCustomerId || null,
+        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+          ? { mileageAtService: Number(mileageInput) }
+          : {}),
+        billerId: selectedBillerId || null,
+        paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod),
+        shipping,
+        ...(serviceFee > 0 ? { serviceFee } : {}),
+        discount: discountAmount > 0 ? discountAmount : undefined,
+        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+        ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
+        ...(selectedTableId ? { tableId: selectedTableId } : {}),
+      });
+
+      const tableLabel = selectedTableId
+        ? diningTables.find((t) => t.id === selectedTableId)?.name ??
+          diningTables.find((t) => t.id === selectedTableId)?.number?.toString()
+        : tr("Gələn müştəri", "Walk-in");
+
+      try {
+        const logoSrc =
+          getCompanyLogoUrl(user?.tenant, false) ??
+          getCompanyLogoUrl(user?.tenant, true) ??
+          APP_LOGO_LIGHT;
+        await printPosOrderTicket({
+          order: detail,
+          role: "bar",
+          language,
+          companyName: user?.tenant?.name?.trim() || "Inflero",
+          logoSrc,
+          customerPhone: receiptPhone,
+        });
+        notifySuccess(
+          tr(
+            "BAR-a göndərildi və BAR bileti çap olundu",
+            "Sent to Bar and BAR ticket printed",
+          ),
+        );
+      } catch (printErr) {
+        notifyWarning(
+          tr(
+            "BAR-a göndərildi, amma BAR çapı alınmadı",
+            "Sent to Bar, but BAR print failed",
+          ),
+        );
+        notifyFromError(printErr);
+      }
+
+      setReceipt(
+        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
+          diningFlow: true,
+          tableLabel,
+        }),
+      );
+      resetCartAfterSave();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setSendingToBar(false);
+    }
+  };
+
   const handleSendToProduction = async () => {
     if (!canCreate || isDemo || !isAuthenticated || !posSendToProductionEnabled) return;
     if (cart.length === 0) {
@@ -1232,6 +1506,8 @@ export function CorporatePOS() {
     }
 
     const stockIssue = stockEnabled && cart.find((item) => {
+      const isService = !item.trackStock || item.productType === "SERVICE";
+      if (isService) return false;
       const product = products.find((p) => p.id === item.id);
       return !product || product.stock <= 0 || item.quantity > product.stock;
     });
@@ -1292,10 +1568,14 @@ export function CorporatePOS() {
 
   const filteredProducts = products.filter((p) => {
     const q = searchQuery.toLowerCase();
-    return (
-      (p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)) &&
-      (selectedCategory === "all" || p.category === selectedCategory)
-    );
+    const matchesSearch =
+      p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+    if (selectedCategory === "services") {
+      return p.productType === "SERVICE" || p.trackStock === false;
+    }
+    if (selectedCategory === "all") return true;
+    return p.category === selectedCategory;
   });
 
   return (
@@ -1318,6 +1598,15 @@ export function CorporatePOS() {
           <Printer className="w-3.5 h-3.5" />
         </button>
       )}
+      <button
+        type="button"
+        onClick={() => navigate("/dashboard/sales/pos-orders")}
+        className="fixed top-2 right-2 z-50 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:text-[#0d9488] hover:border-[#14b8a6]/50 hover:bg-[#f0fdfa] dark:hover:bg-[#14b8a6]/10 shadow-sm transition-all"
+        title={tr("Sifarişlər", "Orders")}
+      >
+        <ClipboardList className="w-3.5 h-3.5" />
+        <span className="text-xs font-medium">{tr("Sifarişlər", "Orders")}</span>
+      </button>
 
       <div className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8">
 
@@ -1349,20 +1638,93 @@ export function CorporatePOS() {
                   </button>
                 </div>
               </div>
-              <div className="flex gap-2 overflow-x-auto mt-3 pb-1">
-                {categories.map((cat) => (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                    {tr("Kateqoriyalar", "Categories")}
+                  </p>
                   <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
-                      selectedCategory === cat.id
-                        ? "bg-[#14b8a6] text-white"
-                        : "bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    type="button"
+                    onClick={() => setCategoryReorderMode((v) => !v)}
+                    className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
+                      categoryReorderMode
+                        ? "bg-[#14b8a6] border-[#14b8a6] text-white"
+                        : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                     }`}
+                    title={tr("Kateqoriyaları sırala", "Reorder categories")}
                   >
-                    {cat.name}
+                    <ListOrdered className="w-3 h-3" />
+                    {categoryReorderMode
+                      ? tr("Bitir", "Done")
+                      : tr("Sırala", "Reorder")}
                   </button>
-                ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((cat) => {
+                    const isServices = cat.id === "services";
+                    const isActive = selectedCategory === cat.id;
+                    const canReorder = categoryReorderMode && !cat.pinned;
+                    return (
+                      <div
+                        key={cat.id}
+                        draggable={canReorder}
+                        onDragStart={() => onCategoryDragStart(cat.id)}
+                        onDragOver={(e) => {
+                          if (!canReorder) return;
+                          e.preventDefault();
+                        }}
+                        onDrop={() => {
+                          if (!cat.pinned) onCategoryDrop(cat.id);
+                        }}
+                        onDragEnd={() => setDragCategoryId(null)}
+                        className={`inline-flex items-center gap-0.5 rounded-lg ${
+                          dragCategoryId === cat.id ? "opacity-60" : ""
+                        }`}
+                      >
+                        {canReorder && (
+                          <button
+                            type="button"
+                            onClick={() => moveCategory(cat.id, -1)}
+                            className="p-1 rounded-md text-gray-400 hover:text-[#14b8a6] hover:bg-gray-100 dark:hover:bg-gray-800"
+                            title={tr("Sola", "Move left")}
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (categoryReorderMode && !cat.pinned) return;
+                            setSelectedCategory(cat.id);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                            isServices
+                              ? isActive
+                                ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-300 dark:ring-blue-500/50"
+                                : "bg-blue-50 text-blue-700 border border-blue-300 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/40"
+                              : isActive
+                                ? "bg-[#14b8a6] text-white"
+                                : "bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          } ${canReorder ? "cursor-grab active:cursor-grabbing" : ""}`}
+                        >
+                          {canReorder && <GripVertical className="w-3 h-3 shrink-0 opacity-70" />}
+                          {isServices && <Wrench className="w-3.5 h-3.5 shrink-0" />}
+                          {cat.name}
+                        </button>
+                        {canReorder && (
+                          <button
+                            type="button"
+                            onClick={() => moveCategory(cat.id, 1)}
+                            className="p-1 rounded-md text-gray-400 hover:text-[#14b8a6] hover:bg-gray-100 dark:hover:bg-gray-800"
+                            title={tr("Sağa", "Move right")}
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -1374,30 +1736,43 @@ export function CorporatePOS() {
               ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-4">
                 {filteredProducts.map((product) => {
+                  const isService = !product.trackStock || product.productType === "SERVICE";
                   const qtyInCart = getCartQuantity(product.id);
-                  const outOfStock = stockEnabled && product.stock <= 0;
+                  const outOfStock = !isService && stockEnabled && product.stock <= 0;
                   const atStockLimit =
-                    stockEnabled && product.stock > 0 && qtyInCart >= product.stock;
+                    !isService && stockEnabled && product.stock > 0 && qtyInCart >= product.stock;
 
                   return (
                   <div
                     key={product.id}
                     role="button"
-                    tabIndex={canCreate ? 0 : -1}
-                    onClick={() => canCreate && addToCart(product)}
+                    tabIndex={canCreate && !outOfStock ? 0 : -1}
+                    onClick={() => {
+                      if (!canCreate || outOfStock) {
+                        if (outOfStock) warnOutOfStock(product);
+                        return;
+                      }
+                      addToCart(product);
+                    }}
                     onKeyDown={(e) => {
-                      if (canCreate && (e.key === "Enter" || e.key === " ")) {
+                      if (!canCreate || outOfStock) return;
+                      if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         addToCart(product);
                       }
                     }}
-                    className={`relative bg-white dark:bg-gray-900 border rounded-lg p-3 sm:p-4 hover:shadow-lg transition-all active:scale-95 text-left group touch-manipulation cursor-pointer ${
-                      outOfStock
-                        ? "border-red-300 dark:border-red-900/60 opacity-80"
-                        : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e]"
+                    className={`relative bg-white dark:bg-gray-900 border rounded-lg p-3 sm:p-4 hover:shadow-lg transition-all active:scale-95 text-left group touch-manipulation ${
+                      outOfStock || !canCreate
+                        ? "border-red-300 dark:border-red-900/60 opacity-80 cursor-not-allowed"
+                        : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer"
                     } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none`}
                   >
-                    {stockEnabled && outOfStock && (
+                    {isService && (
+                      <span className="absolute top-2 left-2 z-10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        {tr("Xidmət", "Service")}
+                      </span>
+                    )}
+                    {!isService && stockEnabled && outOfStock && (
                       <span className="absolute top-2 right-2 z-10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
                         {tr("Stokda yoxdur", "Out of stock")}
                       </span>
@@ -1413,7 +1788,7 @@ export function CorporatePOS() {
                       <span className="text-sm font-bold text-[#14b8a6] dark:text-[#14b8a6]">
                         {formatCurrency(product.price)}
                       </span>
-                      {stockEnabled && <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
+                      {!isService && stockEnabled && <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
                         outOfStock
                           ? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
                           : "text-gray-400 bg-gray-100 dark:bg-gray-800"
@@ -1574,9 +1949,19 @@ export function CorporatePOS() {
                 ) : (
                   cart.map((item) => {
                     const product = products.find((p) => p.id === item.id);
-                    const itemOutOfStock = stockEnabled && product != null && product.stock <= 0;
+                    const isService =
+                      !item.trackStock ||
+                      item.productType === "SERVICE" ||
+                      !product?.trackStock ||
+                      product?.productType === "SERVICE";
+                    const itemOutOfStock =
+                      !isService && stockEnabled && product != null && product.stock <= 0;
                     const itemExceedsStock =
-                      stockEnabled && product != null && product.stock > 0 && item.quantity > product.stock;
+                      !isService &&
+                      stockEnabled &&
+                      product != null &&
+                      product.stock > 0 &&
+                      item.quantity > product.stock;
 
                     return (
                     <div key={item.id} className={`bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border ${
@@ -1590,6 +1975,11 @@ export function CorporatePOS() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-xs font-medium text-gray-900 dark:text-white mb-0.5 truncate">{item.name}</h3>
+                          {isService && (
+                            <span className="inline-flex mb-1 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                              {tr("Xidmət", "Service")}
+                            </span>
+                          )}
                           {(itemOutOfStock || itemExceedsStock) && (
                             <p className="text-[10px] font-medium text-red-600 dark:text-red-400 mb-1">
                               {itemOutOfStock
@@ -1600,7 +1990,28 @@ export function CorporatePOS() {
                                   )}
                             </p>
                           )}
-                          <p className="text-xs font-semibold text-[#14b8a6] dark:text-[#14b8a6] mb-1.5">{formatCurrency(item.price)}</p>
+                          {isService ? (
+                            <div className="flex items-center gap-1 mb-1.5">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={String(item.price)}
+                                onChange={(e) => {
+                                  const next = parseFloat(sanitizeNumericTyping(e.target.value));
+                                  if (!Number.isFinite(next) || next < 0) return;
+                                  setCart((prev) =>
+                                    prev.map((i) =>
+                                      i.id === item.id ? { ...i, price: next } : i,
+                                    ),
+                                  );
+                                }}
+                                className="w-24 px-2 py-1 text-xs font-semibold text-[#14b8a6] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <span className="text-[10px] text-gray-400">₼</span>
+                            </div>
+                          ) : (
+                            <p className="text-xs font-semibold text-[#14b8a6] dark:text-[#14b8a6] mb-1.5">{formatCurrency(item.price)}</p>
+                          )}
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg">
                               <button
@@ -1732,13 +2143,8 @@ export function CorporatePOS() {
                     </div>
                   </div>
 
-                  <div className="flex justify-between mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Cəmi", "Total")}</span>
-                    <span className="text-lg font-bold text-[#14b8a6] dark:text-[#14b8a6]">{formatCurrency(total)}</span>
-                  </div>
-
                   {/* Payment Methods */}
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <p className="text-xs font-medium text-gray-900 dark:text-white mb-2">{tr("Ödəniş Üsulu", "Payment Method")}</p>
                     <div className="grid grid-cols-3 gap-2">
                       {paymentMethods.map((m) => {
@@ -1761,13 +2167,23 @@ export function CorporatePOS() {
                       })}
                     </div>
                   </div>
+                </div>
+              )}
+              </div>
 
-                  {/* Payment Status: Paid vs Pending */}
-                  <div className="mb-4">
-                    <p className="text-xs font-medium text-gray-900 dark:text-white mb-2">
+              {/* Fixed checkout: Total + actions stay visible while cart scrolls */}
+              {cart.length > 0 && (
+                <div className="shrink-0 border-t border-gray-200 dark:border-gray-800 pt-2.5 mt-1 bg-white dark:bg-gray-900">
+                  <div className="flex justify-between items-baseline mb-2.5 pb-2 border-b border-gray-200 dark:border-gray-800">
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Cəmi", "Total")}</span>
+                    <span className="text-base font-bold text-[#14b8a6] dark:text-[#14b8a6]">{formatCurrency(total)}</span>
+                  </div>
+
+                  <div className="mb-2">
+                    <p className="text-[11px] font-medium text-gray-900 dark:text-white mb-1.5">
                       {tr("Status", "Status")}
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1.5">
                       {(
                         [
                           { id: "paid" as const, name: tr("Ödənilib", "Paid") },
@@ -1778,7 +2194,7 @@ export function CorporatePOS() {
                           key={s.id}
                           type="button"
                           onClick={() => setPaymentStatusChoice(s.id)}
-                          className={`flex items-center justify-center gap-1 p-2 rounded-lg border text-xs font-medium transition-all ${
+                          className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] font-medium transition-all ${
                             paymentStatusChoice === s.id
                               ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border-[#14b8a6] dark:border-[#14b8a6] text-[#14b8a6] dark:text-[#14b8a6]"
                               : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -1789,79 +2205,101 @@ export function CorporatePOS() {
                       ))}
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Action Buttons */}
-              {canCreate && (
-              <div className="mt-2 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveDraft()}
-                    disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToProduction || isGlobalMode || !branchId}
-                    className="px-3 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {savingDraft
-                      ? tr("Saxlanılır...", "Saving...")
-                      : tr("Qaralama olaraq saxla", "Save as Draft")}
-                  </button>
-                  {diningEnabled ? (
-                    <button
-                      type="button"
-                      onClick={() => void handleSendToKot()}
-                      disabled={
-                        cart.length === 0 ||
-                        placingOrder ||
-                        savingDraft ||
-                        sendingToKot ||
-                        sendingToProduction ||
-                        isGlobalMode ||
-                        !branchId
-                      }
-                      className="px-3 py-2.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                    >
-                      <ChefHat className="w-3.5 h-3.5" />
-                      {sendingToKot
-                        ? tr("Göndərilir...", "Sending...")
-                        : tr("KOT & Çap", "Send KOT & Print")}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void handlePlaceOrder()}
-                      disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToProduction || isGlobalMode || !branchId}
-                      className="px-3 py-2.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      {placingOrder ? tr("Göndərilir...", "Processing...") : tr("Ödənişi Tamamla", "Complete & Print")}
-                    </button>
+                  {canCreate && (
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveDraft()}
+                        disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToBar || sendingToProduction || isGlobalMode || !branchId}
+                        className="px-2.5 py-2 text-[11px] font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {savingDraft
+                          ? tr("Saxlanılır...", "Saving...")
+                          : tr("Qaralama olaraq saxla", "Save as Draft")}
+                      </button>
+                      {diningEnabled ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleSendToKot()}
+                          disabled={
+                            cart.length === 0 ||
+                            placingOrder ||
+                            savingDraft ||
+                            sendingToKot ||
+                            sendingToBar ||
+                            sendingToProduction ||
+                            isGlobalMode ||
+                            !branchId
+                          }
+                          className="px-2.5 py-2 text-[11px] font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                        >
+                          <ChefHat className="w-3 h-3" />
+                          {sendingToKot
+                            ? tr("Göndərilir...", "Sending...")
+                            : tr("KOT & Çap", "Send KOT & Print")}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handlePlaceOrder()}
+                          disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToBar || sendingToProduction || isGlobalMode || !branchId}
+                          className="px-2.5 py-2 text-[11px] font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                        >
+                          <Printer className="w-3 h-3" />
+                          {placingOrder ? tr("Göndərilir...", "Processing...") : tr("Ödənişi Tamamla", "Complete & Print")}
+                        </button>
+                      )}
+                    </div>
+                    {diningEnabled && posSendToBarEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSendToBar()}
+                        disabled={
+                          cart.length === 0 ||
+                          placingOrder ||
+                          savingDraft ||
+                          sendingToKot ||
+                          sendingToBar ||
+                          sendingToProduction ||
+                          isGlobalMode ||
+                          !branchId
+                        }
+                        className="w-full px-2.5 py-2 text-[11px] font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                      >
+                        <Wine className="w-3 h-3" />
+                        {sendingToBar
+                          ? tr("Göndərilir...", "Sending...")
+                          : tr("BAR & Çap", "Send To Bar & Print")}
+                      </button>
+                    )}
+                    {posSendToProductionEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSendToProduction()}
+                        disabled={
+                          cart.length === 0 ||
+                          placingOrder ||
+                          savingDraft ||
+                          sendingToKot ||
+                          sendingToBar ||
+                          sendingToProduction ||
+                          isGlobalMode ||
+                          !branchId
+                        }
+                        className="w-full px-2.5 py-2 text-[11px] font-medium text-white bg-[#0d9488] hover:bg-[#0f766e] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                      >
+                        <Factory className="w-3 h-3" />
+                        {sendingToProduction
+                          ? tr("İstehsala göndərilir...", "Sending to production...")
+                          : tr("İstehsala göndər", "Send to Production")}
+                      </button>
+                    )}
+                  </div>
                   )}
                 </div>
-                {posSendToProductionEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => void handleSendToProduction()}
-                    disabled={
-                      cart.length === 0 ||
-                      placingOrder ||
-                      savingDraft ||
-                      sendingToKot ||
-                      sendingToProduction ||
-                      isGlobalMode ||
-                      !branchId
-                    }
-                    className="w-full px-3 py-2.5 text-xs font-medium text-white bg-[#0d9488] hover:bg-[#0f766e] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                  >
-                    <Factory className="w-3.5 h-3.5" />
-                    {sendingToProduction
-                      ? tr("İstehsala göndərilir...", "Sending to production...")
-                      : tr("İstehsala göndər", "Send to Production")}
-                  </button>
-                )}
-              </div>
               )}
-              </div>
             </div>
           </div>
         </div>

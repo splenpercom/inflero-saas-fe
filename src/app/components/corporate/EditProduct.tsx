@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useLocation } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
@@ -18,6 +18,7 @@ import {
   uploadProductImage,
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
+import { resolveProductsListReturn, PRODUCTS_LIST_PATH } from "../../lib/productsNavigation";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { ModernSelect } from "../ui/ModernSelect";
 import { DateInput } from "../ui/DateInput";
@@ -43,7 +44,7 @@ import JsBarcode from "jsbarcode";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
-const LIST_PATH = "/dashboard/inventory/products";
+const LIST_PATH = PRODUCTS_LIST_PATH;
 
 interface ProductImage {
   id: string;
@@ -73,6 +74,7 @@ function productImageUrls(images: unknown): string[] {
 export function EditProduct() {
   const { language } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
@@ -80,6 +82,11 @@ export function EditProduct() {
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const returnTo = resolveProductsListReturn(
+    (location.state as { returnTo?: string } | null)?.returnTo,
+  );
+
+  const goBackToList = () => navigate(returnTo, { replace: true });
 
   const pt = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
@@ -223,11 +230,11 @@ export function EditProduct() {
       setImages(urls.map((url, index) => ({ id: `img-${index}`, url })));
     } catch (err) {
       notifyFromError(err, pickLang(language, "Məhsulu yükləmək alınmadı", "Failed to load product"));
-      navigate(LIST_PATH);
+      navigate(returnTo, { replace: true });
     } finally {
       setLoading(false);
     }
-  }, [id, isDemo, isAuthenticated, navigate, branchRevision, language]);
+  }, [id, isDemo, isAuthenticated, navigate, branchRevision, language, returnTo]);
 
   useEffect(() => {
     void loadOptions();
@@ -403,6 +410,10 @@ export function EditProduct() {
       notifyFromError(new Error(tr("Məhsul/Xidmət adı tələb olunur", "Product/Service name is required")));
       return;
     }
+    if (!category.trim()) {
+      notifyFromError(new Error(tr("Kateqoriya tələb olunur", "Category is required")));
+      return;
+    }
     if (!price.trim()) {
       notifyFromError(new Error(tr("Qiymət tələb olunur", "Price is required")));
       return;
@@ -424,7 +435,7 @@ export function EditProduct() {
       const payload: Parameters<typeof updateProduct>[1] = {
         name: productName.trim(),
         description: description.trim() || null,
-        categoryId: category || null,
+        categoryId: category,
         subCategoryId: subCategory || null,
         brandId: brand || null,
         unitId: unit || null,
@@ -446,7 +457,7 @@ export function EditProduct() {
 
       await updateProduct(id, payload);
       notifySuccess(pt("productUpdated"));
-      navigate(`${LIST_PATH}/${id}`);
+      goBackToList();
     } catch (err) {
       notifyFromError(err, tr("Yeniləmək alınmadı", "Failed to update product"));
     } finally {
@@ -471,7 +482,7 @@ export function EditProduct() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{pt("subtitle")}</p>
           </div>
           <button
-            onClick={() => navigate(id ? `${LIST_PATH}/${id}` : LIST_PATH)}
+            onClick={goBackToList}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-900 dark:bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -713,7 +724,7 @@ export function EditProduct() {
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => navigate(id ? `${LIST_PATH}/${id}` : LIST_PATH)} className="px-4 py-2 text-xs bg-gray-900 text-white rounded-lg">
+            <button type="button" onClick={goBackToList} className="px-4 py-2 text-xs bg-gray-900 text-white rounded-lg">
               {pt("cancel")}
             </button>
             <button type="button" onClick={() => void handleSubmit()} disabled={saving || optionsLoading} className="px-4 py-2 text-xs bg-orange-500 text-white rounded-lg disabled:opacity-50">

@@ -65,6 +65,8 @@ export function Settings() {
   const { isDemo, isAuthenticated, refresh, hasModule } = useAuth();
   const posEnabled = hasModule("POS");
   const diningEnabled = hasModule("DINING");
+  const reservationsEnabled = hasModule("RESERVATIONS");
+  const addonsEnabled = posEnabled || reservationsEnabled;
   const { canView, canEdit } = useModulePermissions("Settings");
   const branchRevision = useBranchRevision();
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
@@ -126,6 +128,8 @@ export function Settings() {
   const [employeeCommissionEnabled, setEmployeeCommissionEnabled] = useState(false);
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
+  const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
+  const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [billers, setBillers] = useState<SalesBillerRow[]>([]);
   const [commissionDrafts, setCommissionDrafts] = useState<Record<string, CommissionDraft>>({});
 
@@ -134,6 +138,8 @@ export function Settings() {
     employeeCommissionEnabled: boolean;
     posServiceFeeEnabled: boolean;
     posSendToProductionEnabled: boolean;
+    posSendToBarEnabled: boolean;
+    inventoryServicesEnabled: boolean;
     billers: SalesBillerRow[];
   } | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -181,6 +187,8 @@ export function Settings() {
     setEmployeeCommissionEnabled(data.employeeCommissionEnabled === true);
     setPosServiceFeeEnabled(data.posServiceFeeEnabled === true);
     setPosSendToProductionEnabled(data.posSendToProductionEnabled === true);
+    setPosSendToBarEnabled(data.posSendToBarEnabled === true);
+    setInventoryServicesEnabled(data.inventoryServicesEnabled === true);
     setSavedLogoUrl(data.companyLogo);
     setLogoFile(null);
     setLogoPreview(data.companyLogo);
@@ -224,6 +232,8 @@ export function Settings() {
           employeeCommissionEnabled: data.employeeCommissionEnabled === true,
           posServiceFeeEnabled: data.posServiceFeeEnabled === true,
           posSendToProductionEnabled: data.posSendToProductionEnabled === true,
+          posSendToBarEnabled: data.posSendToBarEnabled === true,
+          inventoryServicesEnabled: data.inventoryServicesEnabled === true,
           billers: billerRows,
         };
         snapshotRef.current = {
@@ -396,8 +406,14 @@ export function Settings() {
         latitude,
         longitude,
         ...(posEnabled
-          ? { employeeCommissionEnabled, posServiceFeeEnabled, posSendToProductionEnabled }
+          ? {
+              employeeCommissionEnabled,
+              posServiceFeeEnabled,
+              posSendToProductionEnabled,
+              ...(diningEnabled ? { posSendToBarEnabled } : {}),
+            }
           : {}),
+        ...(addonsEnabled ? { inventoryServicesEnabled } : {}),
         socialLinks: {
           instagram: emptyToNull(instagram),
           facebook: emptyToNull(facebook),
@@ -432,6 +448,8 @@ export function Settings() {
         employeeCommissionEnabled,
         posServiceFeeEnabled,
         posSendToProductionEnabled,
+        posSendToBarEnabled,
+        inventoryServicesEnabled,
         billers: refreshedBillers,
       };
 
@@ -480,6 +498,8 @@ export function Settings() {
         setEmployeeCommissionEnabled(addonSnapshotRef.current.employeeCommissionEnabled);
         setPosServiceFeeEnabled(addonSnapshotRef.current.posServiceFeeEnabled);
         setPosSendToProductionEnabled(addonSnapshotRef.current.posSendToProductionEnabled);
+        setPosSendToBarEnabled(addonSnapshotRef.current.posSendToBarEnabled);
+        setInventoryServicesEnabled(addonSnapshotRef.current.inventoryServicesEnabled);
         applyBillerDrafts(addonSnapshotRef.current.billers);
       }
       notifyInfo(pt("Changes discarded.", "Dəyişikliklər ləğv edildi."));
@@ -487,14 +507,14 @@ export function Settings() {
   };
 
   useEffect(() => {
-    if (!posEnabled && activeSection === "addons") {
+    if (!addonsEnabled && activeSection === "addons") {
       setActiveSection("companyInfo");
     }
     if ((!posEnabled || !diningEnabled) && activeSection === "printers") {
       setActiveSection("companyInfo");
       if (searchParams.has("section")) setSearchParams({}, { replace: true });
     }
-  }, [posEnabled, diningEnabled, activeSection, searchParams, setSearchParams]);
+  }, [addonsEnabled, posEnabled, diningEnabled, activeSection, searchParams, setSearchParams]);
 
   const navItemClass = (section: SettingsSection) =>
     `w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
@@ -575,7 +595,7 @@ export function Settings() {
               {pt("Social Media & Links", "Sosial Media & Linklər")}
             </button>
 
-            {posEnabled && (
+            {addonsEnabled && (
               <button
                 type="button"
                 onClick={() => selectSection("addons")}
@@ -871,7 +891,7 @@ export function Settings() {
               </div>
             )}
 
-            {posEnabled && activeSection === "addons" && (
+            {addonsEnabled && activeSection === "addons" && (
               <div>
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -880,6 +900,37 @@ export function Settings() {
                 </div>
                 <div className="px-4 pb-4 space-y-5 pt-4">
                   <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Inventory services", "Anbar xidmətləri")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, manage sellable services under Inventory; they appear on POS and bookings.",
+                          "Aktiv olduqda İnventar altında satıla bilən xidmətləri idarə edin; POS və rezervasiyalarda görünür.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => setInventoryServicesEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        inventoryServicesEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={inventoryServicesEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          inventoryServicesEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {posEnabled && (
+                  <>
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
                     <div>
                       <p className="text-xs font-medium text-gray-900 dark:text-white">
                         {pt("Employee commission", "İşçi komissiyası")}
@@ -1051,6 +1102,39 @@ export function Settings() {
                       />
                     </button>
                   </div>
+
+                  {diningEnabled && (
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Send To Bar & Print", "BAR-a göndər & çap")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, POS shows Send To Bar & Print. Orders are tagged BAR, appear on the KOT board, and print from the billing printer.",
+                          "Aktiv olduqda POS-da BAR-a göndər & çap görünür. Sifarişlər BAR etiketi alır, KOT lövhəsində görünür və qəbz printerindən çap olunur.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => setPosSendToBarEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        posSendToBarEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={posSendToBarEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          posSendToBarEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  )}
+                  </>
+                  )}
                 </div>
               </div>
             )}

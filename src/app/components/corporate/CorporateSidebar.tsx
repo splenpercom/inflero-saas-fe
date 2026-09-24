@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
+import { fetchTenantSettings } from "../../api/tenantSettings";
 import { getBrandLogoUrl } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { BrandLogo } from "../ui/BrandLogo";
@@ -81,6 +82,26 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
     isLoading: branchesLoading,
   } = useBranch();
   const location = useLocation();
+  const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!(isAuthenticated || isDemo)) {
+      setInventoryServicesEnabled(false);
+      return;
+    }
+    let cancelled = false;
+    void fetchTenantSettings()
+      .then((s) => {
+        if (!cancelled) setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setInventoryServicesEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isDemo, location.pathname]);
+
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const branchMenuRef = useRef<HTMLDivElement>(null);
@@ -124,6 +145,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       
       // Inventory Sub-items
       products: { en: "Products/Services", az: "Məhsullar/Xidmətlər" },
+      services: { en: "Services", az: "Xidmətlər" },
       createProduct: { en: "Create", az: "Yarat" },
       expiredProducts: { en: "Expired Products/Services", az: "Vaxtı Keçmiş Məhsullar/Xidmətlər" },
       lowStocks: { en: "Low Stocks", az: "Tükənən" },
@@ -271,6 +293,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "Inventory",
       subItems: [
         { labelKey: "products", label: st("products"), path: "/dashboard/inventory/products" },
+        { labelKey: "services", label: st("services"), path: "/dashboard/inventory/services" },
         {
           labelKey: "createProduct",
           label: st("createProduct"),
@@ -371,7 +394,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "Reservations",
       subItems: [
         { labelKey: "reservationsList", label: st("reservations"), path: "/dashboard/reservations" },
-        { labelKey: "serviceTypes", label: st("serviceTypes"), path: "/dashboard/reservations/service-types" },
       ],
     },
     {
@@ -432,6 +454,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         if (item.subItems) {
           const filteredSubItems = item.subItems.filter((sub) => {
             if (["expiredProducts", "lowStocks"].includes(sub.labelKey) && !hasModule("STOCK")) return false;
+            if (sub.labelKey === "services" && !inventoryServicesEnabled) return false;
             // Suppliers stay available without STOCK — required for purchases.
             if (["pos", "posOrders"].includes(sub.labelKey) && !hasModule("POS")) return false;
             if (sub.labelKey === "stockTransfer" && !branchManagementEnabled) return false;
@@ -459,7 +482,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         return item;
       })
       .filter((item): item is NavItem => item !== null);
-  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo]);
+  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled]);
 
   const tenantSlug = user?.tenant?.slug ?? null;
   const myStorePath = tenantSlug ? storePath(tenantSlug) : null;

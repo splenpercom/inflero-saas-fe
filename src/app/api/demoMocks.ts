@@ -1,4 +1,4 @@
-import { ApiError } from "./client";
+﻿import { ApiError } from "./client";
 import { buildDemoDashboardSummary } from "./demoDashboardSummary";
 import { mockClients, mockProducts, mockSuppliers } from "../utils/dashboardData";
 
@@ -11,7 +11,7 @@ function ok<T>(data: T) {
   return { success: true, data };
 }
 
-function paged<T>(items: T[], page = 1, pageSize = 10) {
+function paged<T>(items: T[], page = 1, pageSize = 20) {
   const total = items.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = (page - 1) * pageSize;
@@ -342,7 +342,7 @@ const DEMO_INCOMES = [
     notes: "Daily services",
     amount: "1850.00",
     accountId: "ba-1",
-    bankLabel: "Kapital Bank · ****4521",
+    bankLabel: "Kapital Bank Â· ****4521",
   },
   {
     id: "inc-2",
@@ -355,7 +355,7 @@ const DEMO_INCOMES = [
     notes: "Counter sales",
     amount: "640.00",
     accountId: "ba-2",
-    bankLabel: "ABB · ****8830",
+    bankLabel: "ABB Â· ****8830",
   },
 ];
 
@@ -387,7 +387,7 @@ const DEMO_BANK_ACCOUNTS = [
 const DEMO_PURCHASES = [
   {
     id: "pur-1",
-    productIcon: "📦",
+    productIcon: "ðŸ“¦",
     productName: "Brake pads (set)",
     date: NOW,
     supplierName: "AutoParts Supply Co.",
@@ -402,7 +402,7 @@ const DEMO_PURCHASES = [
   },
   {
     id: "pur-2",
-    productIcon: "🛢️",
+    productIcon: "ðŸ›¢ï¸",
     productName: "Engine oil 5W-30",
     date: "2026-06-14T09:00:00.000Z",
     supplierName: "Oil Distributors Ltd",
@@ -439,7 +439,7 @@ const DEMO_ADJUSTMENTS = [
     warehouse: "Main Warehouse",
     store: "Main Branch",
     productName: "Lenovo IdeaPad 3",
-    productImage: "💻",
+    productImage: "ðŸ’»",
     date: DATE,
     personName: "James Kirwin",
     customerName: null,
@@ -450,7 +450,7 @@ const DEMO_ADJUSTMENTS = [
     warehouse: "Main Warehouse",
     store: "Main Branch",
     productName: "Beats Pro",
-    productImage: "🎧",
+    productImage: "ðŸŽ§",
     date: "2026-06-15",
     personName: "Francis Chang",
     customerName: null,
@@ -488,8 +488,8 @@ const DEMO_RESERVATIONS = [
     status: "confirmed" as const,
     source: "internal" as const,
     createdAt: NOW,
-    customerName: "Anar Həsənov",
-    vehicleLabel: "Toyota Camry · 77-AB-001",
+    customerName: "Anar HÉ™sÉ™nov",
+    vehicleLabel: "Toyota Camry Â· 77-AB-001",
     branchName: "Main Branch",
   },
   {
@@ -507,8 +507,8 @@ const DEMO_RESERVATIONS = [
     status: "pending" as const,
     source: "customer_site" as const,
     createdAt: NOW,
-    customerName: "Leyla Əliyeva",
-    vehicleLabel: "Mercedes C200 · 10-LE-200",
+    customerName: "Leyla Æliyeva",
+    vehicleLabel: "Mercedes C200 Â· 10-LE-200",
     branchName: "Main Branch",
   },
 ];
@@ -946,7 +946,7 @@ const DEMO_TENANT_SETTINGS = {
   city: "Baku",
   postalCode: "AZ1000",
   currency: "AZN",
-  currencySymbol: "₼",
+  currencySymbol: "â‚¼",
   currencyPosition: "after",
   decimalSeparator: ".",
   thousandSeparator: ",",
@@ -966,6 +966,7 @@ const DEMO_TENANT_SETTINGS = {
   employeeCommissionEnabled: false,
   posServiceFeeEnabled: false,
   posSendToProductionEnabled: false,
+  posSendToBarEnabled: false,
 };
 
 /**
@@ -974,7 +975,7 @@ const DEMO_TENANT_SETTINGS = {
  */
 export function resolveDemoApiResponse(path: string, method: string): unknown {
   if (method !== "GET") {
-    throw new ApiError(403, "Demo mode — sign in to save changes.");
+    throw new ApiError(403, "Demo mode â€” sign in to save changes.");
   }
 
   const [pathname, params] = parsePath(path);
@@ -994,18 +995,18 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   if (pathname === "/tenant/inventory/products/low-stock") {
     const low = productListItems().filter((p) => p.quantity < 200);
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(low, page, pageSize));
   }
   if (pathname === "/tenant/inventory/products/expired") {
     const expired = productListItems().slice(0, 2).map((p) => ({ ...p, expiryDate: "2026-01-01" }));
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(expired, page, pageSize));
   }
   if (pathname === "/tenant/inventory/products") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(productListItems(), page, pageSize));
   }
   if (pathname === "/tenant/inventory/products/lookup") {
@@ -1036,7 +1037,7 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   if (pathname === "/tenant/sales/pos-orders") {
     const customerId = params.get("customerId");
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 20);
     const rows = customerId
       ? DEMO_POS_ORDERS.filter((o) => o.customerId === customerId)
       : DEMO_POS_ORDERS;
@@ -1046,20 +1047,20 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   if (posMatch) return ok(posOrderDetail(posMatch[1]));
   if (pathname === "/tenant/sales/invoices") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 20);
     return ok(paged(DEMO_INVOICES, page, pageSize));
   }
   const invMatch = pathname.match(/^\/tenant\/sales\/invoices\/([^/]+)$/);
   if (invMatch) return ok(invoiceDetail(invMatch[1]));
   if (pathname === "/tenant/sales/returns") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 20);
     return ok(
       paged(
         [
           {
             id: "sr-1",
-            productIcon: "🎧",
+            productIcon: "ðŸŽ§",
             productName: "Beats Pro",
             date: NOW,
             customerAvatar: "",
@@ -1119,7 +1120,7 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   // Purchases
   if (pathname === "/tenant/purchases") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 20);
     return ok(paged(DEMO_PURCHASES, page, pageSize));
   }
   const purMatch = pathname.match(/^\/tenant\/purchases\/([^/]+)$/);
@@ -1128,13 +1129,13 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   }
   if (pathname === "/tenant/purchases/returns") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? params.get("limit") ?? 20);
     return ok(
       paged(
         [
           {
             id: "pr-1",
-            productIcon: "📦",
+            productIcon: "ðŸ“¦",
             productName: "Brake pads (set)",
             date: NOW,
             supplierName: "AutoParts Supply Co.",
@@ -1186,17 +1187,17 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   if (pathname === "/tenant/finance/income-categories") return ok(DEMO_INCOME_CATEGORIES);
   if (pathname === "/tenant/finance/bank-accounts") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(DEMO_BANK_ACCOUNTS, page, pageSize));
   }
   if (pathname === "/tenant/finance/expenses") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(DEMO_EXPENSES, page, pageSize));
   }
   if (pathname === "/tenant/finance/incomes") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(DEMO_INCOMES, page, pageSize));
   }
   if (pathname === "/tenant/finance/reports/trial-balance") {
@@ -1230,17 +1231,17 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   // Stock
   if (pathname === "/tenant/stock/levels") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(DEMO_STOCK_LEVELS, page, pageSize));
   }
   if (pathname === "/tenant/stock/adjustments") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(DEMO_ADJUSTMENTS, page, pageSize));
   }
   if (pathname === "/tenant/stock/transfers") {
     const page = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("pageSize") ?? 10);
+    const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(DEMO_TRANSFERS, page, pageSize));
   }
   const trfDetail = pathname.match(/^\/tenant\/stock\/transfers\/([^/]+)\/detail$/);

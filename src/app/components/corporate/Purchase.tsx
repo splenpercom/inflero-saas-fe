@@ -311,9 +311,9 @@ export function Purchase() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4 space-y-3">
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-w-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input
                 type="text"
@@ -324,51 +324,11 @@ export function Purchase() {
               />
             </div>
 
-            <div className="flex gap-2 flex-wrap">
-              <ModernSelect
-                value={sortBy}
-                onChange={setSortBy}
-                options={[
-                  { value: "all", label: tr("Tarix: Hamısı", "Date: All") },
-                  { value: "thisyear", label: tr("Bu il", "This Year") },
-                  { value: "last90days", label: tr("Son 90 gün", "Last 90 Days") },
-                  { value: "last30days", label: tr("Son 30 gün", "Last 30 Days") },
-                  { value: "last7days", label: tr("Son 7 gün", "Last 7 Days") },
-                ]}
-                placeholder={tr("Tarix: Hamısı", "Date: All")}
-              />
-
-              <ModernSelect
-                value={selectedPaymentStatus}
-                onChange={setSelectedPaymentStatus}
-                options={[
-                  { value: "all", label: tr("Ödəniş Statusu", "Payment Status") },
-                  { value: "paid", label: tr("Ödənilib", "Paid") },
-                  { value: "partial", label: tr("Qismən", "Partial") },
-                  { value: "overdue", label: tr("Gecikmiş", "Overdue") },
-                  { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
-                ]}
-                placeholder={tr("Ödəniş Statusu", "Payment Status")}
-              />
-
-              <ModernSelect
-                value={selectedStatus}
-                onChange={setSelectedStatus}
-                options={[
-                  { value: "all", label: tr("Status", "Status") },
-                  { value: "received", label: tr("Qəbul Edildi", "Received") },
-                  { value: "pending", label: tr("Gözləyir", "Pending") },
-                  { value: "ordered", label: tr("Sifariş Edildi", "Ordered") },
-                ]}
-                placeholder={tr("Status", "Status")}
-              />
-            </div>
-
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0 items-center">
               <button
                 onClick={handleExportPDF}
                 disabled={purchases.length === 0}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
                 title={tr("PDF İxrac Et", "Export PDF")}
               >
                 <FileText className="w-3.5 h-3.5 text-red-500" />
@@ -376,7 +336,7 @@ export function Purchase() {
               <button
                 onClick={handleExportCSV}
                 disabled={purchases.length === 0}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
                 title={tr("CSV İxrac Et", "Export CSV")}
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
@@ -384,7 +344,7 @@ export function Purchase() {
               <button
                 onClick={() => void handleRefresh()}
                 disabled={isRefreshing}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
                 title={tr("Yenilə", "Refresh")}
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
@@ -392,13 +352,59 @@ export function Purchase() {
               {canCreate && (
                 <button
                   onClick={() => setIsAddPurchaseModalOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors whitespace-nowrap"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{tr("Satınalma Əlavə Et", "Add Purchase")}</span>
                 </button>
               )}
             </div>
+          </div>
+
+          <div className="flex gap-2 flex-wrap items-center">
+            <ModernSelect
+              value={sortBy}
+              onChange={setSortBy}
+              className="w-[140px]"
+              minWidth={140}
+              options={[
+                { value: "all", label: tr("Tarix: Hamısı", "Date: All") },
+                { value: "thisyear", label: tr("Bu il", "This Year") },
+                { value: "last90days", label: tr("Son 90 gün", "Last 90 Days") },
+                { value: "last30days", label: tr("Son 30 gün", "Last 30 Days") },
+                { value: "last7days", label: tr("Son 7 gün", "Last 7 Days") },
+              ]}
+              placeholder={tr("Tarix: Hamısı", "Date: All")}
+            />
+
+            <ModernSelect
+              value={selectedPaymentStatus}
+              onChange={setSelectedPaymentStatus}
+              className="w-[150px]"
+              minWidth={150}
+              options={[
+                { value: "all", label: tr("Ödəniş Statusu", "Payment Status") },
+                { value: "paid", label: tr("Ödənilib", "Paid") },
+                { value: "partial", label: tr("Qismən", "Partial") },
+                { value: "overdue", label: tr("Gecikmiş", "Overdue") },
+                { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
+              ]}
+              placeholder={tr("Ödəniş Statusu", "Payment Status")}
+            />
+
+            <ModernSelect
+              value={selectedStatus}
+              onChange={setSelectedStatus}
+              className="w-[130px]"
+              minWidth={130}
+              options={[
+                { value: "all", label: tr("Status", "Status") },
+                { value: "received", label: tr("Qəbul Edildi", "Received") },
+                { value: "pending", label: tr("Gözləyir", "Pending") },
+                { value: "ordered", label: tr("Sifariş Edildi", "Ordered") },
+              ]}
+              placeholder={tr("Status", "Status")}
+            />
           </div>
         </div>
 
@@ -487,26 +493,26 @@ export function Purchase() {
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span
                           className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium",
+                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium leading-tight",
                             getStatusBadgeColor(purchase.status),
                           )}
                         >
                           {translateStatus(purchase.status)}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
-                        {purchase.total} ₼
+                      <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap tabular-nums">
+                        {Number(purchase.total).toFixed(2)} ₼
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
-                        {purchase.paid} ₼
+                      <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap tabular-nums">
+                        {Number(purchase.paid).toFixed(2)} ₼
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
-                        {purchase.due.toFixed(2)} ₼
+                      <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap tabular-nums">
+                        {Number(purchase.due).toFixed(2)} ₼
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span
                           className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium",
+                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium leading-tight",
                             getPaymentStatusBadgeColor(purchase.paymentStatus),
                           )}
                         >
@@ -514,13 +520,14 @@ export function Purchase() {
                         </span>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center gap-1.5 flex-nowrap">
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedPurchaseId(purchase.id);
                               setIsDetailModalOpen(true);
                             }}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            className="inline-flex items-center justify-center w-7 h-7 shrink-0 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                             title={tr("Bax", "View")}
                           >
                             <Eye className="w-3 h-3" />
@@ -536,20 +543,20 @@ export function Purchase() {
                                 });
                                 setIsPaymentModalOpen(true);
                               }}
-                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg font-medium hover:bg-[#0d9488] transition-colors"
+                              className="inline-flex items-center justify-center w-7 h-7 shrink-0 bg-[#14b8a6] text-white rounded-lg hover:bg-[#0d9488] transition-colors"
                               title={tr("Ödəniş qeyd et", "Record payment")}
                             >
                               <CreditCard className="w-3 h-3" />
-                              <span className="hidden xl:inline">{tr("Ödəniş", "Pay")}</span>
                             </button>
                           )}
                           {canEdit && (
                             <button
+                              type="button"
                               onClick={() => {
                                 setSelectedPurchaseId(purchase.id);
                                 setIsEditModalOpen(true);
                               }}
-                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                              className="inline-flex items-center justify-center w-7 h-7 shrink-0 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                               title={tr("Redaktə Et", "Edit")}
                             >
                               <Edit2 className="w-3 h-3" />
@@ -557,8 +564,9 @@ export function Purchase() {
                           )}
                           {canDelete && (
                             <button
+                              type="button"
                               onClick={() => void handleDelete(purchase.id)}
-                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              className="inline-flex items-center justify-center w-7 h-7 shrink-0 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                               title={tr("Sil", "Delete")}
                             >
                               <Trash2 className="w-3 h-3" />

@@ -281,6 +281,7 @@ export function LowStocks() {
                 value={selectedCategory}
                 onChange={setSelectedCategory}
                 options={categoryOptions}
+                className="w-[160px]"
               />
             </div>
 

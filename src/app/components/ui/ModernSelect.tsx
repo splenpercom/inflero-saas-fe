@@ -52,7 +52,11 @@ export function ModernSelect({
   }, [isOpen]);
 
   return (
-    <div className={cn("relative", className)} ref={anchorRef}>
+    <div
+      className={cn("relative min-w-0", className)}
+      ref={anchorRef}
+      style={{ minWidth, ...(className ? undefined : { width: minWidth }) }}
+    >
       <button
         type="button"
         disabled={disabled}
@@ -61,17 +65,16 @@ export function ModernSelect({
           setIsOpen(!isOpen);
         }}
         className={cn(
-          "w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] flex items-center justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 dark:disabled:hover:border-gray-700",
+          "w-full min-w-0 overflow-hidden px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] flex items-center justify-between gap-2 hover:border-gray-400 dark:hover:border-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 dark:disabled:hover:border-gray-700",
           buttonClassName,
         )}
-        style={{ minWidth }}
       >
-        <span className={cn("truncate", !selectedOption && "text-gray-400")}>
+        <span className={cn("truncate min-w-0 flex-1 text-left", !selectedOption && "text-gray-400")}>
           {selectedOption?.label || placeholder}
         </span>
         <ChevronDown
           className={cn(
-            "w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0 ml-2",
+            "w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0",
             isOpen && "rotate-180",
           )}
         />
@@ -87,6 +90,7 @@ export function ModernSelect({
               top: position.top,
               left: position.left,
               width: Math.max(position.width, minWidth),
+              minWidth,
             }}
           >
             <div className="max-h-60 overflow-y-auto scrollbar-hide">
@@ -104,6 +108,7 @@ export function ModernSelect({
                       ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
                       : "text-gray-900 dark:text-white",
                   )}
+                  title={option.label}
                 >
                   <span className="flex-1 truncate">{option.label}</span>
                   {value === option.value && (

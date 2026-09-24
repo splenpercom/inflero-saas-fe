@@ -182,6 +182,8 @@ export function thermalReceiptLabels(language: Language) {
     kitchen: t("Mətbəx", "Kitchen"),
     kitchenBanner: t("*** MƏTBƏX / KITCHEN ***", "*** KITCHEN ***"),
     kitchenCopy: t("*** MƏTBƏX KOPYASI ***", "*** KITCHEN COPY ***"),
+    barBanner: t("*** BAR ***", "*** BAR ***"),
+    barCopy: t("*** BAR KOPYASI ***", "*** BAR COPY ***"),
   };
 }
 
@@ -218,7 +220,8 @@ export type ThermalReceiptPayload = {
 
 export type BuildThermalReceiptOpts = {
   language: Language;
-  copy: "customer" | "kitchen";
+  /** customer = full receipt; kitchen/bar = KOT-style ticket (qty only, no totals). */
+  copy: "customer" | "kitchen" | "bar";
   paperWidthMm?: 58 | 80;
 };
 
@@ -228,7 +231,8 @@ export function buildThermalReceiptHtml(
   opts: BuildThermalReceiptOpts,
 ): string {
   const language = opts.language;
-  const isKitchen = opts.copy === "kitchen";
+  const isTicket = opts.copy === "kitchen" || opts.copy === "bar";
+  const isBar = opts.copy === "bar";
   const paperWidthMm = opts.paperWidthMm ?? 80;
   const labels = thermalReceiptLabels(language);
   const p = (value: string) => receiptPrintText(language, value);
@@ -273,17 +277,21 @@ export function buildThermalReceiptHtml(
     thanks: p(labels.thanks),
     kitchenBanner: p(labels.kitchenBanner),
     kitchenCopy: p(labels.kitchenCopy),
+    barBanner: p(labels.barBanner),
+    barCopy: p(labels.barCopy),
   };
 
   const company = p(data.companyName);
-  const titleSuffix = isKitchen ? "KITCHEN" : d.orderNo;
-  const headerBanner = isKitchen
-    ? `<div class="center bold big" style="margin:6px 0;">${L.kitchenBanner}</div>
+  const titleSuffix = isBar ? "BAR" : isTicket ? "KITCHEN" : d.orderNo;
+  const ticketBanner = isBar ? L.barBanner : L.kitchenBanner;
+  const ticketCopy = isBar ? L.barCopy : L.kitchenCopy;
+  const headerBanner = isTicket
+    ? `<div class="center bold big" style="margin:6px 0;">${ticketBanner}</div>
        <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `${L.table}: ${d.tableLabel}` : ""}</div>`
     : "";
   const footer = receiptPrintText(language, data.siteFooter ?? "app.inflero.com");
   const logo =
-    !isKitchen && data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
+    !isTicket && data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
 
   return `<!DOCTYPE html>
 <html lang="${language}">
@@ -298,31 +306,31 @@ export function buildThermalReceiptHtml(
   <div class="divider-solid"></div>
   <div class="row"><span class="label">${L.order}:</span><span>${d.orderNo}</span></div>
   <div class="row"><span class="label">${L.date}:</span><span>${d.date}</span></div>
-  ${d.tableLabel && !isKitchen ? `<div class="row"><span class="label">${L.table}:</span><span>${d.tableLabel}</span></div>` : ""}
+  ${d.tableLabel && !isTicket ? `<div class="row"><span class="label">${L.table}:</span><span>${d.tableLabel}</span></div>` : ""}
   <div class="divider"></div>
   <div class="row"><span class="label">${L.customer}:</span><span>${d.customer}</span></div>
-  ${!isKitchen ? `<div class="row"><span class="label">${L.phone}:</span><span>${d.customerPhone}</span></div>` : ""}
-  ${d.vehicle && !isKitchen ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
-  ${d.mileage != null && !isKitchen ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
+  ${!isTicket ? `<div class="row"><span class="label">${L.phone}:</span><span>${d.customerPhone}</span></div>` : ""}
+  ${d.vehicle && !isTicket ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
+  ${d.mileage != null && !isTicket ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
   <div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>
   <div class="divider-solid"></div>
-  <div class="section-title">${isKitchen ? L.orderItems : L.products}</div>
+  <div class="section-title">${isTicket ? L.orderItems : L.products}</div>
   ${d.items
     .map(
       (it) => `
     <div class="row-item">
       <div class="name">${it.name}</div>
       <div class="nums">
-        <span>${isKitchen ? `x ${it.qty}` : `${it.qty} x ${it.price.toFixed(2)} AZN`}</span>
-        ${isKitchen ? "" : `<span>${(it.qty * it.price).toFixed(2)} AZN</span>`}
+        <span>${isTicket ? `x ${it.qty}` : `${it.qty} x ${it.price.toFixed(2)} AZN`}</span>
+        ${isTicket ? "" : `<span>${(it.qty * it.price).toFixed(2)} AZN</span>`}
       </div>
     </div>`,
     )
     .join("")}
   <div class="divider"></div>
   ${
-    isKitchen
-      ? `<div class="center" style="margin-top:8px;font-weight:600;">${L.kitchenCopy}</div>`
+    isTicket
+      ? `<div class="center" style="margin-top:8px;font-weight:600;">${ticketCopy}</div>`
       : `
   <div class="row"><span class="label">${L.subtotal}:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
   <div class="row"><span class="label">${L.shipping}:</span><span>${d.shipping.toFixed(2)} AZN</span></div>

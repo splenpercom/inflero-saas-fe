@@ -9,23 +9,52 @@ import {
   type ThermalReceiptPayload,
 } from "./thermalReceipt";
 
-export type PosPrintRole = "receipt" | "kot";
+export type PosPrintRole = "receipt" | "kot" | "bar";
 
+/**
+ * Browser print without window.open — popups are blocked after async API calls.
+ * Uses a temporary hidden iframe so the print dialog still opens reliably.
+ */
 function browserPrintHtml(html: string): void {
-  const printWin = window.open("", "_blank", "width=340,height=700");
-  if (!printWin) {
-    throw new Error("Popup blocked — allow popups to print");
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText =
+    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) {
+    iframe.remove();
+    throw new Error("Unable to open print frame");
   }
-  printWin.document.write(html);
-  printWin.document.close();
-  printWin.focus();
-  window.setTimeout(() => {
-    printWin.print();
-    printWin.close();
-  }, 400);
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  const cleanup = () => {
+    try {
+      iframe.remove();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const runPrint = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } finally {
+      // Give the print dialog a moment before tearing down the frame.
+      window.setTimeout(cleanup, 1000);
+    }
+  };
+
+  // Wait for document + images so thermal logo/layout is ready.
+  window.setTimeout(runPrint, 400);
 }
 
-/** Resolve QZ target: KOT falls back to receipt printer when kitchen is unmapped. */
+/** Resolve QZ target: KOT → kitchen (fallback receipt); bar/receipt → billing printer. */
 export function resolvePosPrinterName(role: PosPrintRole): string {
   const settings = loadPosPrinterSettings();
   const receipt = settings.receiptPrinter.trim();
@@ -35,7 +64,7 @@ export function resolvePosPrinterName(role: PosPrintRole): string {
 }
 
 /**
- * Print receipt or KOT ticket.
+ * Print receipt, KOT, or Bar ticket.
  * Uses mapped QZ printer when available + configured; otherwise browser print dialog.
  */
 export async function printPosTicket(opts: {
@@ -46,7 +75,8 @@ export async function printPosTicket(opts: {
   forceBrowser?: boolean;
 }): Promise<{ channel: "qz" | "browser"; printer?: string }> {
   const settings = loadPosPrinterSettings();
-  const copy = opts.role === "kot" ? "kitchen" : "customer";
+  const copy =
+    opts.role === "kot" ? "kitchen" : opts.role === "bar" ? "bar" : "customer";
   const html = buildThermalReceiptHtml(opts.payload, {
     language: opts.language,
     copy,

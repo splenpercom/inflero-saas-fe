@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { cn } from "../ui/utils";
 import {
   Search,
@@ -17,10 +17,11 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
+  Columns3,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation, useSearchParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
@@ -33,6 +34,7 @@ import {
   type BrandRecord,
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
+import { rememberProductsListReturn } from "../../lib/productsNavigation";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
@@ -55,9 +57,45 @@ interface Product {
 type SortField = "category" | "brand" | "price" | "quantity" | "createdBy";
 type SortDirection = "asc" | "desc" | null;
 
+type ProductsColumnKey =
+  | "sku"
+  | "productName"
+  | "category"
+  | "brand"
+  | "price"
+  | "unit"
+  | "quantity"
+  | "createdBy";
+
+const PRODUCTS_COLUMNS_STORAGE_KEY = "inflero-products-visible-columns";
+
+const DEFAULT_PRODUCTS_COLUMNS: Record<ProductsColumnKey, boolean> = {
+  sku: true,
+  productName: true,
+  category: true,
+  brand: true,
+  price: true,
+  unit: true,
+  quantity: true,
+  createdBy: true,
+};
+
+function loadProductsColumns(): Record<ProductsColumnKey, boolean> {
+  try {
+    const raw = localStorage.getItem(PRODUCTS_COLUMNS_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_PRODUCTS_COLUMNS };
+    const parsed = JSON.parse(raw) as Partial<Record<ProductsColumnKey, boolean>>;
+    return { ...DEFAULT_PRODUCTS_COLUMNS, ...parsed };
+  } catch {
+    return { ...DEFAULT_PRODUCTS_COLUMNS };
+  }
+}
+
 export function Products() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Inventory");
@@ -98,16 +136,21 @@ export function Products() {
       close: { en: "Close", az: "Bağla" },
       productsImported: { en: "Products imported successfully!", az: "Məhsullar uğurla idxal edildi!" },
       select: { en: "Select", az: "Seç" },
+      columns: { en: "Columns", az: "Sütunlar" },
     };
     return mapLang(language, translations[key], key);
   };
   
-  // Search and filter states
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedBrand, setSelectedBrand] = useState("all");
+  // Search and filter states (restored from URL so edit/view return keeps page)
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "");
+  const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get("category") ?? "all");
+  const [selectedBrand, setSelectedBrand] = useState(() => searchParams.get("brand") ?? "all");
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Record<ProductsColumnKey, boolean>>(loadProductsColumns);
+  const columnsMenuRef = useRef<HTMLDivElement | null>(null);
+  const skipPageResetRef = useRef(true);
 
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -127,11 +170,24 @@ export function Products() {
   const [categories, setCategories] = useState<CategoryRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => {
+    const p = Number.parseInt(searchParams.get("page") ?? "1", 10);
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  });
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("q") ?? "");
   const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
+
+  const listReturnTo = useMemo(() => {
+    const next = new URLSearchParams();
+    if (debouncedSearch.trim()) next.set("q", debouncedSearch.trim());
+    if (selectedCategory !== "all") next.set("category", selectedCategory);
+    if (selectedBrand !== "all") next.set("brand", selectedBrand);
+    if (currentPage > 1) next.set("page", String(currentPage));
+    const qs = next.toString();
+    return qs ? `${location.pathname}?${qs}` : location.pathname;
+  }, [location.pathname, debouncedSearch, selectedCategory, selectedBrand, currentPage]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -139,8 +195,74 @@ export function Products() {
   }, [searchQuery]);
 
   useEffect(() => {
+    if (skipPageResetRef.current) {
+      skipPageResetRef.current = false;
+      return;
+    }
     setCurrentPage(1);
   }, [debouncedSearch, selectedCategory, selectedBrand]);
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (debouncedSearch.trim()) next.set("q", debouncedSearch.trim());
+    if (selectedCategory !== "all") next.set("category", selectedCategory);
+    if (selectedBrand !== "all") next.set("brand", selectedBrand);
+    if (currentPage > 1) next.set("page", String(currentPage));
+    const nextStr = next.toString();
+    if (nextStr !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [debouncedSearch, selectedCategory, selectedBrand, currentPage, searchParams, setSearchParams]);
+
+  const col = (key: ProductsColumnKey) => visibleColumns[key];
+
+  const toggleColumn = (key: ProductsColumnKey) => {
+    setVisibleColumns((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(PRODUCTS_COLUMNS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const columnLabels = useMemo(
+    (): { key: ProductsColumnKey; label: string; available: boolean }[] => [
+      { key: "sku", label: pt("sku"), available: true },
+      { key: "productName", label: pt("productName"), available: true },
+      { key: "category", label: pt("category"), available: true },
+      { key: "brand", label: pt("brand"), available: true },
+      { key: "price", label: pt("price"), available: true },
+      { key: "unit", label: pt("unit"), available: true },
+      { key: "quantity", label: pt("qty"), available: stockEnabled },
+      { key: "createdBy", label: pt("createdBy"), available: true },
+    ],
+    [language, stockEnabled],
+  );
+
+  useEffect(() => {
+    if (!columnsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (columnsMenuRef.current && !columnsMenuRef.current.contains(e.target as Node)) {
+        setColumnsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [columnsOpen]);
+
+  const visibleColCount =
+    (col("sku") ? 1 : 0) +
+    (col("productName") ? 1 : 0) +
+    (col("category") ? 1 : 0) +
+    (col("brand") ? 1 : 0) +
+    (col("price") ? 1 : 0) +
+    (col("unit") ? 1 : 0) +
+    (stockEnabled && col("quantity") ? 1 : 0) +
+    (col("createdBy") ? 1 : 0) +
+    1; // actions
 
   const loadFilterOptions = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) return;
@@ -185,7 +307,7 @@ export function Products() {
         brand: item.brand,
         price: parsePrice(item.price),
         unit: item.unit,
-        quantity: item.quantity,
+        quantity: item.quantity ?? 0,
         createdBy: item.createdBy,
         createdById: item.createdById,
       }));
@@ -345,11 +467,13 @@ export function Products() {
   };
 
   const handleView = (productId: string) => {
-    navigate(`/dashboard/inventory/products/${productId}`);
+    rememberProductsListReturn(listReturnTo);
+    navigate(`/dashboard/inventory/products/${productId}`, { state: { returnTo: listReturnTo } });
   };
 
   const handleEdit = (productId: string) => {
-    navigate(`/dashboard/inventory/products/${productId}/edit`);
+    rememberProductsListReturn(listReturnTo);
+    navigate(`/dashboard/inventory/products/${productId}/edit`, { state: { returnTo: listReturnTo } });
   };
 
   const handleDeleteClick = (productId: string) => {
@@ -461,21 +585,22 @@ export function Products() {
             {/* Filters */}
             <div className="flex gap-2">
               {/* Category Dropdown */}
-              <div className="relative">
+              <div className="relative w-[140px] shrink-0">
                 <button
                   onClick={() => {
                     setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
                     setIsBrandDropdownOpen(false);
                   }}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors min-w-[120px]",
+                    "flex w-full items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
                     selectedCategory === "all" 
                       ? "border border-gray-300 dark:border-gray-700" 
                       : "border-2 border-[#14b8a6] dark:border-[#14b8a6]"
                   )}
+                  title={selectedCategoryLabel}
                 >
-                  <span className="flex-1 text-left">{selectedCategoryLabel}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="flex-1 min-w-0 truncate text-left">{selectedCategoryLabel}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 </button>
                 
                 {isCategoryDropdownOpen && (
@@ -484,7 +609,7 @@ export function Products() {
                       className="fixed inset-0 z-10"
                       onClick={() => setIsCategoryDropdownOpen(false)}
                     />
-                    <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[260px] max-h-60 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20">
                       <button
                         onClick={() => {
                           setSelectedCategory("all");
@@ -508,8 +633,9 @@ export function Products() {
                             "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors text-gray-700 dark:text-gray-300",
                             selectedCategory === category.id && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
                           )}
+                          title={category.name}
                         >
-                          {category.name}
+                          <span className="block truncate">{category.name}</span>
                         </button>
                       ))}
                     </div>
@@ -518,16 +644,22 @@ export function Products() {
               </div>
 
               {/* Brand Dropdown */}
-              <div className="relative">
+              <div className="relative w-[140px] shrink-0">
                 <button
                   onClick={() => {
                     setIsBrandDropdownOpen(!isBrandDropdownOpen);
                     setIsCategoryDropdownOpen(false);
                   }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors min-w-[100px]"
+                  className={cn(
+                    "flex w-full items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
+                    selectedBrand === "all"
+                      ? "border border-gray-300 dark:border-gray-700"
+                      : "border-2 border-[#14b8a6] dark:border-[#14b8a6]",
+                  )}
+                  title={selectedBrandLabel}
                 >
-                  <span className="flex-1 text-left">{selectedBrandLabel}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="flex-1 min-w-0 truncate text-left">{selectedBrandLabel}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 </button>
                 
                 {isBrandDropdownOpen && (
@@ -536,7 +668,7 @@ export function Products() {
                       className="fixed inset-0 z-10"
                       onClick={() => setIsBrandDropdownOpen(false)}
                     />
-                    <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[260px] max-h-60 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20">
                       <button
                         onClick={() => {
                           setSelectedBrand("all");
@@ -560,8 +692,9 @@ export function Products() {
                             "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors text-gray-700 dark:text-gray-300",
                             selectedBrand === brand.id && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
                           )}
+                          title={brand.name}
                         >
-                          {brand.name}
+                          <span className="block truncate">{brand.name}</span>
                         </button>
                       ))}
                     </div>
@@ -572,6 +705,40 @@ export function Products() {
 
             {/* Action Buttons */}
             <div className="flex gap-2">
+              <div className="relative" ref={columnsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setColumnsOpen((v) => !v)}
+                  className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  title={pt("columns")}
+                >
+                  <Columns3 className="w-3.5 h-3.5" />
+                </button>
+                {columnsOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-30 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 max-h-72 overflow-y-auto">
+                    <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-gray-400">
+                      {pt("columns")}
+                    </p>
+                    {columnLabels
+                      .filter((c) => c.available)
+                      .map((c) => (
+                        <label
+                          key={c.key}
+                          className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={visibleColumns[c.key]}
+                            onChange={() => toggleColumn(c.key)}
+                            className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                          />
+                          {c.label}
+                        </label>
+                      ))}
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={handleExportPDF}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -628,12 +795,17 @@ export function Products() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                  {col("sku") && (
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                     {pt("sku")}
                   </th>
+                  )}
+                  {col("productName") && (
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                     {pt("productName")}
                   </th>
+                  )}
+                  {col("category") && (
                   <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
                     onClick={() => handleSort("category")}
@@ -651,6 +823,8 @@ export function Products() {
                       )}
                     </div>
                   </th>
+                  )}
+                  {col("brand") && (
                   <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
                     onClick={() => handleSort("brand")}
@@ -668,6 +842,8 @@ export function Products() {
                       )}
                     </div>
                   </th>
+                  )}
+                  {col("price") && (
                   <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
                     onClick={() => handleSort("price")}
@@ -685,10 +861,14 @@ export function Products() {
                       )}
                     </div>
                   </th>
+                  )}
+                  {col("unit") && (
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                     {pt("unit")}
                   </th>
-                  {stockEnabled && <th
+                  )}
+                  {stockEnabled && col("quantity") && (
+                  <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
                     onClick={() => handleSort("quantity")}
                   >
@@ -704,7 +884,9 @@ export function Products() {
                         <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-50" />
                       )}
                     </div>
-                  </th>}
+                  </th>
+                  )}
+                  {col("createdBy") && (
                   <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
                     onClick={() => handleSort("createdBy")}
@@ -722,6 +904,7 @@ export function Products() {
                       )}
                     </div>
                   </th>
+                  )}
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                     {pt("actions")}
                   </th>
@@ -730,13 +913,13 @@ export function Products() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={stockEnabled ? 9 : 8} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <td colSpan={visibleColCount} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                       {pickLang(language, "Yüklənir...", "Loading...")}
                     </td>
                   </tr>
                 ) : paginatedProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={stockEnabled ? 9 : 8} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <td colSpan={visibleColCount} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                       {pickLang(language, "Məhsul tapılmadı", "No products found")}
                     </td>
                   </tr>
@@ -750,9 +933,12 @@ export function Products() {
                         : "bg-gray-50 dark:bg-gray-800/30"
                     }`}
                   >
+                    {col("sku") && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {product.sku}
                     </td>
+                    )}
+                    {col("productName") && (
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-sm border border-gray-300 dark:border-gray-700 overflow-hidden">
@@ -767,23 +953,35 @@ export function Products() {
                         </span>
                       </div>
                     </td>
+                    )}
+                    {col("category") && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {product.category}
                     </td>
+                    )}
+                    {col("brand") && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {product.brand}
                     </td>
+                    )}
+                    {col("price") && (
                     <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium whitespace-nowrap">
                       {product.price} ₼
                     </td>
+                    )}
+                    {col("unit") && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {product.unit}
                     </td>
-                    {stockEnabled && <td className="px-3 py-2 whitespace-nowrap">
+                    )}
+                    {stockEnabled && col("quantity") && (
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700">
                         {product.quantity}
                       </span>
-                    </td>}
+                    </td>
+                    )}
+                    {col("createdBy") && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       <button
                         onClick={() => navigate("/staff")}
@@ -792,6 +990,7 @@ export function Products() {
                         {product.createdBy}
                       </button>
                     </td>
+                    )}
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button

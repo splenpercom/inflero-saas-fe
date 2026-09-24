@@ -16,6 +16,29 @@ export const DEFAULT_SERVICE_TYPES: ServiceTypeOption[] = [
   { value: "other", label: "Other", labelAz: "Digər", labelTr: "Diğer" },
 ];
 
+/** Stable reservation slug for an inventory SERVICE product. */
+export function inventoryServiceValue(productId: string): string {
+  return `svc:${productId}`;
+}
+
+export function inventoryServiceOption(productId: string, name: string): ServiceTypeOption {
+  return {
+    value: inventoryServiceValue(productId),
+    label: name,
+    labelAz: name,
+  };
+}
+
+/** Settings types first, then inventory services (deduped by value). */
+export function mergeServiceTypeOptions(
+  settings: ServiceTypeOption[],
+  inventory: ServiceTypeOption[],
+): ServiceTypeOption[] {
+  const seen = new Set(settings.map((s) => s.value));
+  const extra = inventory.filter((s) => !seen.has(s.value));
+  return [...settings, ...extra];
+}
+
 export function serviceLabelFor(
   value: string,
   language: "en" | "az" | "tr",

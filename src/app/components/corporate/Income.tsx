@@ -295,33 +295,35 @@ export function Income() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-wrap">
-            <div className="flex-1 relative max-w-xs">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[180px] max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input type="text" placeholder={tr("Axtar...", "Search...")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
             </div>
-            <div className="flex gap-2 ml-auto flex-wrap">
-              <DateInput value={dateFrom} onChange={setDateFrom} className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
-              <DateInput value={dateTo} onChange={setDateTo} className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
-              <ModernSelect
-                value={selectedStore}
-                onChange={setSelectedStore}
-                options={[
-                  { value: "all", label: tr("Mağaza", "Store") },
-                  ...branches.map((b) => ({ value: b.id, label: b.name })),
-                ]}
-                placeholder={tr("Mağaza", "Store")}
-              />
-              <ModernSelect
-                value={selectedCategory}
-                onChange={setSelectedCategory}
-                options={[
-                  { value: "all", label: tr("Kateqoriya", "Category") },
-                  ...categories.map((c) => ({ value: c.id, label: c.name })),
-                ]}
-                placeholder={tr("Kateqoriya", "Category")}
-              />
-            </div>
+            <DateInput value={dateFrom} onChange={setDateFrom} className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+            <DateInput value={dateTo} onChange={setDateTo} className="px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+            <ModernSelect
+              value={selectedStore}
+              onChange={setSelectedStore}
+              className="w-[140px]"
+              minWidth={140}
+              options={[
+                { value: "all", label: tr("Mağaza", "Store") },
+                ...branches.map((b) => ({ value: b.id, label: b.name })),
+              ]}
+              placeholder={tr("Mağaza", "Store")}
+            />
+            <ModernSelect
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              className="w-[140px]"
+              minWidth={140}
+              options={[
+                { value: "all", label: tr("Kateqoriya", "Category") },
+                ...categories.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              placeholder={tr("Kateqoriya", "Category")}
+            />
           </div>
         </div>
 

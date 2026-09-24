@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import {
   ShoppingCart,
@@ -27,6 +27,166 @@ import {
   fetchPublicDiningMenu,
 } from "../../../../app/api/publicDining";
 import { ApiError } from "../../../../app/api/client";
+
+type QrLang = "az" | "en" | "ru";
+
+const QR_LANG_KEY = "inflero-qr-menu-lang";
+
+const QR_STRINGS = {
+  az: {
+    menu: "Menyu",
+    scanOrderEnjoy: "Skan · Sifariş · Ləzzət",
+    detailsUnpublished: "Restoran məlumatları hələ dərc edilməyib.",
+    freeWifi: "Pulsuz Wi‑Fi",
+    network: "Şəbəkə",
+    password: "Şifrə",
+    yourOrder: "Sifarişiniz",
+    each: "ədəd",
+    total: "Cəmi",
+    sending: "Göndərilir…",
+    placeOrder: "Sifariş ver",
+    paymentNote: "Ödəniş kassada · mətbəxə bildiriş",
+    orderConfirmed: "Sifariş təsdiqləndi",
+    orderSent: "Sifariş mətbəxə göndərildi!",
+    sitBack: "Rahat oturun və gözləyin.",
+    yourBill: "Hesabınız",
+    counter: "Kassa",
+    payAtCounter: "Hazır olanda kassada ödəyin.",
+    backToMenu: "Menyuya qayıt",
+    bookTable: "Masa bron et",
+    menuUnavailable: "Menyu əlçatan deyil",
+    notPublishedYet: "Bu restoran hələ menyu dərc etməyib.",
+    missingLink: "Restoran keçidi yoxdur",
+    menuNotPublished: "Menyu hələ dərc edilməyib",
+    menuNotPublishedHint:
+      "Bu restoran rəqəmsal menyuya məhsul əlavə etməyib. Zəhmət olmasa işçidən çap menyusu istəyin və ya sonra yenidən yoxlayın.",
+    available: "mövcud",
+    unavailable: "Mövcud deyil",
+    add: "Əlavə et",
+    viewOrder: "Sifarişə bax",
+    orderSentToast: "Sifariş mətbəxə göndərildi",
+    language: "Dil",
+  },
+  en: {
+    menu: "Menu",
+    scanOrderEnjoy: "Scan · Order · Enjoy",
+    detailsUnpublished: "Restaurant details haven’t been published yet.",
+    freeWifi: "Free WiFi",
+    network: "Network",
+    password: "Password",
+    yourOrder: "Your Order",
+    each: "each",
+    total: "Total",
+    sending: "Sending…",
+    placeOrder: "Place Order",
+    paymentNote: "Payment at counter · kitchen notified",
+    orderConfirmed: "Order confirmed",
+    orderSent: "Order Sent to Kitchen!",
+    sitBack: "Sit back and relax.",
+    yourBill: "Your Bill",
+    counter: "Counter",
+    payAtCounter: "Please pay at the counter when ready.",
+    backToMenu: "Back to menu",
+    bookTable: "Book a table",
+    menuUnavailable: "Menu unavailable",
+    notPublishedYet: "This restaurant hasn’t published a menu yet.",
+    missingLink: "Missing restaurant link",
+    menuNotPublished: "Menu not published yet",
+    menuNotPublishedHint:
+      "This restaurant hasn’t added items to the digital menu. Please ask staff for a printed menu, or check back later.",
+    available: "available",
+    unavailable: "Unavailable",
+    add: "Add",
+    viewOrder: "View Order",
+    orderSentToast: "Order sent to kitchen",
+    language: "Language",
+  },
+  ru: {
+    menu: "Меню",
+    scanOrderEnjoy: "Скан · Заказ · Наслаждайтесь",
+    detailsUnpublished: "Данные ресторана ещё не опубликованы.",
+    freeWifi: "Бесплатный Wi‑Fi",
+    network: "Сеть",
+    password: "Пароль",
+    yourOrder: "Ваш заказ",
+    each: "шт.",
+    total: "Итого",
+    sending: "Отправка…",
+    placeOrder: "Оформить заказ",
+    paymentNote: "Оплата на кассе · кухня уведомлена",
+    orderConfirmed: "Заказ подтверждён",
+    orderSent: "Заказ отправлен на кухню!",
+    sitBack: "Расслабьтесь и подождите.",
+    yourBill: "Ваш счёт",
+    counter: "Касса",
+    payAtCounter: "Оплатите на кассе, когда будете готовы.",
+    backToMenu: "Назад в меню",
+    bookTable: "Забронировать стол",
+    menuUnavailable: "Меню недоступно",
+    notPublishedYet: "Этот ресторан ещё не опубликовал меню.",
+    missingLink: "Ссылка на ресторан отсутствует",
+    menuNotPublished: "Меню ещё не опубликовано",
+    menuNotPublishedHint:
+      "Ресторан ещё не добавил блюда в цифровое меню. Попросите печатное меню у персонала или зайдите позже.",
+    available: "доступно",
+    unavailable: "Недоступно",
+    add: "Добавить",
+    viewOrder: "К заказу",
+    orderSentToast: "Заказ отправлен на кухню",
+    language: "Язык",
+  },
+} as const;
+
+type QrStringKey = keyof typeof QR_STRINGS.az;
+
+function readQrLang(searchParams: URLSearchParams): QrLang {
+  const fromUrl = searchParams.get("lang");
+  if (fromUrl === "az" || fromUrl === "en" || fromUrl === "ru") return fromUrl;
+  try {
+    const saved = sessionStorage.getItem(QR_LANG_KEY);
+    if (saved === "az" || saved === "en" || saved === "ru") return saved;
+  } catch {
+    /* ignore */
+  }
+  return "az";
+}
+
+function LangSwitcher({
+  lang,
+  onChange,
+}: {
+  lang: QrLang;
+  onChange: (lang: QrLang) => void;
+}) {
+  const options: { id: QrLang; label: string }[] = [
+    { id: "az", label: "AZ" },
+    { id: "en", label: "EN" },
+    { id: "ru", label: "RU" },
+  ];
+  return (
+    <div
+      className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 flex-shrink-0"
+      role="group"
+      aria-label="Language"
+    >
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          style={{ touchAction: "manipulation", minHeight: "28px" }}
+          className={`px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${
+            lang === o.id
+              ? "bg-[#14b8a6] text-white shadow-sm"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type MenuItem = {
   productId: string;
@@ -65,31 +225,22 @@ const CAT_COLORS = [
   "from-teal-400 to-cyan-400",
 ];
 
-const CAT_ICONS = ["🍳", "🍽️", "🍰", "🥤", "🥗", "🍕", "🍜", "☕"];
-
 function errMsg(err: unknown) {
   if (err instanceof ApiError) return err.message;
   if (err instanceof Error) return err.message;
   return "Request failed";
 }
 
-function catIcon(name: string, idx: number) {
-  const n = name.toLowerCase();
-  if (n.includes("break")) return "🍳";
-  if (n.includes("main") || n.includes("lunch") || n.includes("dinner")) return "🍽️";
-  if (n.includes("dessert") || n.includes("sweet")) return "🍰";
-  if (n.includes("drink") || n.includes("beverage") || n.includes("coffee")) return "🥤";
-  return CAT_ICONS[idx % CAT_ICONS.length];
-}
-
 function VenueInfoCard({
   info,
   collapsed,
   onToggle,
+  t,
 }: {
   info: RestaurantInfo;
   collapsed: boolean;
   onToggle: () => void;
+  t: (key: QrStringKey) => string;
 }) {
   const [copied, setCopied] = useState<"ssid" | "pass" | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -140,9 +291,7 @@ function VenueInfoCard({
       {!collapsed && (
         <div className="px-4 py-3 space-y-2.5">
           {!hasDetails ? (
-            <p className="text-xs text-gray-500 text-center py-2">
-              Restaurant details haven’t been published yet.
-            </p>
+            <p className="text-xs text-gray-500 text-center py-2">{t("detailsUnpublished")}</p>
           ) : (
             <>
               {info.address && (
@@ -199,11 +348,11 @@ function VenueInfoCard({
                   <div className="flex items-center gap-1.5">
                     <Wifi className="w-3.5 h-3.5 text-gray-500" />
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                      Free WiFi
+                      {t("freeWifi")}
                     </span>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Network</p>
+                    <p className="text-[10px] text-gray-400 mb-0.5">{t("network")}</p>
                     <div className="flex items-center gap-1.5">
                       <p className="text-sm font-semibold text-gray-800 truncate">{info.wifiSsid}</p>
                       <button
@@ -223,7 +372,7 @@ function VenueInfoCard({
                   </div>
                   {wifiPassword && (
                     <div>
-                      <p className="text-[10px] text-gray-400 mb-0.5">Password</p>
+                      <p className="text-[10px] text-gray-400 mb-0.5">{t("password")}</p>
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-semibold text-gray-800 truncate font-mono tracking-wide">
                           {showPassword
@@ -276,6 +425,7 @@ function CartOverlay({
   onPlaceOrder,
   onInc,
   onDec,
+  t,
 }: {
   cart: CartLine[];
   placing: boolean;
@@ -283,6 +433,7 @@ function CartOverlay({
   onPlaceOrder: () => void;
   onInc: (productId: string) => void;
   onDec: (productId: string) => void;
+  t: (key: QrStringKey) => string;
 }) {
   const total = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
   return (
@@ -291,7 +442,7 @@ function CartOverlay({
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
-        <p className="text-sm font-bold text-gray-900">Your Order</p>
+        <p className="text-sm font-bold text-gray-900">{t("yourOrder")}</p>
         <button
           type="button"
           onClick={onClose}
@@ -310,7 +461,9 @@ function CartOverlay({
           >
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900">{c.item.name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{c.item.price.toFixed(2)} ₼ each</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {c.item.price.toFixed(2)} ₼ {t("each")}
+              </p>
             </div>
             <div className="flex items-center gap-1 bg-gray-50 rounded-xl p-0.5">
               <button
@@ -341,7 +494,7 @@ function CartOverlay({
         style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-bold text-gray-900">Total</span>
+          <span className="text-sm font-bold text-gray-900">{t("total")}</span>
           <span className="text-lg font-bold text-gray-900">{total.toFixed(2)} ₼</span>
         </div>
         <button
@@ -351,11 +504,9 @@ function CartOverlay({
           style={{ touchAction: "manipulation", minHeight: "50px" }}
           className="w-full rounded-2xl bg-[#14b8a6] active:bg-[#0d9488] text-white font-bold text-sm transition-colors disabled:opacity-50"
         >
-          {placing ? "Sending…" : "Place Order"}
+          {placing ? t("sending") : t("placeOrder")}
         </button>
-        <p className="text-[10px] text-center text-gray-400 mt-2">
-          Payment at counter · kitchen notified
-        </p>
+        <p className="text-[10px] text-center text-gray-400 mt-2">{t("paymentNote")}</p>
       </div>
     </div>
   );
@@ -368,6 +519,7 @@ function OrderConfirmScreen({
   orderRef,
   tenantSlug,
   onBack,
+  t,
 }: {
   items: CartLine[];
   tableLabel: string | null;
@@ -375,6 +527,7 @@ function OrderConfirmScreen({
   orderRef: string;
   tenantSlug: string;
   onBack: () => void;
+  t: (key: QrStringKey) => string;
 }) {
   const total = items.reduce((s, c) => s + c.item.price * c.qty, 0);
   return (
@@ -389,7 +542,7 @@ function OrderConfirmScreen({
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900">{restaurantName}</p>
-            <p className="text-[11px] text-gray-400">Order confirmed</p>
+            <p className="text-[11px] text-gray-400">{t("orderConfirmed")}</p>
           </div>
         </div>
       </div>
@@ -402,9 +555,10 @@ function OrderConfirmScreen({
           <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
             <Check className="w-7 h-7 text-green-600" />
           </div>
-          <p className="text-base font-bold text-gray-900 mb-1">Order Sent to Kitchen!</p>
+          <p className="text-base font-bold text-gray-900 mb-1">{t("orderSent")}</p>
           <p className="text-sm text-gray-500">
-            {tableLabel ? `${tableLabel} · ` : ""}Sit back and relax.
+            {tableLabel ? `${tableLabel} · ` : ""}
+            {t("sitBack")}
           </p>
           <p className="text-xs text-gray-400 mt-2 font-mono">Ref {orderRef}</p>
         </div>
@@ -413,9 +567,9 @@ function OrderConfirmScreen({
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <div className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-gray-400" />
-              <p className="text-sm font-bold text-gray-900">Your Bill</p>
+              <p className="text-sm font-bold text-gray-900">{t("yourBill")}</p>
             </div>
-            <p className="text-[10px] text-gray-400">{tableLabel || "Counter"}</p>
+            <p className="text-[10px] text-gray-400">{tableLabel || t("counter")}</p>
           </div>
           <div className="px-4 py-3 space-y-3">
             {items.map((c) => (
@@ -431,14 +585,12 @@ function OrderConfirmScreen({
             ))}
           </div>
           <div className="mx-4 py-3 border-t border-dashed border-gray-200 flex items-center justify-between">
-            <span className="text-sm font-bold text-gray-900">Total</span>
+            <span className="text-sm font-bold text-gray-900">{t("total")}</span>
             <span className="text-xl font-bold text-[#0f766e]">{total.toFixed(2)} ₼</span>
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 px-4">
-          Please pay at the counter when ready.
-        </p>
+        <p className="text-center text-xs text-gray-400 px-4">{t("payAtCounter")}</p>
       </div>
 
       <div
@@ -451,14 +603,14 @@ function OrderConfirmScreen({
           style={{ touchAction: "manipulation", minHeight: "44px" }}
           className="w-full rounded-2xl bg-[#14b8a6] text-white font-semibold text-sm"
         >
-          Order more
+          {t("backToMenu")}
         </button>
         <Link
           to={`/book/${tenantSlug}`}
           style={{ touchAction: "manipulation", minHeight: "44px" }}
           className="w-full rounded-2xl border border-gray-200 text-gray-600 font-medium text-sm flex items-center justify-center gap-1.5"
         >
-          <CalendarDays className="w-3.5 h-3.5" /> Book a table
+          <CalendarDays className="w-3.5 h-3.5" /> {t("bookTable")}
         </Link>
       </div>
     </div>
@@ -467,8 +619,23 @@ function OrderConfirmScreen({
 
 export function QRMenuSite() {
   const { tenantSlug, tableId } = useParams<{ tenantSlug: string; tableId?: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const branchCode = searchParams.get("branch") || undefined;
+  const [lang, setLang] = useState<QrLang>(() => readQrLang(searchParams));
+  const t = useCallback((key: QrStringKey) => QR_STRINGS[lang][key], [lang]);
+
+  const setLanguage = (next: QrLang) => {
+    setLang(next);
+    try {
+      sessionStorage.setItem(QR_LANG_KEY, next);
+    } catch {
+      /* ignore */
+    }
+    const params = new URLSearchParams(searchParams);
+    params.set("lang", next);
+    setSearchParams(params, { replace: true });
+  };
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<RestaurantInfo>({
@@ -494,7 +661,7 @@ export function QRMenuSite() {
 
   useEffect(() => {
     if (!tenantSlug) {
-      setError("Missing restaurant link");
+      setError("MISSING_LINK");
       setLoading(false);
       return;
     }
@@ -534,6 +701,13 @@ export function QRMenuSite() {
       }
     })();
   }, [tenantSlug, tableId, branchCode]);
+
+  useEffect(() => {
+    if (searchParams.get("lang") === lang) return;
+    const params = new URLSearchParams(searchParams);
+    params.set("lang", lang);
+    setSearchParams(params, { replace: true });
+  }, [lang, searchParams, setSearchParams]);
 
   const cartCount = useMemo(() => cart.reduce((s, c) => s + c.qty, 0), [cart]);
   const cartTotal = useMemo(
@@ -581,7 +755,7 @@ export function QRMenuSite() {
       setPlaced({ ref: res.reference || res.id, items: captured });
       setCart([]);
       setShowCart(false);
-      toast.success("Order sent to kitchen");
+      toast.success(t("orderSentToast"));
     } catch (err) {
       toast.error(errMsg(err));
     } finally {
@@ -599,12 +773,15 @@ export function QRMenuSite() {
 
   if (error || !tenantSlug) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 gap-4">
+        <div className="absolute top-3 right-3" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+          <LangSwitcher lang={lang} onChange={setLanguage} />
+        </div>
         <div className="text-center space-y-2 max-w-sm">
           <UtensilsCrossed className="w-8 h-8 text-gray-300 mx-auto" />
-          <p className="text-sm font-semibold text-gray-900">Menu unavailable</p>
+          <p className="text-sm font-semibold text-gray-900">{t("menuUnavailable")}</p>
           <p className="text-xs text-gray-500">
-            {error || "This restaurant hasn’t published a menu yet."}
+            {error === "MISSING_LINK" ? t("missingLink") : error || t("notPublishedYet")}
           </p>
         </div>
       </div>
@@ -620,6 +797,7 @@ export function QRMenuSite() {
         orderRef={placed.ref}
         tenantSlug={tenantSlug}
         onBack={() => setPlaced(null)}
+        t={t}
       />
     );
   }
@@ -646,10 +824,12 @@ export function QRMenuSite() {
                   <span className="truncate">{tableLabel}</span>
                 </p>
               ) : (
-                <p className="text-[11px] text-gray-400 leading-none mt-0.5">Scan · Order · Enjoy</p>
+                <p className="text-[11px] text-gray-400 leading-none mt-0.5">{t("scanOrderEnjoy")}</p>
               )}
             </div>
           </div>
+
+          <LangSwitcher lang={lang} onChange={setLanguage} />
 
           <button
             type="button"
@@ -672,21 +852,28 @@ export function QRMenuSite() {
             className="flex gap-2 px-3 pb-2.5 overflow-x-auto"
             style={{ scrollbarWidth: "none" }}
           >
-            {categories.map((cat, idx) => (
-              <a
+            {categories.map((cat) => (
+              <button
                 key={cat.id}
-                href={`#${cat.id}`}
-                onClick={() => setActiveCat(cat.id)}
+                type="button"
+                onClick={() => {
+                  setActiveCat(cat.id);
+                  const el = document.getElementById(cat.id);
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  } else {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
                 style={{ touchAction: "manipulation", minHeight: "30px", flexShrink: 0 }}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
                   activeCat === cat.id
                     ? "bg-[#14b8a6] border-[#14b8a6] text-white"
                     : "bg-white border-gray-200 text-gray-600"
                 }`}
               >
-                <span className="text-sm leading-none">{catIcon(cat.name, idx)}</span>
                 {cat.name}
-              </a>
+              </button>
             ))}
           </div>
         )}
@@ -697,15 +884,15 @@ export function QRMenuSite() {
           info={info}
           collapsed={infoCollapsed}
           onToggle={() => setInfoCollapsed((p) => !p)}
+          t={t}
         />
 
         {menuEmpty ? (
           <div className="mx-3 mt-4 mb-8 rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center space-y-2">
             <UtensilsCrossed className="w-8 h-8 text-gray-300 mx-auto" />
-            <p className="text-sm font-semibold text-gray-800">Menu not published yet</p>
+            <p className="text-sm font-semibold text-gray-800">{t("menuNotPublished")}</p>
             <p className="text-xs text-gray-500 max-w-xs mx-auto leading-relaxed">
-              This restaurant hasn’t added items to the digital menu. Please ask staff for a
-              printed menu, or check back later.
+              {t("menuNotPublishedHint")}
             </p>
             {info.phone && (
               <a
@@ -724,20 +911,20 @@ export function QRMenuSite() {
           >
             {categories.map((cat, catIdx) => {
               const available = cat.items.filter((i) => i.available).length;
-              const icon = catIcon(cat.name, catIdx);
               return (
-                <div key={cat.id} id={cat.id}>
+                <div
+                  key={cat.id}
+                  id={cat.id}
+                  style={{
+                    scrollMarginTop: `calc(${HEADER_H + 12}px + env(safe-area-inset-top, 0px))`,
+                  }}
+                >
                   <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className={`w-9 h-9 rounded-xl bg-gradient-to-br ${
-                        CAT_COLORS[catIdx % CAT_COLORS.length]
-                      } flex items-center justify-center text-lg flex-shrink-0`}
-                    >
-                      {icon}
-                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-gray-900">{cat.name}</p>
-                      <p className="text-[11px] text-gray-400">{available} available</p>
+                      <p className="text-[11px] text-gray-400">
+                        {available} {t("available")}
+                      </p>
                     </div>
                     <span className="text-xs font-semibold text-gray-400">{cat.items.length}</span>
                   </div>
@@ -766,7 +953,7 @@ export function QRMenuSite() {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-2xl">{icon}</span>
+                              <span className="text-2xl opacity-40">🍽</span>
                             )}
                           </div>
 
@@ -785,7 +972,7 @@ export function QRMenuSite() {
                               )}
                               {!item.available && (
                                 <span className="inline-block mt-1 text-[10px] font-semibold text-red-400 bg-red-50 px-1.5 py-0.5 rounded">
-                                  Unavailable
+                                  {t("unavailable")}
                                 </span>
                               )}
                             </div>
@@ -802,7 +989,7 @@ export function QRMenuSite() {
                                     style={{ touchAction: "manipulation", minHeight: "30px" }}
                                     className="flex items-center gap-1 px-3 py-1 rounded-xl bg-[#14b8a6] active:bg-[#0d9488] text-white text-xs font-bold transition-colors"
                                   >
-                                    <Plus className="w-3 h-3" /> Add
+                                    <Plus className="w-3 h-3" /> {t("add")}
                                   </button>
                                 ) : (
                                   <div className="flex items-center gap-1 bg-gray-50 rounded-xl p-0.5">
@@ -862,7 +1049,7 @@ export function QRMenuSite() {
             <span className="bg-white/25 rounded-lg w-7 h-7 flex items-center justify-center text-xs font-bold">
               {cartCount}
             </span>
-            <span className="text-sm">View Order</span>
+            <span className="text-sm">{t("viewOrder")}</span>
             <span className="font-bold">{cartTotal.toFixed(2)} ₼</span>
           </button>
         </div>
@@ -879,6 +1066,7 @@ export function QRMenuSite() {
             if (line) addToCart(line.item);
           }}
           onDec={removeFromCart}
+          t={t}
         />
       )}
     </div>

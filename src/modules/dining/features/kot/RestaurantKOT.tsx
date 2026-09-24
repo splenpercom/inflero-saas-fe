@@ -30,6 +30,7 @@ interface UiKotOrder {
   status: KOTStatus;
   expected: KotOrder["kotStatus"];
   source: string;
+  sentToBar: boolean;
   items: KOTItem[];
   placedAt: Date;
   updatedAt: Date;
@@ -134,6 +135,7 @@ function mapOrder(o: KotOrder): UiKotOrder {
     status,
     expected: o.kotStatus,
     source: o.source,
+    sentToBar: o.sentToBar === true,
     items: o.items.map((i) => ({ name: i.name, qty: i.qty })),
     placedAt: new Date(placed),
     updatedAt: new Date(updated),
@@ -171,8 +173,14 @@ function KOTCard({
           <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400 flex-shrink-0">
             {order.orderNumber}
           </span>
-          <span className="text-[9px] text-gray-400 flex-shrink-0">
-            {order.source === "QR_MENU" ? "QR" : "POS"}
+          <span
+            className={`text-[9px] font-semibold flex-shrink-0 px-1 py-0.5 rounded ${
+              order.sentToBar
+                ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-200"
+                : "text-gray-400"
+            }`}
+          >
+            {order.sentToBar ? "BAR" : order.source === "QR_MENU" ? "QR" : "POS"}
           </span>
         </div>
         {isUrgent && (

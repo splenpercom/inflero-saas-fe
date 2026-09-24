@@ -36,6 +36,7 @@ export interface PosOrderListRow {
   storeName?: string | null;
   source?: string;
   kotStatus?: string | null;
+  sentToBar?: boolean;
   productionStatus?: string | null;
   table?: { id: string; number: number; name: string } | null;
   /** Present when source === WEB */
@@ -110,6 +111,7 @@ export interface PosOrderDetail {
   kotStatus?: string | null;
   kotSentAt?: string | null;
   kotUpdatedAt?: string | null;
+  sentToBar?: boolean;
   productionStatus?: ProductionStatusApi | null;
   productionSentAt?: string | null;
   productionUpdatedAt?: string | null;
@@ -393,6 +395,12 @@ export async function posCheckout(body: CreatePosOrderBody) {
 /** Complete sale and send to digital kitchen board (DINING). Paper KOT is printed by the client. */
 export async function sendPosOrderToKot(body: CreatePosOrderBody) {
   const res = await apiPost<{ success: boolean; data: PosOrderDetail }>("/tenant/sales/pos/send-to-kot", body);
+  return res.data;
+}
+
+/** Same as KOT flow, tagged BAR; client prints via billing/receipt printer. */
+export async function sendPosOrderToBar(body: CreatePosOrderBody) {
+  const res = await apiPost<{ success: boolean; data: PosOrderDetail }>("/tenant/sales/pos/send-to-bar", body);
   return res.data;
 }
 

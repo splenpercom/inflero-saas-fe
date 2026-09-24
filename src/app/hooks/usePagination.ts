@@ -1,5 +1,10 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 
+/** Default page size for list tables across the platform. */
+export const DEFAULT_LIST_PAGE_SIZE = 20;
+/** Default page size for report tables. */
+export const DEFAULT_REPORT_PAGE_SIZE = 20;
+
 interface UsePaginationProps<T> {
   data: T[];
   itemsPerPage?: number;
@@ -22,7 +27,7 @@ interface UsePaginationReturn<T> {
 
 export function usePagination<T>({
   data,
-  itemsPerPage = 10,
+  itemsPerPage = DEFAULT_LIST_PAGE_SIZE,
   resetKey,
 }: UsePaginationProps<T>): UsePaginationReturn<T> {
   const [currentPage, setCurrentPageState] = useState(1);
@@ -90,14 +95,14 @@ export interface ServerPaginationState {
 }
 
 /** Server-driven page state. Persist page across reload; reset via resetToFirstPage on filter change. */
-export function useServerPagination(pageSize = 10): ServerPaginationState {
+export function useServerPagination(pageSize = DEFAULT_LIST_PAGE_SIZE): ServerPaginationState {
   const [currentPage, setCurrentPageState] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
   const setTotals = useCallback(
     (items: number, pages?: number) => {
-        const nextPages = Math.max(1, pages ?? (Math.ceil(items / pageSize) || 1));
+      const nextPages = Math.max(1, pages ?? (Math.ceil(items / pageSize) || 1));
       setTotalItems(items);
       setTotalPages(nextPages);
       setCurrentPageState((prev) => Math.min(Math.max(1, prev), nextPages));
@@ -126,6 +131,3 @@ export function useServerPagination(pageSize = 10): ServerPaginationState {
     resetToFirstPage,
   };
 }
-
-export const DEFAULT_LIST_PAGE_SIZE = 10;
-export const DEFAULT_REPORT_PAGE_SIZE = 20;

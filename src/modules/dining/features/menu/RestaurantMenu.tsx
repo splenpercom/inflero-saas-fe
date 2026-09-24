@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useNavigate } from "react-router";
 import { useLanguage } from "../../i18n";
 import { toast } from "sonner";
-import { Search, UtensilsCrossed, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, UtensilsCrossed, RefreshCw, ChevronDown, ChevronRight, CheckSquare, Square } from "lucide-react";
 import {
   fetchDiningMenu,
   upsertDiningMenu,
@@ -10,9 +11,15 @@ import {
 } from "../../../../app/api/dining";
 import { ApiError } from "../../../../app/api/client";
 import { useBranchRevision } from "../../../../app/hooks/useBranchRevision";
+import { useConfirm } from "../../../../app/context/ConfirmContext";
+import { Checkbox } from "../../../../app/components/ui/checkbox";
+import { cn } from "../../../../app/components/ui/utils";
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]";
+
+const menuCheckboxCls =
+  "size-4 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 shadow-none data-[state=checked]:bg-[#14b8a6] data-[state=checked]:border-[#14b8a6] data-[state=checked]:text-white dark:data-[state=checked]:bg-[#14b8a6] dark:data-[state=checked]:border-[#14b8a6] focus-visible:ring-[#14b8a6]/30";
 
 function errMsg(err: unknown) {
   if (err instanceof ApiError) return err.message;
@@ -24,6 +31,9 @@ export function RestaurantMenu() {
   const { language } = useLanguage();
   const tr = (az: string, en: string) => (language === "az" ? az : en);
   const branchRevision = useBranchRevision();
+  const askConfirm = useConfirm();
+  const navigate = useNavigate();
+  const dirtyRef = useRef(false);
 
   const [categories, setCategories] = useState<DiningMenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,12 +42,116 @@ export function RestaurantMenu() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [dirty, setDirty] = useState(false);
 
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+
+  const unsavedMessage = tr(
+    "Saxlanmamış menyu dəyişiklikləri var. Səhifəni tərk etsəniz dəyişikliklər itəcək.",
+    "You have unsaved menu changes. If you leave this page, your edits will be lost.",
+  );
+
+  const confirmLeaveUnsaved = useCallback(async () => {
+    return askConfirm({
+      title: tr("Saxlanmamış dəyişikliklər", "Unsaved changes"),
+      message: unsavedMessage,
+      confirmLabel: tr("Tərk et", "Leave"),
+      cancelLabel: tr("Qal", "Stay"),
+      variant: "danger",
+    });
+  }, [askConfirm, unsavedMessage, language]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  // Browser Back/Forward: trap navigation while unsaved.
+  useEffect(() => {
+    if (!dirty) return;
+
+    window.history.pushState({ __infleroMenuUnsavedGuard: true }, "");
+
+    let confirming = false;
+
+    const onPopState = () => {
+      if (!dirtyRef.current || confirming) return;
+      confirming = true;
+      // Stay on this page while the dialog is open.
+      window.history.pushState({ __infleroMenuUnsavedGuard: true }, "");
+
+      void (async () => {
+        const leave = await confirmLeaveUnsaved();
+        confirming = false;
+        if (!leave) return;
+        dirtyRef.current = false;
+        setDirty(false);
+        // Skip guard entries and leave the menu page.
+        requestAnimationFrame(() => {
+          window.history.go(-2);
+        });
+      })();
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [dirty, confirmLeaveUnsaved]);
+
+  useEffect(() => {
+    const isInternalNavLink = (anchor: HTMLAnchorElement) => {
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+        return false;
+      }
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return false;
+      try {
+        const url = new URL(href, window.location.origin);
+        if (url.origin !== window.location.origin) return false;
+        const next = `${url.pathname}${url.search}${url.hash}`;
+        const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        return next !== current;
+      } catch {
+        return false;
+      }
+    };
+
+    const onDocumentClick = (e: MouseEvent) => {
+      if (!dirtyRef.current) return;
+      if (e.defaultPrevented) return;
+      if (e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const anchor = (e.target as HTMLElement | null)?.closest?.("a");
+      if (!anchor || !(anchor instanceof HTMLAnchorElement)) return;
+      if (!isInternalNavLink(anchor)) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      const href = anchor.getAttribute("href");
+      if (!href) return;
+      void (async () => {
+        const leave = await confirmLeaveUnsaved();
+        if (!leave) return;
+        dirtyRef.current = false;
+        setDirty(false);
+        navigate(href);
+      })();
+    };
+
+    document.addEventListener("click", onDocumentClick, true);
+    return () => document.removeEventListener("click", onDocumentClick, true);
+  }, [confirmLeaveUnsaved, navigate]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchDiningMenu();
       setCategories(data.categories);
-      setExpanded(new Set(data.categories.filter((c) => c.products.some((p) => p.onMenu)).map((c) => c.id)));
+      setExpanded(new Set());
       setDirty(false);
     } catch (err) {
       toast.error(errMsg(err));
@@ -46,9 +160,27 @@ export function RestaurantMenu() {
     }
   }, []);
 
+  // Initial load + reload when branch changes (skip while unsaved edits exist).
   useEffect(() => {
+    if (dirtyRef.current) return;
     void load();
   }, [load, branchRevision]);
+
+  const confirmDiscardIfDirty = async () => {
+    if (!dirty) return true;
+    return askConfirm({
+      title: tr("Saxlanmamış dəyişikliklər", "Unsaved changes"),
+      message: unsavedMessage,
+      confirmLabel: tr("Dəyişiklikləri at", "Discard"),
+      cancelLabel: tr("Ləğv et", "Cancel"),
+      variant: "danger",
+    });
+  };
+
+  const handleRefresh = async () => {
+    if (!(await confirmDiscardIfDirty())) return;
+    await load();
+  };
 
   const patchProduct = (categoryId: string, productId: string, patch: Partial<DiningMenuProduct>) => {
     setCategories((prev) =>
@@ -58,6 +190,28 @@ export function RestaurantMenu() {
           : {
               ...c,
               products: c.products.map((p) => (p.productId === productId ? { ...p, ...patch } : p)),
+            },
+      ),
+    );
+    setDirty(true);
+  };
+
+  const setCategoryProductsOnMenu = (
+    categoryId: string,
+    productIds: string[],
+    onMenu: boolean,
+  ) => {
+    if (productIds.length === 0) return;
+    const idSet = new Set(productIds);
+    setCategories((prev) =>
+      prev.map((c) =>
+        c.id !== categoryId
+          ? c
+          : {
+              ...c,
+              products: c.products.map((p) =>
+                idSet.has(p.productId) ? { ...p, onMenu } : p,
+              ),
             },
       ),
     );
@@ -129,7 +283,17 @@ export function RestaurantMenu() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => void load()} className="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700">
+          {dirty && (
+            <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+              {tr("Saxlanmayıb", "Unsaved")}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleRefresh()}
+            className="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700"
+            title={tr("Yenilə", "Refresh")}
+          >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <button
@@ -196,6 +360,41 @@ export function RestaurantMenu() {
               </button>
               {open && (
                 <div className="border-t border-gray-100 dark:border-gray-800 p-2 space-y-1">
+                  <div className="flex items-center justify-between gap-2 px-2 py-1.5 mb-1 rounded-lg bg-[#f0fdfa] dark:bg-[#14b8a6]/10 border border-[#99f6e4]/60 dark:border-[#14b8a6]/25">
+                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                      {tr("Kateqoriya seçimi", "Category selection")}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCategoryProductsOnMenu(
+                            cat.id,
+                            cat.products.map((p) => p.productId),
+                            true,
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white shadow-sm transition-colors"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5" />
+                        {tr("Hamısını seç", "Select all")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCategoryProductsOnMenu(
+                            cat.id,
+                            cat.products.map((p) => p.productId),
+                            false,
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm transition-colors"
+                      >
+                        <Square className="w-3.5 h-3.5" />
+                        {tr("Hamısını təmizlə", "Clear all")}
+                      </button>
+                    </div>
+                  </div>
                   {cat.products.map((p) => (
                     <div
                       key={p.productId}
@@ -215,12 +414,20 @@ export function RestaurantMenu() {
                           {p.status !== "ACTIVE" ? ` · ${p.status}` : ""}
                         </p>
                       </div>
-                      <label className="flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-300 flex-shrink-0">
-                        <input
-                          type="checkbox"
+                      <label
+                        className={cn(
+                          "flex items-center gap-2 text-[10px] font-medium flex-shrink-0 cursor-pointer select-none rounded-full px-2.5 py-1 border transition-colors",
+                          p.onMenu
+                            ? "border-[#14b8a6]/40 bg-[#ccfbf1]/50 dark:bg-[#14b8a6]/15 text-[#0d9488] dark:text-[#14b8a6]"
+                            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400",
+                        )}
+                      >
+                        <Checkbox
                           checked={p.onMenu}
-                          onChange={(e) => patchProduct(cat.id, p.productId, { onMenu: e.target.checked })}
-                          className="accent-[#14b8a6]"
+                          onCheckedChange={(checked) =>
+                            patchProduct(cat.id, p.productId, { onMenu: checked === true })
+                          }
+                          className={menuCheckboxCls}
                         />
                         {tr("Menyuda", "On menu")}
                       </label>

@@ -439,9 +439,8 @@ export function SubCategory() {
 
         {/* Search and Actions Bar */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
-            {/* Search */}
-            <div className="flex-1 relative">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[180px] max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input
                 type="text"
@@ -452,30 +451,31 @@ export function SubCategory() {
               />
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap gap-2">
-              <ModernSelect
-                value={selectedCategory}
-                onChange={setSelectedCategory}
-                options={[
-                  { value: "all", label: tr("Bütün Kateqoriyalar", "All Categories") },
-                  ...categories.map((c) => ({ value: c.name, label: c.name })),
-                ]}
-              />
+            <ModernSelect
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              className="w-[160px]"
+              minWidth={160}
+              options={[
+                { value: "all", label: tr("Bütün Kateqoriyalar", "All Categories") },
+                ...categories.map((c) => ({ value: c.name, label: c.name })),
+              ]}
+            />
 
-              <ModernSelect
-                value={selectedStatus}
-                onChange={setSelectedStatus}
-                options={[
-                  { value: "all", label: tr("Bütün Statuslar", "All Status") },
-                  { value: "active", label: tr("Aktiv", "Active") },
-                  { value: "inactive", label: tr("Qeyri-aktiv", "Inactive") },
-                ]}
-              />
-            </div>
+            <ModernSelect
+              value={selectedStatus}
+              onChange={setSelectedStatus}
+              className="w-[130px]"
+              minWidth={130}
+              options={[
+                { value: "all", label: tr("Bütün Statuslar", "All Status") },
+                { value: "active", label: tr("Aktiv", "Active") },
+                { value: "inactive", label: tr("Qeyri-aktiv", "Inactive") },
+              ]}
+            />
 
             {/* Action Buttons */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center ml-auto">
               <button
                 onClick={handleExportPDF}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -808,6 +808,7 @@ export function SubCategory() {
                   <ModernSelect
                     value={formData.status}
                     onChange={(value) => setFormData({ ...formData, status: value as "active" | "inactive" })}
+                    className="w-full"
                     options={[
                       { value: "active", label: tr("Aktiv", "Active") },
                       { value: "inactive", label: tr("Qeyri-aktiv", "Inactive") },

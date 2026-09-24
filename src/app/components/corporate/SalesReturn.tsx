@@ -259,8 +259,8 @@ export function SalesReturn() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 relative max-w-xs">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[180px] max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input
                 type="text"
@@ -271,54 +271,60 @@ export function SalesReturn() {
               />
             </div>
 
-            <div className="flex gap-2 ml-auto flex-wrap">
-              <ModernSelect
-                value={selectedCustomer}
-                onChange={setSelectedCustomer}
-                options={[
-                  { value: "all", label: tr("Müştəri", "Customer") },
-                  ...customers.map((c) => ({ value: c.id, label: c.name })),
-                ]}
-                placeholder={tr("Müştəri", "Customer")}
-              />
+            <ModernSelect
+              value={selectedCustomer}
+              onChange={setSelectedCustomer}
+              className="w-[150px]"
+              minWidth={150}
+              options={[
+                { value: "all", label: tr("Müştəri", "Customer") },
+                ...customers.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              placeholder={tr("Müştəri", "Customer")}
+            />
 
-              <ModernSelect
-                value={selectedStatus}
-                onChange={setSelectedStatus}
-                options={[
-                  { value: "all", label: tr("Status", "Status") },
-                  { value: "partially_refunded", label: tr("Qismən qaytarılıb", "Partially Refunded") },
-                  { value: "refunded", label: tr("Qaytarılıb", "Refunded") },
-                ]}
-                placeholder={tr("Status", "Status")}
-              />
+            <ModernSelect
+              value={selectedStatus}
+              onChange={setSelectedStatus}
+              className="w-[150px]"
+              minWidth={150}
+              options={[
+                { value: "all", label: tr("Status", "Status") },
+                { value: "partially_refunded", label: tr("Qismən qaytarılıb", "Partially Refunded") },
+                { value: "refunded", label: tr("Qaytarılıb", "Refunded") },
+              ]}
+              placeholder={tr("Status", "Status")}
+            />
 
-              <ModernSelect
-                value={selectedPaymentStatus}
-                onChange={setSelectedPaymentStatus}
-                options={[
-                  { value: "all", label: tr("Ödəniş statusu", "Payment status") },
-                  { value: "paid", label: tr("Ödənilib", "Paid") },
-                  { value: "partial", label: tr("Qismən", "Partial") },
-                  { value: "overdue", label: tr("Gecikmiş", "Overdue") },
-                  { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
-                ]}
-                placeholder={tr("Ödəniş statusu", "Payment status")}
-              />
+            <ModernSelect
+              value={selectedPaymentStatus}
+              onChange={setSelectedPaymentStatus}
+              className="w-[150px]"
+              minWidth={150}
+              options={[
+                { value: "all", label: tr("Ödəniş statusu", "Payment status") },
+                { value: "paid", label: tr("Ödənilib", "Paid") },
+                { value: "partial", label: tr("Qismən", "Partial") },
+                { value: "overdue", label: tr("Gecikmiş", "Overdue") },
+                { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
+              ]}
+              placeholder={tr("Ödəniş statusu", "Payment status")}
+            />
 
-              <ModernSelect
-                value={sortBy}
-                onChange={setSortBy}
-                options={[
-                  { value: "last7days", label: tr("Son 7 gün", "Last 7 days") },
-                  { value: "last30days", label: tr("Son 30 gün", "Last 30 days") },
-                  { value: "last90days", label: tr("Son 90 gün", "Last 90 days") },
-                  { value: "thisyear", label: tr("Bu il", "This year") },
-                  { value: "all", label: tr("Hamısı", "All") },
-                ]}
-                placeholder={tr("Son 7 gün", "Last 7 days")}
-              />
-            </div>
+            <ModernSelect
+              value={sortBy}
+              onChange={setSortBy}
+              className="w-[140px]"
+              minWidth={140}
+              options={[
+                { value: "last7days", label: tr("Son 7 gün", "Last 7 days") },
+                { value: "last30days", label: tr("Son 30 gün", "Last 30 days") },
+                { value: "last90days", label: tr("Son 90 gün", "Last 90 days") },
+                { value: "thisyear", label: tr("Bu il", "This year") },
+                { value: "all", label: tr("Hamısı", "All") },
+              ]}
+              placeholder={tr("Son 7 gün", "Last 7 days")}
+            />
           </div>
         </div>
 

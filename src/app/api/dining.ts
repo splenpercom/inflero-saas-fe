@@ -37,6 +37,7 @@ export type KotOrder = {
   reference: string | null;
   documentNo: string | null;
   source: string;
+  sentToBar?: boolean;
   status: string;
   paymentStatus: string;
   grandTotal: number;

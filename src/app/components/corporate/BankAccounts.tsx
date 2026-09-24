@@ -306,8 +306,8 @@ export function BankAccounts() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 relative max-w-xs">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[180px] max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input
                 type="text"
@@ -317,31 +317,32 @@ export function BankAccounts() {
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
             </div>
-            <div className="flex gap-2 ml-auto">
-              <ModernSelect
-                value={selectedStatus}
-                onChange={setSelectedStatus}
-                options={[
-                  { value: "all", label: tr("Status", "Status") },
-                  { value: "active", label: tr("Aktiv", "Active") },
-                  { value: "inactive", label: tr("Qeyri-aktiv", "Inactive") },
-                  { value: "closed", label: tr("Bağlı", "Closed") },
-                  { value: "suspended", label: tr("Dayandırılıb", "Suspended") },
-                ]}
-                placeholder={tr("Status", "Status")}
-              />
-              <ModernSelect
-                value={selectedSort}
-                onChange={(v) => setSelectedSort(v as "latest" | "oldest" | "name")}
-                options={[
-                  { value: "latest", label: tr("Sırala : Ən Yeni", "Sort By : Latest") },
-                  { value: "oldest", label: tr("Sırala : Ən Köhnə", "Sort By : Oldest") },
-                  { value: "name", label: tr("Sırala : Ad", "Sort By : Name") },
-                ]}
-                placeholder={tr("Sırala : Ən Yeni", "Sort By : Latest")}
-                minWidth={150}
-              />
-            </div>
+            <ModernSelect
+              value={selectedStatus}
+              onChange={setSelectedStatus}
+              className="w-[130px]"
+              minWidth={130}
+              options={[
+                { value: "all", label: tr("Status", "Status") },
+                { value: "active", label: tr("Aktiv", "Active") },
+                { value: "inactive", label: tr("Qeyri-aktiv", "Inactive") },
+                { value: "closed", label: tr("Bağlı", "Closed") },
+                { value: "suspended", label: tr("Dayandırılıb", "Suspended") },
+              ]}
+              placeholder={tr("Status", "Status")}
+            />
+            <ModernSelect
+              value={selectedSort}
+              onChange={(v) => setSelectedSort(v as "latest" | "oldest" | "name")}
+              className="w-[160px]"
+              minWidth={160}
+              options={[
+                { value: "latest", label: tr("Sırala : Ən Yeni", "Sort By : Latest") },
+                { value: "oldest", label: tr("Sırala : Ən Köhnə", "Sort By : Oldest") },
+                { value: "name", label: tr("Sırala : Ad", "Sort By : Name") },
+              ]}
+              placeholder={tr("Sırala : Ən Yeni", "Sort By : Latest")}
+            />
           </div>
         </div>
 

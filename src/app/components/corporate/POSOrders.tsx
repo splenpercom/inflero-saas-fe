@@ -595,7 +595,7 @@ export function POSOrders() {
           order.customerName,
           formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
           formatSalesDate(order.date),
-          orderSourceTag(order.source, !!order.table),
+          order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
           order.status,
           String(order.grandTotal),
           String(order.paid),
@@ -633,7 +633,7 @@ export function POSOrders() {
         order.customerName,
         formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
         formatSalesDate(order.date),
-        orderSourceTag(order.source, !!order.table),
+        order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
         order.status,
         order.grandTotal,
         order.paid,
@@ -969,6 +969,8 @@ export function POSOrders() {
                 value={selectedCustomer}
                 onChange={setSelectedCustomer}
                 placeholder={tr("Müştəri", "Customer")}
+                className="w-[160px]"
+                minWidth={160}
                 options={[
                   { value: "all", label: tr("Müştəri", "Customer") },
                   ...customers.map((c) => ({ value: c.id, label: c.name })),
@@ -979,6 +981,8 @@ export function POSOrders() {
                 value={selectedStatus}
                 onChange={setSelectedStatus}
                 placeholder={tr("Status", "Status")}
+                className="w-[130px]"
+                minWidth={130}
                 options={[
                   { value: "all", label: tr("Status", "Status") },
                   { value: "completed", label: tr("Tamamlandı", "Completed") },
@@ -992,6 +996,7 @@ export function POSOrders() {
                 value={selectedPaymentStatus}
                 onChange={setSelectedPaymentStatus}
                 placeholder={tr("Ödəniş", "Payment")}
+                className="w-[140px]"
                 minWidth={140}
                 options={[
                   { value: "all", label: tr("Ödəniş", "Payment") },
@@ -1008,6 +1013,8 @@ export function POSOrders() {
                 value={selectedSource}
                 onChange={setSelectedSource}
                 placeholder={tr("Mənbə", "Source")}
+                className="w-[120px]"
+                minWidth={120}
                 options={[
                   { value: "all", label: tr("Mənbə", "Source") },
                   { value: "POS", label: "POS" },
@@ -1024,6 +1031,7 @@ export function POSOrders() {
                   value={selectedKotStatus}
                   onChange={setSelectedKotStatus}
                   placeholder={tr("KOT Status", "KOT Status")}
+                  className="w-[130px]"
                   minWidth={130}
                   options={[
                     { value: "all", label: tr("KOT Status", "KOT Status") },
@@ -1041,6 +1049,7 @@ export function POSOrders() {
                   value={selectedProductionStatus}
                   onChange={setSelectedProductionStatus}
                   placeholder={tr("İstehsal statusu", "Production")}
+                  className="w-[140px]"
                   minWidth={140}
                   options={[
                     { value: "all", label: tr("İstehsal statusu", "Production") },
@@ -1062,6 +1071,7 @@ export function POSOrders() {
                 value={sortBy}
                 onChange={setSortBy}
                 placeholder={tr("Sırala", "Sort")}
+                className="w-[140px]"
                 minWidth={140}
                 options={[
                   { value: "last7days", label: tr("Sırala: 7 gün", "Sort: 7 days") },
@@ -1204,18 +1214,29 @@ export function POSOrders() {
                       )}
                       {col("source") && (
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={cn(
-                              "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight border",
-                              sourceBadgeClass,
-                            )}
-                          >
-                            {sourceTag === "QR Menu"
-                              ? tr("QR Menyu", "QR Menu")
-                              : sourceTag === "Web"
-                                ? "Web"
-                                : "POS"}
-                          </span>
+                          {order.sentToBar ? (
+                            <span
+                              className={cn(
+                                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight border",
+                                "bg-violet-50 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200 border-violet-200 dark:border-violet-800",
+                              )}
+                            >
+                              BAR
+                            </span>
+                          ) : (
+                            <span
+                              className={cn(
+                                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight border",
+                                sourceBadgeClass,
+                              )}
+                            >
+                              {sourceTag === "QR Menu"
+                                ? tr("QR Menyu", "QR Menu")
+                                : sourceTag === "Web"
+                                  ? "Web"
+                                  : "POS"}
+                            </span>
+                          )}
                         </td>
                       )}
                       {diningEnabled && col("table") && (

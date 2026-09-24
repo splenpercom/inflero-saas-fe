@@ -36,6 +36,8 @@ export interface TenantSettingsRecord {
   employeeCommissionEnabled?: boolean;
   posServiceFeeEnabled?: boolean;
   posSendToProductionEnabled?: boolean;
+  posSendToBarEnabled?: boolean;
+  inventoryServicesEnabled?: boolean;
 }
 
 export type TenantSettingsUpdate = Partial<{
@@ -53,6 +55,8 @@ export type TenantSettingsUpdate = Partial<{
   employeeCommissionEnabled: boolean;
   posServiceFeeEnabled: boolean;
   posSendToProductionEnabled: boolean;
+  posSendToBarEnabled: boolean;
+  inventoryServicesEnabled: boolean;
 }>;
 
 export async function fetchTenantSettings() {

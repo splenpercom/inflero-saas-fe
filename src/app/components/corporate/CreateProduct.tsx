@@ -402,10 +402,7 @@ export function CreateProduct() {
 
   const resetProductForm = useCallback(() => {
     setProductName("");
-    setCategory("");
-    setSubCategory("");
-    setBrand("");
-    setUnit("");
+    // Keep category / sub-category / brand / unit for rapid consecutive creates
     setItemBarcode("");
     setDescription("");
     setQuantity("");
@@ -432,6 +429,10 @@ export function CreateProduct() {
       notifyFromError(new Error(tr("Məhsul/Xidmət adı tələb olunur", "Product/Service name is required")));
       return;
     }
+    if (!category.trim()) {
+      notifyFromError(new Error(tr("Kateqoriya tələb olunur", "Category is required")));
+      return;
+    }
     if (!price.trim()) {
       notifyFromError(new Error(tr("Qiymət tələb olunur", "Price is required")));
       return;
@@ -455,7 +456,7 @@ export function CreateProduct() {
         name: productName.trim(),
         description: description.trim() || null,
         productType: "SINGLE",
-        categoryId: category || null,
+        categoryId: category,
         subCategoryId: subCategory || null,
         brandId: brand || null,
         unitId: unit || null,
