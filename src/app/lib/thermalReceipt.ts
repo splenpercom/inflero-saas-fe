@@ -176,7 +176,7 @@ export function thermalReceiptLabels(language: Language) {
     total: t("CƏMİ", "TOTAL"),
     payment: t("Ödəniş", "Payment"),
     status: t("Status", "Status"),
-    thanks: t("Müraciətiniz üçün təşəkkür edirik!", "Thank you for your business!"),
+    thanks: t("Təşəkkür edirik", "Thank you"),
     close: t("Bağla", "Close"),
     print: t("Çap Et", "Print"),
     kitchen: t("Mətbəx", "Kitchen"),
@@ -315,7 +315,7 @@ export function buildThermalReceiptHtml(
   ${!isTicket ? `<div class="row"><span class="label">${L.phone}:</span><span>${d.customerPhone}</span></div>` : ""}
   ${d.vehicle && !isTicket ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
   ${d.mileage != null && !isTicket ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
-  <div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>
+  ${isTicket ? `<div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>` : ""}
   <div class="divider-solid"></div>
   <div class="section-title">${isTicket ? L.orderItems : L.products}</div>
   ${d.items

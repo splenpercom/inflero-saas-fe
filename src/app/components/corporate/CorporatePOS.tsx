@@ -53,7 +53,7 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, releaseQrPosOrder, rejectQrPosOrder, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -561,7 +561,6 @@ function ThermalReceipt({
           <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.phone}:</span><span className="text-right">{data.customerPhone}</span></div>
           {data.vehicle && <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.vehicle}:</span><span className="text-right break-words">{data.vehicle}</span></div>}
           {data.mileage != null && <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.mileage}:</span><span>{data.mileage} km</span></div>}
-          <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.employee}:</span><span className="text-right break-words">{data.employee}</span></div>
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
           <p className="text-[11px] font-bold mb-1 uppercase">{labels.products}</p>
           {data.items.map((it, i) => (
@@ -1675,6 +1674,42 @@ export function CorporatePOS() {
     card: tr("Kart", "Card"),
   });
 
+  const paymentMethodUnspecifiedLabel = () =>
+    tr("Göstərilməyib", "Not specified");
+
+  const resolvePaymentMethodLabel = (
+    pmLabel: Record<PaymentMethod, string>,
+    apiMethod?: string | null,
+  ) => {
+    if (selectedPaymentMethod) return pmLabel[selectedPaymentMethod];
+    const m = (apiMethod ?? "").toUpperCase();
+    if (m === "CARD" || m === "CREDIT_CARD") return pmLabel.card;
+    if (m === "CASH" || m === "CASH_ON_HAND") return pmLabel.cash;
+    if (apiMethod?.trim()) return apiMethod.trim();
+    return paymentMethodUnspecifiedLabel();
+  };
+
+  /**
+   * Create/checkout already auto-collects when Paid omits initialPaymentAmount.
+   * Edit + QR approve go through updatePosOrder (no initial payment) — collect remaining here
+   * so Paid / Pending on the POS footer matches the printed bill.
+   */
+  const collectRemainingIfPaid = async (detail: PosOrderDetail): Promise<PosOrderDetail> => {
+    if (paymentStatusChoice !== "paid") return detail;
+    if (detail.status === "HELD" || detail.status === "CANCELLED") return detail;
+    const total = parsePrice(detail.grandTotal);
+    const paid = parsePrice(detail.paid);
+    const due = Math.round((total - paid) * 100) / 100;
+    if (due <= 0) return detail;
+    return recordPosOrderPayment(detail.id, {
+      amount: due,
+      ...(selectedPaymentMethod
+        ? { method: mapPaymentMethodToApi(selectedPaymentMethod) }
+        : {}),
+      note: "POS checkout payment",
+    });
+  };
+
   const resolveTableLabel = (fallbackWalkIn = false) => {
     if (selectedTableId) {
       return (
@@ -1700,8 +1735,8 @@ export function CorporatePOS() {
     ...(serviceFee > 0 ? { serviceFee } : {}),
     discount: discountAmount > 0 ? discountAmount : undefined,
     items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
-    // Paid: omit amount so backend collects exact grandTotal when method is set.
-    // Pending: explicit 0 so collectFullPaymentIfMethodSet does not auto-charge.
+    // Paid: omit amount → backend collects exact grandTotal (method optional).
+    // Pending: explicit 0 so backend does not auto-charge.
     ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
     ...(isGlobalMode ? { storeId: branchId ?? null } : {}),
     ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
@@ -1881,7 +1916,7 @@ export function CorporatePOS() {
           : tr("Endirim", "Discount")
         : tr("Endirim", "Discount"),
       total: apiTotal,
-      paymentMethod: selectedPaymentMethod ? pmLabel[selectedPaymentMethod] : "—",
+      paymentMethod: resolvePaymentMethodLabel(pmLabel, detail.paymentMethod),
       paymentStatusLabel: serverPaymentStatusLabel,
       autoPrintReceipt: opts?.autoPrintReceipt ?? !opts?.diningFlow,
       autoPrintKitchen: false,
@@ -1890,6 +1925,43 @@ export function CorporatePOS() {
         ? { tableLabel: opts.tableLabel }
         : {}),
     };
+  };
+
+  const receiptToPrintPayload = (data: ReceiptData): ThermalReceiptPayload => {
+    const logoSrc =
+      getCompanyLogoUrl(user?.tenant, false) ??
+      getCompanyLogoUrl(user?.tenant, true) ??
+      APP_LOGO_LIGHT;
+    return {
+      orderNo: data.orderNo,
+      date: data.date,
+      customer: data.customer,
+      customerPhone: data.customerPhone,
+      vehicle: data.vehicle,
+      mileage: data.mileage,
+      employee: data.employee,
+      items: data.items,
+      subtotal: data.subtotal,
+      shipping: data.shipping,
+      serviceFee: data.serviceFee,
+      discount: data.discount,
+      discountLabel: data.discountLabel,
+      total: data.total,
+      paymentMethod: data.paymentMethod,
+      paymentStatusLabel: data.paymentStatusLabel,
+      tableLabel: data.tableLabel,
+      companyName: user?.tenant?.name?.trim() || "Inflero",
+      logoSrc,
+      siteFooter: "app.inflero.com",
+    };
+  };
+
+  const printCustomerBillFromReceipt = async (data: ReceiptData) => {
+    await printPosTicket({
+      role: "receipt",
+      language,
+      payload: receiptToPrintPayload(data),
+    });
   };
 
   const handlePlaceOrder = async (opts?: { printBill?: boolean }) => {
@@ -1903,22 +1975,52 @@ export function CorporatePOS() {
 
     setCheckoutAction(printBill ? "orderBill" : "order");
     try {
-      const detail = editingOrderId
+      let detail = editingOrderId
         ? await submitEditingOrder({
             // Update & Print finalizes drafts; Update Order keeps draft as HELD.
             finalize: printBill || !editingOrderWasHeld,
           })
         : await posCheckout(buildCheckoutBody());
+      detail = await collectRemainingIfPaid(detail);
       const tableLabel = diningEnabled ? resolveTableLabel(false) : undefined;
 
+      const receiptData = buildReceiptFromDetail(
+        detail,
+        pmLabel,
+        receiptCustomer,
+        receiptPhone,
+        receiptBiller,
+        {
+          autoPrintReceipt: false,
+          tableLabel,
+          allowKitchenReprint: false,
+        },
+      );
+
       if (printBill) {
-        setReceipt(
-          buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
-            autoPrintReceipt: true,
-            tableLabel,
-            allowKitchenReprint: false,
-          }),
-        );
+        try {
+          await printCustomerBillFromReceipt(receiptData);
+          notifySuccess(
+            editingOrderId
+              ? tr(
+                  `Sifariş yeniləndi və qəbz çap olundu (${detail.reference})`,
+                  `Order updated and bill printed (${detail.reference})`,
+                )
+              : tr(
+                  `Sifariş yerləşdirildi və qəbz çap olundu (${detail.reference})`,
+                  `Order placed and bill printed (${detail.reference})`,
+                ),
+          );
+        } catch (printErr) {
+          notifyWarning(
+            tr(
+              "Sifariş yerləşdirildi, amma qəbz çapı alınmadı",
+              "Order placed, but bill print failed",
+            ),
+          );
+          notifyFromError(printErr);
+        }
+        setReceipt(receiptData);
       } else {
         notifySuccess(
           editingOrderId
@@ -1957,11 +2059,12 @@ export function CorporatePOS() {
     setCheckoutAction(printBill ? "kotBill" : "kot");
     try {
       const body = buildCheckoutBody();
-      const detail = pendingQrOrderId
+      let detail = pendingQrOrderId
         ? await approveQrAndSendToKot(pendingQrOrderId, body)
         : editingOrderId
           ? await submitEditingOrder({ sendToKot: true, finalize: true })
           : await sendPosOrderToKot(body);
+      detail = await collectRemainingIfPaid(detail);
 
       const tableLabel = resolveTableLabel(true);
 
@@ -1999,14 +2102,35 @@ export function CorporatePOS() {
         notifyFromError(printErr);
       }
 
-      setReceipt(
-        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
+      const receiptData = buildReceiptFromDetail(
+        detail,
+        pmLabel,
+        receiptCustomer,
+        receiptPhone,
+        receiptBiller,
+        {
           diningFlow: true,
           tableLabel,
-          autoPrintReceipt: printBill,
+          autoPrintReceipt: false,
           allowKitchenReprint: true,
-        }),
+        },
       );
+
+      if (printBill) {
+        try {
+          await printCustomerBillFromReceipt(receiptData);
+        } catch (printErr) {
+          notifyWarning(
+            tr(
+              "KOT göndərildi, amma müştəri qəbzi çap olunmadı",
+              "Sent to KOT, but customer bill print failed",
+            ),
+          );
+          notifyFromError(printErr);
+        }
+      }
+      // Always open receipt modal (no auto customer print) so kitchen/customer can be reprinted.
+      setReceipt(receiptData);
       resetCartAfterSave({ skipQrRelease: true });
     } catch (err) {
       notifyFromError(err);
@@ -2026,9 +2150,10 @@ export function CorporatePOS() {
 
     setCheckoutAction(printBill ? "barBill" : "bar");
     try {
-      const detail = editingOrderId
+      let detail = editingOrderId
         ? await submitEditingOrder({ sendToBar: true, finalize: true })
         : await sendPosOrderToBar(buildCheckoutBody());
+      detail = await collectRemainingIfPaid(detail);
       const tableLabel = resolveTableLabel(true);
 
       try {
@@ -2060,14 +2185,34 @@ export function CorporatePOS() {
         notifyFromError(printErr);
       }
 
-      setReceipt(
-        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
+      const receiptData = buildReceiptFromDetail(
+        detail,
+        pmLabel,
+        receiptCustomer,
+        receiptPhone,
+        receiptBiller,
+        {
           diningFlow: true,
           tableLabel,
-          autoPrintReceipt: printBill,
+          autoPrintReceipt: false,
           allowKitchenReprint: false,
-        }),
+        },
       );
+
+      if (printBill) {
+        try {
+          await printCustomerBillFromReceipt(receiptData);
+        } catch (printErr) {
+          notifyWarning(
+            tr(
+              "BAR göndərildi, amma müştəri qəbzi çap olunmadı",
+              "Sent to Bar, but customer bill print failed",
+            ),
+          );
+          notifyFromError(printErr);
+        }
+      }
+      setReceipt(receiptData);
       resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
@@ -2086,21 +2231,41 @@ export function CorporatePOS() {
 
     setCheckoutAction("production");
     try {
-      const detail = editingOrderId
+      let detail = editingOrderId
         ? await submitEditingOrder({ finalize: true })
         : await sendPosOrderToProduction(buildCheckoutBody());
+      detail = await collectRemainingIfPaid(detail);
 
-      setReceipt(
-        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
-          autoPrintReceipt: true,
+      const receiptData = buildReceiptFromDetail(
+        detail,
+        pmLabel,
+        receiptCustomer,
+        receiptPhone,
+        receiptBiller,
+        {
+          autoPrintReceipt: false,
           allowKitchenReprint: false,
-        }),
+        },
       );
-      notifySuccess(
-        editingOrderId
-          ? tr("Sifariş yeniləndi", "Order updated")
-          : tr("İstehsala göndərildi", "Sent to production"),
-      );
+
+      try {
+        await printCustomerBillFromReceipt(receiptData);
+        notifySuccess(
+          editingOrderId
+            ? tr("Sifariş yeniləndi və qəbz çap olundu", "Order updated and bill printed")
+            : tr("İstehsala göndərildi və qəbz çap olundu", "Sent to production and bill printed"),
+        );
+      } catch (printErr) {
+        notifyWarning(
+          tr(
+            "Sifariş tamamlandı, amma qəbz çapı alınmadı",
+            "Order completed, but bill print failed",
+          ),
+        );
+        notifyFromError(printErr);
+      }
+
+      setReceipt(receiptData);
       resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
@@ -2767,7 +2932,9 @@ export function CorporatePOS() {
                           <button
                             key={m.id}
                             type="button"
-                            onClick={() => setSelectedPaymentMethod(m.id)}
+                            onClick={() =>
+                              setSelectedPaymentMethod((prev) => (prev === m.id ? null : m.id))
+                            }
                             className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg border text-xs font-medium transition-all ${
                               selectedPaymentMethod === m.id
                                 ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border-[#14b8a6] dark:border-[#14b8a6] text-[#14b8a6] dark:text-[#14b8a6]"

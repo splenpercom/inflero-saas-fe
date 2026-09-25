@@ -47,13 +47,19 @@ function browserPrintHtml(html: string): void {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
     } finally {
-      // Give the print dialog a moment before tearing down the frame.
-      window.setTimeout(cleanup, 1000);
+      window.setTimeout(cleanup, 1500);
     }
   };
 
-  // Wait for document + images so thermal logo/layout is ready.
-  window.setTimeout(runPrint, 400);
+  // Prefer onload so images/fonts are ready; fallback timer if onload already fired.
+  let printed = false;
+  const trigger = () => {
+    if (printed) return;
+    printed = true;
+    runPrint();
+  };
+  iframe.onload = () => window.setTimeout(trigger, 50);
+  window.setTimeout(trigger, 600);
 }
 
 /** Resolve QZ target: KOT → kitchen (fallback receipt); bar/receipt → billing printer. */
@@ -175,7 +181,7 @@ export function posOrderToThermalPayload(
       ? t("Kart", "Card")
       : method === "CASH" || method === "CASH_ON_HAND"
         ? t("Nağd", "Cash")
-        : order.paymentMethod?.trim() || "—";
+        : order.paymentMethod?.trim() || t("Göstərilməyib", "Not specified");
 
   const subtotal = order.items.reduce(
     (sum, item) => sum + parseMoney(item.price) * item.quantity,
