@@ -184,6 +184,9 @@ export function thermalReceiptLabels(language: Language) {
     kitchenCopy: t("*** MƏTBƏX KOPYASI ***", "*** KITCHEN COPY ***"),
     barBanner: t("*** BAR ***", "*** BAR ***"),
     barCopy: t("*** BAR KOPYASI ***", "*** BAR COPY ***"),
+    dailySales: t("GÜNÜN SATIŞLARI", "TODAY'S SALES"),
+    productsSold: t("Satılan məhsullar", "Products sold"),
+    noSales: t("Bu gün satış yoxdur", "No sales today"),
   };
 }
 
@@ -346,6 +349,81 @@ export function buildThermalReceiptHtml(
     <div style="margin-top:3px;">${footer}</div>
   </div>`
   }
+</body>
+</html>`;
+}
+
+export type DailySalesSummaryPayload = {
+  date: string;
+  companyName: string;
+  logoSrc?: string | null;
+  siteFooter?: string;
+  items: { name: string; qty: number; amount: number }[];
+  total: number;
+};
+
+/** Thermal HTML for today's aggregated product sales (receipt printer). */
+export function buildDailySalesSummaryHtml(
+  data: DailySalesSummaryPayload,
+  opts: { language: Language; paperWidthMm?: 58 | 80 },
+): string {
+  const language = opts.language;
+  const paperWidthMm = opts.paperWidthMm ?? 80;
+  const labels = thermalReceiptLabels(language);
+  const p = (value: string) => receiptPrintText(language, value);
+
+  const L = {
+    dailySales: p(labels.dailySales),
+    date: p(labels.date),
+    productsSold: p(labels.productsSold),
+    qty: p(labels.qty),
+    total: p(labels.total),
+    noSales: p(labels.noSales),
+  };
+
+  const company = p(data.companyName);
+  const footer = receiptPrintText(language, data.siteFooter ?? "app.inflero.com");
+  const logo = data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
+  const items = data.items.map((it) => ({ ...it, name: p(it.name) }));
+
+  const body =
+    items.length === 0
+      ? `<div class="center" style="margin:10px 0;">${L.noSales}</div>`
+      : `
+  <div class="section-title">${L.productsSold}</div>
+  ${items
+    .map(
+      (it) => `
+    <div class="row-item">
+      <div class="name">${it.name}</div>
+      <div class="nums">
+        <span>${it.qty} ${L.qty}</span>
+        <span>${it.amount.toFixed(2)} AZN</span>
+      </div>
+    </div>`,
+    )
+    .join("")}
+  <div class="divider-solid"></div>
+  <div class="total-row"><span>${L.total}:</span><span>${data.total.toFixed(2)} AZN</span></div>`;
+
+  return `<!DOCTYPE html>
+<html lang="${language}">
+<head>
+  <meta charset="utf-8" />
+  <title>${company} - ${L.dailySales}</title>
+  <style>${thermalReceiptPrintCss(paperWidthMm)}</style>
+</head>
+<body>
+  ${logo}
+  <div class="center bold big" style="margin:6px 0;">${L.dailySales}</div>
+  <div class="divider-solid"></div>
+  <div class="row"><span class="label">${L.date}:</span><span>${data.date}</span></div>
+  <div class="divider"></div>
+  ${body}
+  <div class="divider-solid"></div>
+  <div class="thanks">
+    <div style="margin-top:3px;">${footer}</div>
+  </div>
 </body>
 </html>`;
 }

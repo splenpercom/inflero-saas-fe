@@ -5,7 +5,9 @@ import { formatDateTime } from "./dateFormat";
 import { loadPosPrinterSettings } from "./posPrinterSettings";
 import { ensureQzConnected, isQzAvailable, qzPrintHtml } from "./qzTrayClient";
 import {
+  buildDailySalesSummaryHtml,
   buildThermalReceiptHtml,
+  type DailySalesSummaryPayload,
   type ThermalReceiptPayload,
 } from "./thermalReceipt";
 
@@ -63,6 +65,35 @@ export function resolvePosPrinterName(role: PosPrintRole): string {
   return receipt;
 }
 
+/** Print pre-built thermal HTML via QZ (receipt role) or browser fallback. */
+export async function printThermalHtml(opts: {
+  role: PosPrintRole;
+  html: string;
+  forceBrowser?: boolean;
+}): Promise<{ channel: "qz" | "browser"; printer?: string }> {
+  const settings = loadPosPrinterSettings();
+  const printer = resolvePosPrinterName(opts.role);
+
+  const tryQz =
+    !opts.forceBrowser &&
+    settings.preferQz &&
+    !!printer &&
+    (await isQzAvailable().catch(() => false));
+
+  if (tryQz) {
+    try {
+      await ensureQzConnected();
+      await qzPrintHtml(printer, opts.html, settings.paperWidthMm);
+      return { channel: "qz", printer };
+    } catch {
+      // Fall through to browser print.
+    }
+  }
+
+  browserPrintHtml(opts.html);
+  return { channel: "browser", printer: printer || undefined };
+}
+
 /**
  * Print receipt, KOT, or Bar ticket.
  * Uses mapped QZ printer when available + configured; otherwise browser print dialog.
@@ -83,26 +114,29 @@ export async function printPosTicket(opts: {
     paperWidthMm: settings.paperWidthMm,
   });
 
-  const printer = resolvePosPrinterName(opts.role);
+  return printThermalHtml({
+    role: opts.role,
+    html,
+    forceBrowser: opts.forceBrowser,
+  });
+}
 
-  const tryQz =
-    !opts.forceBrowser &&
-    settings.preferQz &&
-    !!printer &&
-    (await isQzAvailable().catch(() => false));
-
-  if (tryQz) {
-    try {
-      await ensureQzConnected();
-      await qzPrintHtml(printer, html, settings.paperWidthMm);
-      return { channel: "qz", printer };
-    } catch {
-      // Fall through to browser print.
-    }
-  }
-
-  browserPrintHtml(html);
-  return { channel: "browser", printer: printer || undefined };
+/** Print today's product sales summary on the bill/receipt printer. */
+export async function printDailySalesSummary(opts: {
+  language: Language;
+  payload: DailySalesSummaryPayload;
+  forceBrowser?: boolean;
+}): Promise<{ channel: "qz" | "browser"; printer?: string }> {
+  const settings = loadPosPrinterSettings();
+  const html = buildDailySalesSummaryHtml(opts.payload, {
+    language: opts.language,
+    paperWidthMm: settings.paperWidthMm,
+  });
+  return printThermalHtml({
+    role: "receipt",
+    html,
+    forceBrowser: opts.forceBrowser,
+  });
 }
 
 export async function canSilentPrint(role: PosPrintRole): Promise<boolean> {

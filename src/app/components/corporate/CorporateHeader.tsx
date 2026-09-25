@@ -17,6 +17,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Printer,
 } from "lucide-react";
 import { memo, useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router";
@@ -31,6 +32,7 @@ import { useHeaderStats } from "../../hooks/useHeaderStats";
 import { useSubscriptionBadge } from "../../hooks/useSubscriptionRemaining";
 import type { TenantRbacModule } from "../../lib/rbacModules";
 import type { PermissionAction } from "../../lib/permissions";
+import { DaySalesBillModal } from "./DaySalesBillModal";
 
 interface CorporateHeaderProps {
   onToggleSidebar: () => void;
@@ -84,6 +86,7 @@ export const CorporateHeader = memo(function CorporateHeader({
   const initials = getUserInitials(displayName, user?.email);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [daySalesBillOpen, setDaySalesBillOpen] = useState(false);
   const { pendingCount: reservationPendingCount } = usePendingReservationCount();
   const { productCount, todayOrdersCount } = useHeaderStats();
   const subscriptionBadge = useSubscriptionBadge(pt);
@@ -176,6 +179,7 @@ export const CorporateHeader = memo(function CorporateHeader({
   };
 
   return (
+    <>
     <header
       className="h-12 glass-strong border-b border-white/20 dark:border-white/10 flex items-center justify-between px-3 sticky top-0 z-50"
       style={{
@@ -268,15 +272,28 @@ export const CorporateHeader = memo(function CorporateHeader({
           </SimpleDropdown>
         )}
 
-        {/* POS Shortcut */}
+        {/* POS + today's day bill (shared control) */}
         {canViewPos && (
-          <Link
-            to="/dashboard/sales/pos"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 smooth-transition bg-[#14b8a6]/10 dark:bg-[#14b8a6]/20 border border-[#14b8a6]/20 dark:border-[#14b8a6]/30"
-          >
-            <ShoppingCart className="w-3.5 h-3.5 text-[#14b8a6] dark:text-[#14b8a6]" />
-            <span className="hidden sm:inline text-xs font-medium text-[#14b8a6] dark:text-[#14b8a6]">{pt("POS", "POS")}</span>
-          </Link>
+          <div className="flex items-stretch rounded-lg overflow-hidden border border-[#14b8a6]/25 dark:border-[#14b8a6]/35 bg-[#14b8a6]/10 dark:bg-[#14b8a6]/20">
+            <Link
+              to="/dashboard/sales/pos"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-[#14b8a6]/15 dark:hover:bg-[#14b8a6]/25 smooth-transition"
+              title={pt("Open POS", "POS-u aç")}
+            >
+              <ShoppingCart className="w-3.5 h-3.5 text-[#14b8a6]" />
+              <span className="hidden sm:inline text-xs font-medium text-[#14b8a6]">{pt("POS", "POS")}</span>
+            </Link>
+            <div className="w-px self-stretch bg-[#14b8a6]/25 dark:bg-[#14b8a6]/35" aria-hidden />
+            <button
+              type="button"
+              onClick={() => setDaySalesBillOpen(true)}
+              title={pt("Day sales bill", "Günün satış hesabı")}
+              aria-label={pt("Day sales bill", "Günün satış hesabı")}
+              className="flex items-center justify-center px-2 py-1.5 hover:bg-[#14b8a6]/15 dark:hover:bg-[#14b8a6]/25 smooth-transition"
+            >
+              <Printer className="w-3.5 h-3.5 text-[#14b8a6]" />
+            </button>
+          </div>
         )}
 
         {/* Language Switcher */}
@@ -366,5 +383,7 @@ export const CorporateHeader = memo(function CorporateHeader({
         </SimpleDropdown>
       </div>
     </header>
+    <DaySalesBillModal open={daySalesBillOpen} onClose={() => setDaySalesBillOpen(false)} />
+    </>
   );
 });
