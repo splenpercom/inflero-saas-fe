@@ -25,6 +25,8 @@ import { toast } from "sonner";
 import {
   createPublicDiningOrder,
   fetchPublicDiningMenu,
+  fetchPublicDiningOrder,
+  type PublicQrOrderStatus,
 } from "../../../../app/api/publicDining";
 import { ApiError } from "../../../../app/api/client";
 
@@ -45,10 +47,19 @@ const QR_STRINGS = {
     total: "Cəmi",
     sending: "Göndərilir…",
     placeOrder: "Sifariş ver",
-    paymentNote: "Ödəniş kassada · mətbəxə bildiriş",
-    orderConfirmed: "Sifariş təsdiqləndi",
-    orderSent: "Sifariş mətbəxə göndərildi!",
-    sitBack: "Rahat oturun və gözləyin.",
+    paymentNote: "Ödəniş kassada · restoran təsdiqi gözlənilir",
+    orderConfirmed: "Sifariş qəbul edildi",
+    orderSent: "Sifariş göndərildi!",
+    sitBack: "Restoran təsdiqini gözləyin.",
+    awaitingConfirmation: "Restoran təsdiqini gözləyir",
+    seeActiveOrder: "Aktiv sifarişə bax",
+    seeBill: "Hesaba bax",
+    statusPending: "Təsdiq gözləyir",
+    statusAccepted: "Qəbul edildi",
+    statusInKitchen: "Mətbəxdə",
+    statusReady: "Hazırdır",
+    statusServed: "Verildi",
+    statusCancelled: "Ləğv edildi",
     yourBill: "Hesabınız",
     counter: "Kassa",
     payAtCounter: "Hazır olanda kassada ödəyin.",
@@ -64,7 +75,7 @@ const QR_STRINGS = {
     unavailable: "Mövcud deyil",
     add: "Əlavə et",
     viewOrder: "Sifarişə bax",
-    orderSentToast: "Sifariş mətbəxə göndərildi",
+    orderSentToast: "Sifariş göndərildi — təsdiq gözlənilir",
     language: "Dil",
   },
   en: {
@@ -79,10 +90,19 @@ const QR_STRINGS = {
     total: "Total",
     sending: "Sending…",
     placeOrder: "Place Order",
-    paymentNote: "Payment at counter · kitchen notified",
-    orderConfirmed: "Order confirmed",
-    orderSent: "Order Sent to Kitchen!",
-    sitBack: "Sit back and relax.",
+    paymentNote: "Pay at counter · awaiting restaurant confirmation",
+    orderConfirmed: "Order received",
+    orderSent: "Order placed!",
+    sitBack: "Waiting for the restaurant to confirm.",
+    awaitingConfirmation: "Awaiting restaurant confirmation",
+    seeActiveOrder: "See active order",
+    seeBill: "See bill",
+    statusPending: "Awaiting confirmation",
+    statusAccepted: "Accepted",
+    statusInKitchen: "In kitchen",
+    statusReady: "Ready",
+    statusServed: "Served",
+    statusCancelled: "Cancelled",
     yourBill: "Your Bill",
     counter: "Counter",
     payAtCounter: "Please pay at the counter when ready.",
@@ -98,7 +118,7 @@ const QR_STRINGS = {
     unavailable: "Unavailable",
     add: "Add",
     viewOrder: "View Order",
-    orderSentToast: "Order sent to kitchen",
+    orderSentToast: "Order sent — awaiting confirmation",
     language: "Language",
   },
   ru: {
@@ -113,10 +133,19 @@ const QR_STRINGS = {
     total: "Итого",
     sending: "Отправка…",
     placeOrder: "Оформить заказ",
-    paymentNote: "Оплата на кассе · кухня уведомлена",
-    orderConfirmed: "Заказ подтверждён",
-    orderSent: "Заказ отправлен на кухню!",
-    sitBack: "Расслабьтесь и подождите.",
+    paymentNote: "Оплата на кассе · ожидание подтверждения",
+    orderConfirmed: "Заказ принят",
+    orderSent: "Заказ отправлен!",
+    sitBack: "Ожидайте подтверждения ресторана.",
+    awaitingConfirmation: "Ожидание подтверждения ресторана",
+    seeActiveOrder: "Активный заказ",
+    seeBill: "Счёт",
+    statusPending: "Ожидает подтверждения",
+    statusAccepted: "Принят",
+    statusInKitchen: "На кухне",
+    statusReady: "Готов",
+    statusServed: "Подан",
+    statusCancelled: "Отменён",
     yourBill: "Ваш счёт",
     counter: "Касса",
     payAtCounter: "Оплатите на кассе, когда будете готовы.",
@@ -132,12 +161,73 @@ const QR_STRINGS = {
     unavailable: "Недоступно",
     add: "Добавить",
     viewOrder: "К заказу",
-    orderSentToast: "Заказ отправлен на кухню",
+    orderSentToast: "Заказ отправлен — ожидайте подтверждения",
     language: "Язык",
   },
 } as const;
 
 type QrStringKey = keyof typeof QR_STRINGS.az;
+
+type StoredQrOrder = { orderId: string; token: string; reference: string };
+
+function qrActiveOrderKey(slug: string, tableId?: string | null, branch?: string | null) {
+  return `inflero-qr-active-order:${slug}:${tableId || branch || "default"}`;
+}
+
+function readStoredQrOrder(slug: string, tableId?: string | null, branch?: string | null): StoredQrOrder | null {
+  try {
+    const raw = localStorage.getItem(qrActiveOrderKey(slug, tableId, branch));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredQrOrder;
+    if (!parsed?.orderId || !parsed?.token) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredQrOrder(
+  slug: string,
+  data: StoredQrOrder,
+  tableId?: string | null,
+  branch?: string | null,
+) {
+  try {
+    localStorage.setItem(qrActiveOrderKey(slug, tableId, branch), JSON.stringify(data));
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearStoredQrOrder(slug: string, tableId?: string | null, branch?: string | null) {
+  try {
+    localStorage.removeItem(qrActiveOrderKey(slug, tableId, branch));
+  } catch {
+    /* ignore */
+  }
+}
+
+function guestStatusLabel(
+  status: string,
+  t: (key: QrStringKey) => string,
+): string {
+  switch (status) {
+    case "pending":
+      return t("statusPending");
+    case "accepted":
+      return t("statusAccepted");
+    case "in_kitchen":
+      return t("statusInKitchen");
+    case "ready":
+      return t("statusReady");
+    case "served":
+      return t("statusServed");
+    case "cancelled":
+      return t("statusCancelled");
+    default:
+      return t("statusPending");
+  }
+}
 
 function readQrLang(searchParams: URLSearchParams): QrLang {
   const fromUrl = searchParams.get("lang");
@@ -517,7 +607,11 @@ function OrderConfirmScreen({
   tableLabel,
   restaurantName,
   orderRef,
+  orderId,
+  publicToken,
   tenantSlug,
+  tableId,
+  branchCode,
   onBack,
   t,
 }: {
@@ -525,11 +619,46 @@ function OrderConfirmScreen({
   tableLabel: string | null;
   restaurantName: string;
   orderRef: string;
+  orderId: string;
+  publicToken: string;
   tenantSlug: string;
+  tableId?: string | null;
+  branchCode?: string | null;
   onBack: () => void;
   t: (key: QrStringKey) => string;
 }) {
-  const total = items.reduce((s, c) => s + c.item.price * c.qty, 0);
+  const [live, setLive] = useState<PublicQrOrderStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const data = await fetchPublicDiningOrder(tenantSlug, orderId, publicToken);
+        if (cancelled) return;
+        setLive(data);
+        if (data.status === "cancelled" || data.status === "served") {
+          clearStoredQrOrder(tenantSlug, tableId, branchCode);
+        }
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+    void poll();
+    const tmr = window.setInterval(() => void poll(), 6000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(tmr);
+    };
+  }, [tenantSlug, orderId, publicToken, tableId, branchCode]);
+
+  const status = live?.status ?? "pending";
+  const billItems = live?.items?.length
+    ? live.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price }))
+    : items.map((c) => ({ name: c.item.name, qty: c.qty, price: c.item.price }));
+  const total =
+    live?.grandTotal ??
+    items.reduce((s, c) => s + c.item.price * c.qty, 0);
+
   return (
     <div className="bg-gray-50 flex flex-col" style={{ minHeight: "100dvh" }}>
       <div
@@ -551,16 +680,40 @@ function OrderConfirmScreen({
         className="flex-1 overflow-y-auto px-3 py-4 space-y-3"
         style={{ paddingBottom: "calc(100px + env(safe-area-inset-bottom, 0px))" }}
       >
-        <div className="bg-white border border-green-200 rounded-2xl p-5 text-center shadow-sm">
-          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-            <Check className="w-7 h-7 text-green-600" />
+        <div
+          className={`bg-white border rounded-2xl p-5 text-center shadow-sm ${
+            status === "cancelled"
+              ? "border-red-200"
+              : status === "pending"
+                ? "border-amber-200"
+                : "border-green-200"
+          }`}
+        >
+          <div
+            className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 ${
+              status === "cancelled"
+                ? "bg-red-100"
+                : status === "pending"
+                  ? "bg-amber-100"
+                  : "bg-green-100"
+            }`}
+          >
+            {status === "cancelled" ? (
+              <X className="w-7 h-7 text-red-600" />
+            ) : status === "pending" ? (
+              <Receipt className="w-7 h-7 text-amber-600" />
+            ) : (
+              <Check className="w-7 h-7 text-green-600" />
+            )}
           </div>
-          <p className="text-base font-bold text-gray-900 mb-1">{t("orderSent")}</p>
+          <p className="text-base font-bold text-gray-900 mb-1">
+            {status === "pending" ? t("awaitingConfirmation") : guestStatusLabel(status, t)}
+          </p>
           <p className="text-sm text-gray-500">
             {tableLabel ? `${tableLabel} · ` : ""}
-            {t("sitBack")}
+            {status === "pending" ? t("sitBack") : t("payAtCounter")}
           </p>
-          <p className="text-xs text-gray-400 mt-2 font-mono">Ref {orderRef}</p>
+          <p className="text-xs text-gray-400 mt-2 font-mono">Ref {live?.reference || orderRef}</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -572,14 +725,14 @@ function OrderConfirmScreen({
             <p className="text-[10px] text-gray-400">{tableLabel || t("counter")}</p>
           </div>
           <div className="px-4 py-3 space-y-3">
-            {items.map((c) => (
-              <div key={c.item.productId} className="flex items-center gap-3">
+            {billItems.map((c, idx) => (
+              <div key={`${c.name}-${idx}`} className="flex items-center gap-3">
                 <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
                   <span className="text-[11px] font-bold text-gray-600">{c.qty}</span>
                 </div>
-                <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">{c.item.name}</span>
+                <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">{c.name}</span>
                 <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
-                  {(c.item.price * c.qty).toFixed(2)} ₼
+                  {(c.price * c.qty).toFixed(2)} ₼
                 </span>
               </div>
             ))}
@@ -589,8 +742,6 @@ function OrderConfirmScreen({
             <span className="text-xl font-bold text-[#0f766e]">{total.toFixed(2)} ₼</span>
           </div>
         </div>
-
-        <p className="text-center text-xs text-gray-400 px-4">{t("payAtCounter")}</p>
       </div>
 
       <div
@@ -617,10 +768,137 @@ function OrderConfirmScreen({
   );
 }
 
+function ActiveOrderPanel({
+  tenantSlug,
+  stored,
+  tableId,
+  branchCode,
+  onClose,
+  onCleared,
+  t,
+}: {
+  tenantSlug: string;
+  stored: StoredQrOrder;
+  tableId?: string | null;
+  branchCode?: string | null;
+  onClose: () => void;
+  onCleared: () => void;
+  t: (key: QrStringKey) => string;
+}) {
+  const [live, setLive] = useState<PublicQrOrderStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const data = await fetchPublicDiningOrder(tenantSlug, stored.orderId, stored.token);
+        if (cancelled) return;
+        setLive(data);
+        setLoading(false);
+        if (data.status === "cancelled" || data.status === "served") {
+          clearStoredQrOrder(tenantSlug, tableId, branchCode);
+          onCleared();
+        }
+      } catch (err) {
+        if (!cancelled) setLoading(false);
+        if (err instanceof ApiError && err.statusCode === 404) {
+          clearStoredQrOrder(tenantSlug, tableId, branchCode);
+          onCleared();
+        }
+      }
+    };
+    void poll();
+    const tmr = window.setInterval(() => void poll(), 6000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(tmr);
+    };
+  }, [tenantSlug, stored.orderId, stored.token, tableId, branchCode, onCleared]);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black/40" onClick={onClose}>
+      <div
+        className="mt-auto bg-white rounded-t-2xl max-h-[85dvh] overflow-y-auto"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <p className="text-sm font-bold text-gray-900">{t("seeActiveOrder")}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
+          >
+            <X className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
+        {loading && !live ? (
+          <div className="py-10 flex justify-center">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#14b8a6] border-t-transparent" />
+          </div>
+        ) : live ? (
+          <div className="px-4 py-4 space-y-4">
+            <div
+              className={`rounded-2xl px-4 py-5 text-center border ${
+                live.status === "cancelled"
+                  ? "bg-red-50 border-red-200"
+                  : live.status === "pending"
+                    ? "bg-amber-50 border-amber-200"
+                    : live.status === "ready" || live.status === "served"
+                      ? "bg-green-50 border-green-200"
+                      : "bg-teal-50 border-teal-200"
+              }`}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                {t("orderConfirmed")}
+              </p>
+              <p
+                className={`text-xl font-bold leading-tight ${
+                  live.status === "cancelled"
+                    ? "text-red-700"
+                    : live.status === "pending"
+                      ? "text-amber-800"
+                      : live.status === "ready" || live.status === "served"
+                        ? "text-green-800"
+                        : "text-teal-800"
+                }`}
+              >
+                {guestStatusLabel(live.status, t)}
+              </p>
+              <p className="text-xs text-gray-400 font-mono mt-2">
+                Ref {live.reference || stored.reference}
+              </p>
+            </div>
+            <div className="space-y-2">
+              {live.items.map((i, idx) => (
+                <div key={`${i.name}-${idx}`} className="flex justify-between text-sm">
+                  <span className="text-gray-700">
+                    {i.qty}× {i.name}
+                  </span>
+                  <span className="font-medium">{i.lineTotal.toFixed(2)} ₼</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between pt-2 border-t border-dashed border-gray-200">
+              <span className="font-bold">{t("total")}</span>
+              <span className="font-bold text-[#0f766e]">{live.grandTotal.toFixed(2)} ₼</span>
+            </div>
+          </div>
+        ) : (
+          <p className="px-4 py-8 text-center text-sm text-gray-500">{t("menuUnavailable")}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function QRMenuSite() {
-  const { tenantSlug, tableId } = useParams<{ tenantSlug: string; tableId?: string }>();
+  const { tenantSlug, tableId: tableIdParam } = useParams<{ tenantSlug: string; tableId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const branchCode = searchParams.get("branch") || undefined;
+  const tableIdFromQuery = searchParams.get("tableId") || undefined;
+  const tableId = tableIdParam || tableIdFromQuery || undefined;
   const [lang, setLang] = useState<QrLang>(() => readQrLang(searchParams));
   const t = useCallback((key: QrStringKey) => QR_STRINGS[lang][key], [lang]);
 
@@ -657,7 +935,19 @@ export function QRMenuSite() {
   const [activeCat, setActiveCat] = useState<string>("");
   const [infoCollapsed, setInfoCollapsed] = useState(false);
   const [placing, setPlacing] = useState(false);
-  const [placed, setPlaced] = useState<{ ref: string; items: CartLine[] } | null>(null);
+  const [placed, setPlaced] = useState<{
+    ref: string;
+    items: CartLine[];
+    orderId: string;
+    publicToken: string;
+  } | null>(null);
+  const [storedOrder, setStoredOrder] = useState<StoredQrOrder | null>(null);
+  const [showActiveOrder, setShowActiveOrder] = useState(false);
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    setStoredOrder(readStoredQrOrder(tenantSlug, tableId, branchCode));
+  }, [tenantSlug, tableId, branchCode]);
 
   useEffect(() => {
     if (!tenantSlug) {
@@ -746,13 +1036,28 @@ export function QRMenuSite() {
     if (!tenantSlug || cart.length === 0) return;
     setPlacing(true);
     try {
-      const res = (await createPublicDiningOrder(tenantSlug, {
+      const res = await createPublicDiningOrder(tenantSlug, {
         tableId: tableId ?? null,
         branch: branchCode ?? null,
         items: cart.map((c) => ({ productId: c.item.productId, quantity: c.qty })),
-      })) as { reference?: string | null; id: string };
+      });
       const captured = [...cart];
-      setPlaced({ ref: res.reference || res.id, items: captured });
+      const token = res.publicToken || "";
+      if (token) {
+        const stored = {
+          orderId: res.id,
+          token,
+          reference: res.reference || res.id,
+        };
+        writeStoredQrOrder(tenantSlug, stored, tableId, branchCode);
+        setStoredOrder(stored);
+      }
+      setPlaced({
+        ref: res.reference || res.id,
+        items: captured,
+        orderId: res.id,
+        publicToken: token,
+      });
       setCart([]);
       setShowCart(false);
       toast.success(t("orderSentToast"));
@@ -788,14 +1093,18 @@ export function QRMenuSite() {
     );
   }
 
-  if (placed) {
+  if (placed && tenantSlug) {
     return (
       <OrderConfirmScreen
         items={placed.items}
         tableLabel={tableLabel}
         restaurantName={info.name}
         orderRef={placed.ref}
+        orderId={placed.orderId}
+        publicToken={placed.publicToken}
         tenantSlug={tenantSlug}
+        tableId={tableId}
+        branchCode={branchCode}
         onBack={() => setPlaced(null)}
         t={t}
       />
@@ -830,6 +1139,18 @@ export function QRMenuSite() {
           </div>
 
           <LangSwitcher lang={lang} onChange={setLanguage} />
+
+          {storedOrder ? (
+            <button
+              type="button"
+              onClick={() => setShowActiveOrder(true)}
+              style={{ touchAction: "manipulation", minHeight: "38px" }}
+              className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-[11px] font-bold flex-shrink-0"
+              title={t("seeActiveOrder")}
+            >
+              <Receipt className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -1066,6 +1387,21 @@ export function QRMenuSite() {
             if (line) addToCart(line.item);
           }}
           onDec={removeFromCart}
+          t={t}
+        />
+      )}
+
+      {showActiveOrder && storedOrder && tenantSlug && (
+        <ActiveOrderPanel
+          tenantSlug={tenantSlug}
+          stored={storedOrder}
+          tableId={tableId}
+          branchCode={branchCode}
+          onClose={() => setShowActiveOrder(false)}
+          onCleared={() => {
+            setStoredOrder(null);
+            setShowActiveOrder(false);
+          }}
           t={t}
         />
       )}

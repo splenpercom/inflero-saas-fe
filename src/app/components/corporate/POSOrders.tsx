@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { cn } from "../ui/utils";
 import {
   FileSpreadsheet,
@@ -15,6 +15,8 @@ import {
   ChefHat,
   Columns3,
   Keyboard,
+  Check,
+  X,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -38,9 +40,12 @@ import {
   fetchPosOrder,
   sendHeldPosOrderToKot,
   updatePosOrderProductionStatus,
+  acceptQrPosOrder,
+  rejectQrPosOrder,
   type PosOrderListRow,
   type ProductionStatusApi,
 } from "../../api/sales";
+import { ApiError } from "../../api/client";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import {
   formatSalesDate,
@@ -182,6 +187,7 @@ function loadOrdersColumns(): Record<OrdersColumnKey, boolean> {
 }
 export function POSOrders() {
   const { language } = useLanguage();
+  const navigate = useNavigate();
   const { isDemo, isAuthenticated, hasModule, user } = useAuth();
   const posEnabled = hasModule("POS");
   const diningEnabled = hasModule("DINING");
@@ -193,6 +199,7 @@ export function POSOrders() {
   const { customers } = useSalesCustomers("", true);
   const askConfirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [qrActionBusyId, setQrActionBusyId] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -660,6 +667,60 @@ export function POSOrders() {
     setIsRefreshing(true);
     await loadItems();
     setIsRefreshing(false);
+  };
+
+  const isPendingQrOrder = (order: PosOrderListRow) =>
+    order.source === "QR_MENU" &&
+    !order.kotStatus &&
+    (order.status === "Pending" || order.status === "Draft" || isDraftOrderStatus(order.status));
+
+  const handleAcceptQrFromOrders = async (orderId: string) => {
+    if (!canEdit || isDemo) return;
+    setQrActionBusyId(orderId);
+    try {
+      await acceptQrPosOrder(orderId);
+      notifySuccess(tr("QR sifariş qəbul edildi", "QR order accepted"));
+      navigate(`/dashboard/sales/pos?acceptOrder=${encodeURIComponent(orderId)}`);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "ALREADY_CLAIMED") {
+        const raw = err.raw && typeof err.raw === "object" ? (err.raw as Record<string, unknown>) : {};
+        const name = typeof raw.claimedByName === "string" ? raw.claimedByName : "";
+        notifyWarning(
+          name
+            ? tr(`Artıq ${name} tərəfindən götürülüb`, `Already taken by ${name}`)
+            : tr("Artıq başqa kassir tərəfindən götürülüb", "Already taken by another cashier"),
+        );
+      } else {
+        notifyFromError(err);
+      }
+      await loadItems();
+    } finally {
+      setQrActionBusyId(null);
+    }
+  };
+
+  const handleRejectQrFromOrders = async (orderId: string) => {
+    if (!canEdit || isDemo) return;
+    const ok = await askConfirm({
+      title: tr("QR sifarişi rədd et?", "Reject QR order?"),
+      message: tr(
+        "Bu sifariş ləğv olunacaq və müştəriyə göstəriləcək.",
+        "This order will be cancelled and shown to the guest.",
+      ),
+      confirmLabel: tr("Rədd et", "Reject"),
+    });
+    if (!ok) return;
+    setQrActionBusyId(orderId);
+    try {
+      await rejectQrPosOrder(orderId);
+      notifySuccess(tr("QR sifariş rədd edildi", "QR order rejected"));
+      await loadItems();
+    } catch (err) {
+      notifyFromError(err);
+      await loadItems();
+    } finally {
+      setQrActionBusyId(null);
+    }
   };
 
   const handleAddSales = () => {
@@ -1187,7 +1248,11 @@ export function POSOrders() {
                     <tr
                       key={order.id}
                       className={`border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-all duration-75 ${
-                        index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/30 dark:bg-gray-800/10"
+                        isPendingQrOrder(order)
+                          ? "bg-orange-50/80 dark:bg-orange-950/20 ring-1 ring-inset ring-orange-200 dark:ring-orange-900"
+                          : index % 2 === 0
+                            ? "bg-white dark:bg-gray-900"
+                            : "bg-gray-50/30 dark:bg-gray-800/10"
                       }`}
                     >
                       {col("customer") && (
@@ -1351,6 +1416,31 @@ export function POSOrders() {
                       )}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-0.5">
+                          {diningEnabled &&
+                            posEnabled &&
+                            canEdit &&
+                            isPendingQrOrder(order) && (
+                              <>
+                                <button
+                                  type="button"
+                                  className={cn(iconBtn, "text-[#0f766e] dark:text-[#5eead4]")}
+                                  title={tr("Qəbul et (POS)", "Accept (POS)")}
+                                  disabled={qrActionBusyId === order.id}
+                                  onClick={() => void handleAcceptQrFromOrders(order.id)}
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={cn(iconBtn, "text-red-600 dark:text-red-400")}
+                                  title={tr("Rədd et", "Reject")}
+                                  disabled={qrActionBusyId === order.id}
+                                  onClick={() => void handleRejectQrFromOrders(order.id)}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
                           <button
                             type="button"
                             className={iconBtn}
@@ -1377,6 +1467,7 @@ export function POSOrders() {
                             diningEnabled &&
                             posEnabled &&
                             canEdit &&
+                            order.source !== "QR_MENU" &&
                             isDraftOrderStatus(order.status) &&
                             !order.kotStatus && (
                               <button

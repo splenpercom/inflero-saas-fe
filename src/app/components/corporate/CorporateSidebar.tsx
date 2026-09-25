@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation } from "react-router";
 import { preloadRoute } from "../../utils/routePreloader";
 import { usePendingReservationCount } from "../../hooks/usePendingReservationCount";
+import { usePendingQrOrderCount } from "../../hooks/usePendingQrOrderCount";
 import {
   LayoutDashboard,
   Building2,
@@ -22,6 +23,9 @@ import {
   Users,
   UtensilsCrossed,
   BookOpen,
+  LayoutGrid,
+  ClipboardList,
+  FileBarChart,
   Puzzle,
   ExternalLink,
 } from "lucide-react";
@@ -106,6 +110,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const branchMenuRef = useRef<HTMLDivElement>(null);
   const { badgeCount: newResCount, acknowledge: acknowledgeReservations } = usePendingReservationCount();
+  const { badgeCount: newQrOrderCount, acknowledge: acknowledgeQrOrders } = usePendingQrOrderCount();
 
   const companyLogo = getCompanyLogoUrl(user?.tenant, isDarkMode);
   const brandLogo = getBrandLogoUrl(user?.tenant, isDarkMode);
@@ -212,6 +217,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   useEffect(() => {
     if (location.pathname.startsWith("/dashboard/reservations")) {
       setExpandedItems(["reservations"]);
+    } else if (location.pathname.startsWith("/dashboard/sales")) {
+      setExpandedItems(["sales"]);
     }
   }, [location.pathname]);
 
@@ -264,16 +271,22 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: entry.permissionModule,
     }));
 
-    items.push({
-      icon: Globe,
-      labelKey: "myWebsite",
-      label: st("myWebsite"),
-      permissionModule: "My Website",
-      subItems: [
-        { labelKey: "myWebsite", label: st("myWebsite"), path: "/dashboard/my-website" },
-        { labelKey: "webReports", label: st("webReports"), path: "/dashboard/my-website/reports" },
-      ],
-    });
+    items.push(
+      {
+        icon: Globe,
+        labelKey: "myWebsite",
+        label: st("myWebsite"),
+        path: "/dashboard/my-website",
+        permissionModule: "My Website",
+      },
+      {
+        icon: FileBarChart,
+        labelKey: "webReports",
+        label: st("webReports"),
+        path: "/dashboard/my-website/reports",
+        permissionModule: "My Website",
+      },
+    );
 
     return items;
   }, [language]);
@@ -391,32 +404,50 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       icon: CalendarDays,
       labelKey: "reservations",
       label: st("reservations"),
+      path: "/dashboard/reservations",
       permissionModule: "Reservations",
-      subItems: [
-        { labelKey: "reservationsList", label: st("reservations"), path: "/dashboard/reservations" },
-      ],
     },
     {
       icon: Globe,
       labelKey: "myWebsite",
       label: st("myWebsite"),
+      path: "/dashboard/my-website",
       permissionModule: "My Website",
-      subItems: [
-        { labelKey: "myWebsite", label: st("myWebsite"), path: "/dashboard/my-website" },
-        { labelKey: "webReports", label: st("webReports"), path: "/dashboard/my-website/reports" },
-      ],
+    },
+    {
+      icon: FileBarChart,
+      labelKey: "webReports",
+      label: st("webReports"),
+      path: "/dashboard/my-website/reports",
+      permissionModule: "My Website",
+    },
+    {
+      icon: BookOpen,
+      labelKey: "restaurantMenu",
+      label: st("restaurantMenu"),
+      path: "/dashboard/restaurant/menu",
+      permissionModule: "Dining",
+    },
+    {
+      icon: LayoutGrid,
+      labelKey: "tables",
+      label: st("tables"),
+      path: "/dashboard/restaurant/tables",
+      permissionModule: "Dining",
+    },
+    {
+      icon: ClipboardList,
+      labelKey: "kot",
+      label: st("kot"),
+      path: "/dashboard/restaurant/kot",
+      permissionModule: "Dining",
     },
     {
       icon: UtensilsCrossed,
-      labelKey: "dining",
-      label: st("dining"),
+      labelKey: "tableBookings",
+      label: st("tableBookings"),
+      path: "/dashboard/restaurant/bookings",
       permissionModule: "Dining",
-      subItems: [
-        { labelKey: "restaurantMenu", label: st("restaurantMenu"), path: "/dashboard/restaurant/menu" },
-        { labelKey: "tables", label: st("tables"), path: "/dashboard/restaurant/tables" },
-        { labelKey: "kot", label: st("kot"), path: "/dashboard/restaurant/kot" },
-        { labelKey: "tableBookings", label: st("tableBookings"), path: "/dashboard/restaurant/bookings" },
-      ],
     },
     {
       icon: Puzzle,
@@ -447,9 +478,22 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         if (item.labelKey === "plugins" && !user?.isTenantOwner && !isDemo) return null;
         if (item.labelKey === "stock" && !hasModule("STOCK")) return null;
         if (item.labelKey === "reservations" && !hasModule("RESERVATIONS")) return null;
-        if (item.labelKey === "myWebsite" && !hasModule("WEB_EDITOR")) return null;
-        if (item.labelKey === "dining" && !hasModule("DINING")) return null;
+        if (["myWebsite", "webReports"].includes(item.labelKey) && !hasModule("WEB_EDITOR")) return null;
+        if (
+          ["restaurantMenu", "tables", "kot", "tableBookings", "dining"].includes(item.labelKey) &&
+          !hasModule("DINING")
+        ) {
+          return null;
+        }
         if (item.labelKey === "warehouses" && !branchManagementEnabled) return null;
+        // Branch users cannot open the website editor when BRANCH_MANAGEMENT is on.
+        if (
+          item.path === "/dashboard/my-website" &&
+          hasModule("BRANCH_MANAGEMENT") &&
+          !user?.isTenantOwner
+        ) {
+          return null;
+        }
         const parentModule = item.permissionModule ?? "Dashboard";
         if (item.subItems) {
           const filteredSubItems = item.subItems.filter((sub) => {
@@ -458,7 +502,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
             // Suppliers stay available without STOCK — required for purchases.
             if (["pos", "posOrders"].includes(sub.labelKey) && !hasModule("POS")) return false;
             if (sub.labelKey === "stockTransfer" && !branchManagementEnabled) return false;
-            // Branch users cannot open the website editor when BRANCH_MANAGEMENT is on.
             if (
               sub.path === "/dashboard/my-website" &&
               hasModule("BRANCH_MANAGEMENT") &&
@@ -482,7 +525,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         return item;
       })
       .filter((item): item is NavItem => item !== null);
-  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled]);
+  }, [hasPermission, hasModule, language, newResCount, newQrOrderCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled]);
 
   const tenantSlug = user?.tenant?.slug ?? null;
   const myStorePath = tenantSlug ? storePath(tenantSlug) : null;
@@ -648,22 +691,26 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
             );
             
             const isReservations = item.labelKey === "reservations";
-            const showRedDot = isReservations && newResCount > 0;
+            const isSales = item.labelKey === "sales";
+            const showResBadge = isReservations && newResCount > 0;
+            const showQrOrderBadge = isSales && newQrOrderCount > 0;
+            const showNavBadge = showResBadge || showQrOrderBadge;
+            const navBadgeCount = showResBadge ? newResCount : showQrOrderBadge ? newQrOrderCount : 0;
 
             const ItemContent = (
               <>
                 <div className="relative flex-shrink-0">
                   <item.icon className="w-4 h-4" />
-                  {showRedDot && (
+                  {showNavBadge && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 border border-white dark:border-gray-900 shadow-sm" />
                   )}
                 </div>
                 {!collapsed && (
                   <>
                     <span className="flex-1 text-left">{label}</span>
-                    {showRedDot && (
+                    {showNavBadge && (
                       <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold shadow-sm animate-pulse">
-                        {newResCount > 9 ? "9+" : newResCount}
+                        {navBadgeCount > 9 ? "9+" : navBadgeCount}
                       </span>
                     )}
                     {item.comingSoon && (
@@ -671,7 +718,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                         {pickLang(language, "Tezliklə", "Soon")}
                       </span>
                     )}
-                    {item.badge && !showRedDot && (
+                    {item.badge && !showNavBadge && (
                       <span className="px-1.5 py-0.5 rounded-full bg-[#14b8a6] text-white text-[10px] font-semibold shadow-lg shadow-[#14b8a6]/30 animate-pulse">
                         {item.badge}
                       </span>
@@ -754,6 +801,10 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                       {item.subItems.map((subItem) => {
                         const subLabel = subItem.label;
                         const isSubActive = subItem.path === location.pathname;
+                        const isOrdersSub =
+                          isSales && subItem.labelKey === "posOrders";
+                        const showOrdersBadge =
+                          isOrdersSub && newQrOrderCount > 0;
                         return (
                           <Link
                             key={subItem.labelKey}
@@ -767,16 +818,24 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                               ) {
                                 acknowledgeReservations();
                               }
+                              if (isOrdersSub && newQrOrderCount > 0) {
+                                acknowledgeQrOrders();
+                              }
                               onClose?.();
                             }}
                             className={cn(
-                              "block w-full text-left px-3 py-1.5 rounded-lg text-xs smooth-transition font-medium",
+                              "w-full text-left px-3 py-1.5 rounded-lg text-xs smooth-transition font-medium flex items-center gap-2",
                               isSubActive
                                 ? "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 text-[#14b8a6] dark:text-[#14b8a6] shadow-sm border-l-2 border-[#14b8a6]"
                                 : "text-gray-600 dark:text-gray-400 hover:bg-white/5 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200"
                             )}
                           >
-                            {subLabel}
+                            <span className="flex-1 truncate">{subLabel}</span>
+                            {showOrdersBadge && (
+                              <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold shadow-sm animate-pulse shrink-0">
+                                {newQrOrderCount > 9 ? "9+" : newQrOrderCount}
+                              </span>
+                            )}
                           </Link>
                         );
                       })}

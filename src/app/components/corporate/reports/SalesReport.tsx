@@ -27,8 +27,9 @@ import { usePagination, DEFAULT_REPORT_PAGE_SIZE } from "../../../hooks/usePagin
 
 export function SalesReport() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, hasModule } = useAuth();
   const { canView } = useModulePermissions("Reports");
+  const stockEnabled = hasModule("STOCK");
   const branchRevision = useBranchRevision();
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -136,21 +137,25 @@ export function SalesReport() {
       r.category,
       r.soldQty,
       parseReportMoney(r.soldAmount),
-      r.instockQty,
+      ...(stockEnabled ? [r.instockQty] : []),
     ]);
+    const headers = [
+      pt("Product", "Məhsul"),
+      pt("Category", "Kateqoriya"),
+      pt("Sold Qty", "Satılan"),
+      pt("Amount", "Məbləğ"),
+      ...(stockEnabled ? [pt("In Stock", "Stok")] : []),
+    ];
     const doc = new jsPDF();
     doc.text(pt("Sales Report", "Satış Hesabatı"), 14, 15);
     autoTable(doc, {
-      head: [[pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold Qty", "Satılan"), pt("Amount", "Məbləğ"), pt("In Stock", "Stok")]],
+      head: [headers],
       body: rows,
       startY: 22,
       styles: { fontSize: 8 },
     });
     doc.save("sales-report.pdf");
-    const ws = XLSX.utils.aoa_to_sheet([
-      [pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold Qty", "Satılan"), pt("Amount", "Məbləğ"), pt("In Stock", "Stok")],
-      ...rows,
-    ]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sales");
     XLSX.writeFile(wb, "sales-report.xlsx");
@@ -310,7 +315,9 @@ export function SalesReport() {
                     <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Category", "Kateqoriya")}</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Sold Qty", "Satılan")}</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Amount", "Məbləğ")}</th>
-                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("In Stock", "Stok")}</th>
+                    {stockEnabled && (
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("In Stock", "Stok")}</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -320,7 +327,9 @@ export function SalesReport() {
                       <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">{row.category}</td>
                       <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{row.soldQty}</td>
                       <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(parseReportMoney(row.soldAmount))}</td>
-                      <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{row.instockQty}</td>
+                      {stockEnabled && (
+                        <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{row.instockQty}</td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

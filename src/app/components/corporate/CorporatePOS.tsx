@@ -1,5 +1,6 @@
 import { pickLang } from "../../i18n/pickLang";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Search,
   ShoppingCart,
@@ -29,6 +30,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Users,
+  Bell,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -50,7 +53,7 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, releaseQrPosOrder, rejectQrPosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -66,8 +69,9 @@ import { thermalReceiptLabels, type ThermalReceiptPayload } from "../../lib/ther
 import { printPosTicket, printPosOrderTicket } from "../../lib/posPrint";
 import { loadPosPrinterSettings } from "../../lib/posPrinterSettings";
 import { PosPrinterSettings } from "./PosPrinterSettings";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { pickCurrentUserBillerId } from "../../lib/salesBiller";
+import { ApiError } from "../../api/client";
 
 interface Product {
   id: string;
@@ -93,6 +97,7 @@ interface CartItem {
 
 type PaymentMethod = "cash" | "card";
 type PaymentStatusChoice = "paid" | "pending";
+type PaymentStatusChoiceState = PaymentStatusChoice | null;
 
 type PosCategoryChip = { id: string; name: string; pinned?: boolean };
 
@@ -210,6 +215,185 @@ function SelectDropdown({
         </div>
       )}
     </div>
+  );
+}
+
+const TABLE_STATUS_UI: Record<
+  DiningTable["status"],
+  { key: "available" | "occupied" | "reserved"; labelEn: string; labelAz: string; badge: string; ring: string }
+> = {
+  AVAILABLE: {
+    key: "available",
+    labelEn: "Available",
+    labelAz: "Boş",
+    badge:
+      "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800",
+    ring: "ring-green-400/60",
+  },
+  OCCUPIED: {
+    key: "occupied",
+    labelEn: "Occupied",
+    labelAz: "Dolu",
+    badge:
+      "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800",
+    ring: "ring-red-400/50",
+  },
+  RESERVED: {
+    key: "reserved",
+    labelEn: "Reserved",
+    labelAz: "Rezerv",
+    badge:
+      "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+    ring: "ring-amber-400/50",
+  },
+};
+
+function PosTablePickerPortal({
+  open,
+  tables,
+  selectedId,
+  onSelect,
+  onClose,
+  tr,
+}: {
+  open: boolean;
+  tables: DiningTable[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onClose: () => void;
+  tr: (az: string, en: string) => string;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
+      <button
+        type="button"
+        aria-label={tr("Bağla", "Close")}
+        className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={tr("Masa seçin", "Select table")}
+        className="relative z-10 w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+              {tr("Masa seçin", "Select table")}
+            </h2>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+              {tr("Kart üzərinə klikləyin", "Tap a table card to select")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {tables.length === 0 ? (
+            <p className="text-center text-xs text-gray-400 py-12">
+              {tr("Masa tapılmadı", "No tables found")}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {tables.map((table) => {
+                const st = TABLE_STATUS_UI[table.status];
+                const selected = selectedId === table.id;
+                const name = table.name?.trim() || String(table.number);
+                return (
+                  <button
+                    key={table.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(table.id);
+                      onClose();
+                    }}
+                    className={`text-left rounded-xl border p-3 transition-all ${
+                      selected
+                        ? `border-[#14b8a6] bg-[#14b8a6]/10 ring-2 ring-[#14b8a6]/40 dark:bg-[#14b8a6]/15`
+                        : `border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 hover:border-[#14b8a6]/50 hover:bg-white dark:hover:bg-gray-800 ${st.ring}`
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0 flex items-center gap-1.5">
+                        <Armchair
+                          className={`w-3.5 h-3.5 flex-shrink-0 ${
+                            selected ? "text-[#14b8a6]" : "text-gray-400"
+                          }`}
+                        />
+                        <span className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                          {name}
+                        </span>
+                      </div>
+                      {selected && <Check className="w-3.5 h-3.5 text-[#14b8a6] flex-shrink-0" />}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${st.badge}`}
+                      >
+                        {tr(st.labelAz, st.labelEn)}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+                        <Users className="w-3 h-3" />
+                        {table.seats}
+                      </span>
+                      {table.area ? (
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                          {table.area}
+                        </span>
+                      ) : null}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80">
+          <button
+            type="button"
+            onClick={() => {
+              onSelect("");
+              onClose();
+            }}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 transition-colors"
+          >
+            {tr("Təmizlə", "Clear")}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#14b8a6] text-white hover:bg-[#0d9488] transition-colors"
+          >
+            {tr("Bağla", "Done")}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -442,6 +626,7 @@ function ThermalReceipt({
 export function CorporatePOS() {
   const { language } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
   const autoEnabled = hasModule("AUTO");
@@ -467,9 +652,10 @@ export function CorporatePOS() {
   const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([]);
   const [selectedBillerId, setSelectedBillerId] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
+  const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const [diningTables, setDiningTables] = useState<DiningTable[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoice>("paid");
+  const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoiceState>(null);
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState("");
@@ -488,10 +674,19 @@ export function CorporatePOS() {
   const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [pendingQrCount, setPendingQrCount] = useState(0);
+  const [pendingQrList, setPendingQrList] = useState<PendingQrPosOrderRow[]>([]);
+  const [pendingQrPortalOpen, setPendingQrPortalOpen] = useState(false);
+  const [pendingQrOrderId, setPendingQrOrderId] = useState<string | null>(null);
+  const [pendingQrBusyId, setPendingQrBusyId] = useState<string | null>(null);
   const lookupAbortRef = useRef<AbortController | null>(null);
   const lookupSeqRef = useRef(0);
   const lastLookupCodeRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const lookupInFlightCodeRef = useRef<string | null>(null);
+  const pendingQrOrderIdRef = useRef<string | null>(null);
+  const acceptOrderHandledRef = useRef<string | null>(null);
+  const pendingQrPortalOpenRef = useRef(false);
+  const pendingQrInFlightRef = useRef(false);
 
   const mapListItemToProduct = useCallback((item: ProductListItem): Product => {
     const isService = item.productType === "SERVICE" || item.trackStock === false;
@@ -508,11 +703,18 @@ export function CorporatePOS() {
     };
   }, []);
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
-  const [placingOrder, setPlacingOrder] = useState(false);
-  const [savingDraft, setSavingDraft] = useState(false);
-  const [sendingToKot, setSendingToKot] = useState(false);
-  const [sendingToBar, setSendingToBar] = useState(false);
-  const [sendingToProduction, setSendingToProduction] = useState(false);
+  const [checkoutAction, setCheckoutAction] = useState<
+    | "draft"
+    | "order"
+    | "orderBill"
+    | "kot"
+    | "kotBill"
+    | "bar"
+    | "barBill"
+    | "production"
+    | null
+  >(null);
+  const checkoutBusy = checkoutAction !== null;
   const { billers, defaultBillerId } = useSalesBillers((isAuthenticated || isDemo));
   const isEmployee = !isDemo && user?.role?.name.trim().toLowerCase() === "employee";
   const currentUserBillerId = useMemo(
@@ -637,16 +839,189 @@ export function CorporatePOS() {
     };
   }, [isAuthenticated, isDemo, branchRevision]);
 
+  useEffect(() => {
+    pendingQrOrderIdRef.current = pendingQrOrderId;
+  }, [pendingQrOrderId]);
+
+  useEffect(() => {
+    pendingQrPortalOpenRef.current = pendingQrPortalOpen;
+  }, [pendingQrPortalOpen]);
+
+  const canPollPendingQr =
+    diningEnabled && isAuthenticated && !isDemo && !isGlobalMode && !!branchId;
+
+  /** Background: count only (pulse). Portal open: list only (count derived from open claims). */
+  const refreshPendingQr = useCallback(
+    async (mode: "count" | "list" | "auto" = "auto") => {
+      if (!canPollPendingQr) {
+        setPendingQrCount(0);
+        setPendingQrList([]);
+        return;
+      }
+      if (pendingQrInFlightRef.current) return;
+      pendingQrInFlightRef.current = true;
+      const wantList =
+        mode === "list" || (mode === "auto" && pendingQrPortalOpenRef.current);
+      try {
+        if (wantList) {
+          const list = await fetchPendingQrPosOrders();
+          setPendingQrList(list);
+          setPendingQrCount(list.filter((r) => r.claimStatus === "open").length);
+        } else {
+          const countRes = await fetchPendingQrPosOrderCount();
+          setPendingQrCount(countRes.count);
+        }
+      } catch {
+        // Poll quietly — do not spam toasts
+      } finally {
+        pendingQrInFlightRef.current = false;
+      }
+    },
+    [canPollPendingQr],
+  );
+
+  useEffect(() => {
+    if (!canPollPendingQr) {
+      setPendingQrCount(0);
+      setPendingQrList([]);
+      return;
+    }
+
+    const tick = () => {
+      if (document.hidden) return;
+      void refreshPendingQr(pendingQrPortalOpenRef.current ? "list" : "count");
+    };
+
+    tick();
+    // Count for pulse is enough when closed; list only while modal is open.
+    const ms = pendingQrPortalOpen ? 5_000 : 12_000;
+    const t = window.setInterval(tick, ms);
+
+    const onVisibility = () => {
+      if (!document.hidden) tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [canPollPendingQr, pendingQrPortalOpen, branchRevision, refreshPendingQr]);
+
+  const hydrateCartFromQrOrder = useCallback(
+    (detail: PosOrderDetail) => {
+      setPendingQrOrderId(detail.id);
+      setCart(
+        detail.items.map((i) => ({
+          id: i.productId,
+          name: i.productName,
+          price: Number(i.price),
+          quantity: i.quantity,
+          image: "📦",
+          productType: (i as { productType?: CartItem["productType"] }).productType,
+          trackStock: (i as { trackStock?: boolean }).trackStock !== false,
+        })),
+      );
+      setSelectedTableId(detail.table?.id ?? "");
+      setSelectedCustomerId(detail.customerId ?? "");
+      if (detail.billerId) setSelectedBillerId(detail.billerId);
+      setSelectedPaymentMethod(
+        detail.paymentMethod === "CARD" ? "card" : detail.paymentMethod === "CASH" ? "cash" : null,
+      );
+      setPaymentStatusChoice(null);
+      setShippingInput(detail.shipping ?? "");
+      setServiceFeeInput(detail.serviceFee ?? "");
+      if (detail.discount && Number(detail.discount) > 0) {
+        setAppliedDiscount({ type: "fixed", value: Number(detail.discount) });
+      } else {
+        setAppliedDiscount(null);
+      }
+      setPendingQrPortalOpen(false);
+    },
+    [],
+  );
+
+  const handleAcceptQrOrder = useCallback(
+    async (orderId: string) => {
+      if (!canCreate || isDemo || !isAuthenticated) return;
+      setPendingQrBusyId(orderId);
+      try {
+        const detail = await acceptQrPosOrder(orderId);
+        hydrateCartFromQrOrder(detail);
+        notifySuccess(tr("QR sifariş qəbul edildi", "QR order accepted"));
+        void refreshPendingQr("count");
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "ALREADY_CLAIMED") {
+          const raw = err.raw && typeof err.raw === "object" ? (err.raw as Record<string, unknown>) : {};
+          const name = typeof raw.claimedByName === "string" ? raw.claimedByName : "";
+          notifyWarning(
+            name
+              ? tr(`Artıq ${name} tərəfindən götürülüb`, `Already taken by ${name}`)
+              : tr("Artıq başqa kassir tərəfindən götürülüb", "Already taken by another cashier"),
+          );
+        } else {
+          notifyFromError(err);
+        }
+        void refreshPendingQr(pendingQrPortalOpenRef.current ? "list" : "count");
+      } finally {
+        setPendingQrBusyId(null);
+      }
+    },
+    [canCreate, isDemo, isAuthenticated, hydrateCartFromQrOrder, refreshPendingQr, tr],
+  );
+
+  const handleRejectQrOrder = useCallback(
+    async (orderId: string) => {
+      if (!canCreate || isDemo || !isAuthenticated) return;
+      setPendingQrBusyId(orderId);
+      try {
+        await rejectQrPosOrder(orderId);
+        if (pendingQrOrderIdRef.current === orderId) {
+          setPendingQrOrderId(null);
+          setCart([]);
+        }
+        notifySuccess(tr("QR sifariş rədd edildi", "QR order rejected"));
+        void refreshPendingQr(pendingQrPortalOpenRef.current ? "list" : "count");
+      } catch (err) {
+        notifyFromError(err);
+        void refreshPendingQr(pendingQrPortalOpenRef.current ? "list" : "count");
+      } finally {
+        setPendingQrBusyId(null);
+      }
+    },
+    [canCreate, isDemo, isAuthenticated, refreshPendingQr, tr],
+  );
+
+  // Deep-link from POS Orders: ?acceptOrder=id
+  useEffect(() => {
+    const acceptId = searchParams.get("acceptOrder");
+    if (!acceptId || !diningEnabled || !canCreate || isDemo || !isAuthenticated) return;
+    if (acceptOrderHandledRef.current === acceptId) return;
+    acceptOrderHandledRef.current = acceptId;
+    void handleAcceptQrOrder(acceptId).finally(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete("acceptOrder");
+      setSearchParams(next, { replace: true });
+    });
+  }, [
+    searchParams,
+    setSearchParams,
+    diningEnabled,
+    canCreate,
+    isDemo,
+    isAuthenticated,
+    handleAcceptQrOrder,
+  ]);
+
   // Derived selections
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? null;
 
   const customerOptions = customers.map((c) => ({ id: c.id, label: c.name, sub: c.phone }));
   const billerOptions = billers.map((b) => ({ id: b.id, label: b.name, sub: b.code }));
-  const tableOptions = diningTables.map((t) => ({
-    id: t.id,
-    label: `#${t.number} ${t.name}`,
-    sub: `${t.status}${t.area ? ` · ${t.area}` : ""}`,
-  }));
+  const selectedTable = diningTables.find((t) => t.id === selectedTableId) ?? null;
+  const selectedTableLabel = selectedTable
+    ? selectedTable.name?.trim() || String(selectedTable.number)
+    : "";
 
   const handleCustomerChange = (id: string) => {
     if (autoEnabled && id !== selectedCustomerId) {
@@ -1010,7 +1385,14 @@ export function CorporatePOS() {
     }
   };
 
-  const resetCartAfterSave = () => {
+  const resetCartAfterSave = (opts?: { skipQrRelease?: boolean }) => {
+    const claimedId = pendingQrOrderIdRef.current;
+    if (!opts?.skipQrRelease && claimedId && !isDemo && isAuthenticated) {
+      void releaseQrPosOrder(claimedId).catch(() => {
+        /* claim may already be cleared after KOT */
+      });
+    }
+    setPendingQrOrderId(null);
     setCart([]);
     setShippingInput("");
     setServiceFeeInput("");
@@ -1020,13 +1402,126 @@ export function CorporatePOS() {
     setSelectedBillerId(defaultBillerId || "");
     setSelectedTableId("");
     setSelectedPaymentMethod(null);
-    setPaymentStatusChoice("paid");
+    setPaymentStatusChoice(null);
     setAppliedDiscount(null);
     void loadProducts();
+    void refreshPendingQr("count");
   };
+
+  const findCartStockIssue = () => {
+    if (!stockEnabled) return null;
+    return (
+      cart.find((item) => {
+        const isService = !item.trackStock || item.productType === "SERVICE";
+        if (isService) return false;
+        const product = products.find((p) => p.id === item.id);
+        return !product || product.stock <= 0 || item.quantity > product.stock;
+      }) ?? null
+    );
+  };
+
+  const warnCartStockIssue = (stockIssue: CartItem) => {
+    const product = products.find((p) => p.id === stockIssue.id);
+    if (product && product.stock <= 0) warnOutOfStock(product);
+    else if (product) warnInsufficientStock(product, product.stock);
+    else {
+      notifyWarning(
+        tr(
+          "Səbətdə stokda olmayan məhsullar var",
+          "Some items in the cart are out of stock or exceed available quantity",
+        ),
+      );
+    }
+  };
+
+  /** Shared gate for Order / KOT / Bar / Production — keeps validation identical. */
+  const assertPosCheckoutReady = (kind: "order" | "kot" | "bar" | "production"): boolean => {
+    if (!canCreate || isDemo || !isAuthenticated) return false;
+    if (kind === "kot" && !diningEnabled) return false;
+    if (kind === "bar" && (!diningEnabled || !posSendToBarEnabled)) return false;
+    if (kind === "production" && !posSendToProductionEnabled) return false;
+
+    if (pendingQrOrderId && kind !== "kot") {
+      notifyWarning(
+        tr(
+          "QR sifariş üçün KOT & Çap istifadə edin",
+          "Use KOT & Print for QR orders",
+        ),
+      );
+      return false;
+    }
+    if (cart.length === 0) {
+      alert(tr("Səbəti doldurun", "Please add items to cart"));
+      return false;
+    }
+    if (!paymentStatusChoice) {
+      alert(tr("Ödəniş statusunu seçin", "Please select payment status (Paid / Pending)"));
+      return false;
+    }
+    if (!selectedBillerId) {
+      alert(tr("Kassir seçin", "Please select an employee / biller"));
+      return false;
+    }
+    if (isGlobalMode || !branchId) {
+      notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
+      return false;
+    }
+    const stockIssue = findCartStockIssue();
+    if (stockIssue) {
+      warnCartStockIssue(stockIssue);
+      return false;
+    }
+    return true;
+  };
+
+  const paymentMethodLabels = (): Record<PaymentMethod, string> => ({
+    cash: tr("Nağd", "Cash"),
+    card: tr("Kart", "Card"),
+  });
+
+  const resolveTableLabel = (fallbackWalkIn = false) => {
+    if (selectedTableId) {
+      return (
+        diningTables.find((t) => t.id === selectedTableId)?.name ??
+        diningTables.find((t) => t.id === selectedTableId)?.number?.toString()
+      );
+    }
+    return fallbackWalkIn ? tr("Gələn müştəri", "Walk-in") : undefined;
+  };
+
+  const buildCheckoutBody = () => ({
+    status: "COMPLETED" as const,
+    customerId: selectedCustomerId || null,
+    ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+    ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+      ? { mileageAtService: Number(mileageInput) }
+      : {}),
+    billerId: selectedBillerId || null,
+    ...(selectedPaymentMethod
+      ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) }
+      : {}),
+    shipping,
+    ...(serviceFee > 0 ? { serviceFee } : {}),
+    discount: discountAmount > 0 ? discountAmount : undefined,
+    items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+    // Paid: omit amount so backend collects exact grandTotal when method is set.
+    // Pending: explicit 0 so collectFullPaymentIfMethodSet does not auto-charge.
+    ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
+    ...(isGlobalMode ? { storeId: branchId ?? null } : {}),
+    ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
+  });
 
   const handleSaveDraft = async () => {
     if (!canCreate || isDemo || !isAuthenticated) return;
+    if (pendingQrOrderId) {
+      notifyWarning(
+        tr(
+          "QR sifariş üçün KOT & Çap istifadə edin",
+          "Use KOT & Print for QR orders",
+        ),
+      );
+      return;
+    }
     if (cart.length === 0) {
       notifyWarning(tr("Səbəti doldurun", "Please add items to cart"));
       return;
@@ -1036,7 +1531,7 @@ export function CorporatePOS() {
       return;
     }
 
-    setSavingDraft(true);
+    setCheckoutAction("draft");
     try {
       const detail = await createPosOrder({
         status: "HELD",
@@ -1064,131 +1559,7 @@ export function CorporatePOS() {
     } catch (err) {
       notifyFromError(err);
     } finally {
-      setSavingDraft(false);
-    }
-  };
-
-  const handlePlaceOrder = async () => {
-    if (!canCreate || isDemo || !isAuthenticated) return;
-    // Dining tenants use Send KOT & Print instead.
-    if (diningEnabled) return;
-    if (cart.length === 0) { alert(tr("Səbəti doldurun", "Please add items to cart")); return; }
-    if (!selectedPaymentMethod) { alert(tr("Ödəniş üsulunu seçin", "Please select a payment method")); return; }
-    if (!selectedBillerId) { alert(tr("Kassir seçin", "Please select an employee / biller")); return; }
-
-    const stockIssue = stockEnabled && cart.find((item) => {
-      const isService = !item.trackStock || item.productType === "SERVICE";
-      if (isService) return false;
-      const product = products.find((p) => p.id === item.id);
-      return !product || product.stock <= 0 || item.quantity > product.stock;
-    });
-    if (stockIssue) {
-      const product = products.find((p) => p.id === stockIssue.id);
-      if (product && product.stock <= 0) {
-        warnOutOfStock(product);
-      } else if (product) {
-        warnInsufficientStock(product, product.stock);
-      } else {
-        notifyWarning(
-          tr(
-            "Səbətdə stokda olmayan məhsullar var",
-            "Some items in the cart are out of stock or exceed available quantity",
-          ),
-        );
-      }
-      return;
-    }
-
-    const pmLabel: Record<PaymentMethod, string> = { cash: tr("Nağd", "Cash"), card: tr("Kart", "Card") };
-
-    const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
-    const receiptPhone = selectedCustomer?.phone ?? "—";
-    const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
-
-    setPlacingOrder(true);
-    try {
-      const detail = await posCheckout({
-        status: "COMPLETED",
-        customerId: selectedCustomerId || null,
-        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
-          ? { mileageAtService: Number(mileageInput) }
-          : {}),
-        billerId: selectedBillerId || null,
-        paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod),
-        shipping,
-        ...(serviceFee > 0 ? { serviceFee } : {}),
-        discount: discountAmount > 0 ? discountAmount : undefined,
-        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
-        // Paid: omit amount so backend collects exact grandTotal.
-        // Pending: explicit 0 so collectFullPaymentIfMethodSet does not auto-charge.
-        ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
-        ...(isGlobalMode ? { storeId: branchId ?? null } : {}),
-        ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
-      });
-
-      const orderDate = new Date(detail.date);
-      const dateStr = Number.isNaN(orderDate.getTime())
-        ? detail.date
-        : formatDateTime(orderDate, language);
-
-      const apiSubtotal = detail.items.reduce(
-        (sum, item) => sum + parsePrice(item.price) * item.quantity,
-        0,
-      );
-      const apiShipping = parsePrice(detail.shipping);
-      const apiServiceFee = parsePrice(detail.serviceFee);
-      const apiDiscount = parsePrice(detail.discount);
-      const apiTotal = parsePrice(detail.grandTotal);
-      const apiPaid = parsePrice(detail.paid);
-      const serverPaymentStatusLabel =
-        detail.paymentStatus.toLowerCase() === "paid" || (apiTotal > 0 && apiPaid >= apiTotal)
-          ? tr("Ödənilib", "Paid")
-          : paymentStatusChoice === "pending" || detail.paymentStatus.toLowerCase() === "unpaid"
-            ? tr("Gözləyir", "Pending")
-            : detail.paymentStatus;
-
-      setReceipt({
-        orderNo: detail.reference,
-        date: dateStr,
-        customer: detail.customerName ?? receiptCustomer,
-        customerPhone: receiptPhone,
-        vehicle: detail.vehicleLabel ?? undefined,
-        mileage: detail.mileageAtService ?? undefined,
-        employee: detail.billerName ?? receiptBiller,
-        items: detail.items.map((item) => ({
-          name: item.productName,
-          qty: item.quantity,
-          price: parsePrice(item.price),
-        })),
-        subtotal: apiSubtotal,
-        shipping: apiShipping,
-        serviceFee: apiServiceFee,
-        discount: apiDiscount,
-        discountLabel: appliedDiscount
-          ? appliedDiscount.type === "percent"
-            ? tr(`Endirim (${appliedDiscount.value}%)`, `Discount (${appliedDiscount.value}%)`)
-            : tr("Endirim", "Discount")
-          : tr("Endirim", "Discount"),
-        total: apiTotal,
-        paymentMethod: pmLabel[selectedPaymentMethod],
-        paymentStatusLabel: serverPaymentStatusLabel,
-        autoPrintReceipt: true,
-        allowKitchenReprint: false,
-        ...(diningEnabled && selectedTableId
-          ? {
-              tableLabel:
-                diningTables.find((t) => t.id === selectedTableId)?.name ??
-                diningTables.find((t) => t.id === selectedTableId)?.number?.toString(),
-            }
-          : {}),
-      });
-
-      resetCartAfterSave();
-    } catch (err) {
-      notifyFromError(err);
-    } finally {
-      setPlacingOrder(false);
+      setCheckoutAction(null);
     }
   };
 
@@ -1198,7 +1569,12 @@ export function CorporatePOS() {
     receiptCustomer: string,
     receiptPhone: string,
     receiptBiller: string,
-    opts?: { diningFlow?: boolean; tableLabel?: string },
+    opts?: {
+      diningFlow?: boolean;
+      tableLabel?: string;
+      autoPrintReceipt?: boolean;
+      allowKitchenReprint?: boolean;
+    },
   ) => {
     const orderDate = new Date(detail.date);
     const dateStr = Number.isNaN(orderDate.getTime())
@@ -1220,6 +1596,8 @@ export function CorporatePOS() {
         : paymentStatusChoice === "pending" || detail.paymentStatus.toLowerCase() === "unpaid"
           ? tr("Gözləyir", "Pending")
           : detail.paymentStatus;
+
+    const allowKitchenReprint = opts?.allowKitchenReprint ?? !!opts?.diningFlow;
 
     return {
       orderNo: detail.reference,
@@ -1246,86 +1624,70 @@ export function CorporatePOS() {
       total: apiTotal,
       paymentMethod: selectedPaymentMethod ? pmLabel[selectedPaymentMethod] : "—",
       paymentStatusLabel: serverPaymentStatusLabel,
-      autoPrintReceipt: !opts?.diningFlow,
+      autoPrintReceipt: opts?.autoPrintReceipt ?? !opts?.diningFlow,
       autoPrintKitchen: false,
-      allowKitchenReprint: !!opts?.diningFlow,
+      allowKitchenReprint,
       ...(opts?.diningFlow || opts?.tableLabel
         ? { tableLabel: opts.tableLabel }
         : {}),
     };
   };
 
-  const handleSendToKot = async () => {
-    if (!canCreate || isDemo || !isAuthenticated || !diningEnabled) return;
-    if (cart.length === 0) {
-      alert(tr("Səbəti doldurun", "Please add items to cart"));
-      return;
-    }
-    if (!selectedPaymentMethod) {
-      alert(tr("Ödəniş üsulunu seçin", "Please select a payment method"));
-      return;
-    }
-    if (!selectedBillerId) {
-      alert(tr("Kassir seçin", "Please select an employee / biller"));
-      return;
-    }
-    if (isGlobalMode || !branchId) {
-      notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
-      return;
-    }
+  const handlePlaceOrder = async (opts?: { printBill?: boolean }) => {
+    const printBill = opts?.printBill === true;
+    if (!assertPosCheckoutReady("order")) return;
 
-    const stockIssue = stockEnabled && cart.find((item) => {
-      const isService = !item.trackStock || item.productType === "SERVICE";
-      if (isService) return false;
-      const product = products.find((p) => p.id === item.id);
-      return !product || product.stock <= 0 || item.quantity > product.stock;
-    });
-    if (stockIssue) {
-      const product = products.find((p) => p.id === stockIssue.id);
-      if (product && product.stock <= 0) warnOutOfStock(product);
-      else if (product) warnInsufficientStock(product, product.stock);
-      else {
-        notifyWarning(
-          tr(
-            "Səbətdə stokda olmayan məhsullar var",
-            "Some items in the cart are out of stock or exceed available quantity",
-          ),
-        );
-      }
-      return;
-    }
-
-    const pmLabel: Record<PaymentMethod, string> = {
-      cash: tr("Nağd", "Cash"),
-      card: tr("Kart", "Card"),
-    };
+    const pmLabel = paymentMethodLabels();
     const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
     const receiptPhone = selectedCustomer?.phone ?? "—";
     const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
 
-    setSendingToKot(true);
+    setCheckoutAction(printBill ? "orderBill" : "order");
     try {
-      const detail = await sendPosOrderToKot({
-        status: "COMPLETED",
-        customerId: selectedCustomerId || null,
-        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
-          ? { mileageAtService: Number(mileageInput) }
-          : {}),
-        billerId: selectedBillerId || null,
-        paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod),
-        shipping,
-        ...(serviceFee > 0 ? { serviceFee } : {}),
-        discount: discountAmount > 0 ? discountAmount : undefined,
-        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
-        ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
-        ...(selectedTableId ? { tableId: selectedTableId } : {}),
-      });
+      const detail = await posCheckout(buildCheckoutBody());
+      const tableLabel = diningEnabled ? resolveTableLabel(false) : undefined;
 
-      const tableLabel = selectedTableId
-        ? diningTables.find((t) => t.id === selectedTableId)?.name ??
-          diningTables.find((t) => t.id === selectedTableId)?.number?.toString()
-        : tr("Gələn müştəri", "Walk-in");
+      if (printBill) {
+        setReceipt(
+          buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
+            autoPrintReceipt: true,
+            tableLabel,
+            allowKitchenReprint: false,
+          }),
+        );
+      } else {
+        notifySuccess(
+          tr(
+            `Sifariş yerləşdirildi (${detail.reference})`,
+            `Order placed (${detail.reference})`,
+          ),
+        );
+      }
+      resetCartAfterSave();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setCheckoutAction(null);
+    }
+  };
+
+  const handleSendToKot = async (opts?: { printBill?: boolean }) => {
+    const printBill = opts?.printBill === true;
+    if (!assertPosCheckoutReady("kot")) return;
+
+    const pmLabel = paymentMethodLabels();
+    const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
+    const receiptPhone = selectedCustomer?.phone ?? "—";
+    const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
+
+    setCheckoutAction(printBill ? "kotBill" : "kot");
+    try {
+      const body = buildCheckoutBody();
+      const detail = pendingQrOrderId
+        ? await approveQrAndSendToKot(pendingQrOrderId, body)
+        : await sendPosOrderToKot(body);
+
+      const tableLabel = resolveTableLabel(true);
 
       try {
         const logoSrc =
@@ -1365,87 +1727,31 @@ export function CorporatePOS() {
         buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
           diningFlow: true,
           tableLabel,
+          autoPrintReceipt: printBill,
+          allowKitchenReprint: true,
         }),
       );
-      resetCartAfterSave();
+      resetCartAfterSave({ skipQrRelease: true });
     } catch (err) {
       notifyFromError(err);
     } finally {
-      setSendingToKot(false);
+      setCheckoutAction(null);
     }
   };
 
-  const handleSendToBar = async () => {
-    if (!canCreate || isDemo || !isAuthenticated || !diningEnabled || !posSendToBarEnabled) return;
-    if (cart.length === 0) {
-      alert(tr("Səbəti doldurun", "Please add items to cart"));
-      return;
-    }
-    if (!selectedPaymentMethod) {
-      alert(tr("Ödəniş üsulunu seçin", "Please select a payment method"));
-      return;
-    }
-    if (!selectedBillerId) {
-      alert(tr("Kassir seçin", "Please select an employee / biller"));
-      return;
-    }
-    if (isGlobalMode || !branchId) {
-      notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
-      return;
-    }
+  const handleSendToBar = async (opts?: { printBill?: boolean }) => {
+    const printBill = opts?.printBill === true;
+    if (!assertPosCheckoutReady("bar")) return;
 
-    const stockIssue = stockEnabled && cart.find((item) => {
-      const isService = !item.trackStock || item.productType === "SERVICE";
-      if (isService) return false;
-      const product = products.find((p) => p.id === item.id);
-      return !product || product.stock <= 0 || item.quantity > product.stock;
-    });
-    if (stockIssue) {
-      const product = products.find((p) => p.id === stockIssue.id);
-      if (product && product.stock <= 0) warnOutOfStock(product);
-      else if (product) warnInsufficientStock(product, product.stock);
-      else {
-        notifyWarning(
-          tr(
-            "Səbətdə stokda olmayan məhsullar var",
-            "Some items in the cart are out of stock or exceed available quantity",
-          ),
-        );
-      }
-      return;
-    }
-
-    const pmLabel: Record<PaymentMethod, string> = {
-      cash: tr("Nağd", "Cash"),
-      card: tr("Kart", "Card"),
-    };
+    const pmLabel = paymentMethodLabels();
     const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
     const receiptPhone = selectedCustomer?.phone ?? "—";
     const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
 
-    setSendingToBar(true);
+    setCheckoutAction(printBill ? "barBill" : "bar");
     try {
-      const detail = await sendPosOrderToBar({
-        status: "COMPLETED",
-        customerId: selectedCustomerId || null,
-        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
-          ? { mileageAtService: Number(mileageInput) }
-          : {}),
-        billerId: selectedBillerId || null,
-        paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod),
-        shipping,
-        ...(serviceFee > 0 ? { serviceFee } : {}),
-        discount: discountAmount > 0 ? discountAmount : undefined,
-        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
-        ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
-        ...(selectedTableId ? { tableId: selectedTableId } : {}),
-      });
-
-      const tableLabel = selectedTableId
-        ? diningTables.find((t) => t.id === selectedTableId)?.name ??
-          diningTables.find((t) => t.id === selectedTableId)?.number?.toString()
-        : tr("Gələn müştəri", "Walk-in");
+      const detail = await sendPosOrderToBar(buildCheckoutBody());
+      const tableLabel = resolveTableLabel(true);
 
       try {
         const logoSrc =
@@ -1480,89 +1786,42 @@ export function CorporatePOS() {
         buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
           diningFlow: true,
           tableLabel,
+          autoPrintReceipt: printBill,
+          allowKitchenReprint: false,
         }),
       );
       resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
     } finally {
-      setSendingToBar(false);
+      setCheckoutAction(null);
     }
   };
 
   const handleSendToProduction = async () => {
-    if (!canCreate || isDemo || !isAuthenticated || !posSendToProductionEnabled) return;
-    if (cart.length === 0) {
-      alert(tr("Səbəti doldurun", "Please add items to cart"));
-      return;
-    }
-    if (!selectedPaymentMethod) {
-      alert(tr("Ödəniş üsulunu seçin", "Please select a payment method"));
-      return;
-    }
-    if (!selectedBillerId) {
-      alert(tr("Kassir seçin", "Please select an employee / biller"));
-      return;
-    }
+    if (!assertPosCheckoutReady("production")) return;
 
-    const stockIssue = stockEnabled && cart.find((item) => {
-      const isService = !item.trackStock || item.productType === "SERVICE";
-      if (isService) return false;
-      const product = products.find((p) => p.id === item.id);
-      return !product || product.stock <= 0 || item.quantity > product.stock;
-    });
-    if (stockIssue) {
-      const product = products.find((p) => p.id === stockIssue.id);
-      if (product && product.stock <= 0) warnOutOfStock(product);
-      else if (product) warnInsufficientStock(product, product.stock);
-      else {
-        notifyWarning(
-          tr(
-            "Səbətdə stokda olmayan məhsullar var",
-            "Some items in the cart are out of stock or exceed available quantity",
-          ),
-        );
-      }
-      return;
-    }
-
-    const pmLabel: Record<PaymentMethod, string> = {
-      cash: tr("Nağd", "Cash"),
-      card: tr("Kart", "Card"),
-    };
+    const pmLabel = paymentMethodLabels();
     const receiptCustomer = selectedCustomer?.name ?? tr("Anonim", "Anonymous");
     const receiptPhone = selectedCustomer?.phone ?? "—";
     const receiptBiller = billers.find((b) => b.id === selectedBillerId)?.name ?? "—";
 
-    setSendingToProduction(true);
+    setCheckoutAction("production");
     try {
-      const detail = await sendPosOrderToProduction({
-        status: "COMPLETED",
-        customerId: selectedCustomerId || null,
-        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
-          ? { mileageAtService: Number(mileageInput) }
-          : {}),
-        billerId: selectedBillerId || null,
-        paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod),
-        shipping,
-        ...(serviceFee > 0 ? { serviceFee } : {}),
-        discount: discountAmount > 0 ? discountAmount : undefined,
-        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
-        ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
-        ...(isGlobalMode ? { storeId: branchId ?? null } : {}),
-        ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
-      });
+      const detail = await sendPosOrderToProduction(buildCheckoutBody());
 
       setReceipt(
-        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller),
+        buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
+          autoPrintReceipt: true,
+          allowKitchenReprint: false,
+        }),
       );
       notifySuccess(tr("İstehsala göndərildi", "Sent to production"));
       resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
     } finally {
-      setSendingToProduction(false);
+      setCheckoutAction(null);
     }
   };
 
@@ -1607,6 +1866,27 @@ export function CorporatePOS() {
         <ClipboardList className="w-3.5 h-3.5" />
         <span className="text-xs font-medium">{tr("Sifarişlər", "Orders")}</span>
       </button>
+      {diningEnabled && (
+        <button
+          type="button"
+          onClick={() => {
+            setPendingQrPortalOpen(true);
+            void refreshPendingQr("list");
+          }}
+          className={`fixed top-2 right-[6.5rem] z-50 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border shadow-sm transition-all ${
+            pendingQrCount > 0
+              ? "bg-orange-500 border-orange-600 text-white animate-pulse"
+              : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-orange-400"
+          }`}
+          title={tr("Gözləyən QR sifarişlər", "Pending QR orders")}
+        >
+          <Bell className="w-3.5 h-3.5" />
+          <span className="text-xs font-medium">
+            {tr("QR", "QR")}
+            {pendingQrCount > 0 ? ` (${pendingQrCount})` : ""}
+          </span>
+        </button>
+      )}
 
       <div className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8">
 
@@ -1850,16 +2130,18 @@ export function CorporatePOS() {
                 </div>
                 {cart.length > 0 && canCreate && (
                   <button
-                    onClick={() => {
-                      setCart([]);
-                      setShippingInput("");
-                    }}
+                    onClick={() => resetCartAfterSave()}
                     className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
               </div>
+              {pendingQrOrderId && (
+                <div className="shrink-0 mb-2 px-2 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-[11px] text-orange-800 dark:text-orange-200">
+                  {tr("QR sifariş qəbul edildi — KOT & Çap ilə təsdiqləyin", "QR order accepted — confirm with KOT & Print")}
+                </div>
+              )}
 
               {/* Scrollable: customer fields, cart, checkout */}
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 pb-2">
@@ -1930,13 +2212,35 @@ export function CorporatePOS() {
                 />
 
                 {diningEnabled && (
-                  <SelectDropdown
-                    value={selectedTableId}
-                    onChange={setSelectedTableId}
-                    options={tableOptions}
-                    placeholder={tr("Masa (istəyə bağlı)", "Table (optional)")}
-                    icon={Armchair}
-                  />
+                  <>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setTablePickerOpen(true)}
+                        className="w-full flex items-center gap-2 pl-9 pr-3 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        <Armchair className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                        <span
+                          className={
+                            selectedTableLabel
+                              ? "text-gray-900 dark:text-white truncate"
+                              : "text-gray-400"
+                          }
+                        >
+                          {selectedTableLabel || tr("Masa (istəyə bağlı)", "Table (optional)")}
+                        </span>
+                        <ChevronDown className="ml-auto w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      </button>
+                    </div>
+                    <PosTablePickerPortal
+                      open={tablePickerOpen}
+                      tables={diningTables}
+                      selectedId={selectedTableId}
+                      onSelect={setSelectedTableId}
+                      onClose={() => setTablePickerOpen(false)}
+                      tr={tr}
+                    />
+                  </>
                 )}
                 </div>
 
@@ -2130,7 +2434,7 @@ export function CorporatePOS() {
                         ) : (
                           <button
                             onClick={() => setDiscountModalOpen(true)}
-                            className="flex items-center gap-1 text-[#14b8a6] dark:text-[#14b8a6] hover:underline font-medium"
+                            className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-[#14b8a6] dark:hover:text-[#14b8a6] hover:underline"
                           >
                             <Tag className="w-3 h-3" />
                             {tr("Endirim əlavə et", "Add Discount")}
@@ -2208,94 +2512,119 @@ export function CorporatePOS() {
 
                   {canCreate && (
                   <div className="space-y-1.5">
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => void handleSaveDraft()}
-                        disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToBar || sendingToProduction || isGlobalMode || !branchId}
-                        className="px-2.5 py-2 text-[11px] font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {savingDraft
-                          ? tr("Saxlanılır...", "Saving...")
-                          : tr("Qaralama olaraq saxla", "Save as Draft")}
-                      </button>
-                      {diningEnabled ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleSendToKot()}
-                          disabled={
-                            cart.length === 0 ||
-                            placingOrder ||
-                            savingDraft ||
-                            sendingToKot ||
-                            sendingToBar ||
-                            sendingToProduction ||
-                            isGlobalMode ||
-                            !branchId
-                          }
-                          className="px-2.5 py-2 text-[11px] font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                        >
-                          <ChefHat className="w-3 h-3" />
-                          {sendingToKot
-                            ? tr("Göndərilir...", "Sending...")
-                            : tr("KOT & Çap", "Send KOT & Print")}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => void handlePlaceOrder()}
-                          disabled={cart.length === 0 || placingOrder || savingDraft || sendingToKot || sendingToBar || sendingToProduction || isGlobalMode || !branchId}
-                          className="px-2.5 py-2 text-[11px] font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                        >
-                          <Printer className="w-3 h-3" />
-                          {placingOrder ? tr("Göndərilir...", "Processing...") : tr("Ödənişi Tamamla", "Complete & Print")}
-                        </button>
-                      )}
-                    </div>
-                    {diningEnabled && posSendToBarEnabled && (
-                      <button
-                        type="button"
-                        onClick={() => void handleSendToBar()}
-                        disabled={
-                          cart.length === 0 ||
-                          placingOrder ||
-                          savingDraft ||
-                          sendingToKot ||
-                          sendingToBar ||
-                          sendingToProduction ||
-                          isGlobalMode ||
-                          !branchId
-                        }
-                        className="w-full px-2.5 py-2 text-[11px] font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                      >
-                        <Wine className="w-3 h-3" />
-                        {sendingToBar
-                          ? tr("Göndərilir...", "Sending...")
-                          : tr("BAR & Çap", "Send To Bar & Print")}
-                      </button>
-                    )}
-                    {posSendToProductionEnabled && (
-                      <button
-                        type="button"
-                        onClick={() => void handleSendToProduction()}
-                        disabled={
-                          cart.length === 0 ||
-                          placingOrder ||
-                          savingDraft ||
-                          sendingToKot ||
-                          sendingToBar ||
-                          sendingToProduction ||
-                          isGlobalMode ||
-                          !branchId
-                        }
-                        className="w-full px-2.5 py-2 text-[11px] font-medium text-white bg-[#0d9488] hover:bg-[#0f766e] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                      >
-                        <Factory className="w-3 h-3" />
-                        {sendingToProduction
-                          ? tr("İstehsala göndərilir...", "Sending to production...")
-                          : tr("İstehsala göndər", "Send to Production")}
-                      </button>
-                    )}
+                    {(() => {
+                      const baseDisabled =
+                        cart.length === 0 ||
+                        checkoutBusy ||
+                        isGlobalMode ||
+                        !branchId;
+                      const orderDisabled = baseDisabled || !!pendingQrOrderId;
+                      const btnBase =
+                        "px-2.5 py-2 text-[11px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1";
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveDraft()}
+                              disabled={orderDisabled}
+                              className={`${btnBase} text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800`}
+                            >
+                              {checkoutAction === "draft"
+                                ? tr("Saxlanılır...", "Saving...")
+                                : tr("Qaralama olaraq saxla", "Save as Draft")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handlePlaceOrder()}
+                              disabled={orderDisabled}
+                              className={`${btnBase} text-white bg-[#14b8a6] hover:bg-[#0d9488]`}
+                            >
+                              <ClipboardList className="w-3 h-3" />
+                              {checkoutAction === "order"
+                                ? tr("Göndərilir...", "Processing...")
+                                : tr("Sifariş", "Order")}
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handlePlaceOrder({ printBill: true })}
+                            disabled={orderDisabled}
+                            className={`${btnBase} w-full text-white bg-[#14b8a6] hover:bg-[#0d9488]`}
+                          >
+                            <Printer className="w-3 h-3" />
+                            {checkoutAction === "orderBill"
+                              ? tr("Göndərilir...", "Processing...")
+                              : tr("Sifariş & Qəbz", "Order & Bill")}
+                          </button>
+                          {diningEnabled && (
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => void handleSendToKot()}
+                                disabled={baseDisabled}
+                                className={`${btnBase} text-white bg-orange-500 hover:bg-orange-600`}
+                              >
+                                <ChefHat className="w-3 h-3" />
+                                {checkoutAction === "kot"
+                                  ? tr("Göndərilir...", "Sending...")
+                                  : tr("KOT & Çap", "KOT & Print")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleSendToKot({ printBill: true })}
+                                disabled={baseDisabled}
+                                className={`${btnBase} text-white bg-orange-600 hover:bg-orange-700`}
+                              >
+                                <Printer className="w-3 h-3" />
+                                {checkoutAction === "kotBill"
+                                  ? tr("Göndərilir...", "Sending...")
+                                  : tr("KOT & Çap & Qəbz", "KOT & Print & Bill")}
+                              </button>
+                            </div>
+                          )}
+                          {diningEnabled && posSendToBarEnabled && (
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => void handleSendToBar()}
+                                disabled={orderDisabled}
+                                className={`${btnBase} text-white bg-violet-600 hover:bg-violet-700`}
+                              >
+                                <Wine className="w-3 h-3" />
+                                {checkoutAction === "bar"
+                                  ? tr("Göndərilir...", "Sending...")
+                                  : tr("BAR & Çap", "Bar & Print")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleSendToBar({ printBill: true })}
+                                disabled={orderDisabled}
+                                className={`${btnBase} text-white bg-violet-700 hover:bg-violet-800`}
+                              >
+                                <Printer className="w-3 h-3" />
+                                {checkoutAction === "barBill"
+                                  ? tr("Göndərilir...", "Sending...")
+                                  : tr("BAR & Çap & Qəbz", "Bar & Print & Bill")}
+                              </button>
+                            </div>
+                          )}
+                          {posSendToProductionEnabled && (
+                            <button
+                              type="button"
+                              onClick={() => void handleSendToProduction()}
+                              disabled={orderDisabled}
+                              className={`${btnBase} w-full text-white bg-[#0d9488] hover:bg-[#0f766e]`}
+                            >
+                              <Factory className="w-3 h-3" />
+                              {checkoutAction === "production"
+                                ? tr("İstehsala göndərilir...", "Sending to production...")
+                                : tr("İstehsala göndər", "Send to Production")}
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   )}
                 </div>
@@ -2402,6 +2731,126 @@ export function CorporatePOS() {
           </div>
         </div>
       )}
+
+      {diningEnabled && pendingQrPortalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-lg max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 shrink-0">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-orange-500" />
+                  {tr("Gözləyən QR sifarişlər", "Pending QR orders")}
+                  {pendingQrCount > 0 ? (
+                    <span className="ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-orange-500 text-white text-[10px] font-bold animate-pulse">
+                      {pendingQrCount}
+                    </span>
+                  ) : null}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setPendingQrPortalOpen(false)}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                {pendingQrList.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-8">
+                    {tr("Gözləyən QR sifariş yoxdur", "No pending QR orders")}
+                  </p>
+                ) : (
+                  pendingQrList.map((row) => {
+                    const busy = pendingQrBusyId === row.id;
+                    const isClaimedOther = row.claimStatus === "claimed";
+                    const isMine = row.claimStatus === "mine";
+                    return (
+                      <div
+                        key={row.id}
+                        className={`rounded-lg border p-3 ${
+                          isMine
+                            ? "border-[#14b8a6] bg-[#f0fdfa] dark:bg-[#14b8a6]/10"
+                            : isClaimedOther
+                              ? "border-gray-200 dark:border-gray-700 opacity-70"
+                              : "border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                              {row.reference}
+                            </p>
+                            <p className="text-[11px] font-medium text-gray-800 dark:text-gray-200 mt-0.5 flex items-center gap-1">
+                              <Armchair className="w-3 h-3 text-orange-500 shrink-0" />
+                              {row.table
+                                ? tr(
+                                    `Masa #${row.table.number}${
+                                      row.table.name?.trim() &&
+                                      row.table.name.trim() !== String(row.table.number)
+                                        ? ` · ${row.table.name.trim()}`
+                                        : ""
+                                    }`,
+                                    `Table #${row.table.number}${
+                                      row.table.name?.trim() &&
+                                      row.table.name.trim() !== String(row.table.number)
+                                        ? ` · ${row.table.name.trim()}`
+                                        : ""
+                                    }`,
+                                  )
+                                : tr("Masa yoxdur (gələn)", "No table (walk-in)")}
+                            </p>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                              {row.itemSummary || `${row.itemCount} ${tr("məhsul", "items")}`}
+                            </p>
+                            <p className="text-[11px] font-medium text-[#14b8a6] mt-1">
+                              {formatCurrency(row.grandTotal)}
+                            </p>
+                            {isClaimedOther && (
+                              <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-1">
+                                {tr(
+                                  `Götürüb: ${row.claimedByName ?? "—"}`,
+                                  `Claimed by ${row.claimedByName ?? "—"}`,
+                                )}
+                              </p>
+                            )}
+                            {isMine && (
+                              <p className="text-[10px] text-[#0d9488] mt-1">
+                                {tr("Sizin qəbulunuz", "Accepted by you")}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <button
+                              type="button"
+                              disabled={busy || isClaimedOther || !canCreate}
+                              onClick={() => void handleAcceptQrOrder(row.id)}
+                              className="px-2.5 py-1 text-[11px] font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-md disabled:opacity-40"
+                            >
+                              {busy
+                                ? "…"
+                                : isMine
+                                  ? tr("Aç", "Open")
+                                  : tr("Qəbul et", "Accept")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy || (isClaimedOther && !canCreate) || !canCreate}
+                              onClick={() => void handleRejectQrOrder(row.id)}
+                              className="px-2.5 py-1 text-[11px] font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40"
+                            >
+                              {tr("Rədd", "Reject")}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {touchKb && (
         <TouchKeyboard

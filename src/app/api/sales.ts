@@ -59,6 +59,8 @@ export interface PosOrderLineItem {
   sku: string;
   quantity: number;
   price: string;
+  productType?: "SINGLE" | "VARIABLE" | "SERVICE";
+  trackStock?: boolean;
   /** Units already returned for this product on the order (product-level). */
   returnedQty?: number;
   /** quantity - returnedQty, floored at 0. */
@@ -427,6 +429,71 @@ export async function sendHeldPosOrderToKot(id: string, body?: { tableId?: strin
   const res = await apiPost<{ success: boolean; data: PosOrderDetail }>(
     `/tenant/sales/pos-orders/${id}/send-to-kot`,
     body ?? {},
+  );
+  return res.data;
+}
+
+export type PendingQrClaimStatus = "open" | "claimed" | "mine";
+
+export interface PendingQrPosOrderRow {
+  id: string;
+  reference: string;
+  status: string;
+  grandTotal: number;
+  createdAt: string;
+  table: { id: string; number: number; name: string } | null;
+  itemCount: number;
+  itemSummary: string;
+  claimStatus: PendingQrClaimStatus;
+  claimedByName: string | null;
+  acceptanceExpiresAt: string | null;
+}
+
+export async function fetchPendingQrPosOrders() {
+  const res = await apiGet<{ success: boolean; data: PendingQrPosOrderRow[] }>(
+    "/tenant/sales/pos-orders/pending-qr",
+  );
+  return res.data;
+}
+
+export async function fetchPendingQrPosOrderCount() {
+  const res = await apiGet<{ success: boolean; data: { count: number } }>(
+    "/tenant/sales/pos-orders/pending-qr-count",
+  );
+  return res.data;
+}
+
+export async function acceptQrPosOrder(id: string) {
+  const res = await apiPost<{ success: boolean; data: PosOrderDetail }>(
+    `/tenant/sales/pos-orders/${id}/accept-qr`,
+    {},
+  );
+  return res.data;
+}
+
+export async function releaseQrPosOrder(id: string) {
+  const res = await apiPost<{ success: boolean; data: { id: string; status: string } }>(
+    `/tenant/sales/pos-orders/${id}/release-qr`,
+    {},
+  );
+  return res.data;
+}
+
+export async function rejectQrPosOrder(id: string) {
+  const res = await apiPost<{ success: boolean; data: { id: string; status: string } }>(
+    `/tenant/sales/pos-orders/${id}/reject-qr`,
+    {},
+  );
+  return res.data;
+}
+
+export async function approveQrAndSendToKot(
+  id: string,
+  body: Partial<CreatePosOrderBody> = {},
+) {
+  const res = await apiPost<{ success: boolean; data: PosOrderDetail }>(
+    `/tenant/sales/pos-orders/${id}/approve-and-send-to-kot`,
+    body,
   );
   return res.data;
 }

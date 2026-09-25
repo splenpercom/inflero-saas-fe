@@ -62,9 +62,14 @@ function emptyToNull(value: string): string | null {
 
 export function Settings() {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated, refresh, hasModule } = useAuth();
+  const { isDemo, isAuthenticated, refresh, hasModule, user } = useAuth();
   const posEnabled = hasModule("POS");
-  const diningEnabled = hasModule("DINING");
+  // Add-ons are tenant-wide: use the tenant module flag (not branch-scoped hasModule),
+  // so Bar & Print only appears when Dining is actually enabled on the tenant.
+  const diningEnabled =
+    isDemo
+      ? hasModule("DINING")
+      : user?.tenant?.modules?.DINING === true;
   const reservationsEnabled = hasModule("RESERVATIONS");
   const addonsEnabled = posEnabled || reservationsEnabled;
   const { canView, canEdit } = useModulePermissions("Settings");
@@ -515,6 +520,13 @@ export function Settings() {
       if (searchParams.has("section")) setSearchParams({}, { replace: true });
     }
   }, [addonsEnabled, posEnabled, diningEnabled, activeSection, searchParams, setSearchParams]);
+
+  // Hide / clear Bar add-on when Dining is not on this tenant.
+  useEffect(() => {
+    if (!diningEnabled && posSendToBarEnabled) {
+      setPosSendToBarEnabled(false);
+    }
+  }, [diningEnabled, posSendToBarEnabled]);
 
   const navItemClass = (section: SettingsSection) =>
     `w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
@@ -1103,7 +1115,7 @@ export function Settings() {
                     </button>
                   </div>
 
-                  {diningEnabled && (
+                  {posEnabled && diningEnabled ? (
                   <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
                     <div>
                       <p className="text-xs font-medium text-gray-900 dark:text-white">
@@ -1132,7 +1144,7 @@ export function Settings() {
                       />
                     </button>
                   </div>
-                  )}
+                  ) : null}
                   </>
                   )}
                 </div>

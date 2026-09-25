@@ -271,7 +271,7 @@ export function ProductReport() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {stockEnabled && <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
+        <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
             {pt("Top Products by Units Sold", "Satılan Vahid üzrə Ən Yaxşı Məhsullar")}
           </h2>
@@ -288,16 +288,18 @@ export function ProductReport() {
               </BarChart>
             </ResponsiveContainer>
           )}
-        </div>}
-
-        <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-            {pt("Restock Activity", "Yenidən Stok Fəaliyyəti")}
-          </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-24">
-            {pt("Restock time-series is not available from the API.", "Yenidən stok zaman sırası API-dən mövcud deyil.")}
-          </p>
         </div>
+
+        {stockEnabled && (
+          <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+              {pt("Restock Activity", "Yenidən Stok Fəaliyyəti")}
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-24">
+              {pt("Restock time-series is not available from the API.", "Yenidən stok zaman sırası API-dən mövcud deyil.")}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
