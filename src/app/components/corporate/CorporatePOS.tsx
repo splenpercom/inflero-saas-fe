@@ -81,6 +81,7 @@ interface Product {
   category: string;
   stock: number;
   code: string;
+  barcode: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
 }
@@ -641,8 +642,6 @@ export function CorporatePOS() {
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const posSearchSeqRef = useRef(0);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [categoryReorderMode, setCategoryReorderMode] = useState(false);
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
@@ -676,6 +675,8 @@ export function CorporatePOS() {
   const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const productsRef = useRef<Product[]>([]);
+  productsRef.current = products;
   const [pendingQrCount, setPendingQrCount] = useState(0);
   const [pendingQrList, setPendingQrList] = useState<PendingQrPosOrderRow[]>([]);
   const [pendingQrPortalOpen, setPendingQrPortalOpen] = useState(false);
@@ -711,6 +712,7 @@ export function CorporatePOS() {
       category: item.category || "",
       stock: isService ? Number.MAX_SAFE_INTEGER : (item.quantity ?? 0),
       code: item.sku,
+      barcode: (item.itemBarcode ?? "").trim(),
       productType: item.productType,
       trackStock: !isService,
     };
@@ -751,21 +753,17 @@ export function CorporatePOS() {
       setProductsLoading(false);
       return;
     }
-    const seq = ++posSearchSeqRef.current;
     setProductsLoading(true);
     try {
-      const search = debouncedSearch.trim() || undefined;
-      const items = await fetchPosProducts({ search });
-      if (seq !== posSearchSeqRef.current) return;
+      const items = await fetchPosProducts();
       setProducts(items.map(mapListItemToProduct));
     } catch (err) {
-      if (seq !== posSearchSeqRef.current) return;
       notifyFromError(err, tr("Məhsulları yükləmək alınmadı", "Failed to load products"));
       setProducts([]);
     } finally {
-      if (seq === posSearchSeqRef.current) setProductsLoading(false);
+      setProductsLoading(false);
     }
-  }, [isDemo, isAuthenticated, branchRevision, language, mapListItemToProduct, debouncedSearch]);
+  }, [isDemo, isAuthenticated, branchRevision, language, mapListItemToProduct]);
 
   const loadCustomers = useCallback(async () => {
     if (!(isAuthenticated || isDemo)) {
@@ -779,13 +777,6 @@ export function CorporatePOS() {
       setCustomers([]);
     }
   }, [isDemo, isAuthenticated, branchRevision]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebouncedSearch(searchQuery.trim());
-    }, 280);
-    return () => window.clearTimeout(timer);
-  }, [searchQuery]);
 
   useEffect(() => {
     void loadProducts();
@@ -1406,6 +1397,22 @@ export function CorporatePOS() {
       lookupInFlightCodeRef.current = trimmed;
 
       try {
+        const needle = trimmed.toLowerCase();
+        const local = productsRef.current.find(
+          (p) =>
+            p.code.toLowerCase() === needle ||
+            (p.barcode && p.barcode.toLowerCase() === needle),
+        );
+        if (local) {
+          if (seq !== lookupSeqRef.current || ac.signal.aborted) return "ignored";
+          const added = addToCartRef.current(local);
+          if (!added) return false;
+          setSearchQuery("");
+          notifySuccess(tr(`Əlavə olundu: ${local.name}`, `Added: ${local.name}`));
+          lastLookupCodeRef.current = { code: trimmed, at: Date.now() };
+          return true;
+        }
+
         const item = await lookupProductByCode(trimmed, { signal: ac.signal });
         if (seq !== lookupSeqRef.current || ac.signal.aborted) return "ignored";
         const added = addToCartRef.current(mapListItemToProduct(item));
@@ -2103,7 +2110,14 @@ export function CorporatePOS() {
   };
 
   const filteredProducts = products.filter((p) => {
-    // Typed search is applied server-side (full catalog). Keep category filter local.
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      const matchesSearch =
+        p.name.toLowerCase().includes(q) ||
+        p.code.toLowerCase().includes(q) ||
+        (p.barcode && p.barcode.toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+    }
     if (selectedCategory === "services") {
       return p.productType === "SERVICE" || p.trackStock === false;
     }

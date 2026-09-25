@@ -353,20 +353,13 @@ export async function fetchProducts(query: ProductListQuery = {}) {
   return res.data;
 }
 
-/** POS catalog. With `search`, backend returns the full match set (no page cap). */
-export async function fetchPosProducts(opts?: { search?: string }) {
-  const search = opts?.search?.trim() || undefined;
-  if (search) {
-    const data = await fetchProducts({
-      page: 1,
-      pageSize: 100,
-      forPos: true,
-      search,
-    });
-    return data.items;
-  }
-  // Browse grid: first page only — typed search covers the rest of the catalog.
-  const data = await fetchProducts({ page: 1, pageSize: 100, forPos: true });
+/** Full POS catalog (no page cap when `forPos=true` on the API). */
+export async function fetchPosProducts() {
+  const data = await fetchProducts({
+    page: 1,
+    pageSize: 100,
+    forPos: true,
+  });
   return data.items;
 }
 
