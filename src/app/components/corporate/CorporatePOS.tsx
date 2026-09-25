@@ -46,7 +46,7 @@ import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { formatCurrency } from "../../utils/currency";
-import { fetchProducts, lookupProductByCode, type ProductListItem } from "../../api/inventory";
+import { fetchPosProducts, lookupProductByCode, type ProductListItem } from "../../api/inventory";
 import {
   fetchCustomers,
   fetchCustomerVehicles,
@@ -641,6 +641,8 @@ export function CorporatePOS() {
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const posSearchSeqRef = useRef(0);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [categoryReorderMode, setCategoryReorderMode] = useState(false);
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
@@ -749,17 +751,21 @@ export function CorporatePOS() {
       setProductsLoading(false);
       return;
     }
+    const seq = ++posSearchSeqRef.current;
     setProductsLoading(true);
     try {
-      const data = await fetchProducts({ pageSize: 100, forPos: true });
-      setProducts(data.items.map(mapListItemToProduct));
+      const search = debouncedSearch.trim() || undefined;
+      const items = await fetchPosProducts({ search });
+      if (seq !== posSearchSeqRef.current) return;
+      setProducts(items.map(mapListItemToProduct));
     } catch (err) {
+      if (seq !== posSearchSeqRef.current) return;
       notifyFromError(err, tr("Məhsulları yükləmək alınmadı", "Failed to load products"));
       setProducts([]);
     } finally {
-      setProductsLoading(false);
+      if (seq === posSearchSeqRef.current) setProductsLoading(false);
     }
-  }, [isDemo, isAuthenticated, branchRevision, language, mapListItemToProduct]);
+  }, [isDemo, isAuthenticated, branchRevision, language, mapListItemToProduct, debouncedSearch]);
 
   const loadCustomers = useCallback(async () => {
     if (!(isAuthenticated || isDemo)) {
@@ -773,6 +779,13 @@ export function CorporatePOS() {
       setCustomers([]);
     }
   }, [isDemo, isAuthenticated, branchRevision]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     void loadProducts();
@@ -2090,10 +2103,7 @@ export function CorporatePOS() {
   };
 
   const filteredProducts = products.filter((p) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
-    if (!matchesSearch) return false;
+    // Typed search is applied server-side (full catalog). Keep category filter local.
     if (selectedCategory === "services") {
       return p.productType === "SERVICE" || p.trackStock === false;
     }
