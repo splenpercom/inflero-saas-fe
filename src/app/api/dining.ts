@@ -155,6 +155,13 @@ export async function fetchKotOrders(includeServed = false) {
   return res.data;
 }
 
+export async function fetchPendingKotOrderCount() {
+  const res = await apiGet<{ success: true; data: { count: number } }>(
+    "/tenant/dining/kot/pending-count",
+  );
+  return res.data ?? { count: 0 };
+}
+
 export async function patchKotStatus(
   orderId: string,
   body: { kotStatus: KotOrder["kotStatus"]; expectedKotStatus?: KotOrder["kotStatus"] },

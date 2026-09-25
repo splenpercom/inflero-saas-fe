@@ -6,6 +6,7 @@ import { Link, useLocation } from "react-router";
 import { preloadRoute } from "../../utils/routePreloader";
 import { usePendingReservationCount } from "../../hooks/usePendingReservationCount";
 import { usePendingQrOrderCount } from "../../hooks/usePendingQrOrderCount";
+import { usePendingKotCount } from "../../hooks/usePendingKotCount";
 import {
   LayoutDashboard,
   Building2,
@@ -111,6 +112,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const branchMenuRef = useRef<HTMLDivElement>(null);
   const { badgeCount: newResCount, acknowledge: acknowledgeReservations } = usePendingReservationCount();
   const { badgeCount: newQrOrderCount, acknowledge: acknowledgeQrOrders } = usePendingQrOrderCount();
+  const { badgeCount: newKotCount, acknowledge: acknowledgeKot } = usePendingKotCount();
 
   const companyLogo = getCompanyLogoUrl(user?.tenant, isDarkMode);
   const brandLogo = getBrandLogoUrl(user?.tenant, isDarkMode);
@@ -692,10 +694,18 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
             
             const isReservations = item.labelKey === "reservations";
             const isSales = item.labelKey === "sales";
+            const isKot = item.labelKey === "kot";
             const showResBadge = isReservations && newResCount > 0;
             const showQrOrderBadge = isSales && newQrOrderCount > 0;
-            const showNavBadge = showResBadge || showQrOrderBadge;
-            const navBadgeCount = showResBadge ? newResCount : showQrOrderBadge ? newQrOrderCount : 0;
+            const showKotBadge = isKot && newKotCount > 0;
+            const showNavBadge = showResBadge || showQrOrderBadge || showKotBadge;
+            const navBadgeCount = showResBadge
+              ? newResCount
+              : showQrOrderBadge
+                ? newQrOrderCount
+                : showKotBadge
+                  ? newKotCount
+                  : 0;
 
             const ItemContent = (
               <>
@@ -749,6 +759,9 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     onClick={() => {
                       if (isReservations && newResCount > 0) {
                         acknowledgeReservations();
+                      }
+                      if (isKot && newKotCount > 0) {
+                        acknowledgeKot();
                       }
                       onClose?.();
                     }}
