@@ -79,6 +79,7 @@ export interface TenantUserRow {
   storeId: string | null;
   isTenantOwner: boolean;
   isBranchManager: boolean;
+  managedStoreIds: string[];
   createdByUserId: string | null;
   about: string;
   bankName: string;
@@ -140,10 +141,14 @@ export function mapTenantUser(raw: RawTenantUser, language?: Language): TenantUs
     dateOfJoinIso: toIsoDateOnly(raw.dateOfJoin),
     birthday: formatDisplayDate(raw.dateOfBirth, language),
     dateOfBirthIso: toIsoDateOnly(raw.dateOfBirth),
-    branch: raw.store?.name ?? "—",
+    branch:
+      (raw.branchesAsManager?.length ?? 0) > 0
+        ? raw.branchesAsManager!.map((b) => b.name).join(", ")
+        : raw.store?.name ?? "—",
     storeId: raw.storeId,
     isTenantOwner,
     isBranchManager: (raw.branchesAsManager?.length ?? 0) > 0,
+    managedStoreIds: (raw.branchesAsManager ?? []).map((b) => b.id),
     createdByUserId: raw.createdByUserId ?? null,
     about: raw.about ?? "",
     bankName: raw.bankName ?? "",

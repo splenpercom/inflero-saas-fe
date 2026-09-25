@@ -1273,6 +1273,7 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
   if (pathname === "/tenant/stores") return ok(DEMO_STORES);
   if (pathname === "/tenant/branch-quota") return ok({ used: 2, maxBranches: 5, canAdd: true });
   if (pathname === "/tenant/branch-manager-candidates/new-store") return ok([]);
+  if (/^\/tenant\/stores\/[^/]+\/manager-candidates$/.test(pathname)) return ok([]);
   if (pathname === "/tenant/warehouses") return ok(DEMO_WAREHOUSES);
 
   // Reservations & settings

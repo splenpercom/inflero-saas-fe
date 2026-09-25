@@ -72,6 +72,13 @@ export async function fetchNewStoreManagerCandidates() {
   return res.data;
 }
 
+export async function fetchStoreManagerCandidates(storeId: string) {
+  const res = await apiGet<{ success: boolean; data: StoreManagerCandidate[] }>(
+    `/tenant/stores/${storeId}/manager-candidates`,
+  );
+  return res.data;
+}
+
 export async function createStore(body: {
   name: string;
   email?: string | null;
@@ -102,6 +109,7 @@ export async function updateStore(
     address: string | null;
     code: string;
     status: UiPeopleStatus;
+    branchManagerUserId: string | null;
   }>,
 ) {
   const res = await apiPatch<{ success: boolean; data: RawStore }>(`/tenant/stores/${id}`, {

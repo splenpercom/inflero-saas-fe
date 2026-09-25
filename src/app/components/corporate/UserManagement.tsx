@@ -17,6 +17,7 @@ import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
+import { useBranch } from "../../context/BranchContext";
 import { NoAccessPanel } from "../permissions/NoAccessPanel";
 import { PermissionGate } from "../permissions/PermissionGate";
 import { translateModuleName } from "../../i18n/userManagementTranslations";
@@ -52,6 +53,7 @@ export function UserManagement() {
   const { isDemo, isAuthenticated, user: authUser, hasModule } = useAuth();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("User Management");
   const branchRevision = useBranchRevision();
+  const { isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
 
   const activeTab: "users" | "roles" = /\/user-management\/roles\/?$/.test(
@@ -93,6 +95,7 @@ export function UserManagement() {
       addUser: { en: "Add User", az: "İstifadəçi Əlavə et" },
       addRole: { en: "Add Role", az: "Rol Əlavə et" },
       userName: { en: "User Name", az: "İstifadəçi Adı" },
+      branch: { en: "Branch", az: "Filial" },
       phone: { en: "Phone", az: "Telefon" },
       email: { en: "Email", az: "Email" },
       role: { en: "Role", az: "Rol" },
@@ -246,9 +249,18 @@ export function UserManagement() {
           doc.text(`${ut("generated")}: ${formatNowDate(language)}`, 14, 22);
 
           if (activeTab === "users") {
-            const headers = [[ut("userName"), ut("phone"), ut("email"), ut("role"), ut("team"), ut("status")]];
+            const headers = [[
+              ut("userName"),
+              ...(isGlobalMode ? [ut("branch")] : []),
+              ut("phone"),
+              ut("email"),
+              ut("role"),
+              ut("team"),
+              ut("status"),
+            ]];
             const data = filteredUsers.map((user) => [
               user.name,
+              ...(isGlobalMode ? [user.branch] : []),
               user.phone,
               user.email,
               user.role,
@@ -272,9 +284,18 @@ export function UserManagement() {
 
   const handleExportExcel = () => {
     if (activeTab === "users") {
-      const headers = [ut("userName"), ut("phone"), ut("email"), ut("role"), ut("team"), ut("status")];
+      const headers = [
+        ut("userName"),
+        ...(isGlobalMode ? [ut("branch")] : []),
+        ut("phone"),
+        ut("email"),
+        ut("role"),
+        ut("team"),
+        ut("status"),
+      ];
       const rows = filteredUsers.map((user) => [
         user.name,
+        ...(isGlobalMode ? [user.branch] : []),
         user.phone,
         user.email,
         user.role,
@@ -329,10 +350,10 @@ export function UserManagement() {
     }
     const selectedRoleName = roles.find((r) => r.id === roleId)?.name?.toLowerCase() ?? "";
     const isManagerRole = selectedRoleName === "manager";
-    if (isManagerRole && !data.storeId && branches.length > 0) {
+    if (isManagerRole && data.managedStoreIds.length === 0 && branches.length > 0) {
       notifyFromError(
         null,
-        tr("Filial seçilməlidir", "A branch is required to create a branch manager"),
+        tr("Ən azı bir filial seçilməlidir", "Select at least one branch for the manager"),
       );
       return;
     }
@@ -345,7 +366,8 @@ export function UserManagement() {
         phone: data.phone,
         password: data.password,
         roleId,
-        storeId: data.storeId || null,
+        storeId: isManagerRole ? null : data.storeId || null,
+        ...(isManagerRole ? { managedStoreIds: data.managedStoreIds } : {}),
         dateOfBirth: data.dateOfBirth || null,
         dateOfJoin: data.joiningDate || null,
       });
@@ -365,6 +387,21 @@ export function UserManagement() {
       notifyFromError(null, ut("passwordMismatch"));
       return;
     }
+    const selectedRoleName = roles.find((r) => r.id === data.roleId)?.name?.toLowerCase() ?? "";
+    const isManagerRole = selectedRoleName === "manager";
+    if (
+      isOwnerActor &&
+      !selectedUser?.isTenantOwner &&
+      isManagerRole &&
+      data.managedStoreIds.length === 0 &&
+      branches.length > 0
+    ) {
+      notifyFromError(
+        null,
+        tr("Ən azı bir filial seçilməlidir", "Select at least one branch for the manager"),
+      );
+      return;
+    }
     setSaving(true);
     try {
       const isOwner = selectedUser?.id === data.id && selectedUser.isTenantOwner;
@@ -376,6 +413,9 @@ export function UserManagement() {
         // Company owner keeps fixed Administrator role; sending roleId can 403 if dropdown changed.
         ...(isOwner ? {} : { roleId: data.roleId }),
         ...(isOwner ? {} : { status: data.status }),
+        ...(isOwnerActor && !isOwner && isManagerRole
+          ? { managedStoreIds: data.managedStoreIds }
+          : {}),
         dateOfBirth: data.dateOfBirth || null,
         dateOfJoin: data.joiningDate || null,
         newPassword: data.password || null,
@@ -603,6 +643,11 @@ export function UserManagement() {
                     <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                       {ut("userName")}
                     </th>
+                    {isGlobalMode && (
+                      <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                        {ut("branch")}
+                      </th>
+                    )}
                     <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                       {ut("phone")}
                     </th>
@@ -623,13 +668,13 @@ export function UserManagement() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">
+                      <td colSpan={isGlobalMode ? 7 : 6} className="px-3 py-8 text-center text-xs text-gray-500">
                         {ut("loading")}
                       </td>
                     </tr>
                   ) : filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">
+                      <td colSpan={isGlobalMode ? 7 : 6} className="px-3 py-8 text-center text-xs text-gray-500">
                         {ut("noUsers")}
                       </td>
                     </tr>
@@ -651,6 +696,13 @@ export function UserManagement() {
                             <span className="text-xs text-gray-900 dark:text-white">{user.name}</span>
                           </div>
                         </td>
+                        {isGlobalMode && (
+                          <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap max-w-[12rem]">
+                            <span className="truncate block" title={user.branch}>
+                              {user.branch}
+                            </span>
+                          </td>
+                        )}
                         <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                           {user.phone}
                         </td>
@@ -891,6 +943,9 @@ export function UserManagement() {
         }}
         onSave={handleUpdateUser}
         user={selectedUser}
+        branches={branches}
+        showManagedBranches={isOwnerActor && branches.length > 0}
+        managerRoleId={managerRoleId}
         roles={
           !isOwnerActor &&
           selectedUser &&

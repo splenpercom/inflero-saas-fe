@@ -181,7 +181,7 @@ export const CorporateHeader = memo(function CorporateHeader({
   return (
     <>
     <header
-      className="h-12 glass-strong border-b border-white/20 dark:border-white/10 flex items-center justify-between px-3 sticky top-0 z-50"
+      className="h-12 glass-strong border-b border-white/20 dark:border-white/10 flex items-center justify-between px-3 sticky top-0 z-40"
       style={{
         backfaceVisibility: 'hidden',
         transform: 'translateZ(0)',

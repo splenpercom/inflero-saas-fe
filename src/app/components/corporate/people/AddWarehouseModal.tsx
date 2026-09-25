@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { useLanguage } from "../../../i18n/LanguageContext";
-import type { StoreRecord, StoreManagerCandidate } from "../../../api/stores";
+import {
+  fetchStoreManagerCandidates,
+  type StoreManagerCandidate,
+  type StoreRecord,
+} from "../../../api/stores";
 import type { UiPeopleStatus } from "../../../api/people";
 import { ModernSelect } from "../../ui/ModernSelect";
 
@@ -12,7 +16,8 @@ export type BranchFormData = {
   phone: string;
   address: string;
   status: UiPeopleStatus;
-  branchManagerUserId: string;
+  /** Edit only — empty string clears manager. */
+  branchManagerUserId?: string;
 };
 
 interface AddWarehouseModalProps {
@@ -20,10 +25,7 @@ interface AddWarehouseModalProps {
   onClose: () => void;
   onSave: (data: BranchFormData) => void | Promise<void>;
   store?: StoreRecord | null;
-  managers: StoreManagerCandidate[];
   saving?: boolean;
-  /** When false (Branch Management off / first sole store), manager is optional. */
-  requireBranchManager?: boolean;
 }
 
 export function AddWarehouseModal({
@@ -31,9 +33,7 @@ export function AddWarehouseModal({
   onClose,
   onSave,
   store,
-  managers,
   saving = false,
-  requireBranchManager = true,
 }: AddWarehouseModalProps) {
   const { language } = useLanguage();
   const [name, setName] = useState("");
@@ -42,6 +42,8 @@ export function AddWarehouseModal({
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState<UiPeopleStatus | "">("");
   const [branchManagerUserId, setBranchManagerUserId] = useState("");
+  const [managers, setManagers] = useState<StoreManagerCandidate[]>([]);
+  const [managersLoading, setManagersLoading] = useState(false);
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const isEdit = Boolean(store);
@@ -54,6 +56,8 @@ export function AddWarehouseModal({
       setAddress("");
       setStatus("");
       setBranchManagerUserId("");
+      setManagers([]);
+      setManagersLoading(false);
       return;
     }
     if (store) {
@@ -65,20 +69,68 @@ export function AddWarehouseModal({
       setBranchManagerUserId(store.branchManagerId ?? "");
     } else {
       setStatus("Active");
-      if (managers.length === 1) setBranchManagerUserId(managers[0].id);
+      setBranchManagerUserId("");
     }
-  }, [isOpen, store, managers]);
+  }, [isOpen, store]);
+
+  useEffect(() => {
+    if (!isOpen || !store?.id) {
+      setManagers([]);
+      return;
+    }
+    let cancelled = false;
+    setManagersLoading(true);
+    void fetchStoreManagerCandidates(store.id)
+      .then((rows) => {
+        if (cancelled) return;
+        const merged = [...rows];
+        if (
+          store.branchManager &&
+          !merged.some((m) => m.id === store.branchManager!.id)
+        ) {
+          merged.unshift({
+            id: store.branchManager.id,
+            firstName: store.branchManager.firstName,
+            lastName: store.branchManager.lastName,
+            email: store.branchManager.email,
+            roleName: tr("Menecer", "Manager"),
+          });
+        }
+        setManagers(merged);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        if (store.branchManager) {
+          setManagers([
+            {
+              id: store.branchManager.id,
+              firstName: store.branchManager.firstName,
+              lastName: store.branchManager.lastName,
+              email: store.branchManager.email,
+              roleName: tr("Menecer", "Manager"),
+            },
+          ]);
+        } else {
+          setManagers([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setManagersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, store, language]);
 
   const handleSave = async () => {
     if (!name.trim() || !status) return;
-    if (!isEdit && requireBranchManager && !branchManagerUserId) return;
     await onSave({
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim(),
       address: address.trim(),
       status,
-      branchManagerUserId,
+      ...(isEdit ? { branchManagerUserId } : {}),
     });
   };
 
@@ -126,42 +178,52 @@ export function AddWarehouseModal({
               />
             </div>
           </div>
-          {!isEdit && requireBranchManager && (
+          {isEdit ? (
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                {tr("Filial Meneceri", "Branch Manager")} <span className="text-red-500">*</span>
+                {tr("Filial Meneceri", "Branch Manager")}
               </label>
               <ModernSelect
                 value={branchManagerUserId}
                 onChange={setBranchManagerUserId}
                 className="w-full"
-                placeholder={tr("Seç", "Select")}
+                disabled={managersLoading}
                 options={[
-                  { value: "", label: tr("Seç", "Select") },
+                  { value: "", label: tr("Menecer yoxdur", "No manager") },
                   ...managers.map((m) => ({
                     value: m.id,
                     label: `${m.firstName} ${m.lastName} (${m.roleName})`,
                   })),
                 ]}
               />
-              {managers.length === 0 && (
+              {managersLoading && (
+                <p className="text-[10px] text-gray-500 mt-1">
+                  {tr("Menecerlər yüklənir...", "Loading managers...")}
+                </p>
+              )}
+              {!managersLoading && managers.length === 0 && (
                 <p className="text-[10px] text-amber-600 mt-1">
-                  {tr("Filial meneceri üçün uyğun istifadəçi yoxdur (Manager/Administrator, başqa filialı idarə etmir).", "No eligible branch manager (active Manager/Administrator not already managing another branch).")}
+                  {tr(
+                    "Uyğun menecer yoxdur (Manager/Administrator).",
+                    "No eligible managers (Manager/Administrator).",
+                  )}
                 </p>
               )}
             </div>
+          ) : (
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">
+              {tr(
+                "Menecer təyinatı İstifadəçi idarəetməsindən edilir.",
+                "Assign managers later from User Management.",
+              )}
+            </p>
           )}
         </div>
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-2 sticky bottom-0 bg-white dark:bg-gray-900">
           <button onClick={onClose} disabled={saving} className="px-4 py-1.5 bg-gray-800 text-white rounded-lg text-xs disabled:opacity-50">{tr("Ləğv Et", "Cancel")}</button>
           <button
             onClick={() => void handleSave()}
-            disabled={
-              !name.trim() ||
-              !status ||
-              saving ||
-              (!isEdit && requireBranchManager && !branchManagerUserId)
-            }
+            disabled={!name.trim() || !status || saving}
             className="px-4 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs disabled:opacity-50"
           >
             {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq Et", "Submit")}

@@ -26,6 +26,7 @@ export async function createTenantUser(body: {
   phone?: string;
   roleId: string;
   storeId?: string | null;
+  managedStoreIds?: string[];
   team?: string | null;
   dateOfJoin?: string | null;
   dateOfBirth?: string | null;
@@ -43,6 +44,7 @@ export async function updateTenantUser(
     phone?: string | null;
     roleId?: string;
     storeId?: string | null;
+    managedStoreIds?: string[];
     status?: UiUserStatus;
     team?: string | null;
     dateOfJoin?: string | null;

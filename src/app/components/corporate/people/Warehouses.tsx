@@ -20,13 +20,11 @@ import { useModulePermissions } from "../../../hooks/useModulePermissions";
 import {
   fetchStores,
   fetchBranchQuota,
-  fetchNewStoreManagerCandidates,
   createStore,
   updateStore,
   deleteStore,
   type StoreRecord,
   type BranchQuota,
-  type StoreManagerCandidate,
 } from "../../../api/stores";
 import { notifyFromError, notifySuccess } from "../../../lib/toast";
 import { useConfirm } from "../../../context/ConfirmContext";
@@ -42,7 +40,6 @@ export function Warehouses() {
   const askConfirm = useConfirm();
   const [stores, setStores] = useState<StoreRecord[]>([]);
   const [quota, setQuota] = useState<BranchQuota | null>(null);
-  const [managers, setManagers] = useState<StoreManagerCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -56,20 +53,17 @@ export function Warehouses() {
     if (!(isAuthenticated || isDemo) || !canView || !canManageBranches) {
       setStores([]);
       setQuota(null);
-      setManagers([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const [storeRows, quotaRow, managerRows] = await Promise.all([
+      const [storeRows, quotaRow] = await Promise.all([
         fetchStores(branchManagementEnabled ? { managed: true } : undefined),
         branchManagementEnabled ? fetchBranchQuota() : Promise.resolve(null),
-        branchManagementEnabled ? fetchNewStoreManagerCandidates() : Promise.resolve([]),
       ]);
       setStores(storeRows);
       setQuota(quotaRow);
-      setManagers(managerRows);
     } catch (err) {
       notifyFromError(err, tr("Filialları yükləmək alınmadı", "Failed to load branches"));
     } finally {
@@ -99,13 +93,13 @@ export function Warehouses() {
         status: data.status,
       };
       if (editingStore) {
-        await updateStore(editingStore.id, body);
+        await updateStore(editingStore.id, {
+          ...body,
+          branchManagerUserId: data.branchManagerUserId || null,
+        });
         notifySuccess(tr("Filial yeniləndi", "Branch updated"));
       } else {
-        await createStore({
-          ...body,
-          ...(branchManagementEnabled ? { branchManagerUserId: data.branchManagerUserId } : {}),
-        });
+        await createStore(body);
         notifySuccess(tr("Filial əlavə edildi", "Branch added"));
       }
       setIsModalOpen(false);
@@ -278,9 +272,7 @@ export function Warehouses() {
           onClose={() => { setIsModalOpen(false); setEditingStore(null); }}
           onSave={handleSave}
           store={editingStore}
-          managers={managers}
           saving={saving}
-          requireBranchManager={branchManagementEnabled}
         />
       </div>
     </div>

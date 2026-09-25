@@ -6,6 +6,7 @@ import { DateInput } from "../ui/DateInput";
 import { CustomSelect } from "../ui/CustomSelect";
 import type { TenantUserRow } from "../../api/userManagement";
 import type { UiUserStatus } from "../../lib/userManagementMappers";
+import { pickLang } from "../../i18n/pickLang";
 
 export interface EditUserFormData {
   id: string;
@@ -14,6 +15,7 @@ export interface EditUserFormData {
   email: string;
   phone: string;
   roleId: string;
+  managedStoreIds: string[];
   dateOfBirth: string;
   joiningDate: string;
   status: UiUserStatus;
@@ -27,10 +29,23 @@ interface EditUserModalProps {
   onSave?: (userData: EditUserFormData) => void;
   user: TenantUserRow | null;
   roles?: { id: string; name: string }[];
+  branches?: { id: string; name: string }[];
+  showManagedBranches?: boolean;
+  managerRoleId?: string;
   saving?: boolean;
 }
 
-export function EditUserModal({ isOpen, onClose, onSave, user, roles = [], saving }: EditUserModalProps) {
+export function EditUserModal({
+  isOpen,
+  onClose,
+  onSave,
+  user,
+  roles = [],
+  branches = [],
+  showManagedBranches = false,
+  managerRoleId = "",
+  saving,
+}: EditUserModalProps) {
   const { language } = useLanguage();
   const t = (key: Parameters<typeof getUserManagementTranslation>[0]) =>
     getUserManagementTranslation(key, language);
@@ -44,12 +59,16 @@ export function EditUserModal({ isOpen, onClose, onSave, user, roles = [], savin
     email: "",
     phone: "",
     roleId: "",
+    managedStoreIds: [],
     dateOfBirth: "",
     joiningDate: "",
     status: "Active",
     password: "",
     confirmPassword: "",
   });
+
+  const editAsBranchManager =
+    !!managerRoleId && formData.roleId === managerRoleId;
 
   useEffect(() => {
     if (user) {
@@ -60,6 +79,7 @@ export function EditUserModal({ isOpen, onClose, onSave, user, roles = [], savin
         email: user.email,
         phone: user.phone === "—" ? "" : user.phone,
         roleId: user.roleId,
+        managedStoreIds: user.managedStoreIds ?? [],
         dateOfBirth: user.dateOfBirthIso,
         joiningDate: user.dateOfJoinIso,
         status: user.status,
@@ -165,6 +185,41 @@ export function EditUserModal({ isOpen, onClose, onSave, user, roles = [], savin
                 />
               </div>
             </div>
+
+            {showManagedBranches && editAsBranchManager && !user?.isTenantOwner && (
+              <div>
+                <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  {pickLang(language, "İdarə olunan filiallar", "Managed branches")}{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-700 p-2 space-y-1.5 bg-white dark:bg-gray-900">
+                  {branches.map((b) => {
+                    const checked = formData.managedStoreIds.includes(b.id);
+                    return (
+                      <label
+                        key={b.id}
+                        className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                          checked={checked}
+                          onChange={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              managedStoreIds: checked
+                                ? prev.managedStoreIds.filter((id) => id !== b.id)
+                                : [...prev.managedStoreIds, b.id],
+                            }));
+                          }}
+                        />
+                        <span className="text-xs text-gray-900 dark:text-white">{b.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>

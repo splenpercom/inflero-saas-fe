@@ -407,6 +407,14 @@ select:-webkit-autofill:focus {
     touch-action: manipulation;
   }
 
+  /* Drawer: vertical pan when gesture starts on links/buttons (overrides manipulation) */
+  .sidebar-drawer,
+  .sidebar-drawer a,
+  .sidebar-drawer button,
+  .sidebar-drawer [role="button"] {
+    touch-action: pan-y !important;
+  }
+
   /* High-quality border rendering */
   *[class*="border"], *[class*="ring"] {
     will-change: auto;

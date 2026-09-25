@@ -130,21 +130,40 @@ const LayoutWrapper = React.memo(function LayoutWrapper({
   darkMode: boolean;
   toggleDarkMode: () => void;
 }) {
+  // Keep page behind the drawer from stealing touch scroll on phones/tablets.
+  React.useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const html = document.documentElement;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = html.style.overflow;
+    document.body.style.overflow = "hidden";
+    html.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevBody;
+      html.style.overflow = prevHtml;
+    };
+  }, [mobileMenuOpen]);
+
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-100 dark:from-[#042f2e] dark:via-[#0a3d38] dark:to-[#042f2e]">
+    <div className="flex h-dvh max-h-dvh overflow-hidden bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-100 dark:from-[#042f2e] dark:via-[#0a3d38] dark:to-[#042f2e]">
       {/* Mobile Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden smooth-transition"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55] lg:hidden smooth-transition"
           onClick={closeMobileMenu}
+          aria-hidden
         />
       )}
 
-      {/* Sidebar - Mobile Drawer / Desktop Static */}
+      {/* Drawer scrolls as one surface (nested flex overflow breaks on mobile WebKit/Chrome) */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto transform transition-transform duration-300 lg:transform-none ${
+        className={`sidebar-drawer fixed lg:static inset-y-0 left-0 z-[60] lg:z-auto h-dvh max-h-dvh w-[min(15rem,82vw)] sm:w-60 overflow-y-auto overflow-x-hidden overscroll-contain transition-transform duration-300 lg:transition-[width] lg:duration-300 ${
+          sidebarCollapsed ? "lg:w-16" : "lg:w-60"
+        } ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
+        style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
+        onTouchMove={(e) => e.stopPropagation()}
       >
         <CorporateSidebar
           collapsed={sidebarCollapsed}
@@ -153,7 +172,11 @@ const LayoutWrapper = React.memo(function LayoutWrapper({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden w-full lg:w-auto">
+      <div
+        className={`flex-1 flex flex-col overflow-hidden min-h-0 min-w-0 w-full lg:w-auto ${
+          mobileMenuOpen ? "max-lg:pointer-events-none max-lg:select-none" : ""
+        }`}
+      >
         {/* Header */}
         <CorporateHeader
           onToggleSidebar={toggleSidebar}
@@ -167,7 +190,7 @@ const LayoutWrapper = React.memo(function LayoutWrapper({
         <BranchScopeBanner />
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-background scrollbar-hide">
+        <main className="flex-1 overflow-y-auto min-h-0 bg-gray-50 dark:bg-background scrollbar-hide">
           <AllBranchesScopeGuard>
             <DashboardPermissionGuard>{children}</DashboardPermissionGuard>
           </AllBranchesScopeGuard>

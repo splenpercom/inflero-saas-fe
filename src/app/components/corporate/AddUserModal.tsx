@@ -13,6 +13,8 @@ export interface AddUserFormData {
   phone: string;
   roleId: string;
   storeId: string;
+  /** Branches assigned when role is Manager (multi-select). */
+  managedStoreIds: string[];
   dateOfBirth: string;
   joiningDate: string;
   password: string;
@@ -26,6 +28,7 @@ const emptyForm = (): AddUserFormData => ({
   phone: "",
   roleId: "",
   storeId: "",
+  managedStoreIds: [],
   dateOfBirth: "",
   joiningDate: "",
   password: "",
@@ -105,8 +108,8 @@ export function AddUserModal({
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {pickLang(
                   language,
-                  "Bu istifadəçi seçilmiş filialın meneceri olacaq (əvvəlki menecer filialda qalır).",
-                  "This user becomes the branch manager for the selected branch (any previous manager stays on the branch).",
+                  "Bu menecer seçilmiş filial(lar)ı idarə edəcək. Bir menecerə bir neçə filial təyin edilə bilər.",
+                  "This manager will manage the selected branch(es). One manager can be assigned to multiple branches.",
                 )}
               </p>
             )}
@@ -184,18 +187,57 @@ export function AddUserModal({
               </div>
             </div>
 
-            {showBranchSelect && (
+            {showBranchSelect && createAsBranchManager && (
               <div>
                 <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
-                  {t("branch")}{" "}
-                  {createAsBranchManager ? <span className="text-red-500">*</span> : null}
+                  {pickLang(language, "İdarə olunan filiallar", "Managed branches")}{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-700 p-2 space-y-1.5 bg-white dark:bg-gray-900">
+                  {branches.length === 0 ? (
+                    <p className="text-[10px] text-amber-600 px-1">
+                      {pickLang(language, "Əvvəlcə filial yaradın", "Create a branch first")}
+                    </p>
+                  ) : (
+                    branches.map((b) => {
+                      const checked = formData.managedStoreIds.includes(b.id);
+                      return (
+                        <label
+                          key={b.id}
+                          className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                            checked={checked}
+                            onChange={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                managedStoreIds: checked
+                                  ? prev.managedStoreIds.filter((id) => id !== b.id)
+                                  : [...prev.managedStoreIds, b.id],
+                              }));
+                            }}
+                          />
+                          <span className="text-xs text-gray-900 dark:text-white">{b.name}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showBranchSelect && !createAsBranchManager && (
+              <div>
+                <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  {t("branch")}
                 </label>
                 <CustomSelect
                   value={formData.storeId}
                   onChange={(value) => setFormData({ ...formData, storeId: value })}
                   options={branches.map((b) => ({ value: b.id, label: b.name }))}
                   placeholder={t("selectBranch")}
-                  required={createAsBranchManager}
                 />
               </div>
             )}

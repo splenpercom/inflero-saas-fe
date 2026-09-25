@@ -532,21 +532,19 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const tenantSlug = user?.tenant?.slug ?? null;
   const myStorePath = tenantSlug ? storePath(tenantSlug) : null;
 
+  /** Desktop icon-rail only — mobile/tablet drawer always shows full labels & bottom links. */
+  const rail = collapsed;
+  const hideOnRailDesktop = rail ? "lg:hidden" : undefined;
+
   return (
     <aside
       className={cn(
-        "h-screen flex flex-col glass-strong border-r border-white/20 dark:border-white/10 transition-all duration-300 ease-in-out",
-        "w-64",
-        collapsed && "lg:w-16"
+        "w-full min-h-full flex flex-col glass-strong border-r border-white/20 dark:border-white/10",
       )}
-      style={{
-        backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden',
-      }}
     >
-      {/* Logo Section - Fixed Header */}
-      <div className="h-12 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 px-3 flex-shrink-0">
-        {!collapsed ? (
+      {/* Logo — sticky while drawer scrolls */}
+      <div className="h-12 sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 px-3 bg-inherit backdrop-blur-md">
+        {!rail ? (
           <>
             <Link to="/dashboard" className="flex items-center justify-center flex-1">
               <BrandLogo
@@ -556,11 +554,10 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
               />
             </Link>
 
-            {/* Mobile Close Button */}
             {onClose && (
               <button
                 onClick={onClose}
-                className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 <X className="w-4 h-4 text-gray-600 dark:text-gray-400" />
               </button>
@@ -575,8 +572,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
             )}
           </Link>
         )}
-        {/* Mobile always shows full logo */}
-        {collapsed && (
+        {rail && (
           <>
             <Link to="/dashboard" className="lg:hidden flex items-center justify-center flex-1">
               <BrandLogo
@@ -586,11 +582,10 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
               />
             </Link>
 
-            {/* Mobile Close Button */}
             {onClose && (
               <button
                 onClick={onClose}
-                className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 <X className="w-4 h-4 text-gray-600 dark:text-gray-400" />
               </button>
@@ -599,9 +594,9 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         )}
       </div>
 
-      {/* Branch switcher - fixed below header */}
-      {!collapsed && showBranchSwitcher && (
-        <div className="border-b border-white/10 dark:border-white/5 p-2 flex-shrink-0">
+      {/* Branch switcher — full UI in drawer; hidden on desktop icon-rail */}
+      {showBranchSwitcher && (
+        <div className={cn("border-b border-white/10 dark:border-white/5 p-2 flex-shrink-0", hideOnRailDesktop)}>
           <div ref={branchMenuRef} className="relative">
             <button
               type="button"
@@ -610,12 +605,12 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                 setBranchMenuOpen((open) => !open);
               }}
               disabled={isBranchLocked || !hasBranches}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl glass smooth-transition hover:bg-white/20 dark:hover:bg-white/5 text-left group shadow-sm disabled:opacity-70"
+              className="w-full flex items-center gap-2 px-3 py-1.5 min-h-9 rounded-xl glass smooth-transition hover:bg-white/20 dark:hover:bg-white/5 text-left group shadow-sm disabled:opacity-70"
             >
-              <div className="w-8 h-8 rounded-lg bg-[#14b8a6] flex items-center justify-center shadow-lg shadow-[#14b8a6]/30">
+              <div className="w-8 h-8 rounded-lg bg-[#14b8a6] flex items-center justify-center shadow-lg shadow-[#14b8a6]/30 flex-shrink-0">
                 <Warehouse className="w-4 h-4 text-white" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className={cn("flex-1 min-w-0", hideOnRailDesktop)}>
                 <p className="text-[9px] text-gray-500 dark:text-gray-400 mb-0.5 uppercase tracking-wide">
                   {st("selectWarehouse")}
                 </p>
@@ -624,21 +619,24 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                 </p>
               </div>
               {!isBranchLocked && hasBranches && (
-                <ChevronDown className={cn(
-                  "w-3.5 h-3.5 text-gray-400 flex-shrink-0 smooth-transition group-hover:text-[#14b8a6]",
-                  branchMenuOpen && "rotate-180 text-[#14b8a6]",
-                )} />
+                <ChevronDown
+                  className={cn(
+                    "w-3.5 h-3.5 text-gray-400 flex-shrink-0 smooth-transition group-hover:text-[#14b8a6]",
+                    hideOnRailDesktop,
+                    branchMenuOpen && "rotate-180 text-[#14b8a6]",
+                  )}
+                />
               )}
             </button>
 
             {branchMenuOpen && !isBranchLocked && (
-              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[100] max-h-64 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1.5 shadow-xl scrollbar-hide">
+              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[100] max-h-[min(16rem,40dvh)] overflow-y-auto overscroll-contain rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1.5 shadow-xl scrollbar-hide">
                 {hasBranches && branchManagementEnabled && (
                   <button
                     type="button"
                     onClick={() => pickBranch(null)}
                     className={cn(
-                      "w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
+                      "w-full text-left rounded-lg px-3 py-2.5 min-h-11 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
                       isGlobalMode
                         ? "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30"
                         : "",
@@ -660,7 +658,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     type="button"
                     onClick={() => pickBranch(branch.id)}
                     className={cn(
-                      "w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
+                      "w-full text-left rounded-lg px-3 py-2.5 min-h-11 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
                       branchId === branch.id
                         ? "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30"
                         : "",
@@ -682,16 +680,16 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         </div>
       )}
 
-      {/* Navigation - Scrollable Middle Section */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
-        <div className="py-2 px-2">
+      {/* Nav + bottom links (parent .sidebar-drawer scrolls — no nested overflow) */}
+      <nav className="py-0.5 px-1.5 flex-1">
+        <div>
           {visibleNavItems.map((item) => {
             const label = item.label;
             const isActive = item.path === location.pathname;
             const hasActiveSubItem = item.subItems?.some(
               (subItem) => subItem.path === location.pathname
             );
-            
+
             const isReservations = item.labelKey === "reservations";
             const isSales = item.labelKey === "sales";
             const isKot = item.labelKey === "kot";
@@ -715,42 +713,53 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 border border-white dark:border-gray-900 shadow-sm" />
                   )}
                 </div>
-                {!collapsed && (
-                  <>
-                    <span className="flex-1 text-left">{label}</span>
-                    {showNavBadge && (
-                      <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold shadow-sm animate-pulse">
-                        {navBadgeCount > 9 ? "9+" : navBadgeCount}
-                      </span>
+                <span className={cn("flex-1 text-left", hideOnRailDesktop)}>{label}</span>
+                {showNavBadge && (
+                  <span
+                    className={cn(
+                      "flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold shadow-sm animate-pulse",
+                      hideOnRailDesktop,
                     )}
-                    {item.comingSoon && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white text-[9px] font-semibold shadow-sm">
-                        {pickLang(language, "Tezliklə", "Soon")}
-                      </span>
+                  >
+                    {navBadgeCount > 9 ? "9+" : navBadgeCount}
+                  </span>
+                )}
+                {item.comingSoon && (
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white text-[9px] font-semibold shadow-sm",
+                      hideOnRailDesktop,
                     )}
-                    {item.badge && !showNavBadge && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-[#14b8a6] text-white text-[10px] font-semibold shadow-lg shadow-[#14b8a6]/30 animate-pulse">
-                        {item.badge}
-                      </span>
+                  >
+                    {pickLang(language, "Tezliklə", "Soon")}
+                  </span>
+                )}
+                {item.badge && !showNavBadge && (
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.5 rounded-full bg-[#14b8a6] text-white text-[10px] font-semibold shadow-lg shadow-[#14b8a6]/30 animate-pulse",
+                      hideOnRailDesktop,
                     )}
-                    {item.subItems && (
-                      <ChevronDown
-                        className={cn(
-                          "w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200",
-                          expandedItems.includes(item.labelKey) &&
-                            "rotate-180"
-                        )}
-                      />
+                  >
+                    {item.badge}
+                  </span>
+                )}
+                {item.subItems && (
+                  <ChevronDown
+                    className={cn(
+                      "w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200",
+                      hideOnRailDesktop,
+                      expandedItems.includes(item.labelKey) && "rotate-180",
                     )}
-                  </>
+                  />
                 )}
               </>
             );
-            
+
             return (
               <div
                 key={item.labelKey}
-                className="mb-0.5"
+                className="mb-px"
               >
                 {item.path ? (
                   <Link
@@ -766,20 +775,22 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                       onClose?.();
                     }}
                     className={cn(
-                      "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs smooth-transition font-medium relative overflow-hidden group",
+                      "w-full flex items-center gap-2 px-2.5 py-1 min-h-8 rounded-lg text-xs smooth-transition font-medium relative overflow-hidden group",
                       isActive
                         ? "bg-gradient-to-r from-[#14b8a6]/15 to-[#0f766e]/15 text-[#14b8a6] dark:text-[#14b8a6] shadow-sm shadow-[#14b8a6]/10 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30"
                         : "text-gray-700 dark:text-gray-300 hover:bg-white/10 dark:hover:bg-white/5 hover:shadow-sm",
-                      collapsed && "lg:justify-center"
+                      rail && "lg:justify-center",
                     )}
                   >
                     {isActive && (
                       <div className="absolute inset-0 bg-gradient-to-r from-[#14b8a6]/5 to-[#0f766e]/5 animate-pulse" />
                     )}
-                    <div className={cn(
-                      "relative z-10 flex items-center gap-2.5 w-full",
-                      isActive && "drop-shadow-sm"
-                    )}>
+                    <div
+                      className={cn(
+                        "relative z-10 flex items-center gap-2 w-full",
+                        isActive && "drop-shadow-sm",
+                      )}
+                    >
                       {ItemContent}
                     </div>
                   </Link>
@@ -787,81 +798,90 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                   <button
                     onClick={() => item.subItems && toggleExpand(item.labelKey)}
                     className={cn(
-                      "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs smooth-transition font-medium relative overflow-hidden group",
+                      "w-full flex items-center gap-2 px-2.5 py-1 min-h-8 rounded-lg text-xs smooth-transition font-medium relative overflow-hidden group",
                       hasActiveSubItem || item.active
                         ? "bg-gradient-to-r from-[#14b8a6]/15 to-[#0f766e]/15 text-[#14b8a6] dark:text-[#14b8a6] shadow-sm shadow-[#14b8a6]/10 border border-[#14b8a6]/30 dark:border-[#14b8a6]/30"
                         : "text-gray-700 dark:text-gray-300 hover:bg-white/10 dark:hover:bg-white/5 hover:shadow-sm",
-                      collapsed && "lg:justify-center"
+                      rail && "lg:justify-center",
                     )}
                   >
                     {(hasActiveSubItem || item.active) && (
                       <div className="absolute inset-0 bg-gradient-to-r from-[#14b8a6]/5 to-[#0f766e]/5 animate-pulse" />
                     )}
-                    <div className={cn(
-                      "relative z-10 flex items-center gap-2.5 w-full",
-                      (hasActiveSubItem || item.active) && "drop-shadow-sm"
-                    )}>
+                    <div
+                      className={cn(
+                        "relative z-10 flex items-center gap-2 w-full",
+                        (hasActiveSubItem || item.active) && "drop-shadow-sm",
+                      )}
+                    >
                       {ItemContent}
                     </div>
                   </button>
                 )}
 
                 {/* Sub Items */}
-                {item.subItems &&
-                  expandedItems.includes(item.labelKey) &&
-                  !collapsed && (
-                    <div className="mt-1 ml-6 space-y-0.5 pl-3 border-l-2 border-white/10 dark:border-white/5">
-                      {item.subItems.map((subItem) => {
-                        const subLabel = subItem.label;
-                        const isSubActive = subItem.path === location.pathname;
-                        const isOrdersSub =
-                          isSales && subItem.labelKey === "posOrders";
-                        const showOrdersBadge =
-                          isOrdersSub && newQrOrderCount > 0;
-                        return (
-                          <Link
-                            key={subItem.labelKey}
-                            to={subItem.path || "#"}
-                            onMouseEnter={() => subItem.path && preloadRoute(subItem.path)}
-                            onClick={() => {
-                              if (
-                                isReservations &&
-                                subItem.path === "/dashboard/reservations" &&
-                                newResCount > 0
-                              ) {
-                                acknowledgeReservations();
-                              }
-                              if (isOrdersSub && newQrOrderCount > 0) {
-                                acknowledgeQrOrders();
-                              }
-                              onClose?.();
-                            }}
-                            className={cn(
-                              "w-full text-left px-3 py-1.5 rounded-lg text-xs smooth-transition font-medium flex items-center gap-2",
-                              isSubActive
-                                ? "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 text-[#14b8a6] dark:text-[#14b8a6] shadow-sm border-l-2 border-[#14b8a6]"
-                                : "text-gray-600 dark:text-gray-400 hover:bg-white/5 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200"
-                            )}
-                          >
-                            <span className="flex-1 truncate">{subLabel}</span>
-                            {showOrdersBadge && (
-                              <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold shadow-sm animate-pulse shrink-0">
-                                {newQrOrderCount > 9 ? "9+" : newQrOrderCount}
-                              </span>
-                            )}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
+                {item.subItems && expandedItems.includes(item.labelKey) && (
+                  <div
+                    className={cn(
+                      "mt-px ml-4 space-y-px pl-2 border-l border-white/10 dark:border-white/5",
+                      hideOnRailDesktop,
+                    )}
+                  >
+                    {item.subItems.map((subItem) => {
+                      const subLabel = subItem.label;
+                      const isSubActive = subItem.path === location.pathname;
+                      const isOrdersSub =
+                        isSales && subItem.labelKey === "posOrders";
+                      const showOrdersBadge =
+                        isOrdersSub && newQrOrderCount > 0;
+                      return (
+                        <Link
+                          key={subItem.labelKey}
+                          to={subItem.path || "#"}
+                          onMouseEnter={() => subItem.path && preloadRoute(subItem.path)}
+                          onClick={() => {
+                            if (
+                              isReservations &&
+                              subItem.path === "/dashboard/reservations" &&
+                              newResCount > 0
+                            ) {
+                              acknowledgeReservations();
+                            }
+                            if (isOrdersSub && newQrOrderCount > 0) {
+                              acknowledgeQrOrders();
+                            }
+                            onClose?.();
+                          }}
+                          className={cn(
+                            "w-full text-left px-2.5 py-1 min-h-8 rounded-lg text-xs smooth-transition font-medium flex items-center gap-2",
+                            isSubActive
+                              ? "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 text-[#14b8a6] dark:text-[#14b8a6] shadow-sm border-l-2 border-[#14b8a6]"
+                              : "text-gray-600 dark:text-gray-400 hover:bg-white/5 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200",
+                          )}
+                        >
+                          <span className="flex-1 truncate">{subLabel}</span>
+                          {showOrdersBadge && (
+                            <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold shadow-sm animate-pulse shrink-0">
+                              {newQrOrderCount > 9 ? "9+" : newQrOrderCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-      </div>
 
       {(hasModule("DINING") || hasModule("RESERVATIONS") || (hasModule("WEB_EDITOR") && myStorePath && !isDemo)) && (
-        <div className="flex-shrink-0 border-t border-white/10 dark:border-white/5 p-2 space-y-1">
+        <div
+          className={cn(
+            "border-t border-white/10 dark:border-white/5 p-2 space-y-1 mt-0.5",
+            "pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
+          )}
+        >
           {hasModule("RESERVATIONS") && tenantSlug && (
             <Link
               to={
@@ -876,27 +896,25 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
               rel="noopener noreferrer"
               onClick={onClose}
               className={cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl smooth-transition group w-full",
+                "flex items-center gap-2.5 px-3 py-1.5 min-h-9 rounded-lg smooth-transition group w-full active:scale-[0.99]",
                 "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10",
                 "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
                 "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
-                collapsed && "lg:justify-center",
+                rail && "lg:justify-center",
               )}
             >
               <div className="w-7 h-7 rounded-lg bg-[#14b8a6] flex items-center justify-center flex-shrink-0">
                 <CalendarDays className="w-3.5 h-3.5 text-white" />
               </div>
-              {!collapsed && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
-                    {pickLang(language, "Müştəri", "Customer")}
-                  </p>
-                  <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
-                    {st("customerBookingSite")}
-                  </p>
-                </div>
-              )}
-              {!collapsed && <ExternalLink className="w-3 h-3 text-[#14b8a6]/50 flex-shrink-0" />}
+              <div className={cn("flex-1 min-w-0", hideOnRailDesktop)}>
+                <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
+                  {pickLang(language, "Müştəri", "Customer")}
+                </p>
+                <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
+                  {st("customerBookingSite")}
+                </p>
+              </div>
+              <ExternalLink className={cn("w-3 h-3 text-[#14b8a6]/50 flex-shrink-0", hideOnRailDesktop)} />
             </Link>
           )}
           {hasModule("DINING") && tenantSlug && (
@@ -911,27 +929,25 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                 rel="noopener noreferrer"
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-xl smooth-transition group w-full",
+                  "flex items-center gap-2.5 px-3 py-1.5 min-h-9 rounded-lg smooth-transition group w-full active:scale-[0.99]",
                   "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10",
                   "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
                   "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
-                  collapsed && "lg:justify-center",
+                  rail && "lg:justify-center",
                 )}
               >
                 <div className="w-7 h-7 rounded-lg bg-[#14b8a6] flex items-center justify-center flex-shrink-0">
                   <UtensilsCrossed className="w-3.5 h-3.5 text-white" />
                 </div>
-                {!collapsed && (
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
-                      {pickLang(language, "Müştəri", "Customer")}
-                    </p>
-                    <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
-                      {st("qrMenu")}
-                    </p>
-                  </div>
-                )}
-                {!collapsed && <ExternalLink className="w-3 h-3 text-[#14b8a6]/50 flex-shrink-0" />}
+                <div className={cn("flex-1 min-w-0", hideOnRailDesktop)}>
+                  <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
+                    {pickLang(language, "Müştəri", "Customer")}
+                  </p>
+                  <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
+                    {st("qrMenu")}
+                  </p>
+                </div>
+                <ExternalLink className={cn("w-3 h-3 text-[#14b8a6]/50 flex-shrink-0", hideOnRailDesktop)} />
               </Link>
               <Link
                 to={
@@ -943,27 +959,25 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                 rel="noopener noreferrer"
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-xl smooth-transition group w-full",
+                  "flex items-center gap-2.5 px-3 py-1.5 min-h-9 rounded-lg smooth-transition group w-full active:scale-[0.99]",
                   "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10",
                   "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
                   "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
-                  collapsed && "lg:justify-center",
+                  rail && "lg:justify-center",
                 )}
               >
                 <div className="w-7 h-7 rounded-lg bg-[#0f766e] flex items-center justify-center flex-shrink-0">
                   <BookOpen className="w-3.5 h-3.5 text-white" />
                 </div>
-                {!collapsed && (
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
-                      {pickLang(language, "Müştəri", "Customer")}
-                    </p>
-                    <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
-                      {st("bookATable")}
-                    </p>
-                  </div>
-                )}
-                {!collapsed && <ExternalLink className="w-3 h-3 text-[#14b8a6]/50 flex-shrink-0" />}
+                <div className={cn("flex-1 min-w-0", hideOnRailDesktop)}>
+                  <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
+                    {pickLang(language, "Müştəri", "Customer")}
+                  </p>
+                  <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
+                    {st("bookATable")}
+                  </p>
+                </div>
+                <ExternalLink className={cn("w-3 h-3 text-[#14b8a6]/50 flex-shrink-0", hideOnRailDesktop)} />
               </Link>
             </>
           )}
@@ -975,21 +989,22 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
               title={st("myStore")}
               onClick={onClose}
               className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium smooth-transition",
+                "w-full flex items-center gap-2.5 px-3 py-1.5 min-h-9 rounded-lg text-xs font-medium smooth-transition active:scale-[0.99]",
                 "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10 text-[#14b8a6] dark:text-[#14b8a6]",
                 "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
                 "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
-                collapsed && "lg:justify-center lg:px-2",
+                rail && "lg:justify-center lg:px-2",
               )}
             >
               <Globe className="w-4 h-4 flex-shrink-0" />
-              {!collapsed && (
-                <span className="flex-1 text-left leading-tight">{st("myStore")}</span>
-              )}
+              <span className={cn("flex-1 text-left leading-tight", hideOnRailDesktop)}>
+                {st("myStore")}
+              </span>
             </Link>
           )}
         </div>
       )}
+      </nav>
     </aside>
   );
 }
