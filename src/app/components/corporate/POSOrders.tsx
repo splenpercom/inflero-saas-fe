@@ -31,7 +31,6 @@ import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useSalesCustomers } from "../../hooks/useSalesCustomers";
 import { AddSalesModal } from "./AddSalesModal";
 import { SaleDetailModal } from "./SaleDetailModal";
-import { EditSaleModal } from "./EditSaleModal";
 import { CreatePaymentModal } from "./CreatePaymentModal";
 import {
   fetchPosOrders,
@@ -227,7 +226,6 @@ export function POSOrders() {
   const columnsMenuRef = useRef<HTMLDivElement | null>(null);
   const [isAddSalesModalOpen, setIsAddSalesModalOpen] = useState(false);
   const [isSaleDetailModalOpen, setIsSaleDetailModalOpen] = useState(false);
-  const [isEditSaleModalOpen, setIsEditSaleModalOpen] = useState(false);
   const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
   const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -834,8 +832,7 @@ export function POSOrders() {
 
   const handleEditSale = (orderId: string) => {
     if (!posEnabled || !canEdit || isDemo) return;
-    setSelectedOrderId(orderId);
-    setIsEditSaleModalOpen(true);
+    navigate(`/dashboard/sales/pos?orderId=${encodeURIComponent(orderId)}`);
   };
 
   const handleCreatePayment = (orderId: string) => {
@@ -1590,13 +1587,6 @@ export function POSOrders() {
         canFinalize={canEdit}
         isDemo={isDemo}
         onFinalized={() => void loadItems()}
-      />
-
-      <EditSaleModal
-        orderId={selectedOrderId}
-        isOpen={isEditSaleModalOpen}
-        onClose={() => setIsEditSaleModalOpen(false)}
-        onSaved={() => void loadItems()}
       />
 
       <CreatePaymentModal

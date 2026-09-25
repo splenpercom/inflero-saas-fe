@@ -498,7 +498,10 @@ export async function approveQrAndSendToKot(
   return res.data;
 }
 
-export async function updatePosOrder(id: string, body: Partial<CreatePosOrderBody>) {
+export async function updatePosOrder(
+  id: string,
+  body: Partial<CreatePosOrderBody> & { sendToKot?: boolean; sendToBar?: boolean },
+) {
   const res = await apiPatch<{ success: boolean; data: PosOrderDetail }>(`/tenant/sales/pos-orders/${id}`, body);
   return res.data;
 }

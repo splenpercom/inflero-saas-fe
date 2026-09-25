@@ -53,7 +53,7 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, releaseQrPosOrder, rejectQrPosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, releaseQrPosOrder, rejectQrPosOrder, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -633,7 +633,7 @@ export function CorporatePOS() {
   const diningEnabled = hasModule("DINING");
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
-  const { canCreate } = useModulePermissions("Sales");
+  const { canCreate, canEdit } = useModulePermissions("Sales");
   const prefersTouchKeyboard = usePrefersTouchKeyboard();
   const lastPointerType = useLastPointerType();
 
@@ -678,6 +678,15 @@ export function CorporatePOS() {
   const [pendingQrList, setPendingQrList] = useState<PendingQrPosOrderRow[]>([]);
   const [pendingQrPortalOpen, setPendingQrPortalOpen] = useState(false);
   const [pendingQrOrderId, setPendingQrOrderId] = useState<string | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editingOrderRef, setEditingOrderRef] = useState<string | null>(null);
+  const [editingOrderWasHeld, setEditingOrderWasHeld] = useState(false);
+  const [editingAlreadyOnKot, setEditingAlreadyOnKot] = useState(false);
+  const [editingStockLocked, setEditingStockLocked] = useState(false);
+  /** Product qty already on the order being edited — credited back for stock checks. */
+  const [editingOriginalQtyByProduct, setEditingOriginalQtyByProduct] = useState<
+    Record<string, number>
+  >({});
   const [pendingQrBusyId, setPendingQrBusyId] = useState<string | null>(null);
   const lookupAbortRef = useRef<AbortController | null>(null);
   const lookupSeqRef = useRef(0);
@@ -685,6 +694,8 @@ export function CorporatePOS() {
   const lookupInFlightCodeRef = useRef<string | null>(null);
   const pendingQrOrderIdRef = useRef<string | null>(null);
   const acceptOrderHandledRef = useRef<string | null>(null);
+  const editOrderHandledRef = useRef<string | null>(null);
+  const editingOrderIdRef = useRef<string | null>(null);
   const pendingQrPortalOpenRef = useRef(false);
   const pendingQrInFlightRef = useRef(false);
 
@@ -844,6 +855,10 @@ export function CorporatePOS() {
   }, [pendingQrOrderId]);
 
   useEffect(() => {
+    editingOrderIdRef.current = editingOrderId;
+  }, [editingOrderId]);
+
+  useEffect(() => {
     pendingQrPortalOpenRef.current = pendingQrPortalOpen;
   }, [pendingQrPortalOpen]);
 
@@ -910,6 +925,12 @@ export function CorporatePOS() {
 
   const hydrateCartFromQrOrder = useCallback(
     (detail: PosOrderDetail) => {
+      setEditingOrderId(null);
+      setEditingOrderRef(null);
+      setEditingOrderWasHeld(false);
+      setEditingAlreadyOnKot(false);
+      setEditingStockLocked(false);
+      setEditingOriginalQtyByProduct({});
       setPendingQrOrderId(detail.id);
       setCart(
         detail.items.map((i) => ({
@@ -939,6 +960,104 @@ export function CorporatePOS() {
       setPendingQrPortalOpen(false);
     },
     [],
+  );
+
+  const hydrateCartFromExistingOrder = useCallback((detail: PosOrderDetail) => {
+    setPendingQrOrderId(null);
+    setEditingOrderId(detail.id);
+    setEditingOrderRef(detail.reference);
+    const statusKey = (detail.status || "").toLowerCase();
+    setEditingOrderWasHeld(statusKey === "held" || statusKey === "draft");
+    setEditingAlreadyOnKot(Boolean(detail.kotStatus));
+    const payKey = (detail.paymentStatus || "").toLowerCase().replace(/\s+/g, "_");
+    const hasReturns = detail.items.some((i) => (i.returnedQty ?? 0) > 0);
+    const fullyRefunded = payKey === "refunded";
+    // Lock line edits only when returns/refunds exist (stock reverse+reapply would double-restock).
+    setEditingStockLocked(hasReturns || fullyRefunded);
+    const originalQty: Record<string, number> = {};
+    for (const i of detail.items) {
+      originalQty[i.productId] = (originalQty[i.productId] ?? 0) + i.quantity;
+    }
+    setEditingOriginalQtyByProduct(originalQty);
+    setCart(
+      detail.items.map((i) => ({
+        id: i.productId,
+        name: i.productName,
+        price: Number(i.price),
+        quantity: i.quantity,
+        image: "📦",
+        productType: (i as { productType?: CartItem["productType"] }).productType,
+        trackStock: (i as { trackStock?: boolean }).trackStock !== false,
+      })),
+    );
+    setSelectedTableId(detail.table?.id ?? "");
+    setSelectedCustomerId(detail.customerId ?? "");
+    if (detail.billerId) setSelectedBillerId(detail.billerId);
+    setSelectedPaymentMethod(
+      detail.paymentMethod === "CARD" ? "card" : detail.paymentMethod === "CASH" ? "cash" : null,
+    );
+    setPaymentStatusChoice(payKey === "paid" ? "paid" : "pending");
+    setShippingInput(detail.shipping ?? "");
+    setServiceFeeInput(detail.serviceFee ?? "");
+    if (detail.discount && Number(detail.discount) > 0) {
+      setAppliedDiscount({ type: "fixed", value: Number(detail.discount) });
+    } else {
+      setAppliedDiscount(null);
+    }
+    if (detail.vehicleId) setSelectedVehicleId(detail.vehicleId);
+    if (detail.mileageAtService != null) setMileageInput(String(detail.mileageAtService));
+  }, []);
+
+  const handleLoadOrderForEdit = useCallback(
+    async (orderId: string) => {
+      if ((!canCreate && !canEdit) || isDemo || !isAuthenticated) return;
+      try {
+        const detail = await fetchPosOrder(orderId);
+        const statusKey = (detail.status || "").toLowerCase();
+        if (statusKey === "cancelled") {
+          notifyWarning(tr("Ləğv edilmiş sifariş redaktə edilə bilməz", "Cancelled orders cannot be edited"));
+          return;
+        }
+        const refunded = parseFloat(detail.refunded ?? "0") || 0;
+        const grand = parseFloat(detail.grandTotal) || 0;
+        if (refunded > 0 && grand > 0 && refunded >= grand - 0.001) {
+          notifyWarning(
+            tr("Tam qaytarılmış sifariş redaktə edilə bilməz", "Fully refunded orders cannot be edited"),
+          );
+          return;
+        }
+        if (detail.source === "QR_MENU" && statusKey === "pending") {
+          notifyWarning(
+            tr(
+              "QR sifariş üçün qəbul axınından istifadə edin",
+              "Use Accept for pending QR menu orders",
+            ),
+          );
+          return;
+        }
+        hydrateCartFromExistingOrder(detail);
+        const hasReturns = detail.items.some((i) => (i.returnedQty ?? 0) > 0);
+        const payKey = (detail.paymentStatus || "").toLowerCase().replace(/\s+/g, "_");
+        if (hasReturns || payKey === "refunded") {
+          notifyWarning(
+            tr(
+              "Bu sifarişdə qaytarma var — məhsul sətirləri kilidlidir; digər sahələr yenilənə bilər",
+              "This order has returns — line items are locked; other fields can still be updated",
+            ),
+          );
+        } else {
+          notifySuccess(
+            tr(
+              `Sifariş redaktə üçün açıldı (${detail.reference})`,
+              `Order opened for edit (${detail.reference})`,
+            ),
+          );
+        }
+      } catch (err) {
+        notifyFromError(err, tr("Sifariş yüklənə bilmədi", "Failed to load order"));
+      }
+    },
+    [canCreate, canEdit, isDemo, isAuthenticated, hydrateCartFromExistingOrder, tr],
   );
 
   const handleAcceptQrOrder = useCallback(
@@ -1011,6 +1130,28 @@ export function CorporatePOS() {
     isDemo,
     isAuthenticated,
     handleAcceptQrOrder,
+  ]);
+
+  // Deep-link from POS Orders: ?orderId=id → open for edit in POS
+  useEffect(() => {
+    const orderId = searchParams.get("orderId");
+    if (!orderId || isDemo || !isAuthenticated) return;
+    if (!canCreate && !canEdit) return;
+    if (editOrderHandledRef.current === orderId) return;
+    editOrderHandledRef.current = orderId;
+    void handleLoadOrderForEdit(orderId).finally(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete("orderId");
+      setSearchParams(next, { replace: true });
+    });
+  }, [
+    searchParams,
+    setSearchParams,
+    canCreate,
+    canEdit,
+    isDemo,
+    isAuthenticated,
+    handleLoadOrderForEdit,
   ]);
 
   // Derived selections
@@ -1160,18 +1301,27 @@ export function CorporatePOS() {
     );
   };
 
+  /** Listed on-hand + qty already reserved on the order being edited (restored on save). */
+  const getAvailableStock = (productId: string, listedStock: number) => {
+    if (!editingOrderId) return listedStock;
+    return listedStock + (editingOriginalQtyByProduct[productId] ?? 0);
+  };
+
+  const canMutateCart = canCreate || (!!editingOrderId && canEdit && !editingStockLocked);
+
   const addToCart = (product: Product): boolean => {
-    if (!canCreate) return false;
+    if (!canMutateCart) return false;
     const isService = !product.trackStock || product.productType === "SERVICE";
     const existing = cart.find((i) => i.id === product.id);
     const nextQty = existing ? existing.quantity + 1 : 1;
+    const available = getAvailableStock(product.id, product.stock);
 
-    if (!isService && stockEnabled && product.stock <= 0) {
+    if (!isService && stockEnabled && available <= 0) {
       warnOutOfStock(product);
       return false;
     }
-    if (!isService && stockEnabled && nextQty > product.stock) {
-      warnInsufficientStock(product, product.stock);
+    if (!isService && stockEnabled && nextQty > available) {
+      warnInsufficientStock(product, available);
       return false;
     }
 
@@ -1207,8 +1357,15 @@ export function CorporatePOS() {
       const trimmed = code.trim();
       if (!trimmed) return "ignored";
 
-      if (!canCreate) {
-        notifyWarning(tr("Sifariş yaratmaq icazəniz yoxdur", "You do not have permission to add items"));
+      if (!canMutateCart) {
+        notifyWarning(
+          editingStockLocked
+            ? tr(
+                "Bu sifarişdə qaytarma var — məhsul əlavə edilə bilməz",
+                "This order has returns — items cannot be added",
+              )
+            : tr("Sifariş yaratmaq icazəniz yoxdur", "You do not have permission to add items"),
+        );
         return false;
       }
       if (receipt) return "ignored";
@@ -1269,7 +1426,7 @@ export function CorporatePOS() {
         }
       }
     },
-    [canCreate, receipt, mapListItemToProduct, language],
+    [canMutateCart, editingStockLocked, receipt, mapListItemToProduct, language],
   );
 
   const { handleKeyDown: handleSearchBarcodeKeyDown } = useBarcodeWedge(handleBarcodeScan);
@@ -1290,12 +1447,12 @@ export function CorporatePOS() {
   );
 
   const removeFromCart = (id: string) => {
-    if (!canCreate) return;
+    if (!canMutateCart) return;
     setCart((p) => p.filter((i) => i.id !== id));
   };
 
   const updateQuantity = (id: string, delta: number, maxStock?: number) => {
-    if (!canCreate) return;
+    if (!canMutateCart) return;
     const product = products.find((p) => p.id === id);
     const item = cart.find((i) => i.id === id);
     if (!item) return;
@@ -1306,13 +1463,19 @@ export function CorporatePOS() {
       product?.productType === "SERVICE";
 
     const next = item.quantity + delta;
+    const available =
+      maxStock != null
+        ? maxStock
+        : product
+          ? getAvailableStock(product.id, product.stock)
+          : 0;
     if (delta > 0 && !isService) {
-      if (stockEnabled && product && product.stock <= 0) {
-        warnOutOfStock(product);
+      if (stockEnabled && available <= 0) {
+        if (product) warnOutOfStock(product);
         return;
       }
-      if (stockEnabled && maxStock != null && maxStock > 0 && next > maxStock) {
-        if (product) warnInsufficientStock(product, maxStock);
+      if (stockEnabled && available > 0 && next > available) {
+        if (product) warnInsufficientStock(product, available);
         return;
       }
     }
@@ -1393,6 +1556,12 @@ export function CorporatePOS() {
       });
     }
     setPendingQrOrderId(null);
+    setEditingOrderId(null);
+    setEditingOrderRef(null);
+    setEditingOrderWasHeld(false);
+    setEditingAlreadyOnKot(false);
+    setEditingStockLocked(false);
+    setEditingOriginalQtyByProduct({});
     setCart([]);
     setShippingInput("");
     setServiceFeeInput("");
@@ -1415,28 +1584,33 @@ export function CorporatePOS() {
         const isService = !item.trackStock || item.productType === "SERVICE";
         if (isService) return false;
         const product = products.find((p) => p.id === item.id);
-        return !product || product.stock <= 0 || item.quantity > product.stock;
+        if (!product) return true;
+        const available = getAvailableStock(item.id, product.stock);
+        return available <= 0 || item.quantity > available;
       }) ?? null
     );
   };
 
   const warnCartStockIssue = (stockIssue: CartItem) => {
     const product = products.find((p) => p.id === stockIssue.id);
-    if (product && product.stock <= 0) warnOutOfStock(product);
-    else if (product) warnInsufficientStock(product, product.stock);
-    else {
+    if (!product) {
       notifyWarning(
         tr(
           "Səbətdə stokda olmayan məhsullar var",
           "Some items in the cart are out of stock or exceed available quantity",
         ),
       );
+      return;
     }
+    const available = getAvailableStock(product.id, product.stock);
+    if (available <= 0) warnOutOfStock(product);
+    else warnInsufficientStock(product, available);
   };
 
   /** Shared gate for Order / KOT / Bar / Production — keeps validation identical. */
   const assertPosCheckoutReady = (kind: "order" | "kot" | "bar" | "production"): boolean => {
-    if (!canCreate || isDemo || !isAuthenticated) return false;
+    const allowed = editingOrderId ? canCreate || canEdit : canCreate;
+    if (!allowed || isDemo || !isAuthenticated) return false;
     if (kind === "kot" && !diningEnabled) return false;
     if (kind === "bar" && (!diningEnabled || !posSendToBarEnabled)) return false;
     if (kind === "production" && !posSendToProductionEnabled) return false;
@@ -1466,10 +1640,12 @@ export function CorporatePOS() {
       notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
       return false;
     }
-    const stockIssue = findCartStockIssue();
-    if (stockIssue) {
-      warnCartStockIssue(stockIssue);
-      return false;
+    if (!editingStockLocked) {
+      const stockIssue = findCartStockIssue();
+      if (stockIssue) {
+        warnCartStockIssue(stockIssue);
+        return false;
+      }
     }
     return true;
   };
@@ -1511,8 +1687,60 @@ export function CorporatePOS() {
     ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
   });
 
+  /** Persist cart changes onto the order opened from Orders (PATCH, not create). */
+  const submitEditingOrder = async (opts?: {
+    /** Keep/save as draft (HELD). */
+    asDraft?: boolean;
+    /** Force COMPLETED (e.g. Update & Print on a draft). */
+    finalize?: boolean;
+    sendToKot?: boolean;
+    sendToBar?: boolean;
+  }) => {
+    const id = editingOrderId;
+    if (!id) throw new Error("No order loaded for edit");
+    if (opts?.asDraft && !editingOrderWasHeld) {
+      throw new Error(
+        tr(
+          "Tamamlanmış sifariş qaralamaya qaytarıla bilməz",
+          "A completed order cannot be saved as draft",
+        ),
+      );
+    }
+    const body = buildCheckoutBody();
+    const {
+      initialPaymentAmount: _pay,
+      storeId: _store,
+      status: _status,
+      ...rest
+    } = body as typeof body & { initialPaymentAmount?: number; storeId?: string | null };
+    void _pay;
+    void _store;
+    void _status;
+
+    // Update Order on a draft keeps HELD; Update & Print finalizes to COMPLETED.
+    // Completed orders always stay COMPLETED.
+    const nextStatus: "HELD" | "COMPLETED" = opts?.asDraft
+      ? "HELD"
+      : opts?.finalize || !editingOrderWasHeld
+        ? "COMPLETED"
+        : "HELD";
+
+    const payload: Parameters<typeof updatePosOrder>[1] = {
+      ...rest,
+      status: nextStatus,
+      ...(diningEnabled ? { tableId: selectedTableId || null } : {}),
+      ...(opts?.sendToKot && !editingAlreadyOnKot ? { sendToKot: true } : {}),
+      ...(opts?.sendToBar && !editingAlreadyOnKot ? { sendToBar: true } : {}),
+    };
+    if (editingStockLocked) {
+      delete payload.items;
+    }
+    return updatePosOrder(id, payload);
+  };
+
   const handleSaveDraft = async () => {
-    if (!canCreate || isDemo || !isAuthenticated) return;
+    const allowed = editingOrderId ? canCreate || canEdit : canCreate;
+    if (!allowed || isDemo || !isAuthenticated) return;
     if (pendingQrOrderId) {
       notifyWarning(
         tr(
@@ -1530,25 +1758,36 @@ export function CorporatePOS() {
       notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
       return;
     }
+    if (editingOrderId && !editingOrderWasHeld) {
+      notifyWarning(
+        tr(
+          "Tamamlanmış sifariş qaralamaya qaytarıla bilməz",
+          "A completed order cannot be saved as draft",
+        ),
+      );
+      return;
+    }
 
     setCheckoutAction("draft");
     try {
-      const detail = await createPosOrder({
-        status: "HELD",
-        customerId: selectedCustomerId || null,
-        billerId: selectedBillerId || null,
-        ...(selectedPaymentMethod ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) } : {}),
-        shipping,
-        ...(serviceFee > 0 ? { serviceFee } : {}),
-        discount: discountAmount > 0 ? discountAmount : undefined,
-        items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
-        initialPaymentAmount: 0,
-        ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-        ...(autoEnabled && selectedVehicleId && mileageInput.trim()
-          ? { mileageAtService: Number(mileageInput) }
-          : {}),
-        ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
-      });
+      const detail = editingOrderId
+        ? await submitEditingOrder({ asDraft: true })
+        : await createPosOrder({
+            status: "HELD",
+            customerId: selectedCustomerId || null,
+            billerId: selectedBillerId || null,
+            ...(selectedPaymentMethod ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) } : {}),
+            shipping,
+            ...(serviceFee > 0 ? { serviceFee } : {}),
+            discount: discountAmount > 0 ? discountAmount : undefined,
+            items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+            initialPaymentAmount: 0,
+            ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+            ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+              ? { mileageAtService: Number(mileageInput) }
+              : {}),
+            ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
+          });
       notifySuccess(
         tr(
           `Qaralama saxlanıldı (${detail.reference})`,
@@ -1644,7 +1883,12 @@ export function CorporatePOS() {
 
     setCheckoutAction(printBill ? "orderBill" : "order");
     try {
-      const detail = await posCheckout(buildCheckoutBody());
+      const detail = editingOrderId
+        ? await submitEditingOrder({
+            // Update & Print finalizes drafts; Update Order keeps draft as HELD.
+            finalize: printBill || !editingOrderWasHeld,
+          })
+        : await posCheckout(buildCheckoutBody());
       const tableLabel = diningEnabled ? resolveTableLabel(false) : undefined;
 
       if (printBill) {
@@ -1657,10 +1901,20 @@ export function CorporatePOS() {
         );
       } else {
         notifySuccess(
-          tr(
-            `Sifariş yerləşdirildi (${detail.reference})`,
-            `Order placed (${detail.reference})`,
-          ),
+          editingOrderId
+            ? editingOrderWasHeld && detail.status === "HELD"
+              ? tr(
+                  `Qaralama yeniləndi (${detail.reference})`,
+                  `Draft updated (${detail.reference})`,
+                )
+              : tr(
+                  `Sifariş yeniləndi (${detail.reference})`,
+                  `Order updated (${detail.reference})`,
+                )
+            : tr(
+                `Sifariş yerləşdirildi (${detail.reference})`,
+                `Order placed (${detail.reference})`,
+              ),
         );
       }
       resetCartAfterSave();
@@ -1685,7 +1939,9 @@ export function CorporatePOS() {
       const body = buildCheckoutBody();
       const detail = pendingQrOrderId
         ? await approveQrAndSendToKot(pendingQrOrderId, body)
-        : await sendPosOrderToKot(body);
+        : editingOrderId
+          ? await submitEditingOrder({ sendToKot: true, finalize: true })
+          : await sendPosOrderToKot(body);
 
       const tableLabel = resolveTableLabel(true);
 
@@ -1750,7 +2006,9 @@ export function CorporatePOS() {
 
     setCheckoutAction(printBill ? "barBill" : "bar");
     try {
-      const detail = await sendPosOrderToBar(buildCheckoutBody());
+      const detail = editingOrderId
+        ? await submitEditingOrder({ sendToBar: true, finalize: true })
+        : await sendPosOrderToBar(buildCheckoutBody());
       const tableLabel = resolveTableLabel(true);
 
       try {
@@ -1808,7 +2066,9 @@ export function CorporatePOS() {
 
     setCheckoutAction("production");
     try {
-      const detail = await sendPosOrderToProduction(buildCheckoutBody());
+      const detail = editingOrderId
+        ? await submitEditingOrder({ finalize: true })
+        : await sendPosOrderToProduction(buildCheckoutBody());
 
       setReceipt(
         buildReceiptFromDetail(detail, pmLabel, receiptCustomer, receiptPhone, receiptBiller, {
@@ -1816,7 +2076,11 @@ export function CorporatePOS() {
           allowKitchenReprint: false,
         }),
       );
-      notifySuccess(tr("İstehsala göndərildi", "Sent to production"));
+      notifySuccess(
+        editingOrderId
+          ? tr("Sifariş yeniləndi", "Order updated")
+          : tr("İstehsala göndərildi", "Sent to production"),
+      );
       resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
@@ -2018,31 +2282,33 @@ export function CorporatePOS() {
                 {filteredProducts.map((product) => {
                   const isService = !product.trackStock || product.productType === "SERVICE";
                   const qtyInCart = getCartQuantity(product.id);
-                  const outOfStock = !isService && stockEnabled && product.stock <= 0;
+                  const available = getAvailableStock(product.id, product.stock);
+                  const outOfStock = !isService && stockEnabled && available <= 0;
                   const atStockLimit =
-                    !isService && stockEnabled && product.stock > 0 && qtyInCart >= product.stock;
+                    !isService && stockEnabled && available > 0 && qtyInCart >= available;
+                  const allowAdd = canMutateCart && !outOfStock;
 
                   return (
                   <div
                     key={product.id}
                     role="button"
-                    tabIndex={canCreate && !outOfStock ? 0 : -1}
+                    tabIndex={allowAdd ? 0 : -1}
                     onClick={() => {
-                      if (!canCreate || outOfStock) {
+                      if (!allowAdd) {
                         if (outOfStock) warnOutOfStock(product);
                         return;
                       }
                       addToCart(product);
                     }}
                     onKeyDown={(e) => {
-                      if (!canCreate || outOfStock) return;
+                      if (!allowAdd) return;
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         addToCart(product);
                       }
                     }}
                     className={`relative bg-white dark:bg-gray-900 border rounded-lg p-3 sm:p-4 hover:shadow-lg transition-all active:scale-95 text-left group touch-manipulation ${
-                      outOfStock || !canCreate
+                      outOfStock || !canMutateCart
                         ? "border-red-300 dark:border-red-900/60 opacity-80 cursor-not-allowed"
                         : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer"
                     } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none`}
@@ -2073,10 +2339,10 @@ export function CorporatePOS() {
                           ? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
                           : "text-gray-400 bg-gray-100 dark:bg-gray-800"
                       }`}>
-                        {product.stock < 99 ? `${product.stock}` : "∞"}
+                        {available < 99 ? `${available}` : "∞"}
                       </span>}
                     </div>
-                    {canCreate && qtyInCart > 0 && (
+                    {canMutateCart && qtyInCart > 0 && (
                       <div
                         className="mt-2 flex items-center justify-end"
                         onClick={(e) => e.stopPropagation()}
@@ -2084,7 +2350,7 @@ export function CorporatePOS() {
                         <div className="flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg">
                           <button
                             type="button"
-                            onClick={() => updateQuantity(product.id, -1, product.stock)}
+                            onClick={() => updateQuantity(product.id, -1, available)}
                             className="p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-lg transition-colors"
                             aria-label={tr("Azalt", "Decrease quantity")}
                           >
@@ -2095,7 +2361,7 @@ export function CorporatePOS() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => updateQuantity(product.id, 1, product.stock)}
+                            onClick={() => updateQuantity(product.id, 1, available)}
                             disabled={atStockLimit}
                             className="p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             aria-label={tr("Artır", "Increase quantity")}
@@ -2124,14 +2390,27 @@ export function CorporatePOS() {
                     <ShoppingCart className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Cari Sifariş", "Current Order")}</h2>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400">{cart.length} {tr("məhsul", "items")}</p>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {editingOrderId
+                        ? tr("Sifarişi redaktə et", "Edit Order")
+                        : tr("Cari Sifariş", "Current Order")}
+                    </h2>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                      {editingOrderRef
+                        ? editingOrderRef
+                        : `${cart.length} ${tr("məhsul", "items")}`}
+                    </p>
                   </div>
                 </div>
-                {cart.length > 0 && canCreate && (
+                {cart.length > 0 && (canCreate || (editingOrderId && canEdit)) && (
                   <button
                     onClick={() => resetCartAfterSave()}
                     className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-colors"
+                    title={
+                      editingOrderId
+                        ? tr("Redaktəni ləğv et", "Cancel edit")
+                        : tr("Səbəti təmizlə", "Clear cart")
+                    }
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -2140,6 +2419,19 @@ export function CorporatePOS() {
               {pendingQrOrderId && (
                 <div className="shrink-0 mb-2 px-2 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-[11px] text-orange-800 dark:text-orange-200">
                   {tr("QR sifariş qəbul edildi — KOT & Çap ilə təsdiqləyin", "QR order accepted — confirm with KOT & Print")}
+                </div>
+              )}
+              {editingOrderId && !pendingQrOrderId && (
+                <div className="shrink-0 mb-2 px-2 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 text-[11px] text-sky-800 dark:text-sky-200">
+                  {editingStockLocked
+                    ? tr(
+                        `Redaktə: ${editingOrderRef ?? editingOrderId} (məhsul sətirləri kilidlidir — qaytarma mövcuddur)`,
+                        `Editing ${editingOrderRef ?? editingOrderId} (line items locked — returns exist)`,
+                      )
+                    : tr(
+                        `Redaktə: ${editingOrderRef ?? editingOrderId} — silinən məhsulların stoku geri qaytarılır`,
+                        `Editing ${editingOrderRef ?? editingOrderId} — removed items restore stock`,
+                      )}
                 </div>
               )}
 
@@ -2258,14 +2550,17 @@ export function CorporatePOS() {
                       item.productType === "SERVICE" ||
                       !product?.trackStock ||
                       product?.productType === "SERVICE";
+                    const available = product
+                      ? getAvailableStock(product.id, product.stock)
+                      : 0;
                     const itemOutOfStock =
-                      !isService && stockEnabled && product != null && product.stock <= 0;
+                      !isService && stockEnabled && product != null && available <= 0;
                     const itemExceedsStock =
                       !isService &&
                       stockEnabled &&
                       product != null &&
-                      product.stock > 0 &&
-                      item.quantity > product.stock;
+                      available > 0 &&
+                      item.quantity > available;
 
                     return (
                     <div key={item.id} className={`bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border ${
@@ -2289,8 +2584,8 @@ export function CorporatePOS() {
                               {itemOutOfStock
                                 ? tr("Stokda yoxdur", "Out of stock")
                                 : tr(
-                                    `Yalnız ${product!.stock} ədəd mövcuddur`,
-                                    `Only ${product!.stock} available`,
+                                    `Yalnız ${available} ədəd mövcuddur`,
+                                    `Only ${available} available`,
                                   )}
                             </p>
                           )}
@@ -2320,11 +2615,9 @@ export function CorporatePOS() {
                             <div className="flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const product = products.find((p) => p.id === item.id);
-                                  updateQuantity(item.id, -1, product?.stock);
-                                }}
-                                className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-lg transition-colors"
+                                onClick={() => updateQuantity(item.id, -1, available)}
+                                disabled={!canMutateCart}
+                                className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-lg transition-colors disabled:opacity-40"
                                 aria-label={tr("Azalt", "Decrease quantity")}
                               >
                                 <Minus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
@@ -2334,27 +2627,20 @@ export function CorporatePOS() {
                               </span>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const product = products.find((p) => p.id === item.id);
-                                  updateQuantity(item.id, 1, product?.stock);
-                                }}
-                                disabled={
-                                  (() => {
-                                    const product = products.find((p) => p.id === item.id);
-                                    return (
-                                      product != null &&
-                                      product.stock > 0 &&
-                                      item.quantity >= product.stock
-                                    );
-                                  })()
-                                }
+                                onClick={() => updateQuantity(item.id, 1, available)}
+                                disabled={!canMutateCart || (!isService && stockEnabled && available > 0 && item.quantity >= available)}
                                 className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 aria-label={tr("Artır", "Increase quantity")}
                               >
                                 <Plus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
                               </button>
                             </div>
-                            <button onClick={() => removeFromCart(item.id)} className="ml-auto p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(item.id)}
+                              disabled={!canMutateCart}
+                              className="ml-auto p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-40"
+                            >
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -2510,7 +2796,7 @@ export function CorporatePOS() {
                     </div>
                   </div>
 
-                  {canCreate && (
+                  {(canCreate || (editingOrderId && canEdit)) && (
                   <div className="space-y-1.5">
                     {(() => {
                       const baseDisabled =
@@ -2521,6 +2807,36 @@ export function CorporatePOS() {
                       const orderDisabled = baseDisabled || !!pendingQrOrderId;
                       const btnBase =
                         "px-2.5 py-2 text-[11px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1";
+
+                      if (editingOrderId) {
+                        return (
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void handlePlaceOrder()}
+                              disabled={baseDisabled}
+                              className={`${btnBase} text-white bg-[#14b8a6] hover:bg-[#0d9488]`}
+                            >
+                              <ClipboardList className="w-3 h-3" />
+                              {checkoutAction === "order"
+                                ? tr("Yenilənir...", "Updating...")
+                                : tr("Sifarişi yenilə", "Update Order")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handlePlaceOrder({ printBill: true })}
+                              disabled={baseDisabled}
+                              className={`${btnBase} text-white bg-[#14b8a6] hover:bg-[#0d9488]`}
+                            >
+                              <Printer className="w-3 h-3" />
+                              {checkoutAction === "orderBill"
+                                ? tr("Yenilənir...", "Updating...")
+                                : tr("Yenilə & Çap", "Update & Print")}
+                            </button>
+                          </div>
+                        );
+                      }
+
                       return (
                         <>
                           <div className="grid grid-cols-2 gap-1.5">
