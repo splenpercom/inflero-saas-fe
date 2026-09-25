@@ -13,117 +13,279 @@ import {
 
 export type PosPrintRole = "receipt" | "kot" | "bar";
 
-/**
- * Browser print without window.open — popups are blocked after async API calls.
- * Uses a temporary hidden iframe so the print dialog still opens reliably.
- */
-function browserPrintHtml(html: string): void {
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.style.cssText =
-    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
-  document.body.appendChild(iframe);
+export type PosPrintResult = {
+  channel: "qz" | "browser";
+  printer?: string;
+  /** True when QZ was preferred/mapped but we had to use the browser dialog. */
+  fellBackFromQz?: boolean;
+};
 
-  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-  if (!doc) {
-    iframe.remove();
-    throw new Error("Unable to open print frame");
-  }
+/** Serialize prints so KOT + bill (or double-clicks) cannot race the iframe/QZ job. */
+let printChain: Promise<unknown> = Promise.resolve();
 
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  const cleanup = () => {
-    try {
-      iframe.remove();
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const runPrint = () => {
-    try {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-    } finally {
-      window.setTimeout(cleanup, 1500);
-    }
-  };
-
-  // Prefer onload so images/fonts are ready; fallback timer if onload already fired.
-  let printed = false;
-  const trigger = () => {
-    if (printed) return;
-    printed = true;
-    runPrint();
-  };
-  iframe.onload = () => window.setTimeout(trigger, 50);
-  window.setTimeout(trigger, 600);
+function enqueuePrint<T>(job: () => Promise<T>): Promise<T> {
+  const run = printChain.then(job, job);
+  // Keep the chain alive even if a job fails.
+  printChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
-/** Resolve QZ target: KOT → kitchen (fallback receipt); bar/receipt → billing printer. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (v) => {
+        window.clearTimeout(timer);
+        resolve(v);
+      },
+      (err) => {
+        window.clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+/** Make relative Vite/asset paths absolute so QZ / iframes can load them. */
+export function toAbsoluteAssetUrl(src: string | null | undefined): string | null {
+  if (!src?.trim()) return null;
+  const s = src.trim();
+  if (/^(https?:|data:|blob:)/i.test(s)) return s;
+  if (typeof window === "undefined") return s;
+  try {
+    return new URL(s, window.location.href).href;
+  } catch {
+    return s;
+  }
+}
+
+/**
+ * Browser print without window.open — popups are blocked after async API calls.
+ * Uses a temporary off-screen iframe and resolves after print() is invoked
+ * (so callers can await before opening modals that steal focus).
+ */
+function browserPrintHtml(html: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    // Non-zero size off-screen — some browsers skip print on 0×0 frames.
+    iframe.style.cssText =
+      "position:fixed;left:-10000px;top:0;width:800px;height:1200px;border:0;opacity:0;pointer-events:none;z-index:-1;";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+    if (!doc) {
+      iframe.remove();
+      reject(new Error("Unable to open print frame"));
+      return;
+    }
+
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const cleanup = () => {
+      try {
+        iframe.remove();
+      } catch {
+        /* ignore */
+      }
+    };
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.setTimeout(cleanup, 2500);
+      resolve();
+    };
+
+    const runPrint = () => {
+      try {
+        const win = iframe.contentWindow;
+        if (!win) {
+          cleanup();
+          reject(new Error("Unable to open print frame"));
+          return;
+        }
+        win.focus();
+        win.addEventListener?.("afterprint", finish, { once: true });
+        win.print();
+        // Fallback if afterprint never fires (common on Chromium + silent printers).
+        window.setTimeout(finish, 1200);
+      } catch (err) {
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    };
+
+    let printed = false;
+    const trigger = () => {
+      if (printed) return;
+      printed = true;
+      // Short delay so layout/fonts settle inside the iframe.
+      window.setTimeout(runPrint, 100);
+    };
+
+    iframe.onload = () => trigger();
+    // doc.write often never fires onload — hard fallback.
+    window.setTimeout(trigger, 500);
+  });
+}
+
+/**
+ * Resolve QZ target:
+ * - KOT → kitchen, then billing
+ * - receipt/bar → billing, then kitchen (so a single mapped printer still prints bills)
+ */
 export function resolvePosPrinterName(role: PosPrintRole): string {
   const settings = loadPosPrinterSettings();
   const receipt = settings.receiptPrinter.trim();
   const kot = settings.kotPrinter.trim();
   if (role === "kot") return kot || receipt;
-  return receipt;
+  return receipt || kot;
 }
 
-/** Print pre-built thermal HTML via QZ (receipt role) or browser fallback. */
-export async function printThermalHtml(opts: {
-  role: PosPrintRole;
-  html: string;
-  forceBrowser?: boolean;
-}): Promise<{ channel: "qz" | "browser"; printer?: string }> {
-  const settings = loadPosPrinterSettings();
-  const printer = resolvePosPrinterName(opts.role);
-
-  const tryQz =
-    !opts.forceBrowser &&
-    settings.preferQz &&
-    !!printer &&
-    (await isQzAvailable().catch(() => false));
-
-  if (tryQz) {
-    try {
-      await ensureQzConnected();
-      await qzPrintHtml(printer, opts.html, settings.paperWidthMm);
-      return { channel: "qz", printer };
-    } catch {
-      // Fall through to browser print.
-    }
+function payloadForChannel(
+  payload: ThermalReceiptPayload,
+  channel: "qz" | "browser",
+): ThermalReceiptPayload {
+  // QZ rasterize frequently fails or hangs on remote/relative <img> logos.
+  // Prefer text-only company header for silent thermal print reliability.
+  if (channel === "qz") {
+    return { ...payload, logoSrc: null };
   }
+  return {
+    ...payload,
+    logoSrc: toAbsoluteAssetUrl(payload.logoSrc) ?? payload.logoSrc,
+  };
+}
 
-  browserPrintHtml(opts.html);
-  return { channel: "browser", printer: printer || undefined };
+async function tryQzPrint(
+  role: PosPrintRole,
+  language: Language,
+  payload: ThermalReceiptPayload,
+  printer: string,
+  paperWidthMm: 58 | 80,
+): Promise<void> {
+  const copy =
+    role === "kot" ? "kitchen" : role === "bar" ? "bar" : "customer";
+  const html = buildThermalReceiptHtml(payloadForChannel(payload, "qz"), {
+    language,
+    copy,
+    paperWidthMm,
+  });
+  await withTimeout(ensureQzConnected(), 8000, "QZ connect");
+  await withTimeout(qzPrintHtml(printer, html, paperWidthMm), 20000, "QZ print");
+}
+
+async function tryBrowserPrint(
+  role: PosPrintRole,
+  language: Language,
+  payload: ThermalReceiptPayload,
+  paperWidthMm: 58 | 80,
+): Promise<void> {
+  const copy =
+    role === "kot" ? "kitchen" : role === "bar" ? "bar" : "customer";
+  const html = buildThermalReceiptHtml(payloadForChannel(payload, "browser"), {
+    language,
+    copy,
+    paperWidthMm,
+  });
+  await browserPrintHtml(html);
 }
 
 /**
- * Print receipt, KOT, or Bar ticket.
- * Uses mapped QZ printer when available + configured; otherwise browser print dialog.
+ * Print receipt / KOT / Bar.
+ * - Mapped QZ printer → silent print (no logo images — reliable on thermal)
+ * - Else browser dialog
+ * Jobs are queued so concurrent POS actions cannot race.
  */
 export async function printPosTicket(opts: {
   role: PosPrintRole;
   language: Language;
   payload: ThermalReceiptPayload;
-  /** Force browser dialog even if QZ is configured. */
   forceBrowser?: boolean;
-}): Promise<{ channel: "qz" | "browser"; printer?: string }> {
-  const settings = loadPosPrinterSettings();
-  const copy =
-    opts.role === "kot" ? "kitchen" : opts.role === "bar" ? "bar" : "customer";
-  const html = buildThermalReceiptHtml(opts.payload, {
-    language: opts.language,
-    copy,
-    paperWidthMm: settings.paperWidthMm,
-  });
+}): Promise<PosPrintResult> {
+  return enqueuePrint(async () => {
+    const settings = loadPosPrinterSettings();
+    const printer = resolvePosPrinterName(opts.role);
+    const paperWidthMm = settings.paperWidthMm;
 
-  return printThermalHtml({
-    role: opts.role,
-    html,
-    forceBrowser: opts.forceBrowser,
+    const wantQz =
+      !opts.forceBrowser && settings.preferQz && !!printer;
+
+    if (wantQz) {
+      const qzUp = await withTimeout(
+        isQzAvailable().catch(() => false),
+        8000,
+        "QZ availability",
+      ).catch(() => false);
+
+      if (qzUp) {
+        try {
+          await tryQzPrint(opts.role, opts.language, opts.payload, printer, paperWidthMm);
+          return { channel: "qz" as const, printer };
+        } catch {
+          // Fall through to browser — still deliver a bill.
+        }
+      }
+    }
+
+    await tryBrowserPrint(opts.role, opts.language, opts.payload, paperWidthMm);
+    return {
+      channel: "browser" as const,
+      printer: printer || undefined,
+      fellBackFromQz: wantQz,
+    };
+  });
+}
+
+/** @deprecated Prefer printPosTicket — kept for callers that already built HTML. */
+export async function printThermalHtml(opts: {
+  role: PosPrintRole;
+  html: string;
+  forceBrowser?: boolean;
+}): Promise<PosPrintResult> {
+  return enqueuePrint(async () => {
+    const settings = loadPosPrinterSettings();
+    const printer = resolvePosPrinterName(opts.role);
+
+    const wantQz =
+      !opts.forceBrowser && settings.preferQz && !!printer;
+
+    if (wantQz) {
+      const qzUp = await withTimeout(
+        isQzAvailable().catch(() => false),
+        8000,
+        "QZ availability",
+      ).catch(() => false);
+      if (qzUp) {
+        try {
+          await withTimeout(ensureQzConnected(), 8000, "QZ connect");
+          await withTimeout(
+            qzPrintHtml(printer, opts.html, settings.paperWidthMm),
+            20000,
+            "QZ print",
+          );
+          return { channel: "qz" as const, printer };
+        } catch {
+          /* browser fallback */
+        }
+      }
+    }
+
+    await browserPrintHtml(opts.html);
+    return {
+      channel: "browser" as const,
+      printer: printer || undefined,
+      fellBackFromQz: wantQz,
+    };
   });
 }
 
@@ -132,16 +294,59 @@ export async function printDailySalesSummary(opts: {
   language: Language;
   payload: DailySalesSummaryPayload;
   forceBrowser?: boolean;
-}): Promise<{ channel: "qz" | "browser"; printer?: string }> {
+}): Promise<PosPrintResult> {
   const settings = loadPosPrinterSettings();
-  const html = buildDailySalesSummaryHtml(opts.payload, {
-    language: opts.language,
-    paperWidthMm: settings.paperWidthMm,
-  });
-  return printThermalHtml({
-    role: "receipt",
-    html,
-    forceBrowser: opts.forceBrowser,
+  // Reuse queue via printThermalHtml after building HTML (no logo for QZ path inside).
+  const htmlBrowser = buildDailySalesSummaryHtml(
+    {
+      ...opts.payload,
+      logoSrc: toAbsoluteAssetUrl(opts.payload.logoSrc) ?? opts.payload.logoSrc,
+    },
+    {
+      language: opts.language,
+      paperWidthMm: settings.paperWidthMm,
+    },
+  );
+  const htmlQz = buildDailySalesSummaryHtml(
+    { ...opts.payload, logoSrc: null },
+    {
+      language: opts.language,
+      paperWidthMm: settings.paperWidthMm,
+    },
+  );
+
+  return enqueuePrint(async () => {
+    const printer = resolvePosPrinterName("receipt");
+    const wantQz =
+      !opts.forceBrowser && settings.preferQz && !!printer;
+
+    if (wantQz) {
+      const qzUp = await withTimeout(
+        isQzAvailable().catch(() => false),
+        8000,
+        "QZ availability",
+      ).catch(() => false);
+      if (qzUp) {
+        try {
+          await withTimeout(ensureQzConnected(), 8000, "QZ connect");
+          await withTimeout(
+            qzPrintHtml(printer, htmlQz, settings.paperWidthMm),
+            20000,
+            "QZ print",
+          );
+          return { channel: "qz" as const, printer };
+        } catch {
+          /* browser */
+        }
+      }
+    }
+
+    await browserPrintHtml(htmlBrowser);
+    return {
+      channel: "browser" as const,
+      printer: printer || undefined,
+      fellBackFromQz: wantQz,
+    };
   });
 }
 
@@ -149,7 +354,7 @@ export async function canSilentPrint(role: PosPrintRole): Promise<boolean> {
   const settings = loadPosPrinterSettings();
   const printer = resolvePosPrinterName(role);
   if (!settings.preferQz || !printer) return false;
-  return isQzAvailable();
+  return withTimeout(isQzAvailable(), 5000, "QZ availability").catch(() => false);
 }
 
 function parseMoney(value: string | null | undefined): number {
@@ -236,7 +441,7 @@ export async function printPosOrderTicket(opts: {
   companyName: string;
   logoSrc?: string | null;
   customerPhone?: string;
-}): Promise<{ channel: "qz" | "browser"; printer?: string }> {
+}): Promise<PosPrintResult> {
   const payload = posOrderToThermalPayload(opts.order, {
     language: opts.language,
     companyName: opts.companyName,

@@ -295,6 +295,10 @@ export function buildThermalReceiptHtml(
   const footer = receiptPrintText(language, data.siteFooter ?? "app.inflero.com");
   const logo =
     !isTicket && data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
+  // Always show company name on customer bills (QZ path omits logo images).
+  const companyHeader = !isTicket
+    ? `<div class="center bold big" style="margin:4px 0 6px;">${company}</div>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="${language}">
@@ -305,6 +309,7 @@ export function buildThermalReceiptHtml(
 </head>
 <body>
   ${logo}
+  ${companyHeader}
   ${headerBanner}
   <div class="divider-solid"></div>
   <div class="row"><span class="label">${L.order}:</span><span>${d.orderNo}</span></div>

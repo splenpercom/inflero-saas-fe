@@ -43,8 +43,10 @@ export function DaySalesBillModal({
   onClose: () => void;
 }) {
   const { language } = useLanguage();
-  const { user } = useAuth();
+  const { user, hasModule } = useAuth();
   const branchRevision = useBranchRevision();
+  /** QZ multi-printer routing is a Dining feature; others use the browser print dialog. */
+  const diningEnabled = hasModule("DINING");
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [selectedDate, setSelectedDate] = useState(localYmd);
@@ -105,6 +107,7 @@ export function DaySalesBillModal({
 
       await printDailySalesSummary({
         language,
+        forceBrowser: !diningEnabled,
         payload: {
           date: formatDate(parseYmdLocal(selectedDate), language),
           companyName: user?.tenant?.name?.trim() || "Inflero",

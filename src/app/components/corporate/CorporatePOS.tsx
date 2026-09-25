@@ -482,6 +482,8 @@ function ThermalReceipt({
         role,
         language,
         payload: toPayload(),
+        // QZ only for Dining tenants; others use the standard browser print dialog.
+        forceBrowser: !diningEnabled,
       });
     } catch (err) {
       notifyFromError(
@@ -524,7 +526,7 @@ function ThermalReceipt({
           </button>
         </div>
 
-        {diningEnabled && onConfigurePrinters && (
+        {onConfigurePrinters && (
           <div className="px-4 pt-3">
             <button
               type="button"
@@ -1918,7 +1920,7 @@ export function CorporatePOS() {
       total: apiTotal,
       paymentMethod: resolvePaymentMethodLabel(pmLabel, detail.paymentMethod),
       paymentStatusLabel: serverPaymentStatusLabel,
-      autoPrintReceipt: opts?.autoPrintReceipt ?? !opts?.diningFlow,
+      autoPrintReceipt: opts?.autoPrintReceipt === true,
       autoPrintKitchen: false,
       allowKitchenReprint,
       ...(opts?.diningFlow || opts?.tableLabel
@@ -1956,12 +1958,55 @@ export function CorporatePOS() {
     };
   };
 
+  /**
+   * Customer bill print.
+   * - Dining tenants: QZ Tray (billing + KOT printers) when mapped, else browser.
+   * - Everyone else: standard browser print → default billing printer (no QZ involved).
+   */
   const printCustomerBillFromReceipt = async (data: ReceiptData) => {
-    await printPosTicket({
+    return printPosTicket({
       role: "receipt",
       language,
       payload: receiptToPrintPayload(data),
+      forceBrowser: !diningEnabled,
     });
+  };
+
+  /** Print customer bill fully, then open receipt modal for manual reprint. Never auto-print from modal. */
+  const printBillThenShowReceipt = async (
+    receiptData: ReceiptData,
+    msgs: {
+      ok: string;
+      printFail: string;
+    },
+  ) => {
+    try {
+      const printed = await printCustomerBillFromReceipt(receiptData);
+      notifySuccess(msgs.ok);
+      // Printer-mapping hints only matter for Dining (QZ multi-printer) tenants.
+      if (diningEnabled && printed.channel === "browser") {
+        if (!printed.printer) {
+          notifyWarning(
+            tr(
+              "Qəbz printer təyin olunmayıb — brauzer çapı açıldı. POS Printerlərdən billing printer seçin.",
+              "No bill printer mapped — browser print opened. Set the billing printer under POS Printers.",
+            ),
+          );
+        } else if (printed.fellBackFromQz) {
+          notifyWarning(
+            tr(
+              "QZ çapı alınmadı — brauzer çap dialoqu açıldı. QZ Tray-i yoxlayın.",
+              "QZ print failed — browser print dialog opened. Check QZ Tray.",
+            ),
+          );
+        }
+      }
+    } catch (printErr) {
+      notifyWarning(msgs.printFail);
+      notifyFromError(printErr);
+    }
+    // Only after print attempt finishes — opening earlier races/cancels the job.
+    setReceipt(receiptData);
   };
 
   const handlePlaceOrder = async (opts?: { printBill?: boolean }) => {
@@ -1981,7 +2026,20 @@ export function CorporatePOS() {
             finalize: printBill || !editingOrderWasHeld,
           })
         : await posCheckout(buildCheckoutBody());
-      detail = await collectRemainingIfPaid(detail);
+
+      // Never block bill print if payment sync fails after order already saved.
+      try {
+        detail = await collectRemainingIfPaid(detail);
+      } catch (payErr) {
+        notifyWarning(
+          tr(
+            "Sifariş yaradıldı, amma ödəniş statusu yenilənmədi",
+            "Order placed, but payment status could not be updated",
+          ),
+        );
+        notifyFromError(payErr);
+      }
+
       const tableLabel = diningEnabled ? resolveTableLabel(false) : undefined;
 
       const receiptData = buildReceiptFromDetail(
@@ -1998,29 +2056,21 @@ export function CorporatePOS() {
       );
 
       if (printBill) {
-        try {
-          await printCustomerBillFromReceipt(receiptData);
-          notifySuccess(
-            editingOrderId
-              ? tr(
-                  `Sifariş yeniləndi və qəbz çap olundu (${detail.reference})`,
-                  `Order updated and bill printed (${detail.reference})`,
-                )
-              : tr(
-                  `Sifariş yerləşdirildi və qəbz çap olundu (${detail.reference})`,
-                  `Order placed and bill printed (${detail.reference})`,
-                ),
-          );
-        } catch (printErr) {
-          notifyWarning(
-            tr(
-              "Sifariş yerləşdirildi, amma qəbz çapı alınmadı",
-              "Order placed, but bill print failed",
-            ),
-          );
-          notifyFromError(printErr);
-        }
-        setReceipt(receiptData);
+        await printBillThenShowReceipt(receiptData, {
+          ok: editingOrderId
+            ? tr(
+                `Sifariş yeniləndi və qəbz çap olundu (${detail.reference})`,
+                `Order updated and bill printed (${detail.reference})`,
+              )
+            : tr(
+                `Sifariş yerləşdirildi və qəbz çap olundu (${detail.reference})`,
+                `Order placed and bill printed (${detail.reference})`,
+              ),
+          printFail: tr(
+            "Sifariş yerləşdirildi, amma qəbz çapı alınmadı — əl ilə çap edin",
+            "Order placed, but bill print failed — use Print on the receipt",
+          ),
+        });
       } else {
         notifySuccess(
           editingOrderId
@@ -2064,7 +2114,11 @@ export function CorporatePOS() {
         : editingOrderId
           ? await submitEditingOrder({ sendToKot: true, finalize: true })
           : await sendPosOrderToKot(body);
-      detail = await collectRemainingIfPaid(detail);
+      try {
+        detail = await collectRemainingIfPaid(detail);
+      } catch (payErr) {
+        notifyFromError(payErr);
+      }
 
       const tableLabel = resolveTableLabel(true);
 
@@ -2117,20 +2171,19 @@ export function CorporatePOS() {
       );
 
       if (printBill) {
-        try {
-          await printCustomerBillFromReceipt(receiptData);
-        } catch (printErr) {
-          notifyWarning(
-            tr(
-              "KOT göndərildi, amma müştəri qəbzi çap olunmadı",
-              "Sent to KOT, but customer bill print failed",
-            ),
-          );
-          notifyFromError(printErr);
-        }
+        await printBillThenShowReceipt(receiptData, {
+          ok: tr(
+            "KOT göndərildi və müştəri qəbzi çap olundu",
+            "Sent to KOT and customer bill printed",
+          ),
+          printFail: tr(
+            "KOT göndərildi, amma müştəri qəbzi çap olunmadı — əl ilə çap edin",
+            "Sent to KOT, but customer bill print failed — use Print on the receipt",
+          ),
+        });
+      } else {
+        setReceipt(receiptData);
       }
-      // Always open receipt modal (no auto customer print) so kitchen/customer can be reprinted.
-      setReceipt(receiptData);
       resetCartAfterSave({ skipQrRelease: true });
     } catch (err) {
       notifyFromError(err);
@@ -2153,7 +2206,11 @@ export function CorporatePOS() {
       let detail = editingOrderId
         ? await submitEditingOrder({ sendToBar: true, finalize: true })
         : await sendPosOrderToBar(buildCheckoutBody());
-      detail = await collectRemainingIfPaid(detail);
+      try {
+        detail = await collectRemainingIfPaid(detail);
+      } catch (payErr) {
+        notifyFromError(payErr);
+      }
       const tableLabel = resolveTableLabel(true);
 
       try {
@@ -2200,19 +2257,19 @@ export function CorporatePOS() {
       );
 
       if (printBill) {
-        try {
-          await printCustomerBillFromReceipt(receiptData);
-        } catch (printErr) {
-          notifyWarning(
-            tr(
-              "BAR göndərildi, amma müştəri qəbzi çap olunmadı",
-              "Sent to Bar, but customer bill print failed",
-            ),
-          );
-          notifyFromError(printErr);
-        }
+        await printBillThenShowReceipt(receiptData, {
+          ok: tr(
+            "BAR göndərildi və müştəri qəbzi çap olundu",
+            "Sent to Bar and customer bill printed",
+          ),
+          printFail: tr(
+            "BAR göndərildi, amma müştəri qəbzi çap olunmadı — əl ilə çap edin",
+            "Sent to Bar, but customer bill print failed — use Print on the receipt",
+          ),
+        });
+      } else {
+        setReceipt(receiptData);
       }
-      setReceipt(receiptData);
       resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
@@ -2234,7 +2291,11 @@ export function CorporatePOS() {
       let detail = editingOrderId
         ? await submitEditingOrder({ finalize: true })
         : await sendPosOrderToProduction(buildCheckoutBody());
-      detail = await collectRemainingIfPaid(detail);
+      try {
+        detail = await collectRemainingIfPaid(detail);
+      } catch (payErr) {
+        notifyFromError(payErr);
+      }
 
       const receiptData = buildReceiptFromDetail(
         detail,
@@ -2248,24 +2309,15 @@ export function CorporatePOS() {
         },
       );
 
-      try {
-        await printCustomerBillFromReceipt(receiptData);
-        notifySuccess(
-          editingOrderId
-            ? tr("Sifariş yeniləndi və qəbz çap olundu", "Order updated and bill printed")
-            : tr("İstehsala göndərildi və qəbz çap olundu", "Sent to production and bill printed"),
-        );
-      } catch (printErr) {
-        notifyWarning(
-          tr(
-            "Sifariş tamamlandı, amma qəbz çapı alınmadı",
-            "Order completed, but bill print failed",
-          ),
-        );
-        notifyFromError(printErr);
-      }
-
-      setReceipt(receiptData);
+      await printBillThenShowReceipt(receiptData, {
+        ok: editingOrderId
+          ? tr("Sifariş yeniləndi və qəbz çap olundu", "Order updated and bill printed")
+          : tr("İstehsala göndərildi və qəbz çap olundu", "Sent to production and bill printed"),
+        printFail: tr(
+          "Sifariş tamamlandı, amma qəbz çapı alınmadı — əl ilə çap edin",
+          "Order completed, but bill print failed — use Print on the receipt",
+        ),
+      });
       resetCartAfterSave();
     } catch (err) {
       notifyFromError(err);
