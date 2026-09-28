@@ -4,23 +4,31 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { pickLang } from "../../i18n/pickLang";
 import { fetchSalesReport } from "../../api/reports";
-import {
-  formatReportCurrency,
-  isoDateInputToRange,
-  parseReportMoney,
-} from "../../lib/reportMappers";
+import { formatReportCurrency, parseReportMoney } from "../../lib/reportMappers";
 import { formatDate } from "../../lib/dateFormat";
 import { printDailySalesSummary } from "../../lib/posPrint";
 import { APP_LOGO_LIGHT } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
+import { DateInput } from "../ui/DateInput";
+import { ModernSelect } from "../ui/ModernSelect";
 
 type DaySalesRow = {
   name: string;
   qty: number;
   amount: number;
 };
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => {
+  const v = String(i).padStart(2, "0");
+  return { value: v, label: v };
+});
+
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => {
+  const v = String(i).padStart(2, "0");
+  return { value: v, label: v };
+});
 
 function localYmd(d = new Date()): string {
   const y = d.getFullYear();
@@ -29,10 +37,40 @@ function localYmd(d = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Local wall-clock HH:mm (24h). */
+function localHm(d = new Date()): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function parseYmdLocal(ymd: string): Date {
   const [y, m, d] = ymd.split("-").map(Number);
   if (!y || !m || !d) return new Date();
   return new Date(y, m - 1, d);
+}
+
+function parseHm(hm: string): { hour: number; minute: number } {
+  const [hRaw, mRaw] = (hm || "00:00").split(":");
+  const hour = Math.min(23, Math.max(0, Number(hRaw) || 0));
+  const minute = Math.min(59, Math.max(0, Number(mRaw) || 0));
+  return { hour, minute };
+}
+
+/** Sales from local midnight of `ymd` through `ymd` + `hm` (inclusive end). */
+function localDayRangeToTime(ymd: string, hm: string): { dateFrom: string; dateTo: string } {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const { hour, minute } = parseHm(hm);
+  const from = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+  const to = new Date(y, (m || 1) - 1, d || 1, hour, minute, 59, 999);
+  return { dateFrom: from.toISOString(), dateTo: to.toISOString() };
+}
+
+function formatYmdHm24(
+  ymd: string,
+  hm: string,
+  language?: Parameters<typeof formatDate>[1],
+): string {
+  const { hour, minute } = parseHm(hm);
+  return `${formatDate(parseYmdLocal(ymd), language)} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 export function DaySalesBillModal({
@@ -50,9 +88,18 @@ export function DaySalesBillModal({
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [selectedDate, setSelectedDate] = useState(localYmd);
+  const [selectedTime, setSelectedTime] = useState(localHm);
   const [items, setItems] = useState<DaySalesRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
+
+  const { hour: selectedHour, minute: selectedMinute } = useMemo(
+    () => parseHm(selectedTime),
+    [selectedTime],
+  );
+
+  const hourValue = String(selectedHour).padStart(2, "0");
+  const minuteValue = String(selectedMinute).padStart(2, "0");
 
   const total = useMemo(
     () => items.reduce((sum, row) => sum + row.amount, 0),
@@ -63,11 +110,16 @@ export function DaySalesBillModal({
     [items],
   );
 
+  const rangeLabel = useMemo(
+    () => formatYmdHm24(selectedDate, selectedTime, language),
+    [selectedDate, selectedTime, language],
+  );
+
   const loadDay = useCallback(async () => {
     if (!selectedDate) return;
     setLoading(true);
     try {
-      const { dateFrom, dateTo } = isoDateInputToRange(selectedDate, selectedDate);
+      const { dateFrom, dateTo } = localDayRangeToTime(selectedDate, selectedTime);
       const report = await fetchSalesReport({ dateFrom, dateTo, limit: 500 });
       setItems(
         (report.items ?? [])
@@ -84,11 +136,12 @@ export function DaySalesBillModal({
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, language, branchRevision]);
+  }, [selectedDate, selectedTime, language, branchRevision]);
 
   useEffect(() => {
     if (!open) return;
     setSelectedDate(localYmd());
+    setSelectedTime(localHm());
   }, [open]);
 
   useEffect(() => {
@@ -109,7 +162,7 @@ export function DaySalesBillModal({
         language,
         forceBrowser: !diningEnabled,
         payload: {
-          date: formatDate(parseYmdLocal(selectedDate), language),
+          date: rangeLabel,
           companyName: user?.tenant?.name?.trim() || "Inflero",
           logoSrc,
           siteFooter: "app.inflero.com",
@@ -119,7 +172,7 @@ export function DaySalesBillModal({
       });
       if (items.length === 0) {
         notifyWarning(
-          pt("No sales for this day — empty bill printed", "Bu gün üçün satış yoxdur — boş hesab çap olundu"),
+          pt("No sales for this period — empty bill printed", "Bu dövr üçün satış yoxdur — boş hesab çap olundu"),
         );
       } else {
         notifySuccess(pt("Day sales bill sent to printer", "Günün satış hesabı printerə göndərildi"));
@@ -160,23 +213,60 @@ export function DaySalesBillModal({
         </div>
 
         <div className="px-4 py-3 space-y-3">
-          <label className="block">
-            <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">
-              {pt("Select date", "Tarix seçin")}
-            </span>
-            <input
-              type="date"
-              value={selectedDate}
-              max={localYmd()}
-              onChange={(e) => setSelectedDate(e.target.value || localYmd())}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="min-w-0">
+              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">
+                {pt("Select date", "Tarix seçin")}
+              </span>
+              <DateInput
+                value={selectedDate}
+                onChange={(v) => setSelectedDate(v || localYmd())}
+                defaultYearsAgo={0}
+                className="w-full !py-2 !text-sm"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">
+                {pt("Time (24h)", "Saat (24s)")}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <ModernSelect
+                  value={hourValue}
+                  onChange={(h) => setSelectedTime(`${h}:${minuteValue}`)}
+                  options={HOUR_OPTIONS}
+                  minWidth={72}
+                  className="flex-1"
+                  buttonClassName="!py-2 !text-sm"
+                  placeholder={pt("HH", "SS")}
+                />
+                <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 shrink-0">
+                  :
+                </span>
+                <ModernSelect
+                  value={minuteValue}
+                  onChange={(m) => setSelectedTime(`${hourValue}:${m}`)}
+                  options={MINUTE_OPTIONS}
+                  minWidth={72}
+                  className="flex-1"
+                  buttonClassName="!py-2 !text-sm"
+                  placeholder={pt("MM", "DD")}
+                />
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+            {pt(
+              "Sales from 00:00 through the selected time on that date.",
+              "Satışlar həmin günün 00:00-dan seçilmiş saata qədər.",
+            )}
+          </p>
 
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
               <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
-                {formatDate(parseYmdLocal(selectedDate), language)}
+                {rangeLabel}
               </span>
               <span className="text-[11px] text-gray-500 dark:text-gray-400">
                 {pt(
@@ -194,7 +284,7 @@ export function DaySalesBillModal({
                 </div>
               ) : items.length === 0 ? (
                 <div className="py-10 text-center text-xs text-gray-500 dark:text-gray-400">
-                  {pt("No sales for this day", "Bu gün üçün satış yoxdur")}
+                  {pt("No sales for this period", "Bu dövr üçün satış yoxdur")}
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-100 dark:divide-gray-800">

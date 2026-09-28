@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router";
 import { cn } from "../ui/utils";
 import {
@@ -17,6 +18,8 @@ import {
   Keyboard,
   Check,
   X,
+  Calendar,
+  ChevronDown,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -71,11 +74,91 @@ import { useConfirm } from "../../context/ConfirmContext";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import { ModernSelect } from "../ui/ModernSelect";
+import { DateInput } from "../ui/DateInput";
+import { useFloatingPosition } from "../ui/useFloatingPosition";
 import { InvoicePreviewModal } from "./InvoicePreviewModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { pickLang } from "../../i18n/pickLang";
+
+const HOUR_OPTIONS_24 = Array.from({ length: 24 }, (_, i) => {
+  const v = String(i).padStart(2, "0");
+  return { value: v, label: v };
+});
+const MINUTE_OPTIONS_24 = Array.from({ length: 60 }, (_, i) => {
+  const v = String(i).padStart(2, "0");
+  return { value: v, label: v };
+});
+
+function localYmd(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function localHm(d = new Date()): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function parseHmParts(hm: string): { hour: string; minute: string } {
+  const [hRaw, mRaw] = (hm || "00:00").split(":");
+  const hour = String(Math.min(23, Math.max(0, Number(hRaw) || 0))).padStart(2, "0");
+  const minute = String(Math.min(59, Math.max(0, Number(mRaw) || 0))).padStart(2, "0");
+  return { hour, minute };
+}
+
+/** Local ymd + HH:mm → ISO (start of minute / end of minute). */
+function localDateTimeToIso(ymd: string, hm: string, endOfMinute = false): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const { hour, minute } = parseHmParts(hm);
+  const dt = new Date(
+    y || 1970,
+    (m || 1) - 1,
+    d || 1,
+    Number(hour),
+    Number(minute),
+    endOfMinute ? 59 : 0,
+    endOfMinute ? 999 : 0,
+  );
+  return dt.toISOString();
+}
+
+function addLocalDays(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(y || 1970, (m || 1) - 1, d || 1);
+  dt.setDate(dt.getDate() + days);
+  return localYmd(dt);
+}
+
+/** Snap From/To calendar dates for a preset (times stay separate). */
+function datesForSortPreset(sortBy: string): { fromDate: string; toDate: string } {
+  const toDate = localYmd();
+  if (sortBy === "last30days") return { fromDate: addLocalDays(toDate, -30), toDate };
+  if (sortBy === "last90days") return { fromDate: addLocalDays(toDate, -90), toDate };
+  if (sortBy === "thisyear") {
+    const y = new Date().getFullYear();
+    return { fromDate: `${y}-01-01`, toDate };
+  }
+  if (sortBy === "custom") return { fromDate: toDate, toDate };
+  // last7days (default) and unknown
+  return { fromDate: addLocalDays(toDate, -7), toDate };
+}
+
+const PERIOD_PRESETS = [
+  { value: "last7days", az: "Son 7 gün", en: "Last 7 days" },
+  { value: "last30days", az: "Son 30 gün", en: "Last 30 days" },
+  { value: "last90days", az: "Son 90 gün", en: "Last 90 days" },
+  { value: "thisyear", az: "Bu il", en: "This year" },
+  { value: "custom", az: "Xüsusi", en: "Custom" },
+] as const;
+
+function formatYmdShort(ymd: string): string {
+  const [y, m, d] = ymd.split("-");
+  if (!y || !m || !d) return ymd;
+  return `${d}.${m}.${y.slice(2)}`;
+}
 
 function isWebOrder(order: PosOrderListRow): boolean {
   return String(order.source ?? "").toUpperCase() === "WEB";
@@ -221,6 +304,14 @@ export function POSOrders() {
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [updatingProductionId, setUpdatingProductionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("last7days");
+  const [customFromDate, setCustomFromDate] = useState(() => datesForSortPreset("last7days").fromDate);
+  const [customFromTime, setCustomFromTime] = useState("00:00");
+  const [customToDate, setCustomToDate] = useState(() => datesForSortPreset("last7days").toDate);
+  const [customToTime, setCustomToTime] = useState(localHm);
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const periodMenuRef = useRef<HTMLDivElement | null>(null);
+  const periodPanelRef = useRef<HTMLDivElement | null>(null);
+  const periodPosition = useFloatingPosition(periodMenuRef, periodOpen, 420, periodPanelRef);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<OrdersColumnKey, boolean>>(loadOrdersColumns);
   const columnsMenuRef = useRef<HTMLDivElement | null>(null);
@@ -271,7 +362,66 @@ export function POSOrders() {
     selectedKotStatus,
     selectedProductionStatus,
     sortBy,
+    customFromDate,
+    customFromTime,
+    customToDate,
+    customToTime,
   ]);
+
+  const rangeQuery = useMemo(
+    () => ({
+      dateFrom: localDateTimeToIso(customFromDate, customFromTime, false),
+      dateTo: localDateTimeToIso(customToDate, customToTime, true),
+    }),
+    [customFromDate, customFromTime, customToDate, customToTime],
+  );
+
+  const handleSortByChange = (value: string) => {
+    setSortBy(value);
+    const { fromDate, toDate } = datesForSortPreset(value);
+    setCustomFromDate(fromDate);
+    setCustomToDate(toDate);
+    if (value !== "custom") {
+      setCustomFromTime("00:00");
+      setCustomToTime(localHm());
+    }
+  };
+
+  const markCustomIfEditingDates = () => {
+    if (sortBy !== "custom") setSortBy("custom");
+  };
+
+  const periodSummaryLabel = useMemo(() => {
+    const preset = PERIOD_PRESETS.find((p) => p.value === sortBy);
+    const presetLabel = preset
+      ? tr(preset.az, preset.en)
+      : tr("Dövr", "Period");
+    const timePart = `${customFromTime}–${customToTime}`;
+    if (sortBy === "custom") {
+      return `${formatYmdShort(customFromDate)}–${formatYmdShort(customToDate)} · ${timePart}`;
+    }
+    return `${presetLabel} · ${timePart}`;
+  }, [sortBy, customFromDate, customToDate, customFromTime, customToTime, language]);
+
+  useEffect(() => {
+    if (!periodOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (periodMenuRef.current?.contains(target)) return;
+      if (periodPanelRef.current?.contains(target)) return;
+      // Keep open while using DateInput / ModernSelect portals
+      if (target.closest?.('[class*="z-[9999]"]')) return;
+      setPeriodOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [periodOpen]);
+
+  const periodPanelLeft = useMemo(() => {
+    if (typeof window === "undefined") return periodPosition.left;
+    return Math.max(8, Math.min(periodPosition.left, window.innerWidth - 308));
+  }, [periodPosition.left]);
 
   useEffect(() => {
     if (!(isAuthenticated || isDemo)) {
@@ -370,6 +520,7 @@ export function POSOrders() {
         paymentStatus: selectedPaymentStatus,
         source: selectedSource,
         sortBy,
+        ...rangeQuery,
         page: currentPage,
         pageSize: itemsPerPage,
         ...(diningEnabled ? { kotStatus: selectedKotStatus } : {}),
@@ -411,6 +562,7 @@ export function POSOrders() {
     diningEnabled,
     webEditorEnabled,
     sortBy,
+    rangeQuery,
     branchRevision,
     currentPage,
     itemsPerPage,
@@ -567,6 +719,7 @@ export function POSOrders() {
       status: selectedStatus,
       paymentStatus: selectedPaymentStatus,
       sortBy,
+      ...rangeQuery,
       page: 1,
       pageSize: 200,
     });
@@ -1125,19 +1278,152 @@ export function POSOrders() {
                 />
               )}
 
-              <ModernSelect
-                value={sortBy}
-                onChange={setSortBy}
-                placeholder={tr("Sırala", "Sort")}
-                className="w-[140px]"
-                minWidth={140}
-                options={[
-                  { value: "last7days", label: tr("Sırala: 7 gün", "Sort: 7 days") },
-                  { value: "last30days", label: tr("Sırala: 30 gün", "Sort: 30 days") },
-                  { value: "last90days", label: tr("Sırala: 90 gün", "Sort: 90 days") },
-                  { value: "thisyear", label: tr("Sırala: Bu il", "Sort: This year") },
-                ]}
-              />
+              <div className="relative" ref={periodMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setPeriodOpen((o) => !o)}
+                  className={cn(
+                    "min-w-[180px] max-w-[280px] px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] flex items-center justify-between gap-2 hover:border-gray-400 dark:hover:border-gray-600 transition-colors",
+                    periodOpen && "ring-2 ring-[#14b8a6] border-[#14b8a6]",
+                  )}
+                  title={tr("Dövr", "Period")}
+                >
+                  <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span className="truncate text-left">{periodSummaryLabel}</span>
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0",
+                      periodOpen && "rotate-180",
+                    )}
+                  />
+                </button>
+
+                {periodOpen &&
+                  createPortal(
+                    <div
+                      ref={periodPanelRef}
+                      className="fixed z-[9999] w-[300px] max-w-[calc(100vw-1rem)] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg p-3 space-y-3"
+                      style={{
+                        top: periodPosition.top,
+                        left: periodPanelLeft,
+                      }}
+                    >
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          {tr("Dövr", "Period")}
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {PERIOD_PRESETS.map((p) => (
+                            <button
+                              key={p.value}
+                              type="button"
+                              onClick={() => handleSortByChange(p.value)}
+                              className={cn(
+                                "px-2 py-1 rounded-md text-[11px] font-medium transition-colors border",
+                                sortBy === p.value
+                                  ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#0f766e] dark:text-[#5eead4] border-[#99f6e4] dark:border-[#14b8a6]/40"
+                                  : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800",
+                              )}
+                            >
+                              {tr(p.az, p.en)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            {tr("Başlanğıc", "From")}
+                          </span>
+                          <div className="w-full">
+                            <DateInput
+                              value={customFromDate}
+                              onChange={(v) => {
+                                markCustomIfEditingDates();
+                                setCustomFromDate(v || localYmd());
+                              }}
+                              defaultYearsAgo={0}
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5 w-full">
+                            <ModernSelect
+                              value={parseHmParts(customFromTime).hour}
+                              onChange={(h) =>
+                                setCustomFromTime(`${h}:${parseHmParts(customFromTime).minute}`)
+                              }
+                              options={HOUR_OPTIONS_24}
+                              minWidth={72}
+                              className="flex-1"
+                              buttonClassName="!px-2 justify-center"
+                              placeholder="HH"
+                            />
+                            <span className="text-xs font-semibold text-gray-400 flex-shrink-0 w-2 text-center">
+                              :
+                            </span>
+                            <ModernSelect
+                              value={parseHmParts(customFromTime).minute}
+                              onChange={(m) =>
+                                setCustomFromTime(`${parseHmParts(customFromTime).hour}:${m}`)
+                              }
+                              options={MINUTE_OPTIONS_24}
+                              minWidth={72}
+                              className="flex-1"
+                              buttonClassName="!px-2 justify-center"
+                              placeholder="MM"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            {tr("Son", "To")}
+                          </span>
+                          <div className="w-full">
+                            <DateInput
+                              value={customToDate}
+                              onChange={(v) => {
+                                markCustomIfEditingDates();
+                                setCustomToDate(v || localYmd());
+                              }}
+                              defaultYearsAgo={0}
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5 w-full">
+                            <ModernSelect
+                              value={parseHmParts(customToTime).hour}
+                              onChange={(h) =>
+                                setCustomToTime(`${h}:${parseHmParts(customToTime).minute}`)
+                              }
+                              options={HOUR_OPTIONS_24}
+                              minWidth={72}
+                              className="flex-1"
+                              buttonClassName="!px-2 justify-center"
+                              placeholder="HH"
+                            />
+                            <span className="text-xs font-semibold text-gray-400 flex-shrink-0 w-2 text-center">
+                              :
+                            </span>
+                            <ModernSelect
+                              value={parseHmParts(customToTime).minute}
+                              onChange={(m) =>
+                                setCustomToTime(`${parseHmParts(customToTime).hour}:${m}`)
+                              }
+                              options={MINUTE_OPTIONS_24}
+                              minWidth={72}
+                              className="flex-1"
+                              buttonClassName="!px-2 justify-center"
+                              placeholder="MM"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>,
+                    document.body,
+                  )}
+              </div>
           </div>
         </div>
 

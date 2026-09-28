@@ -57,6 +57,10 @@ export type SalesListQuery = {
   status?: string;
   paymentStatus?: string;
   sortBy?: string;
+  /** ISO datetime — custom range start (with sortBy=custom). */
+  dateFrom?: string;
+  /** ISO datetime — custom range end (with sortBy=custom). */
+  dateTo?: string;
   page?: number;
   pageSize?: number;
   limit?: number;
@@ -72,6 +76,8 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   if (q.status && q.status !== "all") params.set("status", q.status);
   if (q.paymentStatus && q.paymentStatus !== "all") params.set("paymentStatus", q.paymentStatus);
   if (q.sortBy && q.sortBy !== "all") params.set("sortBy", q.sortBy);
+  if (q.dateFrom) params.set("dateFrom", q.dateFrom);
+  if (q.dateTo) params.set("dateTo", q.dateTo);
   if (q.source && q.source !== "all") params.set("source", q.source);
   if (q.kotStatus && q.kotStatus !== "all") params.set("kotStatus", q.kotStatus);
   if (q.productionStatus && q.productionStatus !== "all") params.set("productionStatus", q.productionStatus);
