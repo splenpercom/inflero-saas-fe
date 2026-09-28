@@ -866,8 +866,10 @@ export function CorporatePOS() {
         if (!cancelled) {
           setPosServiceFeeEnabled(s.posServiceFeeEnabled === true);
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
-          setPosSendToBarEnabled(s.posSendToBarEnabled === true);
-          setPosBarBillShowPricesEnabled(s.posBarBillShowPricesEnabled === true);
+          setPosSendToBarEnabled(diningEnabled && s.posSendToBarEnabled === true);
+          setPosBarBillShowPricesEnabled(
+            diningEnabled && s.posBarBillShowPricesEnabled === true,
+          );
           setPosPrintProductBrandEnabled(s.posPrintProductBrandEnabled === true);
           setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
@@ -885,7 +887,7 @@ export function CorporatePOS() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, isDemo, branchRevision]);
+  }, [isAuthenticated, isDemo, branchRevision, diningEnabled]);
 
   useEffect(() => {
     pendingQrOrderIdRef.current = pendingQrOrderId;
@@ -2291,7 +2293,7 @@ export function CorporatePOS() {
           logoSrc,
           customerPhone: receiptPhone,
           printProductBrand: posPrintProductBrandEnabled,
-          barShowPrices: posBarBillShowPricesEnabled,
+          barShowPrices: diningEnabled && posBarBillShowPricesEnabled,
         });
         notifySuccess(
           tr(

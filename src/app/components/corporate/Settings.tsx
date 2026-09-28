@@ -196,8 +196,10 @@ export function Settings() {
     setEmployeeCommissionEnabled(data.employeeCommissionEnabled === true);
     setPosServiceFeeEnabled(data.posServiceFeeEnabled === true);
     setPosSendToProductionEnabled(data.posSendToProductionEnabled === true);
-    setPosSendToBarEnabled(data.posSendToBarEnabled === true);
-    setPosBarBillShowPricesEnabled(data.posBarBillShowPricesEnabled === true);
+    setPosSendToBarEnabled(diningEnabled && data.posSendToBarEnabled === true);
+    setPosBarBillShowPricesEnabled(
+      diningEnabled && data.posBarBillShowPricesEnabled === true,
+    );
     setPosPrintProductBrandEnabled(data.posPrintProductBrandEnabled === true);
     setInventoryServicesEnabled(data.inventoryServicesEnabled === true);
     setSavedLogoUrl(data.companyLogo);
@@ -207,7 +209,7 @@ export function Settings() {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
-  }, []);
+  }, [diningEnabled]);
 
   const applyBillerDrafts = useCallback((rows: SalesBillerRow[]) => {
     setBillers(rows);

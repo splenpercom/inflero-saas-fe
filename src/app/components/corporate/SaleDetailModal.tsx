@@ -134,7 +134,7 @@ export function SaleDetailModal({
         companyName: user?.tenant?.name?.trim() || "Inflero",
         logoSrc,
         printProductBrand: settings?.posPrintProductBrandEnabled === true,
-        barShowPrices: settings?.posBarBillShowPricesEnabled === true,
+        barShowPrices: diningEnabled && settings?.posBarBillShowPricesEnabled === true,
       });
       notifySuccess(
         result.channel === "qz"
