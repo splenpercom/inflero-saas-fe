@@ -289,6 +289,7 @@ export function POSOrders() {
   const [selectedCustomer, setSelectedCustomer] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("all");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("all");
   const [selectedSource, setSelectedSource] = useState(() => {
     const s = new URLSearchParams(window.location.search).get("source");
     return s === "WEB" || s === "POS" || s === "QR_MENU" ? s : "all";
@@ -358,6 +359,7 @@ export function POSOrders() {
     selectedCustomer,
     selectedStatus,
     selectedPaymentStatus,
+    selectedPaymentMethod,
     selectedSource,
     selectedKotStatus,
     selectedProductionStatus,
@@ -518,6 +520,7 @@ export function POSOrders() {
         customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
         status: selectedStatus,
         paymentStatus: selectedPaymentStatus,
+        paymentMethod: selectedPaymentMethod,
         source: selectedSource,
         sortBy,
         ...rangeQuery,
@@ -555,6 +558,7 @@ export function POSOrders() {
     selectedCustomer,
     selectedStatus,
     selectedPaymentStatus,
+    selectedPaymentMethod,
     selectedSource,
     selectedKotStatus,
     selectedProductionStatus,
@@ -718,6 +722,7 @@ export function POSOrders() {
       customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
       status: selectedStatus,
       paymentStatus: selectedPaymentStatus,
+      paymentMethod: selectedPaymentMethod,
       sortBy,
       ...rangeQuery,
       page: 1,
@@ -1217,6 +1222,19 @@ export function POSOrders() {
                   { value: "unpaid", label: tr("Ödənilməyib", "Unpaid") },
                   { value: "partially_refunded", label: tr("Qismən qaytarılıb", "Partially Refunded") },
                   { value: "refunded", label: tr("Qaytarılıb", "Refunded") },
+                ]}
+              />
+
+              <ModernSelect
+                value={selectedPaymentMethod}
+                onChange={setSelectedPaymentMethod}
+                placeholder={tr("Metod", "Method")}
+                className="w-[120px]"
+                minWidth={120}
+                options={[
+                  { value: "all", label: tr("Metod", "Method") },
+                  { value: "cash", label: tr("Nağd", "Cash") },
+                  { value: "card", label: tr("Kart", "Card") },
                 ]}
               />
 

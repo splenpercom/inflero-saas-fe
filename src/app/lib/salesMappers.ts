@@ -56,6 +56,8 @@ export type SalesListQuery = {
   customerId?: string;
   status?: string;
   paymentStatus?: string;
+  /** cash | card | all */
+  paymentMethod?: string;
   sortBy?: string;
   /** ISO datetime — custom range start (with sortBy=custom). */
   dateFrom?: string;
@@ -75,6 +77,7 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   if (q.customerId) params.set("customerId", q.customerId);
   if (q.status && q.status !== "all") params.set("status", q.status);
   if (q.paymentStatus && q.paymentStatus !== "all") params.set("paymentStatus", q.paymentStatus);
+  if (q.paymentMethod && q.paymentMethod !== "all") params.set("paymentMethod", q.paymentMethod);
   if (q.sortBy && q.sortBy !== "all") params.set("sortBy", q.sortBy);
   if (q.dateFrom) params.set("dateFrom", q.dateFrom);
   if (q.dateTo) params.set("dateTo", q.dateTo);
