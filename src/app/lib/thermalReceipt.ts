@@ -229,9 +229,11 @@ export type ThermalReceiptPayload = {
 
 export type BuildThermalReceiptOpts = {
   language: Language;
-  /** customer = full receipt; kitchen/bar = KOT-style ticket (qty only, no totals). */
+  /** customer = full receipt; kitchen = qty-only; bar = qty-only unless barShowPrices. */
   copy: "customer" | "kitchen" | "bar";
   paperWidthMm?: 58 | 80;
+  /** When copy is bar, print line prices + totals like a customer bill. */
+  barShowPrices?: boolean;
 };
 
 /** Full HTML document for browser print or QZ Tray pixel/html. */
@@ -240,8 +242,12 @@ export function buildThermalReceiptHtml(
   opts: BuildThermalReceiptOpts,
 ): string {
   const language = opts.language;
-  const isTicket = opts.copy === "kitchen" || opts.copy === "bar";
   const isBar = opts.copy === "bar";
+  const isKitchen = opts.copy === "kitchen";
+  const showPrices =
+    opts.copy === "customer" || (isBar && opts.barShowPrices === true);
+  /** Qty-only kitchen-style layout (no prices/totals). */
+  const isTicket = isKitchen || (isBar && !showPrices);
   const paperWidthMm = opts.paperWidthMm ?? 80;
   const labels = thermalReceiptLabels(language);
   const p = (value: string) => receiptPrintText(language, value);
@@ -299,18 +305,20 @@ export function buildThermalReceiptHtml(
   };
 
   const company = p(data.companyName);
-  const titleSuffix = isBar ? "BAR" : isTicket ? "KITCHEN" : d.orderNo;
+  const titleSuffix = isBar ? "BAR" : isKitchen ? "KITCHEN" : d.orderNo;
   const ticketBanner = isBar ? L.barBanner : L.kitchenBanner;
   const ticketCopy = isBar ? L.barCopy : L.kitchenCopy;
-  const headerBanner = isTicket
-    ? `<div class="center bold big" style="margin:6px 0;">${ticketBanner}</div>
+  // BAR priced bill keeps BAR banner; kitchen/qty-only bar keep ticket header.
+  const headerBanner =
+    isBar || isKitchen
+      ? `<div class="center bold big" style="margin:6px 0;">${ticketBanner}</div>
        <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `${L.table}: ${d.tableLabel}` : ""}</div>`
-    : "";
+      : "";
   const footer = receiptPrintText(language, data.siteFooter ?? "app.inflero.com");
   const logo =
-    !isTicket && data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
-  // Always show company name on customer bills (QZ path omits logo images).
-  const companyHeader = !isTicket
+    showPrices && data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
+  // Company name on priced bills (customer + priced BAR).
+  const companyHeader = showPrices
     ? `<div class="center bold big" style="margin:4px 0 6px;">${company}</div>`
     : "";
 
@@ -328,12 +336,12 @@ export function buildThermalReceiptHtml(
   <div class="divider-solid"></div>
   <div class="row"><span class="label">${L.order}:</span><span>${d.orderNo}</span></div>
   <div class="row"><span class="label">${L.date}:</span><span>${d.date}</span></div>
-  ${d.tableLabel && !isTicket ? `<div class="row"><span class="label">${L.table}:</span><span>${d.tableLabel}</span></div>` : ""}
+  ${d.tableLabel && showPrices && !isBar ? `<div class="row"><span class="label">${L.table}:</span><span>${d.tableLabel}</span></div>` : ""}
   <div class="divider"></div>
   <div class="row"><span class="label">${L.customer}:</span><span>${d.customer}</span></div>
-  ${!isTicket ? `<div class="row"><span class="label">${L.phone}:</span><span>${d.customerPhone}</span></div>` : ""}
-  ${d.vehicle && !isTicket ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
-  ${d.mileage != null && !isTicket ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
+  ${showPrices ? `<div class="row"><span class="label">${L.phone}:</span><span>${d.customerPhone}</span></div>` : ""}
+  ${d.vehicle && showPrices ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
+  ${d.mileage != null && showPrices ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
   ${isTicket ? `<div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>` : ""}
   <div class="divider-solid"></div>
   <div class="section-title">${isTicket ? L.orderItems : L.products}</div>
@@ -342,17 +350,17 @@ export function buildThermalReceiptHtml(
       (it) => `
     <div class="row-item">
       <div class="name">${it.name}</div>
-      ${!isTicket && it.brand ? `<div class="muted" style="font-size:10px;margin-top:1px;">${it.brand}</div>` : ""}
+      ${showPrices && it.brand ? `<div class="muted" style="font-size:10px;margin-top:1px;">${it.brand}</div>` : ""}
       <div class="nums">
-        <span>${isTicket ? `x ${it.qty}` : `${it.qty} x ${it.price.toFixed(2)} AZN`}</span>
-        ${isTicket ? "" : `<span>${(it.qty * it.price).toFixed(2)} AZN</span>`}
+        <span>${showPrices ? `${it.qty} x ${it.price.toFixed(2)} AZN` : `x ${it.qty}`}</span>
+        ${showPrices ? `<span>${(it.qty * it.price).toFixed(2)} AZN</span>` : ""}
       </div>
     </div>`,
     )
     .join("")}
   <div class="divider"></div>
   ${
-    isTicket
+    !showPrices
       ? `<div class="center" style="margin-top:8px;font-weight:600;">${ticketCopy}</div>`
       : `
   <div class="row"><span class="label">${L.subtotal}:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
@@ -370,6 +378,7 @@ export function buildThermalReceiptHtml(
   <div class="row" style="margin-top:4px;"><span class="label">${L.payment}:</span><span>${d.paymentMethod}</span></div>
   <div class="row"><span class="label">${L.status}:</span><span>${d.paymentStatusLabel}</span></div>
   <div class="divider-solid"></div>
+  ${isBar ? `<div class="center" style="margin:6px 0;font-weight:600;">${ticketCopy}</div>` : ""}
   <div class="thanks">
     <div>${L.thanks}</div>
     <div style="margin-top:3px;">${footer}</div>

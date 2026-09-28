@@ -691,6 +691,7 @@ export function CorporatePOS() {
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
+  const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
   const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [touchKb, setTouchKb] = useState<null | {
@@ -854,6 +855,7 @@ export function CorporatePOS() {
       setPosServiceFeeEnabled(false);
       setPosSendToProductionEnabled(false);
       setPosSendToBarEnabled(false);
+      setPosBarBillShowPricesEnabled(false);
       setPosPrintProductBrandEnabled(false);
       setInventoryServicesEnabled(false);
       return;
@@ -865,6 +867,7 @@ export function CorporatePOS() {
           setPosServiceFeeEnabled(s.posServiceFeeEnabled === true);
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
           setPosSendToBarEnabled(s.posSendToBarEnabled === true);
+          setPosBarBillShowPricesEnabled(s.posBarBillShowPricesEnabled === true);
           setPosPrintProductBrandEnabled(s.posPrintProductBrandEnabled === true);
           setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
@@ -874,6 +877,7 @@ export function CorporatePOS() {
           setPosServiceFeeEnabled(false);
           setPosSendToProductionEnabled(false);
           setPosSendToBarEnabled(false);
+          setPosBarBillShowPricesEnabled(false);
           setPosPrintProductBrandEnabled(false);
           setInventoryServicesEnabled(false);
         }
@@ -2286,6 +2290,8 @@ export function CorporatePOS() {
           companyName: user?.tenant?.name?.trim() || "Inflero",
           logoSrc,
           customerPhone: receiptPhone,
+          printProductBrand: posPrintProductBrandEnabled,
+          barShowPrices: posBarBillShowPricesEnabled,
         });
         notifySuccess(
           tr(

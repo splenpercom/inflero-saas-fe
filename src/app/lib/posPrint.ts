@@ -172,6 +172,7 @@ async function tryQzPrint(
   payload: ThermalReceiptPayload,
   printer: string,
   paperWidthMm: 58 | 80,
+  barShowPrices?: boolean,
 ): Promise<void> {
   const copy =
     role === "kot" ? "kitchen" : role === "bar" ? "bar" : "customer";
@@ -179,6 +180,7 @@ async function tryQzPrint(
     language,
     copy,
     paperWidthMm,
+    barShowPrices: role === "bar" ? barShowPrices === true : undefined,
   });
   await withTimeout(ensureQzConnected(), 8000, "QZ connect");
   await withTimeout(qzPrintHtml(printer, html, paperWidthMm), 20000, "QZ print");
@@ -189,6 +191,7 @@ async function tryBrowserPrint(
   language: Language,
   payload: ThermalReceiptPayload,
   paperWidthMm: 58 | 80,
+  barShowPrices?: boolean,
 ): Promise<void> {
   const copy =
     role === "kot" ? "kitchen" : role === "bar" ? "bar" : "customer";
@@ -196,6 +199,7 @@ async function tryBrowserPrint(
     language,
     copy,
     paperWidthMm,
+    barShowPrices: role === "bar" ? barShowPrices === true : undefined,
   });
   await browserPrintHtml(html);
 }
@@ -211,6 +215,8 @@ export async function printPosTicket(opts: {
   language: Language;
   payload: ThermalReceiptPayload;
   forceBrowser?: boolean;
+  /** When role is bar, print line prices + totals. */
+  barShowPrices?: boolean;
 }): Promise<PosPrintResult> {
   return enqueuePrint(async () => {
     const settings = loadPosPrinterSettings();
@@ -229,7 +235,14 @@ export async function printPosTicket(opts: {
 
       if (qzUp) {
         try {
-          await tryQzPrint(opts.role, opts.language, opts.payload, printer, paperWidthMm);
+          await tryQzPrint(
+            opts.role,
+            opts.language,
+            opts.payload,
+            printer,
+            paperWidthMm,
+            opts.barShowPrices,
+          );
           return { channel: "qz" as const, printer };
         } catch {
           // Fall through to browser — still deliver a bill.
@@ -237,7 +250,13 @@ export async function printPosTicket(opts: {
       }
     }
 
-    await tryBrowserPrint(opts.role, opts.language, opts.payload, paperWidthMm);
+    await tryBrowserPrint(
+      opts.role,
+      opts.language,
+      opts.payload,
+      paperWidthMm,
+      opts.barShowPrices,
+    );
     return {
       channel: "browser" as const,
       printer: printer || undefined,
@@ -453,6 +472,8 @@ export async function printPosOrderTicket(opts: {
   logoSrc?: string | null;
   customerPhone?: string;
   printProductBrand?: boolean;
+  /** When role is bar, print line prices + totals. */
+  barShowPrices?: boolean;
 }): Promise<PosPrintResult> {
   const payload = posOrderToThermalPayload(opts.order, {
     language: opts.language,
@@ -465,5 +486,6 @@ export async function printPosOrderTicket(opts: {
     role: opts.role,
     language: opts.language,
     payload,
+    barShowPrices: opts.barShowPrices,
   });
 }
