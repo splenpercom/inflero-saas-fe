@@ -56,6 +56,8 @@ export interface PosOrderLineItem {
   id: string;
   productId: string;
   productName: string;
+  /** Product brand name when set on the product; null if none. */
+  brand?: string | null;
   sku: string;
   quantity: number;
   price: string;

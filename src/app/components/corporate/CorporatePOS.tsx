@@ -409,7 +409,7 @@ interface ReceiptData {
   vehicle?: string;
   mileage?: number;
   employee: string;
-  items: { name: string; qty: number; price: number }[];
+  items: { name: string; qty: number; price: number; brand?: string | null }[];
   subtotal: number;
   shipping: number;
   serviceFee: number;
@@ -574,6 +574,9 @@ function ThermalReceipt({
           {data.items.map((it, i) => (
             <div key={i} className="mb-1">
               <p className="break-words font-semibold">{it.name}</p>
+              {it.brand ? (
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 pl-0.5">{it.brand}</p>
+              ) : null}
               <div className="flex justify-between text-gray-400 pl-2 text-[11px]">
                 <span>{it.qty} x {it.price.toFixed(2)} AZN</span>
                 <span className="text-gray-800 dark:text-gray-200 font-semibold">{(it.qty * it.price).toFixed(2)} AZN</span>
@@ -688,6 +691,7 @@ export function CorporatePOS() {
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
+  const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [touchKb, setTouchKb] = useState<null | {
     mode: "full" | "numpad";
@@ -850,6 +854,7 @@ export function CorporatePOS() {
       setPosServiceFeeEnabled(false);
       setPosSendToProductionEnabled(false);
       setPosSendToBarEnabled(false);
+      setPosPrintProductBrandEnabled(false);
       setInventoryServicesEnabled(false);
       return;
     }
@@ -860,6 +865,7 @@ export function CorporatePOS() {
           setPosServiceFeeEnabled(s.posServiceFeeEnabled === true);
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
           setPosSendToBarEnabled(s.posSendToBarEnabled === true);
+          setPosPrintProductBrandEnabled(s.posPrintProductBrandEnabled === true);
           setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
       })
@@ -868,6 +874,7 @@ export function CorporatePOS() {
           setPosServiceFeeEnabled(false);
           setPosSendToProductionEnabled(false);
           setPosSendToBarEnabled(false);
+          setPosPrintProductBrandEnabled(false);
           setInventoryServicesEnabled(false);
         }
       });
@@ -1953,6 +1960,9 @@ export function CorporatePOS() {
         name: item.productName,
         qty: item.quantity,
         price: parsePrice(item.price),
+        ...(posPrintProductBrandEnabled && item.brand?.trim()
+          ? { brand: item.brand.trim() }
+          : {}),
       })),
       subtotal: apiSubtotal,
       shipping: apiShipping,
@@ -2184,6 +2194,7 @@ export function CorporatePOS() {
           companyName: user?.tenant?.name?.trim() || "Inflero",
           logoSrc,
           customerPhone: receiptPhone,
+          printProductBrand: posPrintProductBrandEnabled,
         });
         notifySuccess(
           selectedTableId

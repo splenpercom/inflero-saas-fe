@@ -208,7 +208,7 @@ export type ThermalReceiptPayload = {
   vehicle?: string;
   mileage?: number;
   employee: string;
-  items: { name: string; qty: number; price: number }[];
+  items: { name: string; qty: number; price: number; brand?: string | null }[];
   subtotal: number;
   shipping: number;
   serviceFee: number;
@@ -256,7 +256,11 @@ export function buildThermalReceiptHtml(
     paymentStatusLabel: p(data.paymentStatusLabel),
     discountLabel: p(data.discountLabel),
     tableLabel: data.tableLabel ? p(data.tableLabel) : undefined,
-    items: data.items.map((it) => ({ ...it, name: p(it.name) })),
+    items: data.items.map((it) => ({
+      ...it,
+      name: p(it.name),
+      brand: it.brand ? p(it.brand) : undefined,
+    })),
     date: data.date,
     mileage: data.mileage,
     subtotal: data.subtotal,
@@ -338,6 +342,7 @@ export function buildThermalReceiptHtml(
       (it) => `
     <div class="row-item">
       <div class="name">${it.name}</div>
+      ${!isTicket && it.brand ? `<div class="muted" style="font-size:10px;margin-top:1px;">${it.brand}</div>` : ""}
       <div class="nums">
         <span>${isTicket ? `x ${it.qty}` : `${it.qty} x ${it.price.toFixed(2)} AZN`}</span>
         ${isTicket ? "" : `<span>${(it.qty * it.price).toFixed(2)} AZN</span>`}

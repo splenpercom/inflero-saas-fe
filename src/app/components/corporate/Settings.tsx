@@ -134,6 +134,7 @@ export function Settings() {
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
+  const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [billers, setBillers] = useState<SalesBillerRow[]>([]);
   const [commissionDrafts, setCommissionDrafts] = useState<Record<string, CommissionDraft>>({});
@@ -144,6 +145,7 @@ export function Settings() {
     posServiceFeeEnabled: boolean;
     posSendToProductionEnabled: boolean;
     posSendToBarEnabled: boolean;
+    posPrintProductBrandEnabled: boolean;
     inventoryServicesEnabled: boolean;
     billers: SalesBillerRow[];
   } | null>(null);
@@ -193,6 +195,7 @@ export function Settings() {
     setPosServiceFeeEnabled(data.posServiceFeeEnabled === true);
     setPosSendToProductionEnabled(data.posSendToProductionEnabled === true);
     setPosSendToBarEnabled(data.posSendToBarEnabled === true);
+    setPosPrintProductBrandEnabled(data.posPrintProductBrandEnabled === true);
     setInventoryServicesEnabled(data.inventoryServicesEnabled === true);
     setSavedLogoUrl(data.companyLogo);
     setLogoFile(null);
@@ -238,6 +241,7 @@ export function Settings() {
           posServiceFeeEnabled: data.posServiceFeeEnabled === true,
           posSendToProductionEnabled: data.posSendToProductionEnabled === true,
           posSendToBarEnabled: data.posSendToBarEnabled === true,
+          posPrintProductBrandEnabled: data.posPrintProductBrandEnabled === true,
           inventoryServicesEnabled: data.inventoryServicesEnabled === true,
           billers: billerRows,
         };
@@ -415,6 +419,7 @@ export function Settings() {
               employeeCommissionEnabled,
               posServiceFeeEnabled,
               posSendToProductionEnabled,
+              posPrintProductBrandEnabled,
               ...(diningEnabled ? { posSendToBarEnabled } : {}),
             }
           : {}),
@@ -454,6 +459,7 @@ export function Settings() {
         posServiceFeeEnabled,
         posSendToProductionEnabled,
         posSendToBarEnabled,
+        posPrintProductBrandEnabled,
         inventoryServicesEnabled,
         billers: refreshedBillers,
       };
@@ -504,6 +510,7 @@ export function Settings() {
         setPosServiceFeeEnabled(addonSnapshotRef.current.posServiceFeeEnabled);
         setPosSendToProductionEnabled(addonSnapshotRef.current.posSendToProductionEnabled);
         setPosSendToBarEnabled(addonSnapshotRef.current.posSendToBarEnabled);
+        setPosPrintProductBrandEnabled(addonSnapshotRef.current.posPrintProductBrandEnabled);
         setInventoryServicesEnabled(addonSnapshotRef.current.inventoryServicesEnabled);
         applyBillerDrafts(addonSnapshotRef.current.billers);
       }
@@ -1110,6 +1117,35 @@ export function Settings() {
                       <span
                         className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
                           posSendToProductionEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Print product brand on receipt", "Qəbzdə məhsul brendi")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, POS customer bills show each product's brand (from Create/Edit Product).",
+                          "Aktiv olduqda POS müştəri qəbzində hər məhsulun brendi göstərilir (Məhsul yarat/redaktə).",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => setPosPrintProductBrandEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        posPrintProductBrandEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={posPrintProductBrandEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          posPrintProductBrandEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
                         }`}
                       />
                     </button>

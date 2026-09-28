@@ -19,6 +19,7 @@ import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { APP_LOGO_LIGHT } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { printPosOrderTicket } from "../../lib/posPrint";
+import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 
 import { pickLang } from "../../i18n/pickLang";
@@ -125,12 +126,14 @@ export function SaleDetailModal({
         getCompanyLogoUrl(user?.tenant, false) ??
         getCompanyLogoUrl(user?.tenant, true) ??
         APP_LOGO_LIGHT;
+      const settings = await fetchTenantSettings().catch(() => null);
       const result = await printPosOrderTicket({
         order,
         role,
         language,
         companyName: user?.tenant?.name?.trim() || "Inflero",
         logoSrc,
+        printProductBrand: settings?.posPrintProductBrandEnabled === true,
       });
       notifySuccess(
         result.channel === "qz"

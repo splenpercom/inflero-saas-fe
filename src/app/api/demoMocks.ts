@@ -967,6 +967,7 @@ const DEMO_TENANT_SETTINGS = {
   posServiceFeeEnabled: false,
   posSendToProductionEnabled: false,
   posSendToBarEnabled: false,
+  posPrintProductBrandEnabled: false,
 };
 
 /**

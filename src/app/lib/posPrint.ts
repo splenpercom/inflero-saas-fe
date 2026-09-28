@@ -371,6 +371,8 @@ export function posOrderToThermalPayload(
     companyName: string;
     logoSrc?: string | null;
     customerPhone?: string;
+    /** When true, include product brand under each line (Settings add-on). */
+    printProductBrand?: boolean;
   },
 ): ThermalReceiptPayload {
   const language = opts.language;
@@ -409,6 +411,8 @@ export function posOrderToThermalPayload(
     ? order.table.name?.trim() || String(order.table.number)
     : undefined;
 
+  const showBrand = opts.printProductBrand === true;
+
   return {
     orderNo: order.reference,
     date: dateStr,
@@ -421,6 +425,7 @@ export function posOrderToThermalPayload(
       name: item.productName,
       qty: item.quantity,
       price: parseMoney(item.price),
+      ...(showBrand && item.brand?.trim() ? { brand: item.brand.trim() } : {}),
     })),
     subtotal,
     shipping: parseMoney(order.shipping),
@@ -447,12 +452,14 @@ export async function printPosOrderTicket(opts: {
   companyName: string;
   logoSrc?: string | null;
   customerPhone?: string;
+  printProductBrand?: boolean;
 }): Promise<PosPrintResult> {
   const payload = posOrderToThermalPayload(opts.order, {
     language: opts.language,
     companyName: opts.companyName,
     logoSrc: opts.logoSrc,
     customerPhone: opts.customerPhone,
+    printProductBrand: opts.printProductBrand,
   });
   return printPosTicket({
     role: opts.role,
