@@ -55,13 +55,28 @@ function parseHm(hm: string): { hour: number; minute: number } {
   return { hour, minute };
 }
 
-/** Sales from local midnight of `ymd` through `ymd` + `hm` (inclusive end). */
-function localDayRangeToTime(ymd: string, hm: string): { dateFrom: string; dateTo: string } {
+function parseHmParts(hm: string): { hour: string; minute: string } {
+  const { hour, minute } = parseHm(hm);
+  return {
+    hour: String(hour).padStart(2, "0"),
+    minute: String(minute).padStart(2, "0"),
+  };
+}
+
+/** Local ymd + HH:mm → ISO (start of minute / end of minute). */
+function localDateTimeToIso(ymd: string, hm: string, endOfMinute = false): string {
   const [y, m, d] = ymd.split("-").map(Number);
   const { hour, minute } = parseHm(hm);
-  const from = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
-  const to = new Date(y, (m || 1) - 1, d || 1, hour, minute, 59, 999);
-  return { dateFrom: from.toISOString(), dateTo: to.toISOString() };
+  const dt = new Date(
+    y || 1970,
+    (m || 1) - 1,
+    d || 1,
+    hour,
+    minute,
+    endOfMinute ? 59 : 0,
+    endOfMinute ? 999 : 0,
+  );
+  return dt.toISOString();
 }
 
 function formatYmdHm24(
@@ -71,6 +86,60 @@ function formatYmdHm24(
 ): string {
   const { hour, minute } = parseHm(hm);
   return `${formatDate(parseYmdLocal(ymd), language)} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function DateTimeRow({
+  label,
+  ymd,
+  hm,
+  onDateChange,
+  onTimeChange,
+  pt,
+}: {
+  label: string;
+  ymd: string;
+  hm: string;
+  onDateChange: (v: string) => void;
+  onTimeChange: (v: string) => void;
+  pt: (en: string, az: string, ru?: string) => string;
+}) {
+  const { hour, minute } = parseHmParts(hm);
+  return (
+    <div className="space-y-1.5">
+      <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        {label}
+      </span>
+      <div className="w-full">
+        <DateInput
+          value={ymd}
+          onChange={(v) => onDateChange(v || localYmd())}
+          defaultYearsAgo={0}
+          className="w-full !py-2 !text-sm"
+        />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <ModernSelect
+          value={hour}
+          onChange={(h) => onTimeChange(`${h}:${minute}`)}
+          options={HOUR_OPTIONS}
+          minWidth={72}
+          className="flex-1"
+          buttonClassName="!py-2 !text-sm"
+          placeholder={pt("HH", "SS")}
+        />
+        <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 shrink-0">:</span>
+        <ModernSelect
+          value={minute}
+          onChange={(m) => onTimeChange(`${hour}:${m}`)}
+          options={MINUTE_OPTIONS}
+          minWidth={72}
+          className="flex-1"
+          buttonClassName="!py-2 !text-sm"
+          placeholder={pt("MM", "DD")}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function DaySalesBillModal({
@@ -87,19 +156,13 @@ export function DaySalesBillModal({
   const diningEnabled = hasModule("DINING");
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
-  const [selectedDate, setSelectedDate] = useState(localYmd);
-  const [selectedTime, setSelectedTime] = useState(localHm);
+  const [fromDate, setFromDate] = useState(localYmd);
+  const [fromTime, setFromTime] = useState("00:00");
+  const [toDate, setToDate] = useState(localYmd);
+  const [toTime, setToTime] = useState(localHm);
   const [items, setItems] = useState<DaySalesRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
-
-  const { hour: selectedHour, minute: selectedMinute } = useMemo(
-    () => parseHm(selectedTime),
-    [selectedTime],
-  );
-
-  const hourValue = String(selectedHour).padStart(2, "0");
-  const minuteValue = String(selectedMinute).padStart(2, "0");
 
   const total = useMemo(
     () => items.reduce((sum, row) => sum + row.amount, 0),
@@ -110,16 +173,25 @@ export function DaySalesBillModal({
     [items],
   );
 
-  const rangeLabel = useMemo(
-    () => formatYmdHm24(selectedDate, selectedTime, language),
-    [selectedDate, selectedTime, language],
-  );
+  const rangeLabel = useMemo(() => {
+    const from = formatYmdHm24(fromDate, fromTime, language);
+    const to = formatYmdHm24(toDate, toTime, language);
+    return `${from} – ${to}`;
+  }, [fromDate, fromTime, toDate, toTime, language]);
 
   const loadDay = useCallback(async () => {
-    if (!selectedDate) return;
+    if (!fromDate || !toDate) return;
     setLoading(true);
     try {
-      const { dateFrom, dateTo } = localDayRangeToTime(selectedDate, selectedTime);
+      const dateFrom = localDateTimeToIso(fromDate, fromTime, false);
+      const dateTo = localDateTimeToIso(toDate, toTime, true);
+      if (new Date(dateFrom).getTime() > new Date(dateTo).getTime()) {
+        notifyWarning(
+          pt("From must be before To", "Başlanğıc Son-dan əvvəl olmalıdır"),
+        );
+        setItems([]);
+        return;
+      }
       const report = await fetchSalesReport({ dateFrom, dateTo, limit: 500 });
       setItems(
         (report.items ?? [])
@@ -136,12 +208,14 @@ export function DaySalesBillModal({
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, selectedTime, language, branchRevision]);
+  }, [fromDate, fromTime, toDate, toTime, language, branchRevision]);
 
   useEffect(() => {
     if (!open) return;
-    setSelectedDate(localYmd());
-    setSelectedTime(localHm());
+    setFromDate(localYmd());
+    setFromTime("00:00");
+    setToDate(localYmd());
+    setToTime(localHm());
   }, [open]);
 
   useEffect(() => {
@@ -192,7 +266,7 @@ export function DaySalesBillModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="day-sales-bill-title"
-        className="w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <h3
@@ -213,62 +287,38 @@ export function DaySalesBillModal({
         </div>
 
         <div className="px-4 py-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="min-w-0">
-              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">
-                {pt("Select date", "Tarix seçin")}
-              </span>
-              <DateInput
-                value={selectedDate}
-                onChange={(v) => setSelectedDate(v || localYmd())}
-                defaultYearsAgo={0}
-                className="w-full !py-2 !text-sm"
-              />
-            </div>
-
-            <div className="min-w-0">
-              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">
-                {pt("Time (24h)", "Saat (24s)")}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <ModernSelect
-                  value={hourValue}
-                  onChange={(h) => setSelectedTime(`${h}:${minuteValue}`)}
-                  options={HOUR_OPTIONS}
-                  minWidth={72}
-                  className="flex-1"
-                  buttonClassName="!py-2 !text-sm"
-                  placeholder={pt("HH", "SS")}
-                />
-                <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 shrink-0">
-                  :
-                </span>
-                <ModernSelect
-                  value={minuteValue}
-                  onChange={(m) => setSelectedTime(`${hourValue}:${m}`)}
-                  options={MINUTE_OPTIONS}
-                  minWidth={72}
-                  className="flex-1"
-                  buttonClassName="!py-2 !text-sm"
-                  placeholder={pt("MM", "DD")}
-                />
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <DateTimeRow
+              label={pt("From", "Başlanğıc")}
+              ymd={fromDate}
+              hm={fromTime}
+              onDateChange={setFromDate}
+              onTimeChange={setFromTime}
+              pt={pt}
+            />
+            <DateTimeRow
+              label={pt("To", "Son")}
+              ymd={toDate}
+              hm={toTime}
+              onDateChange={setToDate}
+              onTimeChange={setToTime}
+              pt={pt}
+            />
           </div>
 
           <p className="text-[10px] text-gray-500 dark:text-gray-400">
             {pt(
-              "Sales from 00:00 through the selected time on that date.",
-              "Satışlar həmin günün 00:00-dan seçilmiş saata qədər.",
+              "Sales between the From and To date/time (24h).",
+              "Satışlar Başlanğıc və Son tarix/saat aralığında (24s).",
             )}
           </p>
 
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
-              <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
+              <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 min-w-0 truncate">
                 {rangeLabel}
               </span>
-              <span className="text-[11px] text-gray-500 dark:text-gray-400">
+              <span className="text-[11px] text-gray-500 dark:text-gray-400 shrink-0">
                 {pt(
                   `${items.length} products · ${totalQty} qty`,
                   `${items.length} məhsul · ${totalQty} əd`,

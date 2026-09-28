@@ -99,6 +99,8 @@ export interface ProductDetail extends ProductListItem {
   categoryId: string | null;
   subCategoryId: string | null;
   subCategory: string | null;
+  subCategoryIds?: string[];
+  subCategories?: string[];
   brandId: string | null;
   unitId: string | null;
   warrantyId: string | null;
@@ -137,6 +139,8 @@ export type ProductCreateBody = {
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   categoryId?: string | null;
   subCategoryId?: string | null;
+  /** Multiple sub-categories (preferred). */
+  subCategoryIds?: string[];
   brandId?: string | null;
   unitId?: string | null;
   warrantyId?: string | null;

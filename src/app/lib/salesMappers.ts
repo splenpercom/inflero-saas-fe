@@ -1,4 +1,6 @@
 import { formatInventoryDate } from "./inventoryMappers";
+import { formatDateTime } from "./dateFormat";
+import type { Language } from "../i18n/translations";
 
 export type OrderStatusApi = "PENDING" | "PROCESSING" | "COMPLETED" | "CANCELLED" | "HELD";
 export type PurchaseStatusApi = "ORDERED" | "PENDING" | "RECEIVED";
@@ -14,8 +16,13 @@ export type PaymentMethodApi =
 
 export type PosUiPaymentMethod = "cash" | "card" | "bank";
 
-export function formatSalesDate(iso: string): string {
-  return formatInventoryDate(iso);
+export function formatSalesDate(iso: string, language?: Language): string {
+  return formatInventoryDate(iso, language);
+}
+
+/** Exact local date + time for POS order timestamps. */
+export function formatSalesDateTime(iso: string, language?: Language): string {
+  return formatDateTime(iso, language);
 }
 
 export function mapPaymentMethodToApi(ui: PosUiPaymentMethod): PaymentMethodApi {

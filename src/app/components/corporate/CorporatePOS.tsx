@@ -46,10 +46,12 @@ import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { formatCurrency } from "../../utils/currency";
+import { AddCustomerModal, type CustomerFormData } from "./people/AddCustomerModal";
 import { fetchPosProducts, lookupProductByCode, type ProductListItem } from "../../api/inventory";
 import {
   fetchCustomers,
   fetchCustomerVehicles,
+  createCustomer,
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
@@ -414,6 +416,8 @@ interface ReceiptData {
   discount: number;
   discountLabel: string;
   total: number;
+  paid?: number;
+  amountDue?: number;
   paymentMethod: string;
   paymentStatusLabel: string;
   /** Auto-print customer/counter receipt once (QZ when mapped, else browser). */
@@ -465,6 +469,8 @@ function ThermalReceipt({
     discount: data.discount,
     discountLabel: data.discountLabel,
     total: data.total,
+    paid: data.paid,
+    amountDue: data.amountDue,
     paymentMethod: data.paymentMethod,
     paymentStatusLabel: data.paymentStatusLabel,
     tableLabel: data.tableLabel,
@@ -581,6 +587,18 @@ function ThermalReceipt({
           {data.discount > 0 && <div className="flex justify-between"><span className="text-gray-400">{data.discountLabel}:</span><span>-{data.discount.toFixed(2)} AZN</span></div>}
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
           <div className="flex justify-between text-[13px] font-bold"><span>{labels.total}:</span><span>{data.total.toFixed(2)} AZN</span></div>
+          {(data.amountDue ?? 0) > 0.009 && (
+            <>
+              <div className="flex justify-between mt-1">
+                <span className="text-gray-400">{labels.paid}:</span>
+                <span>{(data.paid ?? 0).toFixed(2)} AZN</span>
+              </div>
+              <div className="flex justify-between mt-1 font-bold">
+                <span className="text-gray-400">{labels.amountDue}:</span>
+                <span>{(data.amountDue ?? 0).toFixed(2)} AZN</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between mt-1"><span className="text-gray-400">{labels.payment}:</span><span className="font-semibold">{data.paymentMethod}</span></div>
           <div className="flex justify-between mt-1"><span className="text-gray-400">{labels.status}:</span><span className="font-semibold">{data.paymentStatusLabel}</span></div>
           <hr className="border-gray-400 dark:border-gray-500 my-2" />
@@ -636,6 +654,7 @@ export function CorporatePOS() {
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const { canCreate, canEdit } = useModulePermissions("Sales");
+  const { canCreate: canCreateCustomer } = useModulePermissions("People");
   const prefersTouchKeyboard = usePrefersTouchKeyboard();
   const lastPointerType = useLastPointerType();
 
@@ -649,6 +668,8 @@ export function CorporatePOS() {
   const [dragCategoryId, setDragCategoryId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
+  const [savingCustomer, setSavingCustomer] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [mileageInput, setMileageInput] = useState("");
   const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([]);
@@ -1175,6 +1196,26 @@ export function CorporatePOS() {
       setMileageInput("");
     }
     setSelectedCustomerId(id);
+  };
+
+  const handleSaveNewCustomer = async (data: CustomerFormData) => {
+    if (isDemo || !isAuthenticated || !canCreateCustomer) return;
+    setSavingCustomer(true);
+    try {
+      const created = await createCustomer({
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+      });
+      notifySuccess(tr("Müştəri əlavə edildi", "Customer added"));
+      setAddCustomerModalOpen(false);
+      await loadCustomers();
+      handleCustomerChange(created.id);
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setSavingCustomer(false);
+    }
   };
 
   const categoryOrderStorageKey = useMemo(() => {
@@ -1831,6 +1872,7 @@ export function CorporatePOS() {
         ? await submitEditingOrder({ asDraft: true })
         : await createPosOrder({
             status: "HELD",
+            date: new Date().toISOString(),
             customerId: selectedCustomerId || null,
             billerId: selectedBillerId || null,
             ...(selectedPaymentMethod ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) } : {}),
@@ -1886,6 +1928,10 @@ export function CorporatePOS() {
     const apiDiscount = parsePrice(detail.discount);
     const apiTotal = parsePrice(detail.grandTotal);
     const apiPaid = parsePrice(detail.paid);
+    const apiDue = Math.max(
+      0,
+      Math.round((parsePrice(detail.due) || apiTotal - apiPaid) * 100) / 100,
+    );
     const serverPaymentStatusLabel =
       detail.paymentStatus.toLowerCase() === "paid" || (apiTotal > 0 && apiPaid >= apiTotal)
         ? tr("Ödənilib", "Paid")
@@ -1918,6 +1964,8 @@ export function CorporatePOS() {
           : tr("Endirim", "Discount")
         : tr("Endirim", "Discount"),
       total: apiTotal,
+      paid: apiPaid,
+      amountDue: apiDue,
       paymentMethod: resolvePaymentMethodLabel(pmLabel, detail.paymentMethod),
       paymentStatusLabel: serverPaymentStatusLabel,
       autoPrintReceipt: opts?.autoPrintReceipt === true,
@@ -1949,6 +1997,8 @@ export function CorporatePOS() {
       discount: data.discount,
       discountLabel: data.discountLabel,
       total: data.total,
+      paid: data.paid,
+      amountDue: data.amountDue,
       paymentMethod: data.paymentMethod,
       paymentStatusLabel: data.paymentStatusLabel,
       tableLabel: data.tableLabel,
@@ -2025,7 +2075,7 @@ export function CorporatePOS() {
             // Update & Print finalizes drafts; Update Order keeps draft as HELD.
             finalize: printBill || !editingOrderWasHeld,
           })
-        : await posCheckout(buildCheckoutBody());
+        : await posCheckout({ ...buildCheckoutBody(), date: new Date().toISOString() });
 
       // Never block bill print if payment sync fails after order already saved.
       try {
@@ -2108,7 +2158,7 @@ export function CorporatePOS() {
 
     setCheckoutAction(printBill ? "kotBill" : "kot");
     try {
-      const body = buildCheckoutBody();
+      const body = { ...buildCheckoutBody(), date: new Date().toISOString() };
       let detail = pendingQrOrderId
         ? await approveQrAndSendToKot(pendingQrOrderId, body)
         : editingOrderId
@@ -2205,7 +2255,7 @@ export function CorporatePOS() {
     try {
       let detail = editingOrderId
         ? await submitEditingOrder({ sendToBar: true, finalize: true })
-        : await sendPosOrderToBar(buildCheckoutBody());
+        : await sendPosOrderToBar({ ...buildCheckoutBody(), date: new Date().toISOString() });
       try {
         detail = await collectRemainingIfPaid(detail);
       } catch (payErr) {
@@ -2290,7 +2340,7 @@ export function CorporatePOS() {
     try {
       let detail = editingOrderId
         ? await submitEditingOrder({ finalize: true })
-        : await sendPosOrderToProduction(buildCheckoutBody());
+        : await sendPosOrderToProduction({ ...buildCheckoutBody(), date: new Date().toISOString() });
       try {
         detail = await collectRemainingIfPaid(detail);
       } catch (payErr) {
@@ -2679,13 +2729,27 @@ export function CorporatePOS() {
               {/* Scrollable: customer fields, cart, checkout */}
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 pb-2">
                 <div className="space-y-2 mb-3">
-                <SelectDropdown
-                  value={selectedCustomerId}
-                  onChange={handleCustomerChange}
-                  options={customerOptions}
-                  placeholder={tr("Müştəri seçin...", "Select customer...")}
-                  icon={User}
-                />
+                <div className="flex gap-1.5 items-center">
+                  <div className="flex-1 min-w-0">
+                    <SelectDropdown
+                      value={selectedCustomerId}
+                      onChange={handleCustomerChange}
+                      options={customerOptions}
+                      placeholder={tr("Müştəri seçin...", "Select customer...")}
+                      icon={User}
+                    />
+                  </div>
+                  {canCreateCustomer && (
+                    <button
+                      type="button"
+                      onClick={() => setAddCustomerModalOpen(true)}
+                      title={tr("Yeni müştəri əlavə et", "Add new Customer")}
+                      className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
 
                 {autoEnabled && selectedCustomerId && (
                   <div className="grid grid-cols-2 gap-2">
@@ -3258,6 +3322,15 @@ export function CorporatePOS() {
           </div>
         </div>
       )}
+
+      <AddCustomerModal
+        isOpen={addCustomerModalOpen}
+        onClose={() => {
+          if (!savingCustomer) setAddCustomerModalOpen(false);
+        }}
+        onSave={handleSaveNewCustomer}
+        saving={savingCustomer}
+      />
 
       {/* Thermal Receipt Modal */}
       {receipt && (

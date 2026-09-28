@@ -9,7 +9,7 @@ import {
   type PosOrderDetail,
 } from "../../api/sales";
 import {
-  formatSalesDate,
+  formatSalesDateTime,
   isDraftOrderStatus,
   mapPaymentMethodFromApi,
   mapPaymentMethodToApi,
@@ -229,7 +229,7 @@ export function SaleDetailModal({
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Tarix", "Date")}</p>
-                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{formatSalesDate(order.date)}</p>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{formatSalesDateTime(order.date, language)}</p>
                     </div>
                   </div>
                 </div>

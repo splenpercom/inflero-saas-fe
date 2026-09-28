@@ -15,7 +15,13 @@ import {
   type PaymentMethodApi,
 } from "../../api/sales";
 import { formatSalesDate } from "../../lib/salesMappers";
-import { downloadInvoicePdf, printInvoiceDocument } from "../../lib/invoicePdf";
+import {
+  downloadInvoicePdf,
+  issuerFromTenantSettings,
+  printInvoiceDocument,
+  type InvoiceIssuerInfo,
+} from "../../lib/invoicePdf";
+import { fetchTenantSettings } from "../../api/tenantSettings";
 import { notifyFromError, notifyInfo, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { CreatePaymentModal } from "./CreatePaymentModal";
@@ -35,11 +41,14 @@ export function InvoiceView() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated } = useAuth();
+  const { isDemo, isAuthenticated, user } = useAuth();
   const { canEdit, canDelete } = useModulePermissions("Sales");
   const askConfirm = useConfirm();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [sourceOrder, setSourceOrder] = useState<PosOrderDetail | null>(null);
+  const [issuer, setIssuer] = useState<InvoiceIssuerInfo>(() =>
+    issuerFromTenantSettings(null, user?.tenant?.name),
+  );
   const [loading, setLoading] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
@@ -53,8 +62,12 @@ export function InvoiceView() {
     }
     setLoading(true);
     try {
-      const data = await fetchInvoice(id);
+      const [data, settings] = await Promise.all([
+        fetchInvoice(id),
+        fetchTenantSettings().catch(() => null),
+      ]);
       setInvoice(data);
+      setIssuer(issuerFromTenantSettings(settings, user?.tenant?.name));
       if (data.posOrderId) {
         setSourceOrder(await fetchPosOrder(data.posOrderId).catch(() => null));
       } else {
@@ -67,7 +80,7 @@ export function InvoiceView() {
     } finally {
       setLoading(false);
     }
-  }, [id, isDemo, isAuthenticated, language]);
+  }, [id, isDemo, isAuthenticated, language, user?.tenant?.name]);
 
   useEffect(() => {
     void loadInvoice();
@@ -119,7 +132,7 @@ export function InvoiceView() {
   const handleDownloadPDF = async () => {
     if (!invoice) return;
     try {
-      await downloadInvoicePdf({ invoice, sourceOrder, tr });
+      await downloadInvoicePdf({ invoice, sourceOrder, issuer, tr });
       notifySuccess(tr("Qaimə yükləndi", "Invoice downloaded"));
     } catch (err) {
       notifyFromError(err, tr("Qaimə yüklənə bilmədi", "Failed to download invoice"));
@@ -129,7 +142,7 @@ export function InvoiceView() {
   const handlePrint = () => {
     if (!invoice) return;
     try {
-      printInvoiceDocument({ invoice, sourceOrder, tr });
+      printInvoiceDocument({ invoice, sourceOrder, issuer, tr });
     } catch (err) {
       notifyFromError(err, tr("Çap uğursuz oldu", "Failed to print"));
     }
@@ -234,16 +247,12 @@ export function InvoiceView() {
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 sm:p-8 print:shadow-none">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Inflero</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                123 Business Street
-                <br />
-                Business City, BC 12345
-                <br />
-                noreply@inflero.com
-                <br />
-                +1 (555) 123-4567
-              </p>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{issuer.name}</h2>
+              {issuer.lines.length > 0 && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                  {issuer.lines.join("\n")}
+                </p>
+              )}
             </div>
 
             <div className="text-right">

@@ -13,8 +13,11 @@ import { formatSalesDate } from "../../lib/salesMappers";
 import {
   downloadInvoicePdf,
   invoiceDetailFromPosOrder,
+  issuerFromTenantSettings,
   printInvoiceDocument,
+  type InvoiceIssuerInfo,
 } from "../../lib/invoicePdf";
+import { fetchTenantSettings } from "../../api/tenantSettings";
 import { APP_LOGO_LIGHT } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { printPosOrderTicket } from "../../lib/posPrint";
@@ -38,6 +41,9 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
 
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [sourceOrder, setSourceOrder] = useState<PosOrderDetail | null>(null);
+  const [issuer, setIssuer] = useState<InvoiceIssuerInfo>(() =>
+    issuerFromTenantSettings(null, user?.tenant?.name),
+  );
   const [loading, setLoading] = useState(false);
   const [printingBill, setPrintingBill] = useState(false);
 
@@ -49,8 +55,12 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
     }
     setLoading(true);
     try {
-      const detail = await fetchPosOrder(orderId);
+      const [detail, settings] = await Promise.all([
+        fetchPosOrder(orderId),
+        fetchTenantSettings().catch(() => null),
+      ]);
       setSourceOrder(detail);
+      setIssuer(issuerFromTenantSettings(settings, user?.tenant?.name));
       if (detail.invoiceId) {
         setInvoice(await fetchInvoice(detail.invoiceId));
       } else {
@@ -63,7 +73,7 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
     } finally {
       setLoading(false);
     }
-  }, [orderId, language]);
+  }, [orderId, language, user?.tenant?.name]);
 
   useEffect(() => {
     if (!isOpen || !orderId) return;
@@ -84,7 +94,7 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
   const handleDownload = async () => {
     if (!invoice) return;
     try {
-      await downloadInvoicePdf({ invoice, sourceOrder, tr });
+      await downloadInvoicePdf({ invoice, sourceOrder, issuer, tr });
       notifySuccess(tr("Qaimə yükləndi", "Invoice downloaded"));
     } catch (err) {
       notifyFromError(err, tr("Qaimə yüklənə bilmədi", "Failed to download invoice"));
@@ -94,7 +104,7 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
   const handlePrint = () => {
     if (!invoice) return;
     try {
-      printInvoiceDocument({ invoice, sourceOrder, tr });
+      printInvoiceDocument({ invoice, sourceOrder, issuer, tr });
     } catch (err) {
       notifyFromError(err, tr("Çap uğursuz oldu", "Failed to print"));
     }
@@ -211,16 +221,14 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 sm:p-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Inflero</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    123 Business Street
-                    <br />
-                    Business City, BC 12345
-                    <br />
-                    noreply@inflero.com
-                    <br />
-                    +1 (555) 123-4567
-                  </p>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                    {issuer.name}
+                  </h2>
+                  {issuer.lines.length > 0 && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                      {issuer.lines.join("\n")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="text-right">

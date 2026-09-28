@@ -53,9 +53,9 @@ export function ModernSelect({
 
   return (
     <div
-      className={cn("relative min-w-0", className)}
+      className={cn("relative min-w-0 w-full", className)}
       ref={anchorRef}
-      style={{ minWidth, ...(className ? undefined : { width: minWidth }) }}
+      style={{ minWidth }}
     >
       <button
         type="button"

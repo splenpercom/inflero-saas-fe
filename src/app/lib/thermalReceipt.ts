@@ -174,6 +174,8 @@ export function thermalReceiptLabels(language: Language) {
     shipping: t("Çatdırılma", "Shipping"),
     serviceFee: t("Xidmət haqqı", "Service fee"),
     total: t("CƏMİ", "TOTAL"),
+    paid: t("Ödənilib", "Paid"),
+    amountDue: t("Qalan borc", "Amount due"),
     payment: t("Ödəniş", "Payment"),
     status: t("Status", "Status"),
     thanks: t("Təşəkkür edirik", "Thank you"),
@@ -213,6 +215,10 @@ export type ThermalReceiptPayload = {
   discount: number;
   discountLabel: string;
   total: number;
+  /** Amount already collected (omit or 0 when fully unpaid). */
+  paid?: number;
+  /** Remaining balance — shown on unpaid / partial bills. */
+  amountDue?: number;
   paymentMethod: string;
   paymentStatusLabel: string;
   tableLabel?: string;
@@ -258,6 +264,8 @@ export function buildThermalReceiptHtml(
     serviceFee: data.serviceFee,
     discount: data.discount,
     total: data.total,
+    paid: data.paid ?? 0,
+    amountDue: data.amountDue ?? Math.max(0, data.total - (data.paid ?? 0)),
   };
 
   const L = {
@@ -275,6 +283,8 @@ export function buildThermalReceiptHtml(
     shipping: p(labels.shipping),
     serviceFee: p(labels.serviceFee),
     total: p(labels.total),
+    paid: p(labels.paid),
+    amountDue: p(labels.amountDue),
     payment: p(labels.payment),
     status: p(labels.status),
     thanks: p(labels.thanks),
@@ -346,6 +356,12 @@ export function buildThermalReceiptHtml(
   ${d.discount > 0 ? `<div class="row"><span class="label">${d.discountLabel}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
   <div class="divider-solid"></div>
   <div class="total-row"><span>${L.total}:</span><span>${d.total.toFixed(2)} AZN</span></div>
+  ${
+    d.amountDue > 0.009
+      ? `<div class="row" style="margin-top:2px;"><span class="label">${L.paid}:</span><span>${d.paid.toFixed(2)} AZN</span></div>
+  <div class="row"><span class="label" style="font-weight:700;">${L.amountDue}:</span><span style="font-weight:700;">${d.amountDue.toFixed(2)} AZN</span></div>`
+      : ""
+  }
   <div class="row" style="margin-top:4px;"><span class="label">${L.payment}:</span><span>${d.paymentMethod}</span></div>
   <div class="row"><span class="label">${L.status}:</span><span>${d.paymentStatusLabel}</span></div>
   <div class="divider-solid"></div>

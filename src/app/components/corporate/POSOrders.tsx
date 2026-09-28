@@ -50,7 +50,7 @@ import {
 import { ApiError } from "../../api/client";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import {
-  formatSalesDate,
+  formatSalesDateTime,
   mapPaymentMethodToApi,
   isDraftOrderStatus,
   formatOrderDisplayId,
@@ -96,10 +96,6 @@ function localYmd(d = new Date()): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function localHm(d = new Date()): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function parseHmParts(hm: string): { hour: string; minute: string } {
@@ -308,7 +304,7 @@ export function POSOrders() {
   const [customFromDate, setCustomFromDate] = useState(() => datesForSortPreset("last7days").fromDate);
   const [customFromTime, setCustomFromTime] = useState("00:00");
   const [customToDate, setCustomToDate] = useState(() => datesForSortPreset("last7days").toDate);
-  const [customToTime, setCustomToTime] = useState(localHm);
+  const [customToTime, setCustomToTime] = useState("23:59");
   const [periodOpen, setPeriodOpen] = useState(false);
   const periodMenuRef = useRef<HTMLDivElement | null>(null);
   const periodPanelRef = useRef<HTMLDivElement | null>(null);
@@ -385,7 +381,7 @@ export function POSOrders() {
     setCustomToDate(toDate);
     if (value !== "custom") {
       setCustomFromTime("00:00");
-      setCustomToTime(localHm());
+      setCustomToTime("23:59");
     }
   };
 
@@ -757,7 +753,7 @@ export function POSOrders() {
         body: exportOrders.map((order) => [
           order.customerName,
           formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
-          formatSalesDate(order.date),
+          formatSalesDateTime(order.date, language),
           order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
           order.status,
           String(order.grandTotal),
@@ -795,7 +791,7 @@ export function POSOrders() {
       const rows = exportOrders.map((order) => [
         order.customerName,
         formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
-        formatSalesDate(order.date),
+        formatSalesDateTime(order.date, language),
         order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
         order.status,
         order.grandTotal,
@@ -1575,7 +1571,7 @@ export function POSOrders() {
                       )}
                       {col("date") && (
                         <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
-                          {formatSalesDate(order.date)}
+                          {formatSalesDateTime(order.date, language)}
                         </td>
                       )}
                       {col("source") && (

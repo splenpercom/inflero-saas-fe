@@ -11,6 +11,7 @@ import {
   Eye,
   Edit2,
   Trash2,
+  Copy,
   ChevronDown,
   X,
   ArrowUpDown,
@@ -474,6 +475,14 @@ export function Products() {
   const handleEdit = (productId: string) => {
     rememberProductsListReturn(listReturnTo);
     navigate(`/dashboard/inventory/products/${productId}/edit`, { state: { returnTo: listReturnTo } });
+  };
+
+  const handleDuplicate = (productId: string) => {
+    if (!canCreate) return;
+    rememberProductsListReturn(listReturnTo);
+    navigate(`/dashboard/inventory/products/create?duplicate=${encodeURIComponent(productId)}`, {
+      state: { returnTo: listReturnTo },
+    });
   };
 
   const handleDeleteClick = (productId: string) => {
@@ -1004,8 +1013,20 @@ export function Products() {
                         <button
                           onClick={() => handleEdit(product.id)}
                           className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          title={pickLang(language, "Redaktə et", "Edit")}
                         >
                           <Edit2 className="w-3 h-3" />
+                        </button>
+                        )}
+
+                        {canCreate && (
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicate(product.id)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          title={pickLang(language, "Dublikat", "Duplicate")}
+                        >
+                          <Copy className="w-3 h-3" />
                         </button>
                         )}
 
@@ -1013,6 +1034,7 @@ export function Products() {
                         <button
                           onClick={() => handleDeleteClick(product.id)}
                           className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          title={pickLang(language, "Sil", "Delete")}
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>

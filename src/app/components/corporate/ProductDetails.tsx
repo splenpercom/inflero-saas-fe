@@ -176,7 +176,7 @@ export function ProductDetails() {
       productName: { en: "Product/Service Name", az: "Məhsul/Xidmət Adı" },
       productType: { en: "Type", az: "Növ" },
       category: { en: "Category", az: "Kateqoriya" },
-      subCategory: { en: "Sub Category", az: "Alt Kateqoriya" },
+      subCategory: { en: "Sub Categories", az: "Alt Kateqoriyalar" },
       brand: { en: "Brand", az: "Brend" },
       unit: { en: "Unit", az: "Vahid" },
       sku: { en: "SKU", az: "SKU" },
@@ -357,7 +357,14 @@ export function ProductDetails() {
                   value={formatProductType(product.productType, language)}
                 />
                 <DetailRow label={pt("category")} value={dash(product.category)} />
-                <DetailRow label={pt("subCategory")} value={dash(product.subCategory)} />
+                <DetailRow
+                  label={pt("subCategory")}
+                  value={dash(
+                    product.subCategories?.length
+                      ? product.subCategories.join(", ")
+                      : product.subCategory,
+                  )}
+                />
                 <DetailRow label={pt("brand")} value={dash(product.brand)} />
                 <DetailRow label={pt("unit")} value={dash(product.unit)} />
                 <DetailRow label={pt("sku")} value={product.sku} mono />

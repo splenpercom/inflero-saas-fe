@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams, useLocation } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
@@ -9,6 +9,7 @@ import {
   fetchSubCategories,
   fetchBrands,
   fetchUnits,
+  fetchProduct,
   createCategory,
   createSubCategory,
   createBrand,
@@ -17,8 +18,10 @@ import {
   uploadProductImage,
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
+import { resolveProductsListReturn } from "../../lib/productsNavigation";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { ModernSelect } from "../ui/ModernSelect";
+import { ModernMultiSelect } from "../ui/ModernMultiSelect";
 import { DateInput } from "../ui/DateInput";
 import {
   ChevronDown,
@@ -42,21 +45,48 @@ interface ProductImage {
   file?: File;
 }
 
+function mapDiscountToUi(value: string | null | undefined): string {
+  if (value === "PERCENTAGE") return "percentage";
+  if (value === "FIXED") return "fixed";
+  return "";
+}
+
+function productImageUrls(images: unknown): string[] {
+  if (!Array.isArray(images)) return [];
+  return images.map((img) => (typeof img === "string" ? img : (img as { url: string }).url));
+}
+
 export function CreateProduct() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const duplicateId = searchParams.get("duplicate")?.trim() || "";
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
   const { canCreate } = useModulePermissions("Inventory");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const returnTo = resolveProductsListReturn(
+    (location.state as { returnTo?: string } | null)?.returnTo,
+  );
 
   // Translation helper
   const pt = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
-      title: { en: "Create", az: "Yarat" },
-      subtitle: { en: "Add a new product or service", az: "Yeni məhsul və ya xidmət əlavə edin" },
+      title: {
+        en: duplicateId ? "Duplicate Product" : "Create",
+        az: duplicateId ? "Məhsulu Dublikat Et" : "Yarat",
+      },
+      subtitle: {
+        en: duplicateId
+          ? "Review and save as a new product or service"
+          : "Add a new product or service",
+        az: duplicateId
+          ? "Yoxlayın və yeni məhsul və ya xidmət kimi saxlayın"
+          : "Yeni məhsul və ya xidmət əlavə edin",
+      },
       backToProduct: { en: "Back to Products/Services", az: "Məhsullar/Xidmətlərə Geri" },
       productInformation: { en: "Product/Service Information", az: "Məhsul/Xidmət Məlumatı" },
       pricingStocks: { en: "Pricing & Stocks", az: "Qiymət və Ehtiyatlar" },
@@ -67,7 +97,7 @@ export function CreateProduct() {
       sku: { en: "SKU", az: "SKU" },
       generate: { en: "Generate", az: "Yarat" },
       category: { en: "Category", az: "Kateqoriya" },
-      subCategory: { en: "Sub Category", az: "Alt Kateqoriya" },
+      subCategory: { en: "Sub Categories", az: "Alt Kateqoriyalar" },
       brand: { en: "Brand", az: "Brend" },
       unit: { en: "Unit", az: "Vahid" },
       itemBarcode: { en: "Item Barcode", az: "Məhsul/Xidmət Barkodu" },
@@ -115,12 +145,14 @@ export function CreateProduct() {
   // Form states
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState("");
-  const [subCategory, setSubCategory] = useState("");
+  const [subCategoryIds, setSubCategoryIds] = useState<string[]>([]);
+  const [subCategoryLabelMap, setSubCategoryLabelMap] = useState<Record<string, string>>({});
   const [brand, setBrand] = useState("");
   const [unit, setUnit] = useState("");
   const [itemBarcode, setItemBarcode] = useState("");
   const [description, setDescription] = useState("");
   const barcodeCanvasRef = useRef<SVGSVGElement>(null);
+  const categoryRef = useRef("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [discountType, setDiscountType] = useState("");
@@ -134,6 +166,7 @@ export function CreateProduct() {
 
   const [submitting, setSubmitting] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(true);
+  const [duplicateLoading, setDuplicateLoading] = useState(Boolean(duplicateId));
   const [subCategoryCategoryMap, setSubCategoryCategoryMap] = useState<Record<string, string>>({});
 
   // Category management
@@ -198,10 +231,80 @@ export function CreateProduct() {
   }, [loadOptions]);
 
   useEffect(() => {
-    if (subCategory && category && subCategoryCategoryMap[subCategory] !== category) {
-      setSubCategory("");
+    if (!duplicateId || !(isAuthenticated || isDemo)) {
+      setDuplicateLoading(false);
+      return;
     }
-  }, [category, subCategory, subCategoryCategoryMap]);
+    let cancelled = false;
+    setDuplicateLoading(true);
+    void (async () => {
+      try {
+        const product = await fetchProduct(duplicateId);
+        if (cancelled) return;
+        const copySuffix = tr(" (Surət)", " (Copy)");
+        const baseName = (product.name ?? "").trim();
+        setProductName(
+          baseName
+            ? baseName.endsWith(copySuffix.trim()) || baseName.endsWith("(Copy)") || baseName.endsWith("(Surət)")
+              ? baseName
+              : `${baseName}${copySuffix}`
+            : "",
+        );
+        setCategory(product.categoryId ?? "");
+        categoryRef.current = product.categoryId ?? "";
+        const ids =
+          product.subCategoryIds?.length
+            ? product.subCategoryIds
+            : product.subCategoryId
+              ? [product.subCategoryId]
+              : [];
+        setSubCategoryIds(ids);
+        const names = product.subCategories ?? [];
+        const labels: Record<string, string> = {};
+        ids.forEach((sid, i) => {
+          if (names[i]) labels[sid] = names[i];
+          else if (ids.length === 1 && product.subCategory) labels[sid] = product.subCategory;
+        });
+        setSubCategoryLabelMap(labels);
+        setBrand(product.brandId ?? "");
+        setUnit(product.unitId ?? "");
+        // Barcode must be unique — leave empty so user can generate/scan a new one
+        setItemBarcode("");
+        setDescription(product.description ?? "");
+        setQuantity(String(product.quantity ?? 0));
+        setPrice(product.price ?? "");
+        setDiscountType(mapDiscountToUi(product.discountType));
+        setDiscountValue(product.discountValue ?? "");
+        setQuantityAlert(product.quantityAlert != null ? String(product.quantityAlert) : "");
+        setManufacturedDate(product.manufacturedDate?.slice(0, 10) ?? "");
+        setExpiryDate(product.expiryDate?.slice(0, 10) ?? "");
+        const urls = productImageUrls(product.images);
+        setImages(urls.map((url, index) => ({ id: `dup-img-${index}`, url })));
+      } catch (err) {
+        if (!cancelled) {
+          notifyFromError(err, tr("Məhsulu yükləmək alınmadı", "Failed to load product"));
+          navigate(returnTo, { replace: true });
+        }
+      } finally {
+        if (!cancelled) setDuplicateLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [duplicateId, isAuthenticated, isDemo, language, branchRevision, navigate, returnTo]);
+
+  useEffect(() => {
+    if (categoryRef.current === category) return;
+    categoryRef.current = category;
+    if (!category || Object.keys(subCategoryCategoryMap).length === 0) {
+      setSubCategoryIds([]);
+      return;
+    }
+    setSubCategoryIds((prev) =>
+      prev.filter((id) => !subCategoryCategoryMap[id] || subCategoryCategoryMap[id] === category),
+    );
+  }, [category, subCategoryCategoryMap]);
 
   const generateBarcode = () => {
     const randomBarcode = Math.floor(Math.random() * 1000000000000).toString();
@@ -255,7 +358,7 @@ export function CreateProduct() {
       const newSub = { value: created.id, label: created.name };
       setSubCategories((prev) => [...prev, newSub]);
       setSubCategoryCategoryMap((prev) => ({ ...prev, [created.id]: created.categoryId }));
-      setSubCategory(newSub.value);
+      setSubCategoryIds((prev) => (prev.includes(newSub.value) ? prev : [...prev, newSub.value]));
       setSubCatFormData({ name: "", categoryId: "", status: "active" });
       setSubCatFormErrors({ name: "", categoryId: "" });
       setIsAddSubCategoryModalOpen(false);
@@ -445,6 +548,8 @@ export function CreateProduct() {
         if (img.file) {
           const url = await uploadProductImage(img.file);
           imageUrls.push(url);
+        } else if (img.url && !img.url.startsWith("blob:")) {
+          imageUrls.push(img.url);
         }
       }
 
@@ -457,7 +562,8 @@ export function CreateProduct() {
         description: description.trim() || null,
         productType: "SINGLE",
         categoryId: category,
-        subCategoryId: subCategory || null,
+        subCategoryIds,
+        subCategoryId: subCategoryIds[0] ?? null,
         brandId: brand || null,
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
@@ -477,7 +583,7 @@ export function CreateProduct() {
       if (opts?.andNew) {
         resetProductForm();
       } else {
-        navigate("/dashboard/inventory/products");
+        navigate(returnTo);
       }
     } catch (err) {
       notifyFromError(err);
@@ -487,7 +593,7 @@ export function CreateProduct() {
   };
 
   const handleCancel = () => {
-    navigate("/dashboard/inventory/products");
+    navigate(returnTo);
   };
 
   return (
@@ -512,6 +618,12 @@ export function CreateProduct() {
           </button>
         </div>
 
+        {duplicateLoading ? (
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            {tr("Məhsul yüklənir...", "Loading product...")}
+          </div>
+        ) : (
+        <>
         {/* Form Container */}
         <div className="space-y-3">
           {/* Product Information Section */}
@@ -581,16 +693,17 @@ export function CreateProduct() {
                     </div>
                   </div>
 
-                  {/* Sub Category */}
+                  {/* Sub Categories */}
                   <div>
                     <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
                       {pt("subCategory")}
                     </label>
-                    <div className="flex gap-1 items-center">
+                    <div className="flex gap-1 items-start">
                       <div className="flex-1 min-w-0">
-                        <ModernSelect
-                          value={subCategory}
-                          onChange={(e) => setSubCategory(e)}
+                        <ModernMultiSelect
+                          values={subCategoryIds}
+                          onChange={setSubCategoryIds}
+                          labelMap={subCategoryLabelMap}
                           placeholder={optionsLoading ? tr("Yüklənir...", "Loading...") : pt("select")}
                           options={filteredSubCategories}
                         />
@@ -600,7 +713,7 @@ export function CreateProduct() {
                         type="button"
                         onClick={() => setIsAddSubCategoryModalOpen(true)}
                         title="Add new sub category"
-                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md transition-colors"
+                        className="flex-shrink-0 w-6 h-6 mt-0.5 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-md transition-colors"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
@@ -939,6 +1052,8 @@ export function CreateProduct() {
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Add Category Modal — exact match of Category.tsx modal */}

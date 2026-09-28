@@ -21,6 +21,7 @@ import { parsePrice } from "../../lib/inventoryMappers";
 import { resolveProductsListReturn, PRODUCTS_LIST_PATH } from "../../lib/productsNavigation";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { ModernSelect } from "../ui/ModernSelect";
+import { ModernMultiSelect } from "../ui/ModernMultiSelect";
 import { DateInput } from "../ui/DateInput";
 import {
   ChevronDown,
@@ -99,7 +100,7 @@ export function EditProduct() {
       customFields: { en: "Custom Fields", az: "Xüsusi Sahələr" },
       productName: { en: "Product/Service Name", az: "Məhsul/Xidmət Adı" },
       category: { en: "Category", az: "Kateqoriya" },
-      subCategory: { en: "Sub Category", az: "Alt Kateqoriya" },
+      subCategory: { en: "Sub Categories", az: "Alt Kateqoriyalar" },
       brand: { en: "Brand", az: "Brend" },
       unit: { en: "Unit", az: "Vahid" },
       itemBarcode: { en: "Item Barcode", az: "Məhsul/Xidmət Barkodu" },
@@ -132,7 +133,8 @@ export function EditProduct() {
 
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState("");
-  const [subCategory, setSubCategory] = useState("");
+  const [subCategoryIds, setSubCategoryIds] = useState<string[]>([]);
+  const [subCategoryLabelMap, setSubCategoryLabelMap] = useState<Record<string, string>>({});
   const [brand, setBrand] = useState("");
   const [unit, setUnit] = useState("");
   const [itemBarcode, setItemBarcode] = useState("");
@@ -147,6 +149,7 @@ export function EditProduct() {
   const [images, setImages] = useState<ProductImage[]>([]);
 
   const barcodeCanvasRef = useRef<SVGSVGElement>(null);
+  const categoryRef = useRef("");
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [subCategoryCategoryMap, setSubCategoryCategoryMap] = useState<Record<string, string>>({});
 
@@ -213,7 +216,21 @@ export function EditProduct() {
       const product = await fetchProduct(id);
       setProductName(product.name);
       setCategory(product.categoryId ?? "");
-      setSubCategory(product.subCategoryId ?? "");
+      categoryRef.current = product.categoryId ?? "";
+      const ids =
+        product.subCategoryIds?.length
+          ? product.subCategoryIds
+          : product.subCategoryId
+            ? [product.subCategoryId]
+            : [];
+      setSubCategoryIds(ids);
+      const names = product.subCategories ?? [];
+      const labels: Record<string, string> = {};
+      ids.forEach((sid, i) => {
+        if (names[i]) labels[sid] = names[i];
+        else if (ids.length === 1 && product.subCategory) labels[sid] = product.subCategory;
+      });
+      setSubCategoryLabelMap(labels);
       setBrand(product.brandId ?? "");
       setUnit(product.unitId ?? "");
       setItemBarcode(product.itemBarcode ?? "");
@@ -245,10 +262,18 @@ export function EditProduct() {
   }, [loadProduct]);
 
   useEffect(() => {
-    if (subCategory && category && subCategoryCategoryMap[subCategory] !== category) {
-      setSubCategory("");
+    // Only strip mismatched sub-cats when the user changes category — not when
+    // options finish loading (that was clearing/hiding selections on edit).
+    if (categoryRef.current === category) return;
+    categoryRef.current = category;
+    if (!category || Object.keys(subCategoryCategoryMap).length === 0) {
+      setSubCategoryIds([]);
+      return;
     }
-  }, [category, subCategory, subCategoryCategoryMap]);
+    setSubCategoryIds((prev) =>
+      prev.filter((id) => !subCategoryCategoryMap[id] || subCategoryCategoryMap[id] === category),
+    );
+  }, [category, subCategoryCategoryMap]);
 
   const generateBarcode = () => {
     const randomBarcode = Math.floor(Math.random() * 1000000000000).toString();
@@ -328,7 +353,7 @@ export function EditProduct() {
       });
       setSubCategories((prev) => [...prev, { value: created.id, label: created.name }]);
       setSubCategoryCategoryMap((prev) => ({ ...prev, [created.id]: created.categoryId }));
-      setSubCategory(created.id);
+      setSubCategoryIds((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
       setSubCatFormData({ name: "", categoryId: "", status: "active" });
       setIsAddSubCategoryModalOpen(false);
       notifySuccess(tr("Alt kateqoriya əlavə edildi", "Sub category added"));
@@ -436,7 +461,8 @@ export function EditProduct() {
         name: productName.trim(),
         description: description.trim() || null,
         categoryId: category,
-        subCategoryId: subCategory || null,
+        subCategoryIds,
+        subCategoryId: subCategoryIds[0] ?? null,
         brandId: brand || null,
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
@@ -532,17 +558,18 @@ export function EditProduct() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("subCategory")}</label>
-                    <div className="flex gap-1.5 items-center">
-                      <div className="flex-1">
-                        <ModernSelect
-                          value={subCategory}
-                          onChange={setSubCategory}
+                    <div className="flex gap-1.5 items-start">
+                      <div className="flex-1 min-w-0">
+                        <ModernMultiSelect
+                          values={subCategoryIds}
+                          onChange={setSubCategoryIds}
+                          labelMap={subCategoryLabelMap}
                           placeholder={optionsLoading ? tr("Yüklənir...", "Loading...") : pt("select")}
                           options={filteredSubCategories}
                         />
                       </div>
                       {canCreate && (
-                        <button type="button" onClick={() => setIsAddSubCategoryModalOpen(true)} className="w-7 h-7 flex items-center justify-center bg-[#14b8a6] text-white rounded-lg">
+                        <button type="button" onClick={() => setIsAddSubCategoryModalOpen(true)} className="w-7 h-7 mt-0.5 flex items-center justify-center bg-[#14b8a6] text-white rounded-lg">
                           <Plus className="w-3.5 h-3.5" />
                         </button>
                       )}

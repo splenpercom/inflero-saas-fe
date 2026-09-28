@@ -394,6 +394,10 @@ export function posOrderToThermalPayload(
   );
   const total = parseMoney(order.grandTotal);
   const paid = parseMoney(order.paid);
+  const amountDue = Math.max(
+    0,
+    Math.round((parseMoney(order.due) || total - paid) * 100) / 100,
+  );
   const paymentStatusLabel =
     order.paymentStatus.toLowerCase() === "paid" || (total > 0 && paid >= total)
       ? t("Ödənilib", "Paid")
@@ -424,6 +428,8 @@ export function posOrderToThermalPayload(
     discount: parseMoney(order.discount),
     discountLabel: t("Endirim", "Discount"),
     total,
+    paid,
+    amountDue,
     paymentMethod,
     paymentStatusLabel,
     tableLabel,

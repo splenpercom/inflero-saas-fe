@@ -1,9 +1,38 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import type { InvoiceDetail, PosOrderDetail } from "../api/sales";
+import type { TenantSettingsRecord } from "../api/tenantSettings";
 import { formatSalesDate } from "./salesMappers";
 
 export type InvoicePdfTr = (az: string, en: string, ru?: string) => string;
+
+export type InvoiceIssuerInfo = {
+  name: string;
+  lines: string[];
+};
+
+/** Build issuer block from tenant company settings (+ optional auth tenant name fallback). */
+export function issuerFromTenantSettings(
+  settings: TenantSettingsRecord | null | undefined,
+  fallbackName?: string | null,
+): InvoiceIssuerInfo {
+  const name =
+    settings?.companyName?.trim() ||
+    fallbackName?.trim() ||
+    "Inflero";
+  const lines: string[] = [];
+  if (settings?.address?.trim()) lines.push(settings.address.trim());
+  const locality = [settings?.city, settings?.state, settings?.postalCode]
+    .map((x) => x?.trim())
+    .filter(Boolean)
+    .join(", ");
+  if (locality) lines.push(locality);
+  if (settings?.country?.trim()) lines.push(settings.country.trim());
+  if (settings?.companyEmail?.trim()) lines.push(settings.companyEmail.trim());
+  if (settings?.phone?.trim()) lines.push(settings.phone.trim());
+  if (settings?.website?.trim()) lines.push(settings.website.trim());
+  return { name, lines };
+}
 
 function parseAmount(value: string | number): number {
   if (typeof value === "number") return value;
@@ -25,9 +54,11 @@ function escapeHtml(s: string): string {
 export function buildInvoiceDocumentHtml(opts: {
   invoice: InvoiceDetail;
   sourceOrder?: Pick<PosOrderDetail, "vehicleLabel" | "mileageAtService"> | null;
+  issuer?: InvoiceIssuerInfo | null;
   tr: InvoicePdfTr;
 }): string {
   const { invoice, sourceOrder, tr } = opts;
+  const issuer = opts.issuer ?? { name: "Inflero", lines: [] };
   const customer = invoice.customer;
   const total = parseAmount(invoice.total);
   const subtotal = parseAmount(invoice.subtotal);
@@ -36,6 +67,11 @@ export function buildInvoiceDocumentHtml(opts: {
   const paid = parseAmount(invoice.paid);
   const amountDue = parseAmount(invoice.amountDue);
   const payments = invoice.payments ?? [];
+
+  const issuerLinesHtml =
+    issuer.lines.length > 0
+      ? issuer.lines.map((line) => escapeHtml(line)).join("<br />")
+      : "";
 
   const customerHtml = customer
     ? `<p style="font-weight:600;font-size:16px;margin:0 0 4px;color:#111827">${escapeHtml(customer.name)}</p>
@@ -121,13 +157,12 @@ export function buildInvoiceDocumentHtml(opts: {
   <div id="invoice-root" style="max-width:800px;margin:0 auto;padding:24px 32px;background:#fff">
     <div style="display:flex;justify-content:space-between;gap:32px;margin-bottom:32px;flex-wrap:wrap">
       <div>
-        <h2 style="font-size:28px;font-weight:700;margin:0 0 16px;color:#111827">Inflero</h2>
-        <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0">
-          123 Business Street<br />
-          Business City, BC 12345<br />
-          noreply@inflero.com<br />
-          +1 (555) 123-4567
-        </p>
+        <h2 style="font-size:28px;font-weight:700;margin:0 0 16px;color:#111827">${escapeHtml(issuer.name)}</h2>
+        ${
+          issuerLinesHtml
+            ? `<p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0">${issuerLinesHtml}</p>`
+            : ""
+        }
       </div>
       <div style="text-align:right">
         <h3 style="font-size:32px;font-weight:700;margin:0 0 16px;color:#111827">${escapeHtml(tr("QAİMƏ", "INVOICE"))}</h3>
@@ -214,6 +249,7 @@ function mountInvoiceHtml(html: string): HTMLDivElement {
 export function printInvoiceDocument(opts: {
   invoice: InvoiceDetail;
   sourceOrder?: Pick<PosOrderDetail, "vehicleLabel" | "mileageAtService"> | null;
+  issuer?: InvoiceIssuerInfo | null;
   tr: InvoicePdfTr;
 }): void {
   const html = buildInvoiceDocumentHtml(opts);
@@ -246,6 +282,7 @@ export function printInvoiceDocument(opts: {
 export async function downloadInvoicePdf(opts: {
   invoice: InvoiceDetail;
   sourceOrder?: Pick<PosOrderDetail, "vehicleLabel" | "mileageAtService"> | null;
+  issuer?: InvoiceIssuerInfo | null;
   tr: InvoicePdfTr;
 }): Promise<void> {
   const html = buildInvoiceDocumentHtml(opts);
