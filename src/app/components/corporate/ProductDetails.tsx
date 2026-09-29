@@ -185,7 +185,8 @@ export function ProductDetails() {
       quantityAlert: { en: "Quantity Alert", az: "Miqdar Xəbərdarlığı" },
       discountType: { en: "Discount Type", az: "Endirim Növü" },
       discountValue: { en: "Discount Value", az: "Endirim Dəyəri" },
-      price: { en: "Price", az: "Qiymət" },
+      price: { en: "Sale Price", az: "Satış qiyməti" },
+      cost: { en: "Cost (COGS)", az: "Maya dəyəri (COGS)" },
       status: { en: "Status", az: "Status" },
       description: { en: "Description", az: "Təsvir" },
       manufacturedDate: { en: "Manufactured Date", az: "İstehsal Tarixi" },
@@ -401,6 +402,18 @@ export function ProductDetails() {
                     <span className="text-base font-semibold text-[#0d9488] dark:text-[#14b8a6]">
                       {product.price} ₼
                     </span>
+                  }
+                />
+                <DetailRow
+                  label={pt("cost")}
+                  value={
+                    product.purchasePrice != null && String(product.purchasePrice).trim() !== "" ? (
+                      <span className="text-base font-semibold text-gray-900 dark:text-white">
+                        {product.purchasePrice} ₼
+                      </span>
+                    ) : (
+                      "—"
+                    )
                   }
                 />
                 <DetailRow

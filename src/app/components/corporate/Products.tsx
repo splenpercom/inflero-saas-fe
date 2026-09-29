@@ -33,12 +33,23 @@ import {
   deleteProduct,
   type CategoryRecord,
   type BrandRecord,
+  type ProductListItem,
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
 import { rememberProductsListReturn } from "../../lib/productsNavigation";
-import { notifyFromError, notifySuccess } from "../../lib/toast";
+import {
+  downloadProductDemoCsv,
+  downloadProductExportXlsx,
+  parseProductImportFile,
+  productToExportCells,
+  PRODUCT_FILE_COLUMNS,
+  runProductImport,
+  type ProductImportResult,
+} from "../../lib/productImport";
+import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
+import { useBranch } from "../../context/BranchContext";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface Product {
@@ -49,13 +60,14 @@ interface Product {
   category: string;
   brand: string;
   price: number;
+  cost: number | null;
   unit: string;
   quantity: number;
   createdBy: string;
   createdById: string;
 }
 
-type SortField = "category" | "brand" | "price" | "quantity" | "createdBy";
+type SortField = "category" | "brand" | "price" | "cost" | "quantity" | "createdBy";
 type SortDirection = "asc" | "desc" | null;
 
 type ProductsColumnKey =
@@ -64,6 +76,7 @@ type ProductsColumnKey =
   | "category"
   | "brand"
   | "price"
+  | "cost"
   | "unit"
   | "quantity"
   | "createdBy";
@@ -76,6 +89,7 @@ const DEFAULT_PRODUCTS_COLUMNS: Record<ProductsColumnKey, boolean> = {
   category: true,
   brand: true,
   price: true,
+  cost: true,
   unit: true,
   quantity: true,
   createdBy: true,
@@ -101,7 +115,7 @@ export function Products() {
   const stockEnabled = hasModule("STOCK");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Inventory");
   const branchRevision = useBranchRevision();
-  
+  const { branchId } = useBranch(); 
   // Translation helper - temporary until translations.ts is updated
   const pt = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
@@ -114,7 +128,8 @@ export function Products() {
       productName: { en: "PRODUCT NAME", az: "MƏHSUL ADI" },
       category: { en: "CATEGORY", az: "KATEQORİYA" },
       brand: { en: "BRAND", az: "BREND" },
-      price: { en: "PRICE", az: "QİYMƏT" },
+      price: { en: "SALE PRICE", az: "SATIŞ QİYMƏTİ" },
+      cost: { en: "COST", az: "MAYA" },
       unit: { en: "UNIT", az: "VAHID" },
       qty: { en: "QTY", az: "MİQDAR" },
       createdBy: { en: "CREATED BY", az: "YARADAN" },
@@ -136,6 +151,14 @@ export function Products() {
       importing: { en: "Importing...", az: "İdxal edilir..." },
       close: { en: "Close", az: "Bağla" },
       productsImported: { en: "Products imported successfully!", az: "Məhsullar uğurla idxal edildi!" },
+      importPartial: { en: "Import finished with some errors", az: "İdxal bəzi xətalarla bitdi" },
+      importNoRows: { en: "No product rows found in the file", az: "Faylda məhsul sətri tapılmadı" },
+      importStockSkipped: {
+        en: "Quantity was skipped for some rows (select a branch to set stock)",
+        az: "Bəzi sətirlərdə miqdar buraxıldı (stok üçün filial seçin)",
+      },
+      importCreated: { en: "Created", az: "Yaradıldı" },
+      importFailed: { en: "Failed", az: "Uğursuz" },
       select: { en: "Select", az: "Seç" },
       columns: { en: "Columns", az: "Sütunlar" },
     };
@@ -161,7 +184,9 @@ export function Products() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+  const [importResult, setImportResult] = useState<ProductImportResult | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sorting functionality
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -236,6 +261,7 @@ export function Products() {
       { key: "category", label: pt("category"), available: true },
       { key: "brand", label: pt("brand"), available: true },
       { key: "price", label: pt("price"), available: true },
+      { key: "cost", label: pt("cost"), available: true },
       { key: "unit", label: pt("unit"), available: true },
       { key: "quantity", label: pt("qty"), available: stockEnabled },
       { key: "createdBy", label: pt("createdBy"), available: true },
@@ -260,6 +286,7 @@ export function Products() {
     (col("category") ? 1 : 0) +
     (col("brand") ? 1 : 0) +
     (col("price") ? 1 : 0) +
+    (col("cost") ? 1 : 0) +
     (col("unit") ? 1 : 0) +
     (stockEnabled && col("quantity") ? 1 : 0) +
     (col("createdBy") ? 1 : 0) +
@@ -287,7 +314,7 @@ export function Products() {
     setLoading(true);
     try {
       const sortBy =
-        sortField && sortField !== "quantity"
+        sortField && sortField !== "quantity" && sortField !== "cost"
           ? sortField
           : undefined;
       const data = await fetchProducts({
@@ -307,15 +334,21 @@ export function Products() {
         category: item.category,
         brand: item.brand,
         price: parsePrice(item.price),
+        cost:
+          item.purchasePrice != null && String(item.purchasePrice).trim() !== ""
+            ? parsePrice(item.purchasePrice)
+            : null,
         unit: item.unit,
         quantity: item.quantity ?? 0,
         createdBy: item.createdBy,
         createdById: item.createdById,
       }));
-      if (sortField === "quantity" && sortDirection) {
-        items = [...items].sort((a, b) =>
-          sortDirection === "asc" ? a.quantity - b.quantity : b.quantity - a.quantity,
-        );
+      if ((sortField === "quantity" || sortField === "cost") && sortDirection) {
+        items = [...items].sort((a, b) => {
+          const av = sortField === "cost" ? (a.cost ?? -Infinity) : a.quantity;
+          const bv = sortField === "cost" ? (b.cost ?? -Infinity) : b.quantity;
+          return sortDirection === "asc" ? av - bv : bv - av;
+        });
       }
       setProducts(items);
       setTotalPages(Math.max(1, data.totalPages || 1));
@@ -360,106 +393,113 @@ export function Products() {
       ? pt("allBrands")
       : brands.find((b) => b.id === selectedBrand)?.name ?? pt("allBrands");
 
-  const sortedProducts = products;
-
   const handleAddProduct = () => {
     navigate("/dashboard/inventory/products/create");
   };
 
   const handleImportProduct = () => {
+    if (isDemo || !isAuthenticated || !canCreate) return;
+    setImportResult(null);
+    setImportProgress(0);
     setIsImportModalOpen(true);
   };
 
-  const handleExportPDF = () => {
-    // Dynamically import jsPDF and autoTable
-    import('jspdf').then((jsPDFModule) => {
-      import('jspdf-autotable').then(() => {
-        const jsPDF = jsPDFModule.default;
-        const doc = new jsPDF() as any;
-        
-        // Add title
-        doc.setFontSize(16);
-        doc.text("Products/Services", 14, 15);
-        
-        // Add date
-        doc.setFontSize(10);
-        doc.text(`Generated: ${formatNowDate(language)}`, 14, 22);
-        
-        // Prepare table data
-        const headers = [[
-          "SKU", "Product Name", "Category", "Brand", "Price", "Unit",
-          ...(stockEnabled ? ["Qty"] : []),
-          "Created By",
-        ]];
-        const data = sortedProducts.map(product => [
-          product.sku,
-          product.name,
-          product.category,
-          product.brand,
-          `${product.price} ₼`,
-          product.unit,
-          ...(stockEnabled ? [product.quantity.toString()] : []),
-          product.createdBy
-        ]);
-        
-        // Add table using autoTable (plugin is loaded globally)
-        doc.autoTable({
-          head: headers,
-          body: data,
-          startY: 28,
-          theme: 'grid',
-          headStyles: { fillColor: [20, 184, 166], fontSize: 9 },
-          bodyStyles: { fontSize: 8 },
-          alternateRowStyles: { fillColor: [245, 245, 245] },
-        });
-        
-        // Save PDF
-        doc.save(`products_${new Date().toISOString().split("T")[0]}.pdf`);
-      });
-    }).catch((error) => {
-      console.error('Error loading PDF libraries:', error);
-      alert('Failed to generate PDF. Please try again.');
-    });
+  const closeImportModal = () => {
+    if (isImporting) return;
+    setIsImportModalOpen(false);
+    setImportResult(null);
+    setImportProgress(0);
+    if (importFileInputRef.current) importFileInputRef.current.value = "";
   };
 
-  const handleExportExcel = () => {
-    // Create CSV content with semicolon separator for better international Excel compatibility
-    const headers = [
-      "SKU", "Product Name", "Category", "Brand", "Price", "Unit",
-      ...(stockEnabled ? ["Quantity"] : []),
-      "Created By",
-    ];
-    
-    // Create CSV rows with semicolon separator
-    const rows = sortedProducts.map((product) => [
-      product.sku,
-      product.name,
-      product.category,
-      product.brand,
-      product.price,
-      product.unit,
-      ...(stockEnabled ? [product.quantity] : []),
-      product.createdBy,
-    ]);
-    
-    // Build CSV content with semicolon as delimiter
-    let csvContent = headers.join(";") + "\n";
-    rows.forEach((row) => {
-      csvContent += row.join(";") + "\n";
-    });
+  const fetchAllProductsForExport = useCallback(async (): Promise<ProductListItem[]> => {
+    const sortBy =
+      sortField && sortField !== "quantity" && sortField !== "cost" ? sortField : undefined;
+    const pageSize = 100;
+    let page = 1;
+    let totalPages = 1;
+    const all: ProductListItem[] = [];
+    do {
+      const data = await fetchProducts({
+        page,
+        pageSize,
+        search: debouncedSearch || undefined,
+        categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
+        brandId: selectedBrand !== "all" ? selectedBrand : undefined,
+        sortBy,
+        sortOrder: sortDirection || undefined,
+      });
+      all.push(...(data.items ?? []));
+      totalPages = Math.max(1, data.totalPages || 1);
+      page += 1;
+    } while (page <= totalPages);
+    return all;
+  }, [
+    debouncedSearch,
+    selectedCategory,
+    selectedBrand,
+    sortField,
+    sortDirection,
+  ]);
 
-    // Create and download CSV file with UTF-8 BOM
-    const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `products_${new Date().toISOString().split("T")[0]}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const handleExportPDF = async () => {
+    try {
+      const items = await fetchAllProductsForExport();
+      if (items.length === 0) {
+        notifyWarning(pickLang(language, "İxrac üçün məhsul yoxdur", "No products to export"));
+        return;
+      }
+      const jsPDFModule = await import("jspdf");
+      await import("jspdf-autotable");
+      const jsPDF = jsPDFModule.default;
+      const doc = new jsPDF({ orientation: "landscape" }) as any;
+
+      doc.setFontSize(14);
+      doc.text("Products/Services", 14, 12);
+      doc.setFontSize(9);
+      doc.text(`Generated: ${formatNowDate(language)} · ${items.length} rows`, 14, 18);
+
+      const headers = [[...PRODUCT_FILE_COLUMNS]];
+      const data = items.map((product) =>
+        productToExportCells(product, { stockEnabled }),
+      );
+
+      doc.autoTable({
+        head: headers,
+        body: data,
+        startY: 22,
+        theme: "grid",
+        styles: { fontSize: 6, cellPadding: 1 },
+        headStyles: { fillColor: [20, 184, 166], fontSize: 6 },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+      });
+
+      doc.save(`products_${new Date().toISOString().split("T")[0]}.pdf`);
+      notifySuccess(pickLang(language, "PDF ixrac edildi", "PDF exported"));
+    } catch (err) {
+      notifyFromError(err, pickLang(language, "PDF yaradıla bilmədi", "Failed to generate PDF"));
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const items = await fetchAllProductsForExport();
+      if (items.length === 0) {
+        notifyWarning(pickLang(language, "İxrac üçün məhsul yoxdur", "No products to export"));
+        return;
+      }
+      const base = `products_${new Date().toISOString().split("T")[0]}`;
+      downloadProductExportXlsx(items, `${base}.xlsx`, { stockEnabled });
+      notifySuccess(
+        pickLang(
+          language,
+          `Excel ixrac edildi (${items.length})`,
+          `Excel exported (${items.length})`,
+        ),
+      );
+    } catch (err) {
+      notifyFromError(err, pickLang(language, "Excel ixracı alınmadı", "Failed to export Excel"));
+    }
   };
 
   const handleRefresh = () => {
@@ -509,49 +549,77 @@ export function Products() {
   };
 
   const handleDownloadDemo = () => {
-    // Create demo CSV content
-    const headers = [
-      "SKU", "Product Name", "Category", "Brand", "Price", "Unit",
-      ...(stockEnabled ? ["Quantity"] : []),
-      "Created By",
-    ];
-    const demoData = [
-      ["PT009", "Demo Product 1", "Electronics", "Demo Brand", "100", "Pc", ...(stockEnabled ? ["50"] : []), "Demo User"],
-      ["PT010", "Demo Product 2", "Computers", "Demo Brand", "200", "Pc", ...(stockEnabled ? ["30"] : []), "Demo User"],
-    ];
-    const csvContent = [headers.join(","), ...demoData.map((row) => row.join(","))].join("\n");
-
-    // Create and download CSV file
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", "demo_products.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadProductDemoCsv({ stockEnabled });
   };
 
-  const handleImportFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setIsImporting(true);
-      setImportProgress(0);
+    if (!file) return;
+    if (isDemo || !isAuthenticated || !canCreate) {
+      notifyFromError(new Error(pickLang(language, "Demo rejimində idxal mümkün deyil", "Import is not available in demo mode")));
+      event.target.value = "";
+      return;
+    }
 
-      // Simulate file import process
-      const interval = setInterval(() => {
-        setImportProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setIsImporting(false);
-            setIsImportModalOpen(false);
-            alert("Products imported successfully!");
-            return 100;
-          }
-          return prev + 2;
-        });
-      }, 30);
+    setIsImporting(true);
+    setImportProgress(0);
+    setImportResult(null);
+
+    try {
+      const rows = await parseProductImportFile(file);
+      if (rows.length === 0) {
+        notifyWarning(pt("importNoRows"));
+        return;
+      }
+
+      const result = await runProductImport({
+        rows,
+        stockEnabled,
+        branchId,
+        onProgress: (done, total) => {
+          setImportProgress(total > 0 ? Math.round((done / total) * 100) : 100);
+        },
+      });
+
+      setImportResult(result);
+      setImportProgress(100);
+
+      if (result.created > 0) {
+        void loadProducts();
+        void loadFilterOptions();
+      }
+
+      if (result.failed.length === 0) {
+        notifySuccess(
+          `${pt("productsImported")} (${result.created})`,
+        );
+      } else if (result.created > 0) {
+        notifyWarning(
+          `${pt("importPartial")}: ${pt("importCreated")} ${result.created}, ${pt("importFailed")} ${result.failed.length}`,
+        );
+      } else {
+        notifyFromError(
+          new Error(
+            pickLang(
+              language,
+              `İdxal uğursuz oldu (${result.failed.length} sətir)`,
+              `Import failed (${result.failed.length} rows)`,
+            ),
+          ),
+        );
+      }
+
+      if (result.skippedStock > 0) {
+        notifyWarning(pt("importStockSkipped"));
+      }
+    } catch (err) {
+      notifyFromError(
+        err,
+        pickLang(language, "Fayl oxuna bilmədi", "Failed to read import file"),
+      );
+    } finally {
+      setIsImporting(false);
+      event.target.value = "";
     }
   };
 
@@ -749,14 +817,15 @@ export function Products() {
               </div>
 
               <button
-                onClick={handleExportPDF}
+                onClick={() => void handleExportPDF()}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 <FileText className="w-3.5 h-3.5 text-red-500" />
               </button>
 
               <button
-                onClick={handleExportExcel}
+                type="button"
+                onClick={() => void handleExportExcel()}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
@@ -770,8 +839,9 @@ export function Products() {
                 <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
               </button>
 
-              {canCreate && (
+              {canCreate && !isDemo && (
               <button
+                type="button"
                 onClick={handleImportProduct}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
@@ -860,6 +930,25 @@ export function Products() {
                     <div className="flex items-center gap-1">
                       {pt("price")}
                       {sortField === "price" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="w-3 h-3" />
+                        ) : (
+                          <ArrowDown className="w-3 h-3" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-50" />
+                      )}
+                    </div>
+                  </th>
+                  )}
+                  {col("cost") && (
+                  <th
+                    className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
+                    onClick={() => handleSort("cost")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {pt("cost")}
+                      {sortField === "cost" ? (
                         sortDirection === "asc" ? (
                           <ArrowUp className="w-3 h-3" />
                         ) : (
@@ -978,6 +1067,11 @@ export function Products() {
                       {product.price} ₼
                     </td>
                     )}
+                    {col("cost") && (
+                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap tabular-nums">
+                      {product.cost != null ? `${product.cost} ₼` : "—"}
+                    </td>
+                    )}
                     {col("unit") && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {product.unit}
@@ -1070,8 +1164,10 @@ export function Products() {
                   {pt("importProducts")}
                 </h2>
                 <button
-                  onClick={() => setIsImportModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                  type="button"
+                  onClick={closeImportModal}
+                  disabled={isImporting}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1085,8 +1181,10 @@ export function Products() {
                     {pt("step1")}
                   </label>
                   <button
+                    type="button"
                     onClick={handleDownloadDemo}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border border-[#b3c0ff] dark:border-[#14b8a6] rounded-lg text-sm font-medium text-[#14b8a6] dark:text-[#14b8a6] hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/30 transition-colors"
+                    disabled={isImporting}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border border-[#b3c0ff] dark:border-[#14b8a6] rounded-lg text-sm font-medium text-[#14b8a6] dark:text-[#14b8a6] hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/30 transition-colors disabled:opacity-50"
                   >
                     <Download className="w-4 h-4" />
                     {pt("downloadDemoCSV")}
@@ -1108,13 +1206,16 @@ export function Products() {
                         <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
                           <span className="font-semibold">{pt("clickToUpload")}</span> {pt("dragAndDrop")}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{pt("csvFiles")}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {pickLang(language, "CSV və ya Excel (.xlsx)", "CSV or Excel (.xlsx)")}
+                        </p>
                       </div>
                       <input
+                        ref={importFileInputRef}
                         type="file"
                         className="hidden"
-                        accept=".csv,.xlsx"
-                        onChange={handleImportFileChange}
+                        accept=".csv,.xlsx,.xls"
+                        onChange={(e) => void handleImportFileChange(e)}
                         disabled={isImporting}
                       />
                     </label>
@@ -1138,16 +1239,51 @@ export function Products() {
                     </div>
                   </div>
                 )}
+
+                {importResult && !isImporting && (
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3 space-y-2">
+                    <p className="text-xs text-gray-700 dark:text-gray-300">
+                      {pt("importCreated")}:{" "}
+                      <span className="font-semibold text-green-600 dark:text-green-400">
+                        {importResult.created}
+                      </span>
+                      {" · "}
+                      {pt("importFailed")}:{" "}
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        {importResult.failed.length}
+                      </span>
+                    </p>
+                    {importResult.failed.length > 0 && (
+                      <ul className="max-h-28 overflow-y-auto text-[11px] text-red-600 dark:text-red-400 space-y-1">
+                        {importResult.failed.slice(0, 20).map((f) => (
+                          <li key={`${f.rowNumber}-${f.name}`}>
+                            #{f.rowNumber} {f.name}: {f.error}
+                          </li>
+                        ))}
+                        {importResult.failed.length > 20 && (
+                          <li>
+                            {pickLang(
+                              language,
+                              `…və daha ${importResult.failed.length - 20}`,
+                              `…and ${importResult.failed.length - 20} more`,
+                            )}
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
               <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-3">
                 <button
-                  onClick={() => setIsImportModalOpen(false)}
+                  type="button"
+                  onClick={closeImportModal}
                   disabled={isImporting}
                   className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
-                  {isImporting ? "Importing..." : pt("close")}
+                  {isImporting ? pt("importing") : pt("close")}
                 </button>
               </div>
             </div>

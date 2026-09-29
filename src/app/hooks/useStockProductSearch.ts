@@ -7,6 +7,12 @@ export interface StockProductOption {
   name: string;
   sku: string;
   image: string;
+  category: string;
+  subCategory: string;
+  /** Selling price (fallback when purchase cost is unset). */
+  price: string;
+  /** Preferred cost for purchase lines. */
+  purchasePrice: string | null;
 }
 
 export function useStockProductSearch(search: string, enabled = true) {
@@ -32,6 +38,10 @@ export function useStockProductSearch(search: string, enabled = true) {
           name: p.name,
           sku: p.sku,
           image: p.image,
+          category: p.category?.trim() || "",
+          subCategory: (p.subCategory ?? "").trim(),
+          price: p.price ?? "0",
+          purchasePrice: p.purchasePrice,
         })),
       );
     } catch {

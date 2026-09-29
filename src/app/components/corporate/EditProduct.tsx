@@ -106,7 +106,8 @@ export function EditProduct() {
       itemBarcode: { en: "Item Barcode", az: "Məhsul/Xidmət Barkodu" },
       description: { en: "Description", az: "Təsvir" },
       quantity: { en: "Quantity", az: "Miqdar" },
-      price: { en: "Price", az: "Qiymət" },
+      price: { en: "Sale Price", az: "Satış qiyməti" },
+      cost: { en: "Cost (COGS)", az: "Maya dəyəri (COGS)" },
       discountType: { en: "Discount Type", az: "Endirim Növü" },
       discountValue: { en: "Discount Value", az: "Endirim Dəyəri" },
       quantityAlert: { en: "Quantity Alert", az: "Miqdar Xəbərdarlığı" },
@@ -141,6 +142,7 @@ export function EditProduct() {
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
+  const [cost, setCost] = useState("");
   const [discountType, setDiscountType] = useState("");
   const [discountValue, setDiscountValue] = useState("");
   const [quantityAlert, setQuantityAlert] = useState("");
@@ -237,6 +239,7 @@ export function EditProduct() {
       setDescription(product.description ?? "");
       setQuantity(String(product.quantity ?? 0));
       setPrice(product.price ?? "");
+      setCost(product.purchasePrice ?? "");
       setDiscountType(mapDiscountToUi(product.discountType));
       setDiscountValue(product.discountValue ?? "");
       setQuantityAlert(product.quantityAlert != null ? String(product.quantityAlert) : "");
@@ -467,6 +470,7 @@ export function EditProduct() {
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
         price: String(parsePrice(price)),
+        purchasePrice: cost.trim() ? String(parsePrice(cost)) : null,
         discountType: mapDiscountToApi(discountType),
         discountValue: discountValue.trim() ? String(parsePrice(discountValue)) : null,
         ...(stockEnabled
@@ -660,20 +664,51 @@ export function EditProduct() {
             </button>
             {pricingStocksOpen && (
               <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6 mt-4">
-                  {stockEnabled && <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("quantity")}</label>
-                    <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
-                    {!branchId && (
-                      <p className="text-[10px] text-amber-600 mt-1">{tr("Miqdarı yeniləmək üçün filial seçin", "Select a branch to update quantity")}</p>
-                    )}
-                  </div>}
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-3 mt-4">
+                  {stockEnabled && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {pt("quantity")}
+                      </label>
+                      <input
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      />
+                      {!branchId && (
+                        <p className="text-[10px] text-amber-600 mt-1">
+                          {tr("Miqdarı yeniləmək üçün filial seçin", "Select a branch to update quantity")}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("price")} <span className="text-red-500">*</span></label>
-                    <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {pt("price")} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("discountType")}</label>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {pt("cost")}
+                    </label>
+                    <input
+                      type="number"
+                      value={cost}
+                      onChange={(e) => setCost(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {pt("discountType")}
+                    </label>
                     <ModernSelect
                       value={discountType}
                       onChange={setDiscountType}
@@ -686,14 +721,30 @@ export function EditProduct() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("discountValue")}</label>
-                    <input type="number" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {pt("discountValue")}
+                    </label>
+                    <input
+                      type="number"
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                    />
                   </div>
+                  {stockEnabled && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {pt("quantityAlert")}
+                      </label>
+                      <input
+                        type="number"
+                        value={quantityAlert}
+                        onChange={(e) => setQuantityAlert(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                      />
+                    </div>
+                  )}
                 </div>
-                {stockEnabled && <div className="mt-6">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("quantityAlert")}</label>
-                  <input type="number" value={quantityAlert} onChange={(e) => setQuantityAlert(e.target.value)} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
-                </div>}
               </div>
             )}
           </div>

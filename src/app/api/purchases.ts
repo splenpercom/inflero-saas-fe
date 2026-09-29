@@ -27,6 +27,8 @@ export interface PurchaseLineItem {
   id: string;
   productId: string;
   productName: string;
+  category?: string | null;
+  subCategory?: string | null;
   sku: string | null;
   quantity: number;
   purchasePrice: string;

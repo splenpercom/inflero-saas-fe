@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { cn } from "../ui/utils";
 import {
   Search,
@@ -62,6 +62,7 @@ export function Purchase() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -79,6 +80,10 @@ export function Purchase() {
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearch, selectedStatus, selectedPaymentStatus, sortBy]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [debouncedSearch, selectedStatus, selectedPaymentStatus, sortBy, currentPage, branchRevision]);
 
   const loadPurchases = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
@@ -124,6 +129,44 @@ export function Purchase() {
   useEffect(() => {
     void loadPurchases();
   }, [loadPurchases]);
+
+  const colCount = isGlobalMode ? 11 : 10;
+
+  const selectedOnPage = useMemo(
+    () => purchases.filter((p) => selectedIds.has(p.id)),
+    [purchases, selectedIds],
+  );
+  const columnTotals = useMemo(() => {
+    const source = selectedOnPage.length > 0 ? selectedOnPage : purchases;
+    return source.reduce(
+      (acc, p) => ({
+        total: acc.total + Number(p.total || 0),
+        paid: acc.paid + Number(p.paid || 0),
+        due: acc.due + Number(p.due || 0),
+      }),
+      { total: 0, paid: 0, due: 0 },
+    );
+  }, [purchases, selectedOnPage]);
+  const allPageSelected =
+    purchases.length > 0 && purchases.every((p) => selectedIds.has(p.id));
+  const somePageSelected = selectedOnPage.length > 0 && !allPageSelected;
+
+  const toggleSelectAllPage = () => {
+    if (allPageSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(purchases.map((p) => p.id)));
+  };
+
+  const toggleSelectRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const getStatusBadgeColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -413,6 +456,20 @@ export function Purchase() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap w-10">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = somePageSelected;
+                      }}
+                      onChange={toggleSelectAllPage}
+                      disabled={loading || purchases.length === 0}
+                      className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                      title={tr("Səhifədəkiləri seç", "Select page")}
+                      aria-label={tr("Səhifədəkiləri seç", "Select page")}
+                    />
+                  </th>
                   {isGlobalMode && (
                     <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                       {tr("FİLİAL", "BRANCH")}
@@ -450,13 +507,13 @@ export function Purchase() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={isGlobalMode ? 10 : 9} className="px-3 py-8 text-center text-xs text-gray-500">
+                    <td colSpan={colCount} className="px-3 py-8 text-center text-xs text-gray-500">
                       {tr("Yüklənir...", "Loading...")}
                     </td>
                   </tr>
                 ) : purchases.length === 0 ? (
                   <tr>
-                    <td colSpan={isGlobalMode ? 10 : 9} className="px-3 py-8 text-center text-xs text-gray-500">
+                    <td colSpan={colCount} className="px-3 py-8 text-center text-xs text-gray-500">
                       {tr("Satınalma tapılmadı", "No purchases found")}
                     </td>
                   </tr>
@@ -468,6 +525,15 @@ export function Purchase() {
                         index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"
                       }`}
                     >
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(purchase.id)}
+                          onChange={() => toggleSelectRow(purchase.id)}
+                          className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                          aria-label={tr("Sətiri seç", "Select row")}
+                        />
+                      </td>
                       {isGlobalMode && (
                         <td className="px-3 py-2 text-xs whitespace-nowrap">
                           <span
@@ -578,6 +644,33 @@ export function Purchase() {
                   ))
                 )}
               </tbody>
+              {!loading && purchases.length > 0 && (
+                <tfoot>
+                  <tr className="bg-gray-100 dark:bg-gray-800/70 border-t-2 border-gray-300 dark:border-gray-700">
+                    <td
+                      colSpan={isGlobalMode ? 6 : 5}
+                      className="px-3 py-2.5 text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap"
+                    >
+                      {selectedOnPage.length > 0
+                        ? tr(
+                            `Seçilmiş (${selectedOnPage.length})`,
+                            `Selected (${selectedOnPage.length})`,
+                          )
+                        : tr("Səhifə cəmi", "Page total")}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap tabular-nums">
+                      {columnTotals.total.toFixed(2)} ₼
+                    </td>
+                    <td className="px-3 py-2.5 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap tabular-nums">
+                      {columnTotals.paid.toFixed(2)} ₼
+                    </td>
+                    <td className="px-3 py-2.5 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap tabular-nums">
+                      {columnTotals.due.toFixed(2)} ₼
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
           <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">

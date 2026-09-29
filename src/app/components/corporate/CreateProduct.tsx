@@ -107,7 +107,8 @@ export function CreateProduct() {
       variant: { en: "Variant", az: "Variant" },
       combo: { en: "Combo", az: "Birləşmə" },
       quantity: { en: "Quantity", az: "Miqdar" },
-      price: { en: "Price", az: "Qiymət" },
+      price: { en: "Sale Price", az: "Satış qiyməti" },
+      cost: { en: "Cost (COGS)", az: "Maya dəyəri (COGS)" },
       discountType: { en: "Discount Type", az: "Endirim Növü" },
       discountValue: { en: "Discount Value", az: "Endirim Dəyəri" },
       quantityAlert: { en: "Quantity Alert", az: "Miqdar Xəbərdarlığı" },
@@ -155,6 +156,7 @@ export function CreateProduct() {
   const categoryRef = useRef("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
+  const [cost, setCost] = useState("");
   const [discountType, setDiscountType] = useState("");
   const [discountValue, setDiscountValue] = useState("");
   const [quantityAlert, setQuantityAlert] = useState("");
@@ -273,6 +275,7 @@ export function CreateProduct() {
         setDescription(product.description ?? "");
         setQuantity(String(product.quantity ?? 0));
         setPrice(product.price ?? "");
+        setCost(product.purchasePrice ?? "");
         setDiscountType(mapDiscountToUi(product.discountType));
         setDiscountValue(product.discountValue ?? "");
         setQuantityAlert(product.quantityAlert != null ? String(product.quantityAlert) : "");
@@ -510,6 +513,7 @@ export function CreateProduct() {
     setDescription("");
     setQuantity("");
     setPrice("");
+    setCost("");
     setDiscountType("");
     setDiscountValue("");
     setQuantityAlert("");
@@ -568,6 +572,7 @@ export function CreateProduct() {
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
         price: String(parsePrice(price)),
+        purchasePrice: cost.trim() ? String(parsePrice(cost)) : null,
         discountType: mapDiscountType(discountType),
         discountValue: discountValue.trim() ? String(parsePrice(discountValue)) : null,
         ...(stockEnabled
@@ -951,6 +956,18 @@ export function CreateProduct() {
                       type="number"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {pt("cost")}
+                    </label>
+                    <input
+                      type="number"
+                      value={cost}
+                      onChange={(e) => setCost(e.target.value)}
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Search, Trash2, RotateCcw } from "lucide-react";
+import { X, Search, Trash2, RotateCcw, Plus } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -9,29 +9,70 @@ import {
   updatePurchase,
   type PurchaseListRow,
 } from "../../api/purchases";
+import { createSupplier } from "../../api/people";
 import { mapPurchaseStatusToApi } from "../../lib/salesMappers";
 import { parsePurchaseAmount } from "../../lib/purchaseMappers";
 import { usePurchaseSuppliers } from "../../hooks/usePurchaseSuppliers";
 import { useSalesProductSearch } from "../../hooks/useSalesProductSearch";
+import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { useConfirm } from "../../context/ConfirmContext";
 import { PurchaseBranchField, resolvePurchaseStoreIdForApi } from "./PurchaseBranchField";
 import { SupplierRecentPurchasesPanel } from "./SupplierRecentPurchasesPanel";
 import { PurchaseDetailModal } from "./PurchaseDetailModal";
+import { AddSupplierModal, type SupplierFormData } from "./people/AddSupplierModal";
 import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
-import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+import { asNumber, parseNumericInput, sanitizeNumericTyping } from "../../lib/numericInput";
 
 interface ProductLine {
   productId: string;
   name: string;
+  category: string;
+  subCategory: string;
   sku: string;
-  qty: number | "";
-  purchasePrice: number | "";
-  discount: number | "";
-  taxPercent: number | "";
+  /** Empty until user types — no default placeholder numbers. */
+  qty: string;
+  purchasePrice: string;
+  discount: string;
+  taxPercent: string;
+}
+
+/** Display: Product name / Category / Subcategory */
+function formatProductPath(
+  name: string,
+  category?: string | null,
+  subCategory?: string | null,
+): string {
+  const n = name.trim() || "—";
+  const c = (category ?? "").trim() || "—";
+  const s = (subCategory ?? "").trim() || "—";
+  return `${n} / ${c} / ${s}`;
+}
+
+function localYmd(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function mapDetailItemsToLines(
+  items: Awaited<ReturnType<typeof fetchPurchase>>["items"],
+): ProductLine[] {
+  return items.map((item) => ({
+    productId: item.productId,
+    name: item.productName,
+    category: item.category?.trim() || "",
+    subCategory: item.subCategory?.trim() || "",
+    sku: item.sku ?? "",
+    qty: String(item.quantity),
+    purchasePrice: String(parsePurchaseAmount(item.purchasePrice)),
+    discount: String(parsePurchaseAmount(item.discount)),
+    taxPercent: String(parsePurchaseAmount(item.taxPercent)),
+  }));
 }
 
 interface AddPurchaseModalProps {
@@ -50,20 +91,6 @@ function lineTaxAmount(price: number, qty: number, discount: number, taxPercent:
 function lineTotalCost(price: number, qty: number, discount: number, taxPercent: number) {
   const base = price * qty - discount;
   return base + lineTaxAmount(price, qty, discount, taxPercent);
-}
-
-function mapDetailItemsToLines(
-  items: Awaited<ReturnType<typeof fetchPurchase>>["items"],
-): ProductLine[] {
-  return items.map((item) => ({
-    productId: item.productId,
-    name: item.productName,
-    sku: item.sku ?? "",
-    qty: item.quantity,
-    purchasePrice: parsePurchaseAmount(item.purchasePrice),
-    discount: parsePurchaseAmount(item.discount),
-    taxPercent: parsePurchaseAmount(item.taxPercent),
-  }));
 }
 
 function resetFormState(setters: {
@@ -117,12 +144,15 @@ export function AddPurchaseModal({
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
+  const { canCreate: canCreateSupplier } = useModulePermissions("People");
   const { branchId, isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
   const isEdit = !!purchaseId;
 
   const [supplierId, setSupplierId] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
+  const [addSupplierOpen, setAddSupplierOpen] = useState(false);
+  const [savingSupplier, setSavingSupplier] = useState(false);
   const [date, setDate] = useState("");
   const [reference, setReference] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -155,6 +185,8 @@ export function AddPurchaseModal({
 
   useEffect(() => {
     if (!isOpen) {
+      setAddSupplierOpen(false);
+      setSavingSupplier(false);
       resetFormState({
         setSupplierId,
         setSupplierSearch,
@@ -181,6 +213,7 @@ export function AddPurchaseModal({
 
   useEffect(() => {
     if (!isOpen || isEdit) return;
+    setDate(localYmd());
     if (!isGlobalMode && branchId) {
       setStoreId(branchId);
     }
@@ -226,21 +259,63 @@ export function AddPurchaseModal({
     };
   }, [isOpen, purchaseId, isGlobalMode, branchId, language]);
 
-  const handleAddProduct = (id: string, name: string, sku: string) => {
+  const handleAddProduct = (
+    id: string,
+    name: string,
+    sku: string,
+    category = "",
+    subCategory = "",
+    unitCost = "",
+  ) => {
     if (linesLocked) return;
     if (products.some((p) => p.productId === id)) return;
     setProducts([
       ...products,
-      { productId: id, name, sku, qty: 1, purchasePrice: 0, discount: 0, taxPercent: 0 },
+      {
+        productId: id,
+        name,
+        category,
+        subCategory,
+        sku,
+        qty: "",
+        purchasePrice: unitCost,
+        discount: "",
+        taxPercent: "",
+      },
     ]);
     setProductSearch("");
     setShowProductList(false);
   };
 
+  const handleSaveNewSupplier = async (data: SupplierFormData) => {
+    if (isDemo || !isAuthenticated || !canCreateSupplier) return;
+    setSavingSupplier(true);
+    try {
+      const created = await createSupplier({
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        country: data.country || null,
+        company: data.company || null,
+        status: data.status,
+      });
+      notifySuccess(tr("Təchizatçı əlavə edildi", "Supplier added"));
+      setAddSupplierOpen(false);
+      setSupplierSearch("");
+      setSupplierId(created.id);
+      setLoadedSupplierName(created.name);
+      await reloadSuppliers();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setSavingSupplier(false);
+    }
+  };
+
   const handleUpdateLine = (
     productId: string,
     field: keyof Pick<ProductLine, "qty" | "purchasePrice" | "discount" | "taxPercent">,
-    value: number | "",
+    value: string,
   ) => {
     if (linesLocked) return;
     setProducts(products.map((p) => (p.productId === productId ? { ...p, [field]: value } : p)));
@@ -277,7 +352,7 @@ export function AddPurchaseModal({
         setStoreId(detail.storeId);
       }
       if (!date) {
-        setDate(new Date().toISOString().slice(0, 10));
+        setDate(localYmd());
       }
       setReference("");
       notifySuccess(
@@ -313,10 +388,10 @@ export function AddPurchaseModal({
     (sum, p) =>
       sum +
       lineTotalCost(
-        asNumber(p.purchasePrice),
-        asNumber(p.qty),
-        asNumber(p.discount),
-        asNumber(p.taxPercent),
+        parseNumericInput(p.purchasePrice),
+        parseNumericInput(p.qty),
+        parseNumericInput(p.discount),
+        parseNumericInput(p.taxPercent),
       ),
     0,
   );
@@ -327,9 +402,11 @@ export function AddPurchaseModal({
       return;
     }
 
-    const invalidLine = products.some(
-      (p) => asNumber(p.qty) <= 0 || asNumber(p.purchasePrice) < 0,
-    );
+    const invalidLine = products.some((p) => {
+      const qty = parseNumericInput(p.qty, NaN);
+      const price = parseNumericInput(p.purchasePrice, NaN);
+      return !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0;
+    });
     if (invalidLine) return;
 
     const resolvedStoreId = resolvePurchaseStoreIdForApi(isGlobalMode, branchId, storeId);
@@ -372,10 +449,10 @@ export function AddPurchaseModal({
         ? {
             items: products.map((p) => ({
               productId: p.productId,
-              quantity: asNumber(p.qty, 1),
-              purchasePrice: asNumber(p.purchasePrice),
-              discount: asNumber(p.discount) || undefined,
-              taxPercent: asNumber(p.taxPercent) || undefined,
+              quantity: Math.max(1, Math.round(parseNumericInput(p.qty, 1))),
+              purchasePrice: parseNumericInput(p.purchasePrice),
+              discount: parseNumericInput(p.discount) || undefined,
+              taxPercent: parseNumericInput(p.taxPercent) || undefined,
             })),
           }
         : {}),
@@ -419,7 +496,11 @@ export function AddPurchaseModal({
     products.length > 0 &&
     status &&
     branchOk &&
-    products.every((p) => p.qty > 0 && p.purchasePrice >= 0) &&
+    products.every((p) => {
+      const qty = parseNumericInput(p.qty, NaN);
+      const price = parseNumericInput(p.purchasePrice, NaN);
+      return Number.isFinite(qty) && qty > 0 && Number.isFinite(price) && price >= 0;
+    }) &&
     !(isDemo && isEdit);
 
   return (
@@ -487,6 +568,16 @@ export function AddPurchaseModal({
                     }
                     options={supplierOptions}
                   />
+                  {canCreateSupplier && (
+                    <button
+                      type="button"
+                      onClick={() => setAddSupplierOpen(true)}
+                      title={tr("Yeni təchizatçı əlavə et", "Add new supplier")}
+                      className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => void reloadSuppliers()}
@@ -515,6 +606,7 @@ export function AddPurchaseModal({
                 <DateInput
                   value={date}
                   onChange={setDate}
+                  defaultYearsAgo={0}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                 />
               </div>
@@ -573,23 +665,58 @@ export function AddPurchaseModal({
                       {tr("Məhsul tapılmadı", "No products found")}
                     </p>
                   ) : (
-                    searchResults.map((p) => (
+                    searchResults.map((p) => {
+                      const unitCostRaw =
+                        p.purchasePrice != null && String(p.purchasePrice).trim() !== ""
+                          ? String(p.purchasePrice).trim()
+                          : String(p.price ?? "").trim();
+                      const unitCost = sanitizeNumericTyping(unitCostRaw, {
+                        allowDecimal: true,
+                      });
+                      return (
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => handleAddProduct(p.id, p.name, p.sku)}
+                        onClick={() =>
+                          handleAddProduct(
+                            p.id,
+                            p.name,
+                            p.sku,
+                            p.category,
+                            p.subCategory,
+                            unitCost,
+                          )
+                        }
                         className="w-full px-3 py-2 text-xs text-left hover:bg-gray-100 dark:hover:bg-gray-800"
                       >
-                        {p.name} ({p.sku})
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {formatProductPath(p.name, p.category, p.subCategory)}
+                          {p.sku ? (
+                            <span className="text-gray-400 ml-1 font-normal">({p.sku})</span>
+                          ) : null}
+                        </div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                          {tr("Alış", "Cost")}: ₼{unitCost || "—"}
+                        </div>
                       </button>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}
             </div>
 
             <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-x-auto">
-              <table className="w-full text-xs min-w-[700px]">
+              <table className="w-full text-xs table-fixed min-w-[720px]">
+                <colgroup>
+                  <col className="w-[32%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[6%]" />
+                </colgroup>
                 <thead className="bg-gray-100 dark:bg-gray-800">
                   <tr>
                     <th className="text-left px-2 py-2 text-[10px] font-medium text-gray-600 dark:text-gray-400">
@@ -626,108 +753,107 @@ export function AddPurchaseModal({
                         key={product.productId}
                         className="border-t border-gray-200 dark:border-gray-700"
                       >
-                        <td className="px-2 py-2 text-gray-900 dark:text-white">
-                          {product.name}
-                          <span className="text-gray-400 ml-1">({product.sku})</span>
+                        <td className="px-2 py-2 text-gray-900 dark:text-white align-top">
+                          <div
+                            className="break-words leading-snug"
+                            title={formatProductPath(
+                              product.name,
+                              product.category,
+                              product.subCategory,
+                            )}
+                          >
+                            {formatProductPath(
+                              product.name,
+                              product.category,
+                              product.subCategory,
+                            )}
+                          </div>
+                          {product.sku ? (
+                            <div className="text-gray-400 text-[10px] mt-0.5">({product.sku})</div>
+                          ) : null}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 align-top">
                           {linesLocked ? (
                             <span>{product.qty}</span>
                           ) : (
                             <input
                               type="text"
                               inputMode="numeric"
-                              value={product.qty === "" ? "" : product.qty}
+                              value={product.qty}
                               onChange={(e) => {
                                 const s = sanitizeNumericTyping(e.target.value, {
                                   allowDecimal: false,
                                 });
-                                handleUpdateLine(
-                                  product.productId,
-                                  "qty",
-                                  s === "" ? "" : Number(s),
-                                );
+                                handleUpdateLine(product.productId, "qty", s);
                               }}
-                              className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                              className="w-full min-w-[3.5rem] px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                             />
                           )}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 align-top">
                           {linesLocked ? (
-                            <span>{asNumber(product.purchasePrice).toFixed(2)}</span>
+                            <span>{parseNumericInput(product.purchasePrice).toFixed(2)}</span>
                           ) : (
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={product.purchasePrice === "" ? "" : product.purchasePrice}
+                              value={product.purchasePrice}
                               onChange={(e) => {
                                 const s = sanitizeNumericTyping(e.target.value, {
                                   allowDecimal: true,
                                 });
-                                handleUpdateLine(
-                                  product.productId,
-                                  "purchasePrice",
-                                  s === "" ? "" : Number(s),
-                                );
+                                handleUpdateLine(product.productId, "purchasePrice", s);
                               }}
-                              className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                              className="w-full min-w-[4.5rem] px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                             />
                           )}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 align-top">
                           {linesLocked ? (
-                            <span>{asNumber(product.discount).toFixed(2)}</span>
+                            <span>{parseNumericInput(product.discount).toFixed(2)}</span>
                           ) : (
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={product.discount === "" ? "" : product.discount}
+                              value={product.discount}
                               onChange={(e) => {
                                 const s = sanitizeNumericTyping(e.target.value, {
                                   allowDecimal: true,
                                 });
-                                handleUpdateLine(
-                                  product.productId,
-                                  "discount",
-                                  s === "" ? "" : Number(s),
-                                );
+                                handleUpdateLine(product.productId, "discount", s);
                               }}
-                              className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                              className="w-full min-w-[4.5rem] px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                             />
                           )}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 align-top">
                           {linesLocked ? (
                             <span>{product.taxPercent}</span>
                           ) : (
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={product.taxPercent === "" ? "" : product.taxPercent}
+                              value={product.taxPercent}
                               onChange={(e) => {
                                 const s = sanitizeNumericTyping(e.target.value, {
                                   allowDecimal: true,
                                 });
-                                handleUpdateLine(
-                                  product.productId,
-                                  "taxPercent",
-                                  s === "" ? "" : Number(s),
-                                );
+                                handleUpdateLine(product.productId, "taxPercent", s);
                               }}
-                              className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
+                              className="w-full min-w-[3.5rem] px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                             />
                           )}
                         </td>
-                        <td className="px-2 py-2 text-gray-900 dark:text-white">
+                        <td className="px-2 py-2 text-gray-900 dark:text-white align-top whitespace-nowrap">
                           ₼
                           {lineTotalCost(
-                            asNumber(product.purchasePrice),
-                            asNumber(product.qty),
-                            asNumber(product.discount),
-                            asNumber(product.taxPercent),
+                            parseNumericInput(product.purchasePrice),
+                            parseNumericInput(product.qty),
+                            parseNumericInput(product.discount),
+                            parseNumericInput(product.taxPercent),
                           ).toFixed(2)}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 align-top">
                           {!linesLocked && (
                             <button
                               type="button"
@@ -865,6 +991,15 @@ export function AddPurchaseModal({
         isOpen={!!viewPurchaseId}
         onClose={() => setViewPurchaseId(null)}
         overlayZIndexClass="z-[70]"
+      />
+
+      <AddSupplierModal
+        isOpen={addSupplierOpen}
+        onClose={() => {
+          if (!savingSupplier) setAddSupplierOpen(false);
+        }}
+        onSave={handleSaveNewSupplier}
+        saving={savingSupplier}
       />
     </div>
   );

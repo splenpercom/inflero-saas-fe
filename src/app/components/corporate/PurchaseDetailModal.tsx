@@ -280,7 +280,8 @@ export function PurchaseDetailModal({
                               className="border-t border-gray-200 dark:border-gray-700"
                             >
                               <td className="px-2 py-2 text-gray-900 dark:text-white">
-                                {item.productName}
+                                {[item.productName, item.category || "—", item.subCategory || "—"]
+                                  .join(" / ")}
                                 {item.sku ? (
                                   <span className="text-gray-400 ml-1">({item.sku})</span>
                                 ) : null}

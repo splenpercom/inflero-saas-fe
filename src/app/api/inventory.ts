@@ -57,16 +57,31 @@ export interface ProductListItem {
   sku: string;
   name: string;
   slug: string;
+  description?: string | null;
   productType: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
   image: string;
+  /** All image URLs when returned by list/detail. */
+  images?: string[];
   /** Present on list + detail responses. */
   categoryId?: string | null;
   category: string;
+  /** Sub-category name(s); empty when none. */
+  subCategory?: string | null;
   brand: string;
   price: string;
   purchasePrice: string | null;
   unit: string;
+  /** Full unit name when available (list export). */
+  unitName?: string;
+  warranty?: string | null;
+  barcodeSymbology?: string | null;
+  taxType?: string | null;
+  taxPercent?: string | null;
+  discountType?: string | null;
+  discountValue?: string | null;
+  manufacturer?: string | null;
+  manufacturedDate?: string | null;
   quantity: number | null;
   createdBy: string;
   createdById: string;
