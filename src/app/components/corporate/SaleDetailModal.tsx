@@ -87,6 +87,33 @@ export function SaleDetailModal({
   const taxAmount = (itemsSubtotal * taxPercent) / 100;
   const isDraft = order ? isDraftOrderStatus(order.status) || isDraftOrderStatus(order.statusLabel) : false;
 
+  const translateOrderStatus = (status: string, statusLabel?: string | null) => {
+    const key = (status || statusLabel || "").toLowerCase().replace(/\s+/g, "_");
+    const map: Record<string, string> = {
+      completed: tr("Tamamlandı", "Completed"),
+      pending: tr("Gözləyir", "Pending"),
+      cancelled: tr("Ləğv Edildi", "Cancelled"),
+      canceled: tr("Ləğv Edildi", "Cancelled"),
+      held: tr("Qaralama", "Draft"),
+      draft: tr("Qaralama", "Draft"),
+      processing: tr("İşlənir", "Processing"),
+    };
+    return map[key] || statusLabel || status;
+  };
+
+  const translatePaymentStatus = (status: string) => {
+    const key = status.toLowerCase().replace(/\s+/g, "_");
+    const map: Record<string, string> = {
+      paid: tr("Ödənilib", "Paid"),
+      unpaid: tr("Ödənilməyib", "Unpaid"),
+      overdue: tr("Gecikmiş", "Overdue"),
+      partial: tr("Qismən", "Partial"),
+      refunded: tr("Qaytarılıb", "Refunded"),
+      partially_refunded: tr("Qismən qaytarılıb", "Partially Refunded"),
+    };
+    return map[key] || status;
+  };
+
   const handleFinalize = async () => {
     if (!order || !canFinalize || isDemo) return;
     if (order.items.length === 0) {
@@ -258,7 +285,9 @@ export function SaleDetailModal({
                     <div className="min-w-0">
                       <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Status", "Status")}</p>
                       <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
-                        {isDraft ? tr("Qaralama", "Draft") : order.statusLabel}
+                        {isDraft
+                          ? tr("Qaralama", "Draft")
+                          : translateOrderStatus(order.status, order.statusLabel)}
                       </p>
                     </div>
                   </div>
@@ -271,7 +300,9 @@ export function SaleDetailModal({
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Ödəniş Statusu", "Payment Status")}</p>
-                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{order.paymentStatus}</p>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                        {translatePaymentStatus(order.paymentStatus)}
+                      </p>
                     </div>
                   </div>
                 </div>

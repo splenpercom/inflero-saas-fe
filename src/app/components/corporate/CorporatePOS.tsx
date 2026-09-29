@@ -1,5 +1,5 @@
 import { pickLang } from "../../i18n/pickLang";
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   Search,
@@ -29,6 +29,7 @@ import {
   ListOrdered,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   ClipboardList,
   Users,
   Bell,
@@ -105,8 +106,9 @@ type PaymentStatusChoiceState = PaymentStatusChoice | null;
 type PosCategoryChip = { id: string; name: string; pinned?: boolean };
 
 const POS_CATEGORY_ORDER_KEY = "inflero-pos-category-order";
+const POS_PRODUCT_ORDER_KEY = "inflero-pos-product-order";
 
-function loadPosCategoryOrder(storageKey: string): string[] {
+function loadPosIdOrder(storageKey: string): string[] {
   try {
     const raw = localStorage.getItem(storageKey);
     if (!raw) return [];
@@ -117,12 +119,20 @@ function loadPosCategoryOrder(storageKey: string): string[] {
   }
 }
 
-function savePosCategoryOrder(storageKey: string, order: string[]) {
+function savePosIdOrder(storageKey: string, order: string[]) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(order));
   } catch {
     /* ignore */
   }
+}
+
+function loadPosCategoryOrder(storageKey: string): string[] {
+  return loadPosIdOrder(storageKey);
+}
+
+function savePosCategoryOrder(storageKey: string, order: string[]) {
+  savePosIdOrder(storageKey, order);
 }
 
 function sortCategoriesByOrder(
@@ -137,6 +147,92 @@ function sortCategoriesByOrder(
     if (ai !== bi) return ai - bi;
     return a.name.localeCompare(b.name);
   });
+}
+
+function sortProductsByOrder<T extends { id: string; name: string }>(
+  items: T[],
+  order: string[],
+): T[] {
+  if (order.length === 0) return items;
+  const index = new Map(order.map((id, i) => [id, i]));
+  return [...items].sort((a, b) => {
+    const ai = index.has(a.id) ? (index.get(a.id) as number) : Number.MAX_SAFE_INTEGER;
+    const bi = index.has(b.id) ? (index.get(b.id) as number) : Number.MAX_SAFE_INTEGER;
+    if (ai !== bi) return ai - bi;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/** Move `fromId` to `toId`'s slot in a master id list (adds missing ids first). */
+function moveIdInOrder(
+  order: string[],
+  knownIds: string[],
+  fromId: string,
+  toId: string,
+): string[] {
+  const base = [...order];
+  for (const id of knownIds) {
+    if (!base.includes(id)) base.push(id);
+  }
+  const from = base.indexOf(fromId);
+  const to = base.indexOf(toId);
+  if (from < 0 || to < 0 || from === to) return base;
+  const next = [...base];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+/** Reorder within the currently visible grid, then merge back into the master order. */
+function reorderWithinVisible(
+  master: string[],
+  visibleIds: string[],
+  fromId: string,
+  toId: string,
+): string[] {
+  const from = visibleIds.indexOf(fromId);
+  const to = visibleIds.indexOf(toId);
+  if (from < 0 || to < 0 || from === to) {
+    return moveIdInOrder(master, visibleIds, fromId, toId);
+  }
+  const nextVisible = [...visibleIds];
+  const [item] = nextVisible.splice(from, 1);
+  nextVisible.splice(to, 0, item);
+
+  const visibleSet = new Set(visibleIds);
+  const placed = new Set<string>();
+  const result: string[] = [];
+  let vi = 0;
+  for (const id of master) {
+    if (!visibleSet.has(id)) {
+      result.push(id);
+      placed.add(id);
+      continue;
+    }
+    while (vi < nextVisible.length && placed.has(nextVisible[vi])) vi += 1;
+    if (vi < nextVisible.length) {
+      result.push(nextVisible[vi]);
+      placed.add(nextVisible[vi]);
+      vi += 1;
+    }
+  }
+  for (const id of nextVisible) {
+    if (!placed.has(id)) {
+      result.push(id);
+      placed.add(id);
+    }
+  }
+  for (const id of master) {
+    if (!placed.has(id)) result.push(id);
+  }
+  return result;
+}
+
+function getPosProductColumnCount(): number {
+  if (typeof window === "undefined") return 2;
+  if (window.matchMedia("(min-width: 1280px)").matches) return 4;
+  if (window.matchMedia("(min-width: 640px)").matches) return 3;
+  return 2;
 }
 
 function ProductThumb({ image, className }: { image: string; className?: string }) {
@@ -250,6 +346,25 @@ const TABLE_STATUS_UI: Record<
     ring: "ring-amber-400/50",
   },
 };
+
+const POS_EDIT_ORDER_KEY = "inflero_pos_edit_order_id";
+
+function readPosEditOrderId(): string | null {
+  try {
+    return sessionStorage.getItem(POS_EDIT_ORDER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePosEditOrderId(id: string | null) {
+  try {
+    if (id) sessionStorage.setItem(POS_EDIT_ORDER_KEY, id);
+    else sessionStorage.removeItem(POS_EDIT_ORDER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function PosTablePickerPortal({
   open,
@@ -677,6 +792,28 @@ export function CorporatePOS() {
   const [categoryReorderMode, setCategoryReorderMode] = useState(false);
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [dragCategoryId, setDragCategoryId] = useState<string | null>(null);
+  const [productReorderMode, setProductReorderMode] = useState(false);
+  const [productOrder, setProductOrder] = useState<string[]>([]);
+  const [dragProductId, setDragProductId] = useState<string | null>(null);
+  const [dragOverProductId, setDragOverProductId] = useState<string | null>(null);
+  const [productDragGhost, setProductDragGhost] = useState<{
+    x: number;
+    y: number;
+    name: string;
+    image: string;
+  } | null>(null);
+  const productScrollRef = useRef<HTMLDivElement | null>(null);
+  const productOrderRef = useRef<string[]>([]);
+  productOrderRef.current = productOrder;
+  const productDragSessionRef = useRef<{
+    id: string;
+    pointerId: number;
+    lastTargetId: string | null;
+    moved: boolean;
+    raf: number | null;
+    pendingX: number;
+    pendingY: number;
+  } | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
@@ -973,6 +1110,7 @@ export function CorporatePOS() {
   const hydrateCartFromQrOrder = useCallback(
     (detail: PosOrderDetail) => {
       setEditingOrderId(null);
+      writePosEditOrderId(null);
       setEditingOrderRef(null);
       setEditingOrderWasHeld(false);
       setEditingAlreadyOnKot(false);
@@ -1012,6 +1150,7 @@ export function CorporatePOS() {
   const hydrateCartFromExistingOrder = useCallback((detail: PosOrderDetail) => {
     setPendingQrOrderId(null);
     setEditingOrderId(detail.id);
+    writePosEditOrderId(detail.id);
     setEditingOrderRef(detail.reference);
     const statusKey = (detail.status || "").toLowerCase();
     setEditingOrderWasHeld(statusKey === "held" || statusKey === "draft");
@@ -1181,13 +1320,21 @@ export function CorporatePOS() {
 
   // Deep-link from POS Orders: ?orderId=id → open for edit in POS
   useEffect(() => {
-    const orderId = searchParams.get("orderId");
+    const fromUrl = searchParams.get("orderId");
+    const fromSession = readPosEditOrderId();
+    const orderId = fromUrl || (!editingOrderIdRef.current ? fromSession : null);
     if (!orderId || isDemo || !isAuthenticated) return;
     if (!canCreate && !canEdit) return;
-    if (editOrderHandledRef.current === orderId) return;
+    if (editOrderHandledRef.current === orderId && editingOrderIdRef.current === orderId) return;
+    if (editingOrderIdRef.current === orderId) {
+      editOrderHandledRef.current = orderId;
+      return;
+    }
     editOrderHandledRef.current = orderId;
     void handleLoadOrderForEdit(orderId).finally(() => {
+      if (!fromUrl) return;
       const next = new URLSearchParams(searchParams);
+      if (!next.has("orderId")) return;
       next.delete("orderId");
       setSearchParams(next, { replace: true });
     });
@@ -1245,9 +1392,19 @@ export function CorporatePOS() {
     return `${POS_CATEGORY_ORDER_KEY}:${tenant}:${branch}`;
   }, [user?.tenant?.id, branchId, isGlobalMode]);
 
+  const productOrderStorageKey = useMemo(() => {
+    const tenant = user?.tenant?.id ?? "demo";
+    const branch = isGlobalMode ? "global" : branchId || "none";
+    return `${POS_PRODUCT_ORDER_KEY}:${tenant}:${branch}`;
+  }, [user?.tenant?.id, branchId, isGlobalMode]);
+
   useEffect(() => {
     setCategoryOrder(loadPosCategoryOrder(categoryOrderStorageKey));
   }, [categoryOrderStorageKey]);
+
+  useEffect(() => {
+    setProductOrder(loadPosIdOrder(productOrderStorageKey));
+  }, [productOrderStorageKey]);
 
   const persistCategoryOrder = useCallback(
     (next: string[]) => {
@@ -1256,6 +1413,20 @@ export function CorporatePOS() {
     },
     [categoryOrderStorageKey],
   );
+
+  const persistProductOrder = useCallback(
+    (next: string[]) => {
+      setProductOrder(next);
+      productOrderRef.current = next;
+      savePosIdOrder(productOrderStorageKey, next);
+    },
+    [productOrderStorageKey],
+  );
+
+  const applyLiveProductOrder = useCallback((next: string[]) => {
+    productOrderRef.current = next;
+    setProductOrder(next);
+  }, []);
 
   const categories = useMemo(() => {
     const uniqueNames = [
@@ -1322,6 +1493,154 @@ export function CorporatePOS() {
     persistCategoryOrder(next);
     setDragCategoryId(null);
   };
+
+  const moveProduct = useCallback(
+    (productId: string, direction: -1 | 1, visibleIds: string[], step = 1) => {
+      const from = visibleIds.indexOf(productId);
+      if (from < 0) return;
+      const to = Math.max(0, Math.min(visibleIds.length - 1, from + direction * step));
+      if (to === from) return;
+      persistProductOrder(
+        reorderWithinVisible(productOrderRef.current, visibleIds, productId, visibleIds[to]),
+      );
+    },
+    [persistProductOrder],
+  );
+
+  const endProductPointerDrag = useCallback(() => {
+    const session = productDragSessionRef.current;
+    if (session?.raf != null) cancelAnimationFrame(session.raf);
+    productDragSessionRef.current = null;
+    setDragProductId(null);
+    setDragOverProductId(null);
+    setProductDragGhost(null);
+    savePosIdOrder(productOrderStorageKey, productOrderRef.current);
+  }, [productOrderStorageKey]);
+
+  const processProductPointerMove = useCallback(() => {
+    const session = productDragSessionRef.current;
+    if (!session) return;
+    session.raf = null;
+    const { pendingX: clientX, pendingY: clientY, id } = session;
+
+    setProductDragGhost((prev) =>
+      prev ? { ...prev, x: clientX, y: clientY } : prev,
+    );
+
+    const scrollEl = productScrollRef.current;
+    let nearEdge = false;
+    if (scrollEl) {
+      const rect = scrollEl.getBoundingClientRect();
+      const edge = 56;
+      if (clientY < rect.top + edge) {
+        scrollEl.scrollTop -= Math.max(8, (rect.top + edge - clientY) * 0.35);
+        nearEdge = true;
+      } else if (clientY > rect.bottom - edge) {
+        scrollEl.scrollTop += Math.max(8, (clientY - (rect.bottom - edge)) * 0.35);
+        nearEdge = true;
+      }
+    }
+
+    const stack = document.elementsFromPoint(clientX, clientY);
+    let targetId: string | null = null;
+    for (const node of stack) {
+      if (!(node instanceof HTMLElement)) continue;
+      const hit = node.closest("[data-pos-product-id]") as HTMLElement | null;
+      if (!hit) continue;
+      const candidate = hit.dataset.posProductId ?? null;
+      if (candidate && candidate !== id) {
+        targetId = candidate;
+        break;
+      }
+    }
+
+    setDragOverProductId(targetId);
+    if (targetId && targetId !== session.lastTargetId) {
+      session.lastTargetId = targetId;
+      session.moved = true;
+
+      const visibleIds = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-pos-product-id]"),
+      )
+        .map((el) => el.dataset.posProductId)
+        .filter((x): x is string => !!x);
+      // De-dupe while keeping DOM order (grid visual order)
+      const seen = new Set<string>();
+      const orderedVisible: string[] = [];
+      for (const vid of visibleIds) {
+        if (seen.has(vid)) continue;
+        seen.add(vid);
+        orderedVisible.push(vid);
+      }
+
+      applyLiveProductOrder(
+        reorderWithinVisible(productOrderRef.current, orderedVisible, id, targetId),
+      );
+    }
+
+    // Keep scrolling while held near the edge (even if pointer is still).
+    if (nearEdge && productDragSessionRef.current) {
+      productDragSessionRef.current.raf = requestAnimationFrame(() =>
+        processProductPointerMove(),
+      );
+    }
+  }, [applyLiveProductOrder]);
+
+  const onProductPointerDown = useCallback(
+    (
+      e: ReactPointerEvent,
+      product: { id: string; name: string; image: string },
+    ) => {
+      if (!productReorderMode) return;
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      e.preventDefault();
+      e.stopPropagation();
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      productDragSessionRef.current = {
+        id: product.id,
+        pointerId: e.pointerId,
+        lastTargetId: null,
+        moved: false,
+        raf: null,
+        pendingX: e.clientX,
+        pendingY: e.clientY,
+      };
+      setDragProductId(product.id);
+      setDragOverProductId(null);
+      setProductDragGhost({
+        x: e.clientX,
+        y: e.clientY,
+        name: product.name,
+        image: product.image,
+      });
+    },
+    [productReorderMode],
+  );
+
+  const onProductPointerMove = useCallback(
+    (e: ReactPointerEvent) => {
+      const session = productDragSessionRef.current;
+      if (!session || session.pointerId !== e.pointerId) return;
+      session.pendingX = e.clientX;
+      session.pendingY = e.clientY;
+      if (session.raf != null) return;
+      session.raf = requestAnimationFrame(() => processProductPointerMove());
+    },
+    [processProductPointerMove],
+  );
+
+  const onProductPointerUp = useCallback(
+    (e: ReactPointerEvent) => {
+      const session = productDragSessionRef.current;
+      if (!session || session.pointerId !== e.pointerId) return;
+      endProductPointerDrag();
+    },
+    [endProductPointerDrag],
+  );
+
+  useEffect(() => {
+    if (!productReorderMode) endProductPointerDrag();
+  }, [productReorderMode, endProductPointerDrag]);
 
   useEffect(() => {
     if (selectedCategory === "services" && !inventoryServicesEnabled) {
@@ -1640,6 +1959,7 @@ export function CorporatePOS() {
     }
     setPendingQrOrderId(null);
     setEditingOrderId(null);
+    writePosEditOrderId(null);
     setEditingOrderRef(null);
     setEditingOrderWasHeld(false);
     setEditingAlreadyOnKot(false);
@@ -2403,22 +2723,25 @@ export function CorporatePOS() {
     }
   };
 
-  const filteredProducts = products.filter((p) => {
-    const q = searchQuery.trim().toLowerCase();
-    if (q) {
-      const matchesSearch =
-        p.name.toLowerCase().includes(q) ||
-        p.code.toLowerCase().includes(q) ||
-        (p.barcode && p.barcode.toLowerCase().includes(q));
-      if (!matchesSearch) return false;
-    }
-    if (selectedCategory === "services") {
-      return p.productType === "SERVICE" || p.trackStock === false;
-    }
-    if (selectedCategory === "all") return true;
-    return p.category === selectedCategory;
-  });
-
+  const filteredProducts = sortProductsByOrder(
+    products.filter((p) => {
+      const q = searchQuery.trim().toLowerCase();
+      if (q) {
+        const matchesSearch =
+          p.name.toLowerCase().includes(q) ||
+          p.code.toLowerCase().includes(q) ||
+          (p.barcode && p.barcode.toLowerCase().includes(q));
+        if (!matchesSearch) return false;
+      }
+      if (selectedCategory === "services") {
+        return p.productType === "SERVICE" || p.trackStock === false;
+      }
+      if (selectedCategory === "all") return true;
+      return p.category === selectedCategory;
+    }),
+    productOrder,
+  );
+  const filteredProductIds = filteredProducts.map((p) => p.id);
   return (
     <div className="fixed inset-0 bg-gray-50 dark:bg-gray-950 flex flex-col overflow-hidden">
       {/* Back to Dashboard Button - Small and secluded */}
@@ -2507,7 +2830,17 @@ export function CorporatePOS() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => setCategoryReorderMode((v) => !v)}
+                    onClick={() => {
+                      setCategoryReorderMode((v) => {
+                        const next = !v;
+                        if (next) {
+                          setProductReorderMode(false);
+                          setDragProductId(null);
+                          setDragOverProductId(null);
+                        }
+                        return next;
+                      });
+                    }}
                     className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
                       categoryReorderMode
                         ? "bg-[#14b8a6] border-[#14b8a6] text-white"
@@ -2590,28 +2923,88 @@ export function CorporatePOS() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+            <div
+              ref={productScrollRef}
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+            >
+              <div className="flex items-center justify-between gap-2 mb-2 sticky top-0 z-10 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm py-1">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                  {productReorderMode
+                    ? tr(
+                        "Basılı saxlayıb yuxarı/aşağı sürükləyin",
+                        "Hold and drag up/down across rows",
+                      )
+                    : tr("Məhsullar", "Products")}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductReorderMode((v) => {
+                      const next = !v;
+                      if (next) setCategoryReorderMode(false);
+                      return next;
+                    });
+                    setDragProductId(null);
+                    setDragOverProductId(null);
+                    setProductDragGhost(null);
+                  }}
+                  className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
+                    productReorderMode
+                      ? "bg-[#14b8a6] border-[#14b8a6] text-white"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  }`}
+                  title={tr("Məhsulları sırala", "Reorder products")}
+                >
+                  <ListOrdered className="w-3 h-3" />
+                  {productReorderMode
+                    ? tr("Bitir", "Done")
+                    : tr("Sırala", "Reorder")}
+                </button>
+              </div>
               {productsLoading ? (
                 <div className="flex items-center justify-center h-32 text-xs text-gray-400">
                   {tr("Yüklənir...", "Loading...")}
                 </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="flex items-center justify-center h-32 text-xs text-gray-400">
+                  {tr("Məhsul tapılmadı", "No products found")}
+                </div>
               ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-4">
-                {filteredProducts.map((product) => {
+              <div
+                className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-4"
+                style={dragProductId ? { touchAction: "none" } : undefined}
+              >
+                {filteredProducts.map((product, index) => {
                   const isService = !product.trackStock || product.productType === "SERVICE";
                   const qtyInCart = getCartQuantity(product.id);
                   const available = getAvailableStock(product.id, product.stock);
                   const outOfStock = !isService && stockEnabled && available <= 0;
                   const atStockLimit =
                     !isService && stockEnabled && available > 0 && qtyInCart >= available;
-                  const allowAdd = canMutateCart && !outOfStock;
+                  const allowAdd = canMutateCart && !outOfStock && !productReorderMode;
+                  const isDragging = dragProductId === product.id;
+                  const isDropTarget =
+                    productReorderMode &&
+                    dragOverProductId === product.id &&
+                    dragProductId !== product.id;
+                  const cols = getPosProductColumnCount();
 
                   return (
                   <div
                     key={product.id}
+                    data-pos-product-id={product.id}
                     role="button"
-                    tabIndex={allowAdd ? 0 : -1}
+                    tabIndex={allowAdd || productReorderMode ? 0 : -1}
+                    onPointerDown={
+                      productReorderMode
+                        ? (e) => onProductPointerDown(e, product)
+                        : undefined
+                    }
+                    onPointerMove={productReorderMode ? onProductPointerMove : undefined}
+                    onPointerUp={productReorderMode ? onProductPointerUp : undefined}
+                    onPointerCancel={productReorderMode ? onProductPointerUp : undefined}
                     onClick={() => {
+                      if (productReorderMode) return;
                       if (!allowAdd) {
                         if (outOfStock) warnOutOfStock(product);
                         return;
@@ -2619,24 +3012,88 @@ export function CorporatePOS() {
                       addToCart(product);
                     }}
                     onKeyDown={(e) => {
+                      if (productReorderMode) return;
                       if (!allowAdd) return;
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         addToCart(product);
                       }
                     }}
-                    className={`relative bg-white dark:bg-gray-900 border rounded-lg p-3 sm:p-4 hover:shadow-lg transition-all active:scale-95 text-left group touch-manipulation ${
-                      outOfStock || !canMutateCart
-                        ? "border-red-300 dark:border-red-900/60 opacity-80 cursor-not-allowed"
-                        : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer"
-                    } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none`}
+                    className={`relative bg-white dark:bg-gray-900 border rounded-lg p-3 sm:p-4 transition-all text-left group touch-manipulation select-none ${
+                      isDragging ? "opacity-40 scale-[0.97] ring-2 ring-[#14b8a6]/50" : ""
+                    } ${
+                      isDropTarget
+                        ? "border-[#14b8a6] dark:border-[#14b8a6] ring-2 ring-[#14b8a6]/35 shadow-lg -translate-y-0.5"
+                        : ""
+                    } ${
+                      productReorderMode
+                        ? "cursor-grab active:cursor-grabbing border-dashed border-gray-300 dark:border-gray-600 hover:border-[#14b8a6]"
+                        : outOfStock || !canMutateCart
+                          ? "border-red-300 dark:border-red-900/60 opacity-80 cursor-not-allowed"
+                          : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer hover:shadow-lg active:scale-95"
+                    }`}
                   >
+                    {productReorderMode && (
+                      <div
+                        className="absolute top-1.5 right-1.5 z-20 flex flex-col items-end gap-0.5"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            disabled={index < cols}
+                            onClick={() =>
+                              moveProduct(product.id, -1, filteredProductIds, cols)
+                            }
+                            className="p-1 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
+                            title={tr("Yuxarı sətir", "Move up a row")}
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index + cols >= filteredProductIds.length}
+                            onClick={() =>
+                              moveProduct(product.id, 1, filteredProductIds, cols)
+                            }
+                            className="p-1 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
+                            title={tr("Aşağı sətir", "Move down a row")}
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            onClick={() => moveProduct(product.id, -1, filteredProductIds)}
+                            className="p-1 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
+                            title={tr("Əvvələ", "Move earlier")}
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="p-1 rounded-md bg-[#14b8a6]/10 text-[#0f766e] dark:text-[#5eead4] border border-[#14b8a6]/20 pointer-events-none">
+                            <GripVertical className="w-3.5 h-3.5" />
+                          </span>
+                          <button
+                            type="button"
+                            disabled={index >= filteredProductIds.length - 1}
+                            onClick={() => moveProduct(product.id, 1, filteredProductIds)}
+                            className="p-1 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
+                            title={tr("Sonraya", "Move later")}
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {isService && (
                       <span className="absolute top-2 left-2 z-10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                         {tr("Xidmət", "Service")}
                       </span>
                     )}
-                    {!isService && stockEnabled && outOfStock && (
+                    {!productReorderMode && !isService && stockEnabled && outOfStock && (
                       <span className="absolute top-2 right-2 z-10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
                         {tr("Stokda yoxdur", "Out of stock")}
                       </span>
@@ -2660,7 +3117,7 @@ export function CorporatePOS() {
                         {available < 99 ? `${available}` : "∞"}
                       </span>}
                     </div>
-                    {canMutateCart && qtyInCart > 0 && (
+                    {!productReorderMode && canMutateCart && qtyInCart > 0 && (
                       <div
                         className="mt-2 flex items-center justify-end"
                         onClick={(e) => e.stopPropagation()}
@@ -3507,6 +3964,25 @@ export function CorporatePOS() {
                 )}
               </div>
             </div>
+          </div>,
+          document.body,
+        )}
+
+      {productDragGhost &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[80] w-28 rounded-lg border border-[#14b8a6] bg-white/95 dark:bg-gray-900/95 shadow-2xl p-2 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: productDragGhost.x, top: productDragGhost.y }}
+          >
+            <div className="aspect-square rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800 mb-1 flex items-center justify-center text-2xl">
+              <ProductThumb
+                image={productDragGhost.image}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <p className="text-[10px] font-medium text-gray-900 dark:text-white line-clamp-2 text-center">
+              {productDragGhost.name}
+            </p>
           </div>,
           document.body,
         )}

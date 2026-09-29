@@ -19,13 +19,26 @@ const NUMPAD_KEYS: string[][] = [
   ["0", ".", "backspace"],
 ];
 
+/** Azerbaijani letters shown on the full (QWERTY) touch keyboard (incl. dotless ı). */
+const AZ_LETTERS = "əüöğşçı";
+
 const FULL_ROWS: string[][] = [
   ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
   ["shift", "z", "x", "c", "v", "b", "n", "m", "backspace"],
+  ["ə", "ü", "ö", "ğ", "ş", "ç", "ı"],
 ];
 
+function isLetterKey(key: string): boolean {
+  return /^[a-z]$/.test(key) || AZ_LETTERS.includes(key);
+}
+
+function letterLabel(key: string, shiftOn: boolean): string {
+  if (!isLetterKey(key)) return key;
+  // az locale: i→İ, ı→I (dotless), ə→Ə, etc.
+  return shiftOn ? key.toLocaleUpperCase("az") : key;
+}
 type Pos = { x: number; y: number };
 
 function clampPos(x: number, y: number, w: number, h: number): Pos {
@@ -62,7 +75,7 @@ function TouchKeyboard({
     }
     // Default near bottom-center once opened
     const w = mode === "numpad" ? 320 : 560;
-    const h = mode === "numpad" ? 360 : 320;
+    const h = mode === "numpad" ? 360 : 360;
     setPos((prev) => {
       if (prev) return clampPos(prev.x, prev.y, w, h);
       return clampPos(
@@ -115,8 +128,8 @@ function TouchKeyboard({
       }
 
       let ch = key;
-      if (mode === "full" && /^[a-z]$/.test(key)) {
-        ch = shift ? key.toUpperCase() : key;
+      if (mode === "full" && isLetterKey(key)) {
+        ch = letterLabel(key, shift);
       }
 
       const next = `${value}${ch}`;
@@ -173,8 +186,8 @@ function TouchKeyboard({
         "⇧"
       ) : key === "space" ? (
         "Space"
-      ) : mode === "full" && /^[a-z]$/.test(key) && shift ? (
-        key.toUpperCase()
+      ) : mode === "full" && isLetterKey(key) ? (
+        letterLabel(key, shift)
       ) : (
         key
       );
@@ -252,6 +265,7 @@ function TouchKeyboard({
                   className={cn(
                     "flex gap-1 justify-center",
                     idx === 2 && "px-3",
+                    idx === 4 && "px-6",
                   )}
                 >
                   {row.map((k) =>
@@ -261,6 +275,7 @@ function TouchKeyboard({
                         "flex-1 px-1",
                         k === "shift" && shift && "bg-[#14b8a6]/15 dark:bg-[#14b8a6]/20",
                         k === "backspace" && "max-w-[56px]",
+                        AZ_LETTERS.includes(k) && "min-w-[48px] text-base font-semibold",
                       ),
                     ),
                   )}

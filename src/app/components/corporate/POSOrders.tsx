@@ -462,7 +462,7 @@ export function POSOrders() {
       { key: "date", label: tr("Tarix", "Date"), available: true },
       { key: "source", label: tr("Mənbə", "Source"), available: true },
       { key: "table", label: tr("Masa", "Table"), available: diningEnabled },
-      { key: "kot", label: "KOT", available: diningEnabled },
+      { key: "kot", label: tr("KOT", "KOT"), available: diningEnabled },
       { key: "production", label: tr("İstehsal", "Production"), available: posSendToProductionEnabled },
       { key: "status", label: tr("Status", "Status"), available: true },
       { key: "grandTotal", label: tr("Ümumi", "Total"), available: true },
@@ -501,6 +501,10 @@ export function POSOrders() {
     (col("biller") ? 1 : 0) +
     1; // actions
 
+  const loadGenRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
+  const loadInFlightRef = useRef(false);
+
   const loadItems = useCallback(async (opts?: { silent?: boolean }) => {
     if (!(isAuthenticated || isDemo) || !canView) {
       setOrders([]);
@@ -509,24 +513,37 @@ export function POSOrders() {
       setLoading(false);
       return;
     }
+    // Silent poll must not stack on slow pos-orders responses.
+    if (opts?.silent && loadInFlightRef.current) return;
+
+    loadAbortRef.current?.abort();
+    const ac = new AbortController();
+    loadAbortRef.current = ac;
+    const gen = ++loadGenRef.current;
+    loadInFlightRef.current = true;
+
     if (!opts?.silent) setLoading(true);
     try {
-      const data = await fetchPosOrders({
-        search: debouncedSearch.trim() || undefined,
-        customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
-        status: selectedStatus,
-        paymentStatus: selectedPaymentStatus,
-        paymentMethod: selectedPaymentMethod,
-        source: selectedSource,
-        sortBy,
-        ...rangeQuery,
-        page: currentPage,
-        pageSize: itemsPerPage,
-        ...(diningEnabled ? { kotStatus: selectedKotStatus } : {}),
-        ...(posSendToProductionEnabled
-          ? { productionStatus: selectedProductionStatus }
-          : {}),
-      });
+      const data = await fetchPosOrders(
+        {
+          search: debouncedSearch.trim() || undefined,
+          customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
+          status: selectedStatus,
+          paymentStatus: selectedPaymentStatus,
+          paymentMethod: selectedPaymentMethod,
+          source: selectedSource,
+          sortBy,
+          ...rangeQuery,
+          page: currentPage,
+          pageSize: itemsPerPage,
+          ...(diningEnabled ? { kotStatus: selectedKotStatus } : {}),
+          ...(posSendToProductionEnabled
+            ? { productionStatus: selectedProductionStatus }
+            : {}),
+        },
+        { signal: ac.signal },
+      );
+      if (gen !== loadGenRef.current) return;
       setOrders(
         (data.items ?? []).filter((o) => {
           const src = String(o.source ?? "POS").toUpperCase();
@@ -540,11 +557,16 @@ export function POSOrders() {
       setTotalPages(pages);
       if (pages > 0 && currentPage > pages) setCurrentPage(pages);
     } catch (err) {
+      if (ac.signal.aborted) return;
+      if (gen !== loadGenRef.current) return;
       if (!opts?.silent) {
         notifyFromError(err, tr("Sifarişləri yükləmək alınmadı", "Failed to load orders"));
       }
     } finally {
-      if (!opts?.silent) setLoading(false);
+      if (gen === loadGenRef.current) {
+        loadInFlightRef.current = false;
+        if (!opts?.silent) setLoading(false);
+      }
     }
   }, [
     isDemo,
@@ -571,15 +593,10 @@ export function POSOrders() {
 
   useEffect(() => {
     void loadItems();
+    return () => {
+      loadAbortRef.current?.abort();
+    };
   }, [loadItems]);
-
-  useEffect(() => {
-    if ((!diningEnabled && !webEditorEnabled) || !(isAuthenticated || isDemo) || !canView) return;
-    const id = window.setInterval(() => {
-      void loadItems({ silent: true });
-    }, 8000);
-    return () => window.clearInterval(id);
-  }, [diningEnabled, webEditorEnabled, isAuthenticated, isDemo, canView, loadItems]);
 
   useEffect(() => {
     const orderId = searchParams.get("orderId");
@@ -658,7 +675,7 @@ export function POSOrders() {
     "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight";
 
   const translateStatus = (status: string) => {
-    const key = status.toLowerCase();
+    const key = status.toLowerCase().replace(/\s+/g, "_");
     const statusMap: Record<string, string> = {
       completed: tr("Tamamlandı", "Completed"),
       pending: tr("Gözləyir", "Pending"),
@@ -667,6 +684,8 @@ export function POSOrders() {
       held: tr("Qaralama", "Draft"),
       draft: tr("Qaralama", "Draft"),
       processing: tr("İşlənir", "Processing"),
+      confirmed: tr("Təsdiqləndi", "Confirmed"),
+      shipped: tr("Göndərildi", "Shipped"),
     };
     return statusMap[key] || status;
   };
@@ -680,6 +699,18 @@ export function POSOrders() {
       partial: tr("Qismən", "Partial"),
       refunded: tr("Qaytarılıb", "Refunded"),
       partially_refunded: tr("Qismən qaytarılıb", "Partially Refunded"),
+    };
+    return statusMap[key] || status;
+  };
+
+  const translateKotStatus = (status: string | null | undefined) => {
+    if (!status) return "—";
+    const key = status.toUpperCase();
+    const statusMap: Record<string, string> = {
+      PENDING: tr("Gözləyir", "Pending"),
+      PREPARING: tr("Hazırlanır", "Preparing"),
+      READY: tr("Hazırdır", "Ready"),
+      SERVED: tr("Verildi", "Served"),
     };
     return statusMap[key] || status;
   };
@@ -755,11 +786,11 @@ export function POSOrders() {
           formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
           formatSalesDateTime(order.date, language),
           order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
-          order.status,
+          translateStatus(order.status),
           String(order.grandTotal),
           String(order.paid),
           String(order.due),
-          order.paymentStatus,
+          translatePaymentStatus(order.paymentStatus),
           order.biller,
         ]),
         startY: 28,
@@ -793,11 +824,11 @@ export function POSOrders() {
         formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
         formatSalesDateTime(order.date, language),
         order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
-        order.status,
+        translateStatus(order.status),
         order.grandTotal,
         order.paid,
         order.due,
-        order.paymentStatus,
+        translatePaymentStatus(order.paymentStatus),
         order.biller,
       ]);
       let csvContent = headers.join(";") + "\n";
@@ -1261,10 +1292,10 @@ export function POSOrders() {
                   options={[
                     { value: "all", label: tr("KOT Status", "KOT Status") },
                     { value: "none", label: tr("KOT yox", "No KOT") },
-                    { value: "PENDING", label: "PENDING" },
-                    { value: "PREPARING", label: "PREPARING" },
-                    { value: "READY", label: "READY" },
-                    { value: "SERVED", label: "SERVED" },
+                    { value: "PENDING", label: translateKotStatus("PENDING") },
+                    { value: "PREPARING", label: translateKotStatus("PREPARING") },
+                    { value: "READY", label: translateKotStatus("READY") },
+                    { value: "SERVED", label: translateKotStatus("SERVED") },
                   ]}
                 />
               )}
@@ -1473,7 +1504,7 @@ export function POSOrders() {
                   )}
                   {diningEnabled && col("kot") && (
                     <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
-                      KOT
+                      {tr("KOT", "KOT")}
                     </th>
                   )}
                   {showProductionColumn && (
@@ -1595,7 +1626,7 @@ export function POSOrders() {
                               {sourceTag === "QR Menu"
                                 ? tr("QR Menyu", "QR Menu")
                                 : sourceTag === "Web"
-                                  ? "Web"
+                                  ? tr("Veb", "Web")
                                   : "POS"}
                             </span>
                           )}
@@ -1603,12 +1634,14 @@ export function POSOrders() {
                       )}
                       {diningEnabled && col("table") && (
                         <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
-                          {order.table ? `#${order.table.number}` : "—"}
+                          {order.table
+                            ? order.table.name?.trim() || String(order.table.number)
+                            : "—"}
                         </td>
                       )}
                       {diningEnabled && col("kot") && (
                         <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
-                          {order.kotStatus ?? "—"}
+                          {translateKotStatus(order.kotStatus)}
                         </td>
                       )}
                       {showProductionColumn && (

@@ -37,14 +37,15 @@ function useTr() {
   return (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 }
 
-function statusLabel(language: string, status: WebOrder["status"]): string {
-  const key = language === "az" ? "az" : "en";
-  return STATUS_LABELS[key][status];
+function statusLabel(language: Parameters<typeof pickLang>[0], status: WebOrder["status"]): string {
+  return pickLang(language, STATUS_LABELS.az[status], STATUS_LABELS.en[status]);
 }
 
-function paymentLabel(language: string, status: WebOrder["paymentStatus"]): string {
-  const key = language === "az" ? "az" : "en";
-  return PAYMENT_STATUS_LABELS[key][status];
+function paymentLabel(
+  language: Parameters<typeof pickLang>[0],
+  status: WebOrder["paymentStatus"],
+): string {
+  return pickLang(language, PAYMENT_STATUS_LABELS.az[status], PAYMENT_STATUS_LABELS.en[status]);
 }
 
 function useAnchoredMenu(open: boolean) {

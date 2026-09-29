@@ -5,7 +5,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation } from "react-router";
 import { preloadRoute } from "../../utils/routePreloader";
 import { usePendingReservationCount } from "../../hooks/usePendingReservationCount";
-import { usePendingQrOrderCount } from "../../hooks/usePendingQrOrderCount";
 import { usePendingKotCount } from "../../hooks/usePendingKotCount";
 import {
   LayoutDashboard,
@@ -111,7 +110,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const branchMenuRef = useRef<HTMLDivElement>(null);
   const { badgeCount: newResCount, acknowledge: acknowledgeReservations } = usePendingReservationCount();
-  const { badgeCount: newQrOrderCount, acknowledge: acknowledgeQrOrders } = usePendingQrOrderCount();
   const { badgeCount: newKotCount, acknowledge: acknowledgeKot } = usePendingKotCount();
 
   const companyLogo = getCompanyLogoUrl(user?.tenant, isDarkMode);
@@ -527,7 +525,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         return item;
       })
       .filter((item): item is NavItem => item !== null);
-  }, [hasPermission, hasModule, language, newResCount, newQrOrderCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled]);
+  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled]);
 
   const tenantSlug = user?.tenant?.slug ?? null;
   const myStorePath = tenantSlug ? storePath(tenantSlug) : null;
@@ -691,19 +689,15 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
             );
 
             const isReservations = item.labelKey === "reservations";
-            const isSales = item.labelKey === "sales";
             const isKot = item.labelKey === "kot";
             const showResBadge = isReservations && newResCount > 0;
-            const showQrOrderBadge = isSales && newQrOrderCount > 0;
             const showKotBadge = isKot && newKotCount > 0;
-            const showNavBadge = showResBadge || showQrOrderBadge || showKotBadge;
+            const showNavBadge = showResBadge || showKotBadge;
             const navBadgeCount = showResBadge
               ? newResCount
-              : showQrOrderBadge
-                ? newQrOrderCount
-                : showKotBadge
-                  ? newKotCount
-                  : 0;
+              : showKotBadge
+                ? newKotCount
+                : 0;
 
             const ItemContent = (
               <>
@@ -830,10 +824,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                     {item.subItems.map((subItem) => {
                       const subLabel = subItem.label;
                       const isSubActive = subItem.path === location.pathname;
-                      const isOrdersSub =
-                        isSales && subItem.labelKey === "posOrders";
-                      const showOrdersBadge =
-                        isOrdersSub && newQrOrderCount > 0;
                       return (
                         <Link
                           key={subItem.labelKey}
@@ -847,9 +837,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                             ) {
                               acknowledgeReservations();
                             }
-                            if (isOrdersSub && newQrOrderCount > 0) {
-                              acknowledgeQrOrders();
-                            }
                             onClose?.();
                           }}
                           className={cn(
@@ -860,11 +847,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                           )}
                         >
                           <span className="flex-1 truncate">{subLabel}</span>
-                          {showOrdersBadge && (
-                            <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold shadow-sm animate-pulse shrink-0">
-                              {newQrOrderCount > 9 ? "9+" : newQrOrderCount}
-                            </span>
-                          )}
                         </Link>
                       );
                     })}

@@ -165,26 +165,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const refreshModules = () => {
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = null;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastFocusRefreshAt = 0;
+    const FOCUS_REFRESH_MIN_MS = 5 * 60_000;
+
+    const refreshModules = (force = false) => {
+      if (debounceTimer) return;
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        const now = Date.now();
+        if (!force && now - lastFocusRefreshAt < FOCUS_REFRESH_MIN_MS) return;
+        lastFocusRefreshAt = now;
         // Keep the current session/UI if a transient /auth/me refresh fails.
         void refresh().catch(() => undefined);
       }, 400);
     };
-    window.addEventListener("inflero:module-disabled", refreshModules);
-    const onFocus = () => refreshModules();
+    const onModuleDisabled = () => refreshModules(true);
     const onVisibility = () => {
-      if (document.visibilityState === "visible") refreshModules();
+      if (document.visibilityState === "visible") refreshModules(false);
     };
-    window.addEventListener("focus", onFocus);
+    window.addEventListener("inflero:module-disabled", onModuleDisabled);
+    // visibilitychange alone covers tab return; window focus fires too often (DevTools, etc.)
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      if (timer) clearTimeout(timer);
-      window.removeEventListener("inflero:module-disabled", refreshModules);
-      window.removeEventListener("focus", onFocus);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      window.removeEventListener("inflero:module-disabled", onModuleDisabled);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [refresh]);

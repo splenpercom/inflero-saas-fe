@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from "./client";
+import { apiDelete, apiGet, apiPatch, apiPost, type RequestOptions } from "./client";
 import { salesListQueryString, type SalesListQuery } from "../lib/salesMappers";
 import type { OrderStatusApi, PaymentMethodApi, PurchaseStatusApi } from "../lib/salesMappers";
 
@@ -367,7 +367,7 @@ export async function updateSalesBiller(
   return res.data;
 }
 
-export async function fetchPosOrders(query: SalesListQuery = {}) {
+export async function fetchPosOrders(query: SalesListQuery = {}, opts?: RequestOptions) {
   const res = await apiGet<{
     success: boolean;
     data: {
@@ -377,7 +377,7 @@ export async function fetchPosOrders(query: SalesListQuery = {}) {
       pageSize: number;
       totalPages: number;
     };
-  }>(`/tenant/sales/pos-orders${salesListQueryString(query)}`);
+  }>(`/tenant/sales/pos-orders${salesListQueryString(query)}`, opts);
   return res.data;
 }
 

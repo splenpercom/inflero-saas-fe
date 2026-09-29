@@ -65,6 +65,11 @@ export function getBranchStoreId(): string | null {
 }
 
 export function setBranchStoreId(id: string | null): void {
+  const prev = branchStoreId !== undefined ? branchStoreId : readBranchFromStorage();
+  if (prev === id) {
+    branchStoreId = id;
+    return;
+  }
   branchStoreId = id;
   try {
     const key = branchStorageKey();
