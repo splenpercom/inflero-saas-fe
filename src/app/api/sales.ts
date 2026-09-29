@@ -402,7 +402,7 @@ export async function sendPosOrderToKot(body: CreatePosOrderBody) {
   return res.data;
 }
 
-/** Same as KOT flow, tagged BAR; client prints via billing/receipt printer. */
+/** Same as KOT flow, tagged BAR; client prints via mapped BAR printer (fallback: bill). */
 export async function sendPosOrderToBar(body: CreatePosOrderBody) {
   const res = await apiPost<{ success: boolean; data: PosOrderDetail }>("/tenant/sales/pos/send-to-bar", body);
   return res.data;

@@ -5,6 +5,8 @@ export type PaperWidthMm = 58 | 80;
 export type PosPrinterSettings = {
   receiptPrinter: string;
   kotPrinter: string;
+  /** Bar ticket printer (Dining + Send to Bar). Falls back to receipt when empty. */
+  barPrinter: string;
   paperWidthMm: PaperWidthMm;
   /** Prefer QZ Tray silent print when connected; else browser dialog. */
   preferQz: boolean;
@@ -16,6 +18,7 @@ const settingsKey = (terminalId: string) => `inflero.pos.printers.v1.${terminalI
 const DEFAULT_SETTINGS: PosPrinterSettings = {
   receiptPrinter: "",
   kotPrinter: "",
+  barPrinter: "",
   paperWidthMm: 80,
   preferQz: true,
 };
@@ -47,6 +50,7 @@ export function loadPosPrinterSettings(): PosPrinterSettings {
     return {
       receiptPrinter: typeof parsed.receiptPrinter === "string" ? parsed.receiptPrinter : "",
       kotPrinter: typeof parsed.kotPrinter === "string" ? parsed.kotPrinter : "",
+      barPrinter: typeof parsed.barPrinter === "string" ? parsed.barPrinter : "",
       paperWidthMm: parsed.paperWidthMm === 58 ? 58 : 80,
       preferQz: parsed.preferQz !== false,
     };
@@ -59,6 +63,7 @@ export function savePosPrinterSettings(next: PosPrinterSettings): void {
   const clean: PosPrinterSettings = {
     receiptPrinter: next.receiptPrinter.trim(),
     kotPrinter: next.kotPrinter.trim(),
+    barPrinter: next.barPrinter.trim(),
     paperWidthMm: next.paperWidthMm === 58 ? 58 : 80,
     preferQz: next.preferQz !== false,
   };

@@ -1176,8 +1176,8 @@ export function Settings() {
                       </p>
                       <p className="text-[10px] text-gray-400 mt-0.5">
                         {pt(
-                          "When on, POS shows Send To Bar & Print. Orders are tagged BAR, appear on the KOT board, and print from the billing printer.",
-                          "Aktiv olduqda POS-da BAR-a göndər & çap görünür. Sifarişlər BAR etiketi alır, KOT lövhəsində görünür və qəbz printerindən çap olunur.",
+                          "When on, POS shows Send To Bar & Print. Orders are tagged BAR, appear on the KOT board, and print from the BAR printer (falls back to bill printer if unset).",
+                          "Aktiv olduqda POS-da BAR-a göndər & çap görünür. Sifarişlər BAR etiketi alır, KOT lövhəsində görünür və BAR printerindən çap olunur (təyin olunmayıbsa qəbz printeri).",
                         )}
                       </p>
                     </div>
@@ -1249,8 +1249,8 @@ export function Settings() {
                   </h2>
                   <p className="text-[10px] text-gray-400 mt-0.5">
                     {pt(
-                      "Map receipt and KOT printers for this PC/terminal. Silent print via QZ Tray.",
-                      "Bu kompüter/terminal üçün qəbz və KOT printerlərini təyin edin. QZ Tray ilə səssiz çap.",
+                      "Map receipt, KOT, and BAR printers for this PC/terminal. Silent print via QZ Tray.",
+                      "Bu kompüter/terminal üçün qəbz, KOT və BAR printerlərini təyin edin. QZ Tray ilə səssiz çap.",
                     )}
                   </p>
                 </div>

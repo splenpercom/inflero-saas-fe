@@ -141,14 +141,17 @@ function browserPrintHtml(html: string): Promise<void> {
 /**
  * Resolve QZ target:
  * - KOT → kitchen, then billing
- * - receipt/bar → billing, then kitchen (so a single mapped printer still prints bills)
+ * - bar → bar, then billing, then kitchen
+ * - receipt → billing, then kitchen (so a single mapped printer still prints bills)
  */
 export function resolvePosPrinterName(role: PosPrintRole): string {
   const settings = loadPosPrinterSettings();
   const receipt = settings.receiptPrinter.trim();
   const kot = settings.kotPrinter.trim();
+  const bar = settings.barPrinter.trim();
   if (role === "kot") return kot || receipt;
-  return receipt || kot;
+  if (role === "bar") return bar || receipt || kot;
+  return receipt || kot || bar;
 }
 
 function payloadForChannel(

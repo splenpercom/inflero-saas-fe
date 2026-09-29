@@ -541,16 +541,24 @@ function ThermalReceipt({
             >
               {pickLang(
                 language,
-                printerMap.receiptPrinter
-                  ? printerMap.kotPrinter
-                    ? `Printerlər: ${printerMap.receiptPrinter} / ${printerMap.kotPrinter}`
-                    : `Printer: ${printerMap.receiptPrinter}`
-                  : "Printerləri təyin et (QZ Tray)",
-                printerMap.receiptPrinter
-                  ? printerMap.kotPrinter
-                    ? `Printers: ${printerMap.receiptPrinter} / ${printerMap.kotPrinter}`
-                    : `Printer: ${printerMap.receiptPrinter}`
-                  : "Configure printers (QZ Tray)",
+                (() => {
+                  const parts = [
+                    printerMap.receiptPrinter,
+                    printerMap.kotPrinter,
+                    printerMap.barPrinter,
+                  ].filter((p) => p?.trim());
+                  if (parts.length === 0) return "Printerləri təyin et (QZ Tray)";
+                  return `Printerlər: ${parts.join(" / ")}`;
+                })(),
+                (() => {
+                  const parts = [
+                    printerMap.receiptPrinter,
+                    printerMap.kotPrinter,
+                    printerMap.barPrinter,
+                  ].filter((p) => p?.trim());
+                  if (parts.length === 0) return "Configure printers (QZ Tray)";
+                  return `Printers: ${parts.join(" / ")}`;
+                })(),
               )}
             </button>
           </div>
