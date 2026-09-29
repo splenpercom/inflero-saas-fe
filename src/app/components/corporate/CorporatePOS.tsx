@@ -1403,7 +1403,9 @@ export function CorporatePOS() {
   }, [categoryOrderStorageKey]);
 
   useEffect(() => {
-    setProductOrder(loadPosIdOrder(productOrderStorageKey));
+    const loaded = loadPosIdOrder(productOrderStorageKey);
+    productOrderRef.current = loaded;
+    setProductOrder(loaded);
   }, [productOrderStorageKey]);
 
   const persistCategoryOrder = useCallback(
@@ -1509,12 +1511,16 @@ export function CorporatePOS() {
 
   const endProductPointerDrag = useCallback(() => {
     const session = productDragSessionRef.current;
+    const hadSession = !!session;
     if (session?.raf != null) cancelAnimationFrame(session.raf);
     productDragSessionRef.current = null;
     setDragProductId(null);
     setDragOverProductId(null);
     setProductDragGhost(null);
-    savePosIdOrder(productOrderStorageKey, productOrderRef.current);
+    // Only persist after a real drag — never overwrite storage with [] on mount/exit.
+    if (hadSession) {
+      savePosIdOrder(productOrderStorageKey, productOrderRef.current);
+    }
   }, [productOrderStorageKey]);
 
   const processProductPointerMove = useCallback(() => {
