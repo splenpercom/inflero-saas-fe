@@ -22,6 +22,7 @@ import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { fetchProduct, type ProductDetail } from "../../api/inventory";
 import { notifyFromError } from "../../lib/toast";
+import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { formatDate } from "../../lib/dateFormat";
 import {
   resolveProductsListReturn,
@@ -253,25 +254,11 @@ export function ProductDetails() {
   };
 
   const printBarcode = () => {
-    if (!barcode) return;
-    const printWindow = window.open("", "", "height=400,width=600");
-    if (printWindow) {
-      printWindow.document.write("<html><head><title>Print Barcode</title>");
-      printWindow.document.write(
-        "<style>body{font-family: Arial, sans-serif; text-align: center; padding: 40px;}</style>",
-      );
-      printWindow.document.write("</head><body>");
-      printWindow.document.write(`<svg id="bc"></svg>`);
-      printWindow.document.write(
-        `<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>`,
-      );
-      printWindow.document.write(
-        `<script>JsBarcode("#bc", ${JSON.stringify(barcode)}, {format:"CODE128",width:2,height:60,displayValue:true});<\/script>`,
-      );
-      printWindow.document.write("</body></html>");
-      printWindow.document.close();
-      setTimeout(() => printWindow.print(), 400);
-    }
+    if (!barcode || !barcodeRef.current) return;
+    void printBarcodeLabel({
+      barcodeSvgHtml: barcodeRef.current.outerHTML,
+      priceLabel: formatBarcodePriceLabel(String(product?.price ?? "")),
+    }).catch((err) => notifyFromError(err));
   };
 
   if (loading) {

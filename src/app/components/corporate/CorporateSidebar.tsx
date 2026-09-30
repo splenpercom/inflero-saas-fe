@@ -26,7 +26,6 @@ import {
   LayoutGrid,
   ClipboardList,
   FileBarChart,
-  Puzzle,
   ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -132,7 +131,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       employees: { en: "Employee", az: "İşçi" },
       userRoles: { en: "User roles", az: "İstifadəçi rolları" },
       settings: { en: "Settings", az: "Parametrlər" },
-      plugins: { en: "Plugins", az: "Plaginlər" },
       reservations: { en: "Bookings", az: "Rezervasiyalar" },
       reservationsList: { en: "Bookings", az: "Rezervasiyalar" },
       serviceTypes: { en: "Service Types", az: "Xidmət Növləri" },
@@ -149,10 +147,10 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       bookATable: { en: "Book a Table", az: "Masa Rezervasiya" },
       
       // Inventory Sub-items
-      products: { en: "Products/Services", az: "Məhsullar/Xidmətlər" },
+      products: { en: "Products", az: "Məhsullar" },
       services: { en: "Services", az: "Xidmətlər" },
       createProduct: { en: "Create", az: "Yarat" },
-      expiredProducts: { en: "Expired Products/Services", az: "Vaxtı Keçmiş Məhsullar/Xidmətlər" },
+      expiredProducts: { en: "Expired Products", az: "Vaxtı Keçmiş Məhsullar" },
       lowStocks: { en: "Low Stocks", az: "Tükənən" },
       category: { en: "Category", az: "Kateqoriya" },
       subCategory: { en: "Sub Category", az: "Alt Kateqoriya" },
@@ -180,8 +178,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       // Finances Sub-items
       financeExpenses: { en: "Expenses", az: "Xərclər" },
       income: { en: "Income", az: "Gəlir" },
-      bankAccounts: { en: "Bank Accounts", az: "Bank Hesabları" },
-      trialBalance: { en: "Trial Balance", az: "Sınaq Balansı" },
       
       // Users Sub-items
       peopleCustomers: { en: "Customers", az: "Müştərilər" },
@@ -259,7 +255,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       employees: Users,
       userRoles: Users,
       warehouses: Building2,
-      plugins: Puzzle,
       settings: Settings,
       myWebsite: Globe,
     };
@@ -307,12 +302,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       subItems: [
         { labelKey: "products", label: st("products"), path: "/dashboard/inventory/products" },
         { labelKey: "services", label: st("services"), path: "/dashboard/inventory/services" },
-        {
-          labelKey: "createProduct",
-          label: st("createProduct"),
-          path: "/dashboard/inventory/products/create",
-          permissionAction: "create",
-        },
         { labelKey: "expiredProducts", label: st("expiredProducts"), path: "/dashboard/inventory/products/expired" },
         { labelKey: "lowStocks", label: st("lowStocks"), path: "/dashboard/inventory/products/low-stocks" },
         { labelKey: "category", label: st("category"), path: "/dashboard/inventory/category" },
@@ -361,8 +350,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       subItems: [
         { labelKey: "financeExpenses", label: st("financeExpenses"), path: "/dashboard/finances/expenses" },
         { labelKey: "income", label: st("income"), path: "/dashboard/finances/income" },
-        { labelKey: "bankAccounts", label: st("bankAccounts"), path: "/dashboard/finances/bank-accounts" },
-        { labelKey: "trialBalance", label: st("trialBalance"), path: "/dashboard/finances/trial-balance" },
       ],
     },
     {
@@ -391,14 +378,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       icon: BarChart3,
       labelKey: "reports",
       label: st("reports"),
+      path: "/dashboard/reports",
       permissionModule: "Reports",
-      subItems: [
-        { labelKey: "salesReport", label: st("salesReport"), path: "/dashboard/reports/sales" },
-        { labelKey: "employeeSalesReport", label: st("employeeSalesReport"), path: "/dashboard/reports/employee-sales" },
-        { labelKey: "financeReport", label: st("financeReport"), path: "/dashboard/reports/finance" },
-        { labelKey: "productReport", label: st("productReport"), path: "/dashboard/reports/product" },
-        { labelKey: "annualReport", label: st("annualReport"), path: "/dashboard/reports/annual" },
-      ],
     },
     {
       icon: CalendarDays,
@@ -450,14 +431,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "Dining",
     },
     {
-      icon: Puzzle,
-      labelKey: "plugins",
-      label: st("plugins"),
-      path: "/dashboard/plugins",
-      permissionModule: "Settings",
-      ownerOnly: true,
-    },
-    {
       icon: Settings,
       labelKey: "settings",
       label: st("settings"),
@@ -475,7 +448,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
     return itemsToFilter
       .map((item) => {
         if (item.ownerOnly && !user?.isTenantOwner && !isDemo) return null;
-        if (item.labelKey === "plugins" && !user?.isTenantOwner && !isDemo) return null;
         if (item.labelKey === "stock" && !hasModule("STOCK")) return null;
         if (item.labelKey === "reservations" && !hasModule("RESERVATIONS")) return null;
         if (["myWebsite", "webReports"].includes(item.labelKey) && !hasModule("WEB_EDITOR")) return null;

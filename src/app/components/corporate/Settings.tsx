@@ -136,6 +136,7 @@ export function Settings() {
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
   const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
   const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
+  const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [billers, setBillers] = useState<SalesBillerRow[]>([]);
   const [commissionDrafts, setCommissionDrafts] = useState<Record<string, CommissionDraft>>({});
@@ -148,6 +149,7 @@ export function Settings() {
     posSendToBarEnabled: boolean;
     posBarBillShowPricesEnabled: boolean;
     posPrintProductBrandEnabled: boolean;
+    posQrOrderAlarmEnabled: boolean;
     inventoryServicesEnabled: boolean;
     billers: SalesBillerRow[];
   } | null>(null);
@@ -201,6 +203,7 @@ export function Settings() {
       diningEnabled && data.posBarBillShowPricesEnabled === true,
     );
     setPosPrintProductBrandEnabled(data.posPrintProductBrandEnabled === true);
+    setPosQrOrderAlarmEnabled(diningEnabled && data.posQrOrderAlarmEnabled !== false);
     setInventoryServicesEnabled(data.inventoryServicesEnabled === true);
     setSavedLogoUrl(data.companyLogo);
     setLogoFile(null);
@@ -248,6 +251,7 @@ export function Settings() {
           posSendToBarEnabled: data.posSendToBarEnabled === true,
           posBarBillShowPricesEnabled: data.posBarBillShowPricesEnabled === true,
           posPrintProductBrandEnabled: data.posPrintProductBrandEnabled === true,
+          posQrOrderAlarmEnabled: data.posQrOrderAlarmEnabled !== false,
           inventoryServicesEnabled: data.inventoryServicesEnabled === true,
           billers: billerRows,
         };
@@ -430,6 +434,7 @@ export function Settings() {
                 ? {
                     posSendToBarEnabled,
                     posBarBillShowPricesEnabled,
+                    posQrOrderAlarmEnabled,
                   }
                 : {}),
             }
@@ -472,6 +477,7 @@ export function Settings() {
         posSendToBarEnabled,
         posBarBillShowPricesEnabled,
         posPrintProductBrandEnabled,
+        posQrOrderAlarmEnabled,
         inventoryServicesEnabled,
         billers: refreshedBillers,
       };
@@ -524,6 +530,7 @@ export function Settings() {
         setPosSendToBarEnabled(addonSnapshotRef.current.posSendToBarEnabled);
         setPosBarBillShowPricesEnabled(addonSnapshotRef.current.posBarBillShowPricesEnabled);
         setPosPrintProductBrandEnabled(addonSnapshotRef.current.posPrintProductBrandEnabled);
+        setPosQrOrderAlarmEnabled(addonSnapshotRef.current.posQrOrderAlarmEnabled);
         setInventoryServicesEnabled(addonSnapshotRef.current.inventoryServicesEnabled);
         applyBillerDrafts(addonSnapshotRef.current.billers);
       }
@@ -541,7 +548,7 @@ export function Settings() {
     }
   }, [addonsEnabled, posEnabled, diningEnabled, activeSection, searchParams, setSearchParams]);
 
-  // Hide / clear Bar add-ons when Dining is not on this tenant.
+  // Hide / clear Bar / QR alarm add-ons when Dining is not on this tenant.
   useEffect(() => {
     if (!diningEnabled && posSendToBarEnabled) {
       setPosSendToBarEnabled(false);
@@ -549,7 +556,10 @@ export function Settings() {
     if (!diningEnabled && posBarBillShowPricesEnabled) {
       setPosBarBillShowPricesEnabled(false);
     }
-  }, [diningEnabled, posSendToBarEnabled, posBarBillShowPricesEnabled]);
+    if (!diningEnabled && posQrOrderAlarmEnabled) {
+      setPosQrOrderAlarmEnabled(false);
+    }
+  }, [diningEnabled, posSendToBarEnabled, posBarBillShowPricesEnabled, posQrOrderAlarmEnabled]);
 
   const navItemClass = (section: SettingsSection) =>
     `w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
@@ -1172,6 +1182,35 @@ export function Settings() {
                   <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
                     <div>
                       <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("QR order ringtone", "QR sifariş zəngi")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, POS plays a soft chime and opens the pending QR orders popup when a new QR menu order arrives.",
+                          "Aktiv olduqda yeni QR menyu sifarişi gələndə POS yumşaq zəng çalır və gözləyən QR sifarişlər pəncərəsini açır.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => setPosQrOrderAlarmEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        posQrOrderAlarmEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={posQrOrderAlarmEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          posQrOrderAlarmEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
                         {pt("Send To Bar & Print", "BAR-a göndər & çap")}
                       </p>
                       <p className="text-[10px] text-gray-400 mt-0.5">
@@ -1249,8 +1288,8 @@ export function Settings() {
                   </h2>
                   <p className="text-[10px] text-gray-400 mt-0.5">
                     {pt(
-                      "Map receipt, KOT, and BAR printers for this PC/terminal. Silent print via QZ Tray.",
-                      "Bu kompüter/terminal üçün qəbz, KOT və BAR printerlərini təyin edin. QZ Tray ilə səssiz çap.",
+                      "Map receipt, KOT, BAR, and barcode printers for this PC/terminal. Silent print via QZ Tray.",
+                      "Bu kompüter/terminal üçün qəbz, KOT, BAR və barkod printerlərini təyin edin. QZ Tray ilə səssiz çap.",
                     )}
                   </p>
                 </div>

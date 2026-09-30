@@ -240,7 +240,7 @@ const DEMO_POS_ORDERS = [
     customerId: "cust-1",
     customerAvatar: "",
     customerName: "Carl Evans",
-    reference: "POS-1001",
+    reference: "IN0001",
     date: NOW,
     status: "Completed",
     grandTotal: 1240,
@@ -255,7 +255,7 @@ const DEMO_POS_ORDERS = [
     customerId: "cust-2",
     customerAvatar: "",
     customerName: "Minerva Rameriz",
-    reference: "POS-1002",
+    reference: "IN0002",
     date: "2026-06-15T14:30:00.000Z",
     status: "Pending",
     grandTotal: 860,
@@ -663,6 +663,7 @@ function billerReportResult() {
         paidAmount: 5980,
         dueAmount: 320,
         unpaidAmount: 120,
+        commissionAmount: 0,
         itemsSold: 52,
         avgOrderValue: 458.57,
         uniqueProducts: 18,
@@ -681,6 +682,7 @@ function billerReportResult() {
         paidAmount: 3440,
         dueAmount: 260,
         unpaidAmount: 100,
+        commissionAmount: 0,
         itemsSold: 34,
         avgOrderValue: 380,
         uniqueProducts: 12,
@@ -691,6 +693,25 @@ function billerReportResult() {
         ],
       },
     ],
+  };
+}
+
+function reportsOverviewResult() {
+  return {
+    dateFrom: "2026-06-01",
+    dateTo: "2026-06-16",
+    totalIncome: "4500.00",
+    totalExpenses: "1200.00",
+    profit: "3300.00",
+    totalOrders: "4500.00",
+    paid: "3900.00",
+    unpaid: "600.00",
+    paymentType: { cash: 55, card: 45 },
+    purchases: "1200.00",
+    purchasesPaid: "800.00",
+    purchasesDebt: "400.00",
+    avgMonthlyRevenue: "90.57",
+    yoyGrowthPercent: null,
   };
 }
 
@@ -969,6 +990,7 @@ const DEMO_TENANT_SETTINGS = {
   posSendToBarEnabled: false,
   posBarBillShowPricesEnabled: false,
   posPrintProductBrandEnabled: false,
+  posQrOrderAlarmEnabled: true,
 };
 
 /**
@@ -987,6 +1009,7 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
     const period = (params.get("period") ?? "1M") as "1D" | "1W" | "1M" | "1Y";
     return ok(buildDemoDashboardSummary(period));
   }
+  if (pathname === "/tenant/reports/overview") return ok(reportsOverviewResult());
 
   // Inventory
   if (pathname === "/tenant/inventory/categories") return ok(DEMO_CATEGORIES);
@@ -1073,7 +1096,7 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
             due: 0,
             paymentStatus: "Paid",
             storeId: DEMO_STORE_ID,
-            posOrderReference: "POS-1001",
+            posOrderReference: "IN0001",
             restocked: true,
           },
         ],
@@ -1099,7 +1122,7 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
       due: "0",
       paymentStatus: "Paid",
       posOrderId: "pos-1",
-      posOrderReference: "POS-1001",
+      posOrderReference: "IN0001",
       restocked: true,
       payments: [],
       items: [
@@ -1201,21 +1224,6 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
     const page = Number(params.get("page") ?? 1);
     const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(DEMO_INCOMES, page, pageSize));
-  }
-  if (pathname === "/tenant/finance/reports/trial-balance") {
-    return ok({
-      dateFrom: params.get("dateFrom") ?? "2026-01-01",
-      dateTo: params.get("dateTo") ?? DATE,
-      totalDebit: "18400.00",
-      totalCredit: "18400.00",
-      items: [
-        { accountId: "ba-1", code: "1000", name: "Cash & Bank", type: "ASSET", debit: "12480.00", credit: "0" },
-        { accountId: "ba-2", code: "1100", name: "Petty Cash", type: "ASSET", debit: "4320.00", credit: "0" },
-        { accountId: "rev-1", code: "4000", name: "Revenue", type: "INCOME", debit: "0", credit: "15200.00" },
-        { accountId: "exp-1", code: "5000", name: "Expenses", type: "EXPENSE", debit: "6840.00", credit: "0" },
-        { accountId: "eq-1", code: "3000", name: "Equity", type: "EQUITY", debit: "0", credit: "3640.00" },
-      ],
-    });
   }
   if (pathname === "/tenant/finance/reports/profit-loss") return ok(profitLossResult());
   if (pathname === "/tenant/finance/reports/expense") {
@@ -1323,7 +1331,7 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
         ? [
             {
               posOrderId: "pos-2",
-              reference: "POS-1002",
+              reference: "IN0002",
               date: "2026-06-15T14:30:00.000Z",
               customerName: "Minerva Rameriz",
               grandTotal: "860",

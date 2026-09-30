@@ -11,7 +11,7 @@ import {
   type ThermalReceiptPayload,
 } from "./thermalReceipt";
 
-export type PosPrintRole = "receipt" | "kot" | "bar";
+export type PosPrintRole = "receipt" | "kot" | "bar" | "barcode";
 
 export type PosPrintResult = {
   channel: "qz" | "browser";
@@ -142,6 +142,7 @@ function browserPrintHtml(html: string): Promise<void> {
  * Resolve QZ target:
  * - KOT → kitchen, then billing
  * - bar → bar, then billing, then kitchen
+ * - barcode → barcode label printer, then billing
  * - receipt → billing, then kitchen (so a single mapped printer still prints bills)
  */
 export function resolvePosPrinterName(role: PosPrintRole): string {
@@ -149,9 +150,11 @@ export function resolvePosPrinterName(role: PosPrintRole): string {
   const receipt = settings.receiptPrinter.trim();
   const kot = settings.kotPrinter.trim();
   const bar = settings.barPrinter.trim();
+  const barcode = settings.barcodePrinter.trim();
   if (role === "kot") return kot || receipt;
   if (role === "bar") return bar || receipt || kot;
-  return receipt || kot || bar;
+  if (role === "barcode") return barcode || receipt || kot || bar;
+  return receipt || kot || bar || barcode;
 }
 
 function payloadForChannel(
@@ -308,6 +311,86 @@ export async function printThermalHtml(opts: {
       printer: printer || undefined,
       fellBackFromQz: wantQz,
     };
+  });
+}
+
+function escapePrintHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Format sale price for barcode label (under the bars). */
+export function formatBarcodePriceLabel(price: string): string {
+  const trimmed = price.trim();
+  if (!trimmed) return "";
+  const n = Number(trimmed.replace(",", "."));
+  if (Number.isFinite(n)) {
+    return n.toFixed(2);
+  }
+  return trimmed;
+}
+
+export function buildBarcodeLabelHtml(opts: {
+  barcodeSvgHtml: string;
+  priceLabel: string;
+}): string {
+  const price = escapePrintHtml(opts.priceLabel.trim());
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Barcode</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, sans-serif;
+      }
+      .barcode-container {
+        text-align: center;
+        padding: 8px;
+      }
+      .price {
+        margin-top: 6px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #111;
+      }
+      @media print {
+        body { padding: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="barcode-container">
+      ${opts.barcodeSvgHtml}
+      ${price ? `<div class="price">${price}</div>` : ""}
+    </div>
+  </body>
+</html>`;
+}
+
+/** Print a product barcode label to the mapped barcode printer (QZ or browser). */
+export async function printBarcodeLabel(opts: {
+  barcodeSvgHtml: string;
+  priceLabel: string;
+  forceBrowser?: boolean;
+}): Promise<PosPrintResult> {
+  const html = buildBarcodeLabelHtml({
+    barcodeSvgHtml: opts.barcodeSvgHtml,
+    priceLabel: opts.priceLabel,
+  });
+  return printThermalHtml({
+    role: "barcode",
+    html,
+    forceBrowser: opts.forceBrowser,
   });
 }
 

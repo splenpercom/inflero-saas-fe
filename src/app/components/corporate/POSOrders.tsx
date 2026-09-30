@@ -783,7 +783,7 @@ export function POSOrders() {
         ],
         body: exportOrders.map((order) => [
           order.customerName,
-          formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
+          formatOrderDisplayId(order.reference, order.storeName, order.storeCode, user?.tenant?.name),
           formatSalesDateTime(order.date, language),
           order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
           translateStatus(order.status),
@@ -821,7 +821,7 @@ export function POSOrders() {
       ];
       const rows = exportOrders.map((order) => [
         order.customerName,
-        formatOrderDisplayId(order.reference, order.storeName, order.storeCode),
+        formatOrderDisplayId(order.reference, order.storeName, order.storeCode, user?.tenant?.name),
         formatSalesDateTime(order.date, language),
         order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
         translateStatus(order.status),
@@ -1597,7 +1597,7 @@ export function POSOrders() {
                       )}
                       {col("id") && (
                         <td className="px-4 py-3 text-xs text-gray-900 dark:text-white whitespace-nowrap">
-                          {formatOrderDisplayId(order.reference, order.storeName, order.storeCode)}
+                          {formatOrderDisplayId(order.reference, order.storeName, order.storeCode, user?.tenant?.name)}
                         </td>
                       )}
                       {col("date") && (

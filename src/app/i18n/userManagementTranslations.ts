@@ -121,8 +121,6 @@ export const userManagementTranslations = {
     // Finances sub-items
     expenses: "Expenses",
     income: "Income",
-    bankaccounts: "Bank Accounts",
-    trialbalance: "Trial Balance",
 
     // People sub-items
     customers: "Customers",
@@ -319,8 +317,6 @@ export const userManagementTranslations = {
     // Finances sub-items
     expenses: "Xərclər",
     income: "Gəlir",
-    bankaccounts: "Bank Hesabları",
-    trialbalance: "Sınaq Balansı",
 
     // People sub-items
     customers: "Müştərilər",
@@ -484,8 +480,6 @@ export const userManagementTranslations = {
     purchasereturn: "Возврат закупки",
     expenses: "Расходы",
     income: "Доходы",
-    bankaccounts: "Банковские счета",
-    trialbalance: "Пробный баланс",
     customers: "Клиенты",
     suppliers: "Поставщики",
     warehouses: "Склады",

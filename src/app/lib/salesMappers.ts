@@ -98,39 +98,51 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   return s ? `?${s}` : "";
 }
 
-/** Branch initials from store name (e.g. "Filial 1 - Demo" → "F1D") or code fallback. */
+/** First 2 Latin letters from a name (e.g. "Inflero" → "IN"). */
+export function orderIdLettersFromName(
+  name: string | null | undefined,
+  fallback?: string | null,
+): string {
+  const letters = (s: string | null | undefined) =>
+    (s ?? "").replace(/[^A-Za-z]/g, "").toUpperCase();
+  let out = letters(name).slice(0, 2);
+  if (out.length < 2) {
+    out = (out + letters(fallback) + "OR").slice(0, 2);
+  }
+  return out;
+}
+
+/** @deprecated Prefer orderIdLettersFromName — kept for older call sites. */
 export function branchInitialsFromStore(
   name: string | null | undefined,
   code: string | null | undefined,
 ): string {
-  const n = (name ?? "").trim();
-  if (n) {
-    const parts = n
-      .replace(/[^\w\u00C0-\u024F\s-]/gi, " ")
-      .split(/[\s/_-]+/)
-      .filter(Boolean);
-    const init = parts
-      .map((w) => (/^\d+$/.test(w) ? w : w.charAt(0)))
-      .join("")
-      .toUpperCase()
-      .slice(0, 4);
-    if (init) return init;
-  }
-  const c = (code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-  return c.slice(0, 4) || "BR";
+  return orderIdLettersFromName(name, code);
 }
 
-/** Display order ID with branch initials prefix (adds prefix for legacy SL### refs). */
+/**
+ * Short display order ID: 2 letters + 4 digits (IN0001).
+ * Compacts legacy refs like F1D-SL048 / SL048 when possible.
+ */
 export function formatOrderDisplayId(
   reference: string,
   storeName?: string | null,
   storeCode?: string | null,
+  tenantName?: string | null,
 ): string {
   if (!reference || reference === "—") return reference;
-  if (/^[A-Z0-9]{1,4}-/i.test(reference)) return reference;
-  const initials = branchInitialsFromStore(storeName, storeCode);
-  if (!initials) return reference;
-  return `${initials}-${reference}`;
+  const ref = reference.trim();
+  if (/^[A-Za-z]{2}\d{4,}$/.test(ref)) return ref.toUpperCase();
+
+  const numMatch = ref.match(/(?:SL)?(\d+)$/i);
+  if (numMatch) {
+    const prefix =
+      orderIdLettersFromName(tenantName, storeName) ||
+      orderIdLettersFromName(storeName, storeCode) ||
+      "OR";
+    return `${prefix}${numMatch[1].padStart(4, "0")}`;
+  }
+  return ref;
 }
 
 /** Human source tag: POS counter, web store, or QR menu (dining). */

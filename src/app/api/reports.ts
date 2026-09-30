@@ -233,3 +233,53 @@ export async function fetchProductQuantityAlert(query: ProductReportQuery = {}):
   );
   return res.data?.items ?? [];
 }
+
+// --- Consolidated overview ---
+
+export interface ReportsOverview {
+  dateFrom: string;
+  dateTo: string;
+  totalIncome: string;
+  totalExpenses: string;
+  profit: string;
+  totalOrders: string;
+  paid: string;
+  unpaid: string;
+  paymentType: { cash: number; card: number };
+  purchases: string;
+  purchasesPaid: string;
+  purchasesDebt: string;
+  avgMonthlyRevenue: string | null;
+  yoyGrowthPercent: number | null;
+}
+
+export type ReportsOverviewQuery = {
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+const EMPTY_OVERVIEW: ReportsOverview = {
+  dateFrom: "",
+  dateTo: "",
+  totalIncome: "0.00",
+  totalExpenses: "0.00",
+  profit: "0.00",
+  totalOrders: "0.00",
+  paid: "0.00",
+  unpaid: "0.00",
+  paymentType: { cash: 0, card: 0 },
+  purchases: "0.00",
+  purchasesPaid: "0.00",
+  purchasesDebt: "0.00",
+  avgMonthlyRevenue: null,
+  yoyGrowthPercent: null,
+};
+
+export async function fetchReportsOverview(
+  query: ReportsOverviewQuery = {},
+): Promise<ReportsOverview> {
+  const res = await apiGet<ApiEnvelope<ReportsOverview>>(
+    `/tenant/reports/overview${reportQueryString(query)}`,
+  );
+  return res.data ?? EMPTY_OVERVIEW;
+}

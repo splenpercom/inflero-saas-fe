@@ -19,6 +19,7 @@ import {
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
 import { resolveProductsListReturn, PRODUCTS_LIST_PATH } from "../../lib/productsNavigation";
+import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { ModernSelect } from "../ui/ModernSelect";
 import { ModernMultiSelect } from "../ui/ModernMultiSelect";
@@ -92,18 +93,18 @@ export function EditProduct() {
   const pt = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
       title: { en: "Edit", az: "Redaktə et" },
-      subtitle: { en: "Update product or service information", az: "Məhsul və ya xidmət məlumatını yeniləyin" },
-      backToProduct: { en: "Back to Products/Services", az: "Məhsullar/Xidmətlərə Geri" },
-      productInformation: { en: "Product/Service Information", az: "Məhsul/Xidmət Məlumatı" },
+      subtitle: { en: "Update product information", az: "Məhsul məlumatını yeniləyin" },
+      backToProduct: { en: "Back to Products", az: "Məhsullara Geri" },
+      productInformation: { en: "Product Information", az: "Məhsul Məlumatı" },
       pricingStocks: { en: "Pricing & Stocks", az: "Qiymət və Ehtiyatlar" },
       images: { en: "Images", az: "Şəkillər" },
       customFields: { en: "Custom Fields", az: "Xüsusi Sahələr" },
-      productName: { en: "Product/Service Name", az: "Məhsul/Xidmət Adı" },
+      productName: { en: "Product Name", az: "Məhsul Adı" },
       category: { en: "Category", az: "Kateqoriya" },
       subCategory: { en: "Sub Categories", az: "Alt Kateqoriyalar" },
       brand: { en: "Brand", az: "Brend" },
       unit: { en: "Unit", az: "Vahid" },
-      itemBarcode: { en: "Item Barcode", az: "Məhsul/Xidmət Barkodu" },
+      itemBarcode: { en: "Item Barcode", az: "Məhsul Barkodu" },
       description: { en: "Description", az: "Təsvir" },
       quantity: { en: "Quantity", az: "Miqdar" },
       price: { en: "Sale Price", az: "Satış qiyməti" },
@@ -117,7 +118,7 @@ export function EditProduct() {
       cancel: { en: "Cancel", az: "Ləğv et" },
       submit: { en: "Save Changes", az: "Yadda saxla" },
       select: { en: "Select", az: "Seç" },
-      productUpdated: { en: "Product/Service updated successfully!", az: "Məhsul/Xidmət uğurla yeniləndi!" },
+      productUpdated: { en: "Product updated successfully!", az: "Məhsul uğurla yeniləndi!" },
       generate: { en: "Generate", az: "Yarat" },
       print: { en: "Print", az: "Çap et" },
       datePlaceholder: { en: "dd/mm/yyyy", az: "gün/ay/il" },
@@ -309,17 +310,11 @@ export function EditProduct() {
   }, [itemBarcode]);
 
   const handlePrintBarcode = () => {
-    if (!barcodeCanvasRef.current) return;
-    const printWindow = window.open("", "", "width=400,height=300");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html><head><title>Print Barcode</title></head><body style="display:flex;justify-content:center;padding:20px;">
-        ${barcodeCanvasRef.current.outerHTML}
-        <p style="margin-top:10px;font-size:12px;">${productName}</p>
-        </body></html>
-      `);
-      printWindow.document.close();
-    }
+    if (!barcodeCanvasRef.current || !itemBarcode) return;
+    void printBarcodeLabel({
+      barcodeSvgHtml: barcodeCanvasRef.current.outerHTML,
+      priceLabel: formatBarcodePriceLabel(price),
+    }).catch((err) => notifyFromError(err));
   };
 
   const handleAddCategory = async () => {
@@ -435,7 +430,7 @@ export function EditProduct() {
   const handleSubmit = async () => {
     if (!id || saving || !(isAuthenticated || isDemo) || !canEdit) return;
     if (!productName.trim()) {
-      notifyFromError(new Error(tr("Məhsul/Xidmət adı tələb olunur", "Product/Service name is required")));
+      notifyFromError(new Error(tr("Məhsul adı tələb olunur", "Product name is required")));
       return;
     }
     if (!category.trim()) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Save, DollarSign, Calendar, CreditCard, FileText } from "lucide-react";
+import { X, Save, DollarSign, Calendar, CreditCard } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { fetchPosOrder, type PosOrderDetail } from "../../api/sales";
 import { notifyFromError } from "../../lib/toast";
@@ -50,13 +50,11 @@ export function CreatePaymentModal({
     date: string;
     amount: number | "";
     paymentMethod: string;
-    reference: string;
     note: string;
   }>({
     date: new Date().toISOString().split("T")[0],
     amount: "",
     paymentMethod: "Cash",
-    reference: "",
     note: "",
   });
 
@@ -72,7 +70,6 @@ export function CreatePaymentModal({
         date: new Date().toISOString().split("T")[0],
         amount: "",
         paymentMethod: "Cash",
-        reference: "",
         note: "",
       });
       return;
@@ -89,7 +86,6 @@ export function CreatePaymentModal({
           date: new Date().toISOString().split("T")[0],
           amount: "",
           paymentMethod: "Cash",
-          reference: "",
           note: "",
         });
       })
@@ -125,7 +121,7 @@ export function CreatePaymentModal({
         date: formData.date,
         amount,
         paymentMethod: formData.paymentMethod,
-        reference: formData.reference,
+        reference: "",
         note: formData.note,
       });
       onClose();
@@ -257,20 +253,6 @@ export function CreatePaymentModal({
                   { value: "Cash", label: tr("Nağd", "Cash") },
                   { value: "Card", label: tr("Kart", "Card") },
                 ]}
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <FileText className="w-3.5 h-3.5" />
-                {tr("İstinad Nömrəsi", "Reference Number")}
-              </label>
-              <input
-                type="text"
-                value={formData.reference}
-                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                placeholder={tr("Ödəniş istinadı", "Payment reference")}
               />
             </div>
 

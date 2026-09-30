@@ -119,7 +119,7 @@ export function Products() {
   // Translation helper - temporary until translations.ts is updated
   const pt = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
-      title: { en: "Products/Services", az: "Məhsullar/Xidmətlər" },
+      title: { en: "Products", az: "Məhsullar" },
       searchPlaceholder: { en: "Search products...", az: "Məhsul axtarın..." },
       allCategories: { en: "All Categories", az: "Bütün Kateqoriyalar" },
       allBrands: { en: "All Brands", az: "Bütün Brendlər" },
@@ -455,7 +455,7 @@ export function Products() {
       const doc = new jsPDF({ orientation: "landscape" }) as any;
 
       doc.setFontSize(14);
-      doc.text("Products/Services", 14, 12);
+      doc.text("Products", 14, 12);
       doc.setFontSize(9);
       doc.text(`Generated: ${formatNowDate(language)} · ${items.length} rows`, 14, 18);
 

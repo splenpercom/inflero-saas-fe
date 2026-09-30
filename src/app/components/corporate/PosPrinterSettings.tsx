@@ -29,7 +29,7 @@ import {
   isQzAvailable,
   listQzPrinters,
 } from "../../lib/qzTrayClient";
-import { printPosTicket } from "../../lib/posPrint";
+import { printPosTicket, printBarcodeLabel } from "../../lib/posPrint";
 import type { ThermalReceiptPayload } from "../../lib/thermalReceipt";
 
 function samplePayload(language: "az" | "en" | "ru"): ThermalReceiptPayload {
@@ -80,7 +80,7 @@ export function PosPrinterSettings({
   const [qzOnline, setQzOnline] = useState(false);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState<"receipt" | "kot" | "bar" | null>(null);
+  const [testing, setTesting] = useState<"receipt" | "kot" | "bar" | "barcode" | null>(null);
   const terminalId = getPosTerminalId();
 
   const refreshQz = useCallback(async () => {
@@ -123,7 +123,7 @@ export function PosPrinterSettings({
   const persistSettings = (next: PosPrinterSettings) => {
     savePosPrinterSettings({
       ...next,
-      // Non-dining tenants only use the bill printer.
+      // Non-dining tenants only use the bill printer (+ barcode labels).
       kotPrinter: diningEnabled ? next.kotPrinter : "",
       barPrinter: diningEnabled ? next.barPrinter : "",
     });
@@ -142,7 +142,7 @@ export function PosPrinterSettings({
     }
   };
 
-  const handleTest = async (role: "receipt" | "kot" | "bar") => {
+  const handleTest = async (role: "receipt" | "kot" | "bar" | "barcode") => {
     if ((role === "kot" || role === "bar") && !diningEnabled) {
       notifyWarning(
         tr(
@@ -157,7 +157,9 @@ export function PosPrinterSettings({
         ? settings.receiptPrinter
         : role === "kot"
           ? settings.kotPrinter || settings.receiptPrinter
-          : settings.barPrinter || settings.receiptPrinter || settings.kotPrinter;
+          : role === "bar"
+            ? settings.barPrinter || settings.receiptPrinter || settings.kotPrinter
+            : settings.barcodePrinter || settings.receiptPrinter;
     if (!printer.trim()) {
       notifyWarning(
         tr(
@@ -165,12 +167,16 @@ export function PosPrinterSettings({
             ? "Qəbz printeri seçin"
             : role === "kot"
               ? "KOT printeri seçin"
-              : "BAR printeri seçin",
+              : role === "bar"
+                ? "BAR printeri seçin"
+                : "Barkod printeri seçin",
           role === "receipt"
             ? "Select a receipt printer"
             : role === "kot"
               ? "Select a KOT printer"
-              : "Select a BAR printer",
+              : role === "bar"
+                ? "Select a BAR printer"
+                : "Select a barcode printer",
         ),
       );
       return;
@@ -178,11 +184,18 @@ export function PosPrinterSettings({
     persistSettings(settings);
     setTesting(role);
     try {
-      const result = await printPosTicket({
-        role,
-        language,
-        payload: samplePayload(language),
-      });
+      const result =
+        role === "barcode"
+          ? await printBarcodeLabel({
+              barcodeSvgHtml:
+                '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60"><text x="10" y="35" font-size="14">*TEST-BARCODE*</text></svg>',
+              priceLabel: "12.50",
+            })
+          : await printPosTicket({
+              role,
+              language,
+              payload: samplePayload(language),
+            });
       notifySuccess(
         result.channel === "qz"
           ? tr(
@@ -203,7 +216,12 @@ export function PosPrinterSettings({
 
   if (!canView) return <NoAccessPanel />;
 
-  const savedExtras = [settings.receiptPrinter, settings.kotPrinter, settings.barPrinter]
+  const savedExtras = [
+    settings.receiptPrinter,
+    settings.kotPrinter,
+    settings.barPrinter,
+    settings.barcodePrinter,
+  ]
     .map((name) => name.trim())
     .filter(Boolean)
     .filter((name, idx, arr) => arr.indexOf(name) === idx)
@@ -234,12 +252,12 @@ export function PosPrinterSettings({
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {diningEnabled
                   ? tr(
-                      "Bu kompüter/terminal üçün qəbz, KOT və BAR printerlərini təyin edin. QZ Tray ilə səssiz çap.",
-                      "Map receipt, KOT, and BAR printers for this PC/terminal. Silent print via QZ Tray.",
+                      "Bu kompüter/terminal üçün qəbz, KOT, BAR və barkod printerlərini təyin edin. QZ Tray ilə səssiz çap.",
+                      "Map receipt, KOT, BAR, and barcode printers for this PC/terminal. Silent print via QZ Tray.",
                     )
                   : tr(
-                      "Bu kompüter/terminal üçün qəbz printerini təyin edin. QZ Tray ilə səssiz çap.",
-                      "Map the receipt printer for this PC/terminal. Silent print via QZ Tray.",
+                      "Bu kompüter/terminal üçün qəbz və barkod printerlərini təyin edin. QZ Tray ilə səssiz çap.",
+                      "Map the receipt and barcode printers for this PC/terminal. Silent print via QZ Tray.",
                     )}
               </p>
             </div>
@@ -292,7 +310,7 @@ export function PosPrinterSettings({
 
           <div
             className={`grid grid-cols-1 gap-3 ${
-              diningEnabled ? "sm:grid-cols-2 lg:grid-cols-3" : ""
+              diningEnabled ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2"
             }`}
           >
             <div>
@@ -307,6 +325,27 @@ export function PosPrinterSettings({
                 placeholder={tr("Printer seçin", "Select printer")}
                 disabled={!canMutate}
               />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("Barkod printeri", "Barcode Printer")}
+              </label>
+              <ModernSelect
+                value={settings.barcodePrinter}
+                onChange={(value) => setSettings((s) => ({ ...s, barcodePrinter: value }))}
+                options={printerOptions}
+                className="w-full"
+                placeholder={tr("Printer seçin", "Select printer")}
+                disabled={!canMutate}
+              />
+              {!settings.barcodePrinter.trim() && (
+                <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-1">
+                  {tr(
+                    "Barkod boşdursa qəbz printerindən istifadə olunur.",
+                    "If barcode is empty, the receipt printer is used.",
+                  )}
+                </p>
+              )}
             </div>
             {diningEnabled && (
               <div>
@@ -404,6 +443,15 @@ export function PosPrinterSettings({
             >
               {testing === "receipt" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
               {tr("Test qəbz", "Test receipt")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleTest("barcode")}
+              disabled={!!testing || !canMutate}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg disabled:opacity-50"
+            >
+              {testing === "barcode" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+              {tr("Test barkod", "Test barcode")}
             </button>
             {diningEnabled && (
               <button

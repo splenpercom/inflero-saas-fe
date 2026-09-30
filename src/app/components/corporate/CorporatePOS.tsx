@@ -33,6 +33,7 @@ import {
   ClipboardList,
   Users,
   Bell,
+  Truck,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -72,6 +73,7 @@ import { thermalReceiptLabels, type ThermalReceiptPayload } from "../../lib/ther
 import { printPosTicket, printPosOrderTicket } from "../../lib/posPrint";
 import { loadPosPrinterSettings } from "../../lib/posPrinterSettings";
 import { PosPrinterSettings } from "./PosPrinterSettings";
+import { createQrOrderAlarm } from "../../lib/qrOrderAlarm";
 import { useNavigate, useSearchParams } from "react-router";
 import { pickCurrentUserBillerId } from "../../lib/salesBiller";
 import { ApiError } from "../../api/client";
@@ -229,10 +231,11 @@ function reorderWithinVisible(
 }
 
 function getPosProductColumnCount(): number {
-  if (typeof window === "undefined") return 2;
-  if (window.matchMedia("(min-width: 1280px)").matches) return 4;
-  if (window.matchMedia("(min-width: 640px)").matches) return 3;
-  return 2;
+  if (typeof window === "undefined") return 3;
+  if (window.matchMedia("(min-width: 1280px)").matches) return 6;
+  if (window.matchMedia("(min-width: 1024px)").matches) return 5;
+  if (window.matchMedia("(min-width: 640px)").matches) return 4;
+  return 3;
 }
 
 function ProductThumb({ image, className }: { image: string; className?: string }) {
@@ -250,69 +253,130 @@ function SelectDropdown({
   placeholder,
   icon: Icon,
   disabled = false,
+  variant = "row",
 }: {
   value: string;
   onChange: (val: string) => void;
   options: { id: string; label: string; sub?: string }[];
   placeholder: string;
-  icon: React.ElementType;
+  icon?: React.ElementType;
   disabled?: boolean;
+  variant?: "row" | "box";
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const selected = options.find((o) => o.id === value);
+  const isBox = variant === "box";
 
   useEffect(() => {
+    if (!open) return;
+    const updatePos = () => {
+      const el = ref.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setMenuPos({
+        top: r.bottom + 4,
+        left: r.left,
+        width: Math.max(r.width, isBox ? 180 : r.width),
+      });
+    };
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, true);
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos, true);
+    };
+  }, [open, isBox]);
+
+  useEffect(() => {
+    if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [open]);
 
-  const selected = options.find((o) => o.id === value);
+  const menu = open && menuPos ? (
+    <div
+      ref={menuRef}
+      className="fixed z-[200] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto"
+      style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          onChange("");
+          setOpen(false);
+        }}
+        className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+      >
+        {placeholder}
+      </button>
+      {options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={() => {
+            onChange(opt.id);
+            setOpen(false);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+        >
+          <span className="flex-1 text-left">
+            <span className="block font-medium text-gray-900 dark:text-white">{opt.label}</span>
+            {opt.sub && <span className="block text-gray-400 text-[10px]">{opt.sub}</span>}
+          </span>
+          {value === opt.id && <Check className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6]" />}
+        </button>
+      ))}
+    </div>
+  ) : null;
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={`relative ${isBox ? "h-full" : ""}`}>
       <button
         type="button"
         onClick={() => {
           if (!disabled) setOpen((p) => !p);
         }}
         disabled={disabled}
-        className="w-full flex items-center gap-2 pl-9 pr-3 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-white dark:disabled:hover:bg-gray-900"
+        className={
+          isBox
+            ? "w-full h-full min-h-[4.25rem] flex flex-col items-stretch justify-center gap-1 px-2 py-2 text-left bg-white dark:bg-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#14b8a6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+            : `w-full flex items-center gap-2 ${Icon ? "pl-9" : "pl-3"} pr-3 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-white dark:disabled:hover:bg-gray-900`
+        }
       >
-        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-        <span className={selected ? "text-gray-900 dark:text-white" : "text-gray-400"}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <ChevronDown className={`ml-auto w-3.5 h-3.5 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        {isBox ? (
+          <span
+            className={`text-[10px] font-medium leading-tight line-clamp-2 ${
+              selected ? "text-gray-900 dark:text-white" : "text-gray-400"
+            }`}
+          >
+            {selected ? selected.label : placeholder}
+          </span>
+        ) : (
+          <>
+            {Icon && (
+              <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            )}
+            <span className={selected ? "text-gray-900 dark:text-white" : "text-gray-400"}>
+              {selected ? selected.label : placeholder}
+            </span>
+            <ChevronDown
+              className={`ml-auto w-3.5 h-3.5 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </>
+        )}
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-          <button
-            type="button"
-            onClick={() => { onChange(""); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            {placeholder}
-          </button>
-          {options.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => { onChange(opt.id); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              <span className="flex-1 text-left">
-                <span className="block font-medium text-gray-900 dark:text-white">{opt.label}</span>
-                {opt.sub && <span className="block text-gray-400 text-[10px]">{opt.sub}</span>}
-              </span>
-              {value === opt.id && <Check className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6]" />}
-            </button>
-          ))}
-        </div>
-      )}
+      {menu && createPortal(menu, document.body)}
     </div>
   );
 }
@@ -826,8 +890,9 @@ export function CorporatePOS() {
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const [diningTables, setDiningTables] = useState<DiningTable[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoiceState>(null);
+  const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoiceState>("pending");
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
+  const [shippingModalOpen, setShippingModalOpen] = useState(false);
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState("");
   const [appliedDiscount, setAppliedDiscount] = useState<{ type: "percent" | "fixed"; value: number } | null>(null);
@@ -838,6 +903,7 @@ export function CorporatePOS() {
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
   const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
   const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
+  const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [touchKb, setTouchKb] = useState<null | {
     mode: "full" | "numpad";
@@ -873,6 +939,9 @@ export function CorporatePOS() {
   const editingOrderIdRef = useRef<string | null>(null);
   const pendingQrPortalOpenRef = useRef(false);
   const pendingQrInFlightRef = useRef(false);
+  const prevPendingQrCountRef = useRef(0);
+  const posQrOrderAlarmEnabledRef = useRef(true);
+  const qrOrderAlarmRef = useRef(createQrOrderAlarm(2800));
 
   const mapListItemToProduct = useCallback((item: ProductListItem): Product => {
     const isService = item.productType === "SERVICE" || item.trackStock === false;
@@ -1002,6 +1071,7 @@ export function CorporatePOS() {
       setPosSendToBarEnabled(false);
       setPosBarBillShowPricesEnabled(false);
       setPosPrintProductBrandEnabled(false);
+      setPosQrOrderAlarmEnabled(true);
       setInventoryServicesEnabled(false);
       return;
     }
@@ -1016,6 +1086,7 @@ export function CorporatePOS() {
             diningEnabled && s.posBarBillShowPricesEnabled === true,
           );
           setPosPrintProductBrandEnabled(s.posPrintProductBrandEnabled === true);
+          setPosQrOrderAlarmEnabled(diningEnabled && s.posQrOrderAlarmEnabled !== false);
           setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
       })
@@ -1026,6 +1097,7 @@ export function CorporatePOS() {
           setPosSendToBarEnabled(false);
           setPosBarBillShowPricesEnabled(false);
           setPosPrintProductBrandEnabled(false);
+          setPosQrOrderAlarmEnabled(true);
           setInventoryServicesEnabled(false);
         }
       });
@@ -1033,6 +1105,31 @@ export function CorporatePOS() {
       cancelled = true;
     };
   }, [isAuthenticated, isDemo, branchRevision, diningEnabled]);
+
+  useEffect(() => {
+    posQrOrderAlarmEnabledRef.current = posQrOrderAlarmEnabled;
+    if (!posQrOrderAlarmEnabled) {
+      qrOrderAlarmRef.current.stop();
+    } else if (pendingQrCount > 0) {
+      qrOrderAlarmRef.current.start();
+    }
+  }, [posQrOrderAlarmEnabled, pendingQrCount]);
+
+  useEffect(() => {
+    return () => {
+      qrOrderAlarmRef.current.stop();
+    };
+  }, []);
+
+  useEffect(() => {
+    const unlock = () => qrOrderAlarmRef.current.unlock();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     pendingQrOrderIdRef.current = pendingQrOrderId;
@@ -1049,12 +1146,14 @@ export function CorporatePOS() {
   const canPollPendingQr =
     diningEnabled && isAuthenticated && !isDemo && !isGlobalMode && !!branchId;
 
-  /** Background: count only (pulse). Portal open: list only (count derived from open claims). */
+  /** Poll pending QR: auto-open popup + soft alarm when new orders arrive. */
   const refreshPendingQr = useCallback(
     async (mode: "count" | "list" | "auto" = "auto") => {
       if (!canPollPendingQr) {
+        prevPendingQrCountRef.current = 0;
         setPendingQrCount(0);
         setPendingQrList([]);
+        qrOrderAlarmRef.current.stop();
         return;
       }
       if (pendingQrInFlightRef.current) return;
@@ -1062,13 +1161,38 @@ export function CorporatePOS() {
       const wantList =
         mode === "list" || (mode === "auto" && pendingQrPortalOpenRef.current);
       try {
+        let nextCount = 0;
+        let list: PendingQrPosOrderRow[] | null = null;
+
         if (wantList) {
-          const list = await fetchPendingQrPosOrders();
+          list = await fetchPendingQrPosOrders();
+          nextCount = list.filter((r) => r.claimStatus === "open").length;
           setPendingQrList(list);
-          setPendingQrCount(list.filter((r) => r.claimStatus === "open").length);
         } else {
           const countRes = await fetchPendingQrPosOrderCount();
-          setPendingQrCount(countRes.count);
+          nextCount = countRes.count;
+        }
+
+        const prev = prevPendingQrCountRef.current;
+        const grew = nextCount > prev;
+
+        if (grew) {
+          // New QR order(s) — open popup immediately and load full list.
+          setPendingQrPortalOpen(true);
+          if (!list) {
+            list = await fetchPendingQrPosOrders();
+            nextCount = list.filter((r) => r.claimStatus === "open").length;
+            setPendingQrList(list);
+          }
+        }
+
+        setPendingQrCount(nextCount);
+        prevPendingQrCountRef.current = nextCount;
+
+        if (posQrOrderAlarmEnabledRef.current && nextCount > 0) {
+          qrOrderAlarmRef.current.start();
+        } else {
+          qrOrderAlarmRef.current.stop();
         }
       } catch {
         // Poll quietly — do not spam toasts
@@ -1081,8 +1205,10 @@ export function CorporatePOS() {
 
   useEffect(() => {
     if (!canPollPendingQr) {
+      prevPendingQrCountRef.current = 0;
       setPendingQrCount(0);
       setPendingQrList([]);
+      qrOrderAlarmRef.current.stop();
       return;
     }
 
@@ -1092,8 +1218,8 @@ export function CorporatePOS() {
     };
 
     tick();
-    // Count for pulse is enough when closed; list only while modal is open.
-    const ms = pendingQrPortalOpen ? 5_000 : 12_000;
+    // Faster poll so new QR orders surface quickly without a click.
+    const ms = pendingQrPortalOpen ? 4_000 : 5_000;
     const t = window.setInterval(tick, ms);
 
     const onVisibility = () => {
@@ -1134,7 +1260,7 @@ export function CorporatePOS() {
       setSelectedPaymentMethod(
         detail.paymentMethod === "CARD" ? "card" : detail.paymentMethod === "CASH" ? "cash" : null,
       );
-      setPaymentStatusChoice(null);
+      setPaymentStatusChoice("pending");
       setShippingInput(detail.shipping ?? "");
       setServiceFeeInput(detail.serviceFee ?? "");
       if (detail.discount && Number(detail.discount) > 0) {
@@ -1980,7 +2106,7 @@ export function CorporatePOS() {
     setSelectedBillerId(defaultBillerId || "");
     setSelectedTableId("");
     setSelectedPaymentMethod(null);
-    setPaymentStatusChoice(null);
+    setPaymentStatusChoice("pending");
     setAppliedDiscount(null);
     void loadProducts();
     void refreshPendingQr("count");
@@ -2758,46 +2884,6 @@ export function CorporatePOS() {
       >
         <ArrowLeft className="w-3.5 h-3.5" />
       </button>
-      {diningEnabled && (
-        <button
-          type="button"
-          onClick={() => setPrinterSettingsOpen(true)}
-          className="fixed top-2 left-12 z-50 p-2 rounded-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-[#14b8a6] hover:bg-white dark:hover:bg-gray-900 transition-all opacity-50 hover:opacity-100"
-          title={tr("POS Printerlər", "POS Printers")}
-        >
-          <Printer className="w-3.5 h-3.5" />
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={() => navigate("/dashboard/sales/pos-orders")}
-        className="fixed top-2 right-2 z-50 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:text-[#0d9488] hover:border-[#14b8a6]/50 hover:bg-[#f0fdfa] dark:hover:bg-[#14b8a6]/10 shadow-sm transition-all"
-        title={tr("Sifarişlər", "Orders")}
-      >
-        <ClipboardList className="w-3.5 h-3.5" />
-        <span className="text-xs font-medium">{tr("Sifarişlər", "Orders")}</span>
-      </button>
-      {diningEnabled && (
-        <button
-          type="button"
-          onClick={() => {
-            setPendingQrPortalOpen(true);
-            void refreshPendingQr("list");
-          }}
-          className={`fixed top-2 right-[6.5rem] z-50 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border shadow-sm transition-all ${
-            pendingQrCount > 0
-              ? "bg-orange-500 border-orange-600 text-white animate-pulse"
-              : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-orange-400"
-          }`}
-          title={tr("Gözləyən QR sifarişlər", "Pending QR orders")}
-        >
-          <Bell className="w-3.5 h-3.5" />
-          <span className="text-xs font-medium">
-            {tr("QR", "QR")}
-            {pendingQrCount > 0 ? ` (${pendingQrCount})` : ""}
-          </span>
-        </button>
-      )}
 
       <div className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8">
 
@@ -2977,7 +3063,7 @@ export function CorporatePOS() {
                 </div>
               ) : (
               <div
-                className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-4"
+                className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 pb-4"
                 style={dragProductId ? { touchAction: "none" } : undefined}
               >
                 {filteredProducts.map((product, index) => {
@@ -3025,7 +3111,7 @@ export function CorporatePOS() {
                         addToCart(product);
                       }
                     }}
-                    className={`relative bg-white dark:bg-gray-900 border rounded-lg p-3 sm:p-4 transition-all text-left group touch-manipulation select-none ${
+                    className={`relative bg-white dark:bg-gray-900 border rounded-lg p-2 transition-all text-left group touch-manipulation select-none ${
                       isDragging ? "opacity-40 scale-[0.97] ring-2 ring-[#14b8a6]/50" : ""
                     } ${
                       isDropTarget
@@ -3041,7 +3127,7 @@ export function CorporatePOS() {
                   >
                     {productReorderMode && (
                       <div
-                        className="absolute top-1.5 right-1.5 z-20 flex flex-col items-end gap-0.5"
+                        className="absolute top-1 right-1 z-20 flex flex-col items-end gap-0.5"
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -3052,10 +3138,10 @@ export function CorporatePOS() {
                             onClick={() =>
                               moveProduct(product.id, -1, filteredProductIds, cols)
                             }
-                            className="p-1 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
+                            className="p-0.5 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
                             title={tr("Yuxarı sətir", "Move up a row")}
                           >
-                            <ChevronUp className="w-3.5 h-3.5" />
+                            <ChevronUp className="w-3 h-3" />
                           </button>
                           <button
                             type="button"
@@ -3063,10 +3149,10 @@ export function CorporatePOS() {
                             onClick={() =>
                               moveProduct(product.id, 1, filteredProductIds, cols)
                             }
-                            className="p-1 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
+                            className="p-0.5 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
                             title={tr("Aşağı sətir", "Move down a row")}
                           >
-                            <ChevronDown className="w-3.5 h-3.5" />
+                            <ChevronDown className="w-3 h-3" />
                           </button>
                         </div>
                         <div className="flex items-center gap-0.5">
@@ -3074,80 +3160,86 @@ export function CorporatePOS() {
                             type="button"
                             disabled={index === 0}
                             onClick={() => moveProduct(product.id, -1, filteredProductIds)}
-                            className="p-1 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
+                            className="p-0.5 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
                             title={tr("Əvvələ", "Move earlier")}
                           >
-                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <ChevronLeft className="w-3 h-3" />
                           </button>
-                          <span className="p-1 rounded-md bg-[#14b8a6]/10 text-[#0f766e] dark:text-[#5eead4] border border-[#14b8a6]/20 pointer-events-none">
-                            <GripVertical className="w-3.5 h-3.5" />
+                          <span className="p-0.5 rounded-md bg-[#14b8a6]/10 text-[#0f766e] dark:text-[#5eead4] border border-[#14b8a6]/20 pointer-events-none">
+                            <GripVertical className="w-3 h-3" />
                           </span>
                           <button
                             type="button"
                             disabled={index >= filteredProductIds.length - 1}
                             onClick={() => moveProduct(product.id, 1, filteredProductIds)}
-                            className="p-1 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
+                            className="p-0.5 rounded-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-[#14b8a6] disabled:opacity-30"
                             title={tr("Sonraya", "Move later")}
                           >
-                            <ChevronRight className="w-3.5 h-3.5" />
+                            <ChevronRight className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
                     )}
                     {isService && (
-                      <span className="absolute top-2 left-2 z-10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      <span className="absolute top-1 left-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                         {tr("Xidmət", "Service")}
                       </span>
                     )}
                     {!productReorderMode && !isService && stockEnabled && outOfStock && (
-                      <span className="absolute top-2 right-2 z-10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
+                      <span className="absolute top-1 right-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
                         {tr("Stokda yoxdur", "Out of stock")}
                       </span>
                     )}
-                    <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-lg flex items-center justify-center text-4xl mb-2 border border-gray-300 dark:border-gray-700 group-hover:border-[#14b8a6] transition-colors overflow-hidden">
+                    <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-md flex items-center justify-center text-2xl mb-1.5 border border-gray-300 dark:border-gray-700 group-hover:border-[#14b8a6] transition-colors overflow-hidden">
                       <ProductThumb image={product.image} className="w-full h-full object-cover" />
                     </div>
-                    <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">{product.code}</div>
-                    <h3 className="text-xs font-medium text-gray-900 dark:text-white mb-2 line-clamp-2 min-h-[32px]">
-                      {product.name}
-                    </h3>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-[#14b8a6] dark:text-[#14b8a6]">
-                        {formatCurrency(product.price)}
-                      </span>
-                      {!isService && stockEnabled && <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
-                        outOfStock
-                          ? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
-                          : "text-gray-400 bg-gray-100 dark:bg-gray-800"
-                      }`}>
-                        {available < 99 ? `${available}` : "∞"}
-                      </span>}
+                    <div className="text-[9px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">{product.code}</div>
+                    <div className="flex items-start justify-between gap-1.5">
+                      <h3 className="text-[11px] font-medium text-gray-900 dark:text-white line-clamp-2 min-w-0 flex-1 leading-tight">
+                        {product.name}
+                      </h3>
+                      <div className="flex flex-col items-end gap-0.5 shrink-0 pt-0.5">
+                        <span className="text-xs font-bold text-[#14b8a6] dark:text-[#14b8a6] whitespace-nowrap">
+                          {formatCurrency(product.price)}
+                        </span>
+                        {!isService && stockEnabled && (
+                          <span
+                            className={`text-[9px] px-1 py-0.5 rounded ${
+                              outOfStock
+                                ? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
+                                : "text-gray-400 bg-gray-100 dark:bg-gray-800"
+                            }`}
+                          >
+                            {available < 99 ? `${available}` : "∞"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {!productReorderMode && canMutateCart && qtyInCart > 0 && (
                       <div
-                        className="mt-2 flex items-center justify-end"
+                        className="mt-1.5 flex items-center justify-end"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg">
+                        <div className="flex items-center gap-0.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg">
                           <button
                             type="button"
                             onClick={() => updateQuantity(product.id, -1, available)}
-                            className="p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-lg transition-colors"
+                            className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-lg transition-colors"
                             aria-label={tr("Azalt", "Decrease quantity")}
                           >
-                            <Minus className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+                            <Minus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
                           </button>
-                          <span className="text-xs font-semibold text-gray-900 dark:text-white px-2 min-w-[1.5rem] text-center">
+                          <span className="text-[11px] font-semibold text-gray-900 dark:text-white px-1.5 min-w-[1.25rem] text-center">
                             {qtyInCart}
                           </span>
                           <button
                             type="button"
                             onClick={() => updateQuantity(product.id, 1, available)}
                             disabled={atStockLimit}
-                            className="p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             aria-label={tr("Artır", "Increase quantity")}
                           >
-                            <Plus className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+                            <Plus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
                           </button>
                         </div>
                       </div>
@@ -3165,37 +3257,95 @@ export function CorporatePOS() {
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 flex flex-col h-full min-h-0">
 
               {/* Order Header */}
-              <div className="shrink-0 flex items-center justify-between mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#14b8a6] flex items-center justify-center">
-                    <ShoppingCart className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {editingOrderId
-                        ? tr("Sifarişi redaktə et", "Edit Order")
-                        : tr("Cari Sifariş", "Current Order")}
-                    </h2>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                      {editingOrderRef
-                        ? editingOrderRef
-                        : `${cart.length} ${tr("məhsul", "items")}`}
-                    </p>
-                  </div>
+              <div className="shrink-0 flex items-center gap-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
+                <div className="min-w-0 flex-shrink">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                    {editingOrderId
+                      ? tr("Sifarişi redaktə et", "Edit Order")
+                      : tr("Sifariş", "Order")}
+                  </h2>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                    {editingOrderRef
+                      ? editingOrderRef
+                      : `${cart.length} ${tr("məhsul", "items")}`}
+                  </p>
                 </div>
-                {cart.length > 0 && (canCreate || (editingOrderId && canEdit)) && (
+                <div className="ml-auto flex items-center gap-1 flex-shrink-0">
                   <button
-                    onClick={() => resetCartAfterSave()}
-                    className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-colors"
-                    title={
-                      editingOrderId
-                        ? tr("Redaktəni ləğv et", "Cancel edit")
-                        : tr("Səbəti təmizlə", "Clear cart")
-                    }
+                    type="button"
+                    onClick={() => navigate("/dashboard/sales/pos-orders")}
+                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:text-[#0d9488] hover:border-[#14b8a6]/50 hover:bg-[#f0fdfa] dark:hover:bg-[#14b8a6]/10 transition-all"
+                    title={tr("Sifarişlər", "Orders")}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-medium hidden sm:inline">{tr("Sifarişlər", "Orders")}</span>
                   </button>
-                )}
+                  {diningEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingQrPortalOpen(true);
+                        void refreshPendingQr("list");
+                      }}
+                      className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-md border transition-all ${
+                        pendingQrCount > 0
+                          ? "bg-orange-500 border-orange-600 text-white animate-pulse"
+                          : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-orange-400"
+                      }`}
+                      title={tr("Gözləyən QR sifarişlər", "Pending QR orders")}
+                    >
+                      <Bell className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-medium">
+                        {tr("QR", "QR")}
+                        {pendingQrCount > 0 ? ` (${pendingQrCount})` : ""}
+                      </span>
+                    </button>
+                  )}
+                  {diningEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/dashboard/restaurant/kot")}
+                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:text-[#0d9488] hover:border-[#14b8a6]/50 hover:bg-[#f0fdfa] dark:hover:bg-[#14b8a6]/10 transition-all"
+                      title={tr("KOT", "KOT")}
+                    >
+                      <ChefHat className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-medium hidden sm:inline">{tr("KOT", "KOT")}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDiscountModalOpen(true)}
+                    disabled={cart.length === 0}
+                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:text-[#0d9488] hover:border-[#14b8a6]/50 disabled:opacity-40 transition-all"
+                    title={tr("Endirim əlavə et", "Add Discount")}
+                  >
+                    <Tag className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-medium hidden xl:inline">{tr("Endirim", "Discount")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShippingModalOpen(true)}
+                    disabled={cart.length === 0}
+                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:text-[#0d9488] hover:border-[#14b8a6]/50 disabled:opacity-40 transition-all"
+                    title={tr("Çatdırılma", "Shipping")}
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-medium hidden xl:inline">{tr("Çatdırılma", "Shipping")}</span>
+                  </button>
+                  {cart.length > 0 && (canCreate || (editingOrderId && canEdit)) && (
+                    <button
+                      onClick={() => resetCartAfterSave()}
+                      className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-1 rounded-md transition-colors"
+                      title={
+                        editingOrderId
+                          ? tr("Redaktəni ləğv et", "Cancel edit")
+                          : tr("Səbəti təmizlə", "Clear cart")
+                      }
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
               {pendingQrOrderId && (
                 <div className="shrink-0 mb-2 px-2 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-[11px] text-orange-800 dark:text-orange-200">
@@ -3218,107 +3368,103 @@ export function CorporatePOS() {
 
               {/* Scrollable: customer fields, cart, checkout */}
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 pb-2">
-                <div className="space-y-2 mb-3">
-                <div className="flex gap-1.5 items-center">
-                  <div className="flex-1 min-w-0">
-                    <SelectDropdown
-                      value={selectedCustomerId}
-                      onChange={handleCustomerChange}
-                      options={customerOptions}
-                      placeholder={tr("Müştəri seçin...", "Select customer...")}
-                      icon={User}
-                    />
-                  </div>
-                  {canCreateCustomer && (
-                    <button
-                      type="button"
-                      onClick={() => setAddCustomerModalOpen(true)}
-                      title={tr("Yeni müştəri əlavə et", "Add new Customer")}
-                      className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                {autoEnabled && selectedCustomerId && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <SelectDropdown
-                      value={selectedVehicleId}
-                      onChange={(id) => {
-                        setSelectedVehicleId(id);
-                        if (!id) setMileageInput("");
-                      }}
-                      options={customerVehicles.map((vehicle) => ({
-                        id: vehicle.id,
-                        label: [vehicle.make, vehicle.model].filter(Boolean).join(" ") || tr("Avtomobil", "Vehicle"),
-                        sub: vehicle.plate || undefined,
-                      }))}
-                      placeholder={tr("Avtomobil (istəyə bağlı)", "Vehicle (optional)")}
-                      icon={Car}
-                    />
-                    <div className="relative">
-                      <input
-                        type="text"
-                        inputMode="none"
-                        value={mileageInput}
-                        onChange={(e) =>
-                          setMileageInput(
-                            sanitizeNumericTyping(e.target.value, { allowDecimal: false }),
-                          )
-                        }
-                        onFocus={() => openTouchKb("numpad", "mileage")}
-                        disabled={!selectedVehicleId}
-                        placeholder={tr("KM (istəyə bağlı)", "KM (optional)")}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-xs text-gray-900 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-gray-400 hover:text-[#14b8a6] disabled:opacity-40"
-                        title={tr("Klaviatura", "Keyboard")}
-                        disabled={!selectedVehicleId}
-                        onClick={() => openTouchKb("numpad", "mileage", true)}
-                      >
-                        <Keyboard className="w-3.5 h-3.5" />
-                      </button>
+                <div className="mb-3 space-y-1.5">
+                  <div
+                    className={`grid gap-1.5 ${
+                      diningEnabled ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"
+                    }`}
+                  >
+                    {/* Customer + add */}
+                    <div className="flex min-h-[4.25rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
+                      <div className="flex-1 min-w-0 rounded-l-lg">
+                        <SelectDropdown
+                          variant="box"
+                          value={selectedCustomerId}
+                          onChange={handleCustomerChange}
+                          options={customerOptions}
+                          placeholder={tr("Müştəri seçin", "Select customer")}
+                        />
+                      </div>
+                      {canCreateCustomer && (
+                        <button
+                          type="button"
+                          onClick={() => setAddCustomerModalOpen(true)}
+                          title={tr("Yeni müştəri əlavə et", "Add new Customer")}
+                          className="w-9 flex-shrink-0 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-r-lg border-l border-[#0d9488]/40 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                  </div>
-                )}
 
-                <SelectDropdown
-                  value={selectedBillerId}
-                  onChange={setSelectedBillerId}
-                  options={
-                    isEmployee
-                      ? billerOptions.filter((biller) => biller.id === currentUserBillerId)
-                      : billerOptions
-                  }
-                  placeholder={tr("İşçi seçin...", "Select employee...")}
-                  icon={UserCheck}
-                  disabled={isEmployee}
-                />
+                    {/* Employee */}
+                    <div className="min-h-[4.25rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
+                      <SelectDropdown
+                        variant="box"
+                        value={selectedBillerId}
+                        onChange={setSelectedBillerId}
+                        options={
+                          isEmployee
+                            ? billerOptions.filter((biller) => biller.id === currentUserBillerId)
+                            : billerOptions
+                        }
+                        placeholder={tr("İşçi seçin", "Select employee")}
+                        disabled={isEmployee}
+                      />
+                    </div>
 
-                {diningEnabled && (
-                  <>
-                    <div className="relative">
+                    {/* Table — simple button opens picker */}
+                    {diningEnabled && (
                       <button
                         type="button"
                         onClick={() => setTablePickerOpen(true)}
-                        className="w-full flex items-center gap-2 pl-9 pr-3 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="min-h-[4.25rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col items-center justify-center gap-1.5 px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       >
-                        <Armchair className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                        <Armchair
+                          className={`w-5 h-5 flex-shrink-0 ${
+                            selectedTableLabel ? "text-[#14b8a6]" : "text-gray-400"
+                          }`}
+                        />
                         <span
-                          className={
+                          className={`text-[10px] font-semibold leading-tight text-center line-clamp-2 ${
                             selectedTableLabel
-                              ? "text-gray-900 dark:text-white truncate"
-                              : "text-gray-400"
-                          }
+                              ? "text-gray-900 dark:text-white"
+                              : "text-gray-500 dark:text-gray-400"
+                          }`}
                         >
-                          {selectedTableLabel || tr("Masa (istəyə bağlı)", "Table (optional)")}
+                          {selectedTableLabel || tr("Masa", "Table")}
                         </span>
-                        <ChevronDown className="ml-auto w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      </button>
+                    )}
+
+                    {/* Payment status: Pending / Paid */}
+                    <div className="min-h-[4.25rem] rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden flex flex-col bg-white dark:bg-gray-900">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentStatusChoice("pending")}
+                        className={`flex-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                          paymentStatusChoice === "pending"
+                            ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/25 text-[#0f766e] dark:text-[#5eead4]"
+                            : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }`}
+                      >
+                        {tr("Gözləyir", "Pending")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentStatusChoice("paid")}
+                        className={`flex-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-t border-gray-200 dark:border-gray-700 transition-colors ${
+                          paymentStatusChoice === "paid"
+                            ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/25 text-[#0f766e] dark:text-[#5eead4]"
+                            : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }`}
+                      >
+                        {tr("Ödənilib", "Paid")}
                       </button>
                     </div>
+                  </div>
+
+                  {diningEnabled && (
                     <PosTablePickerPortal
                       open={tablePickerOpen}
                       tables={diningTables}
@@ -3327,14 +3473,59 @@ export function CorporatePOS() {
                       onClose={() => setTablePickerOpen(false)}
                       tr={tr}
                     />
-                  </>
-                )}
+                  )}
+
+                  {autoEnabled && selectedCustomerId && (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <SelectDropdown
+                        value={selectedVehicleId}
+                        onChange={(id) => {
+                          setSelectedVehicleId(id);
+                          if (!id) setMileageInput("");
+                        }}
+                        options={customerVehicles.map((vehicle) => ({
+                          id: vehicle.id,
+                          label:
+                            [vehicle.make, vehicle.model].filter(Boolean).join(" ") ||
+                            tr("Avtomobil", "Vehicle"),
+                          sub: vehicle.plate || undefined,
+                        }))}
+                        placeholder={tr("Avtomobil (istəyə bağlı)", "Vehicle (optional)")}
+                        icon={Car}
+                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="none"
+                          value={mileageInput}
+                          onChange={(e) =>
+                            setMileageInput(
+                              sanitizeNumericTyping(e.target.value, { allowDecimal: false }),
+                            )
+                          }
+                          onFocus={() => openTouchKb("numpad", "mileage")}
+                          disabled={!selectedVehicleId}
+                          placeholder={tr("KM (istəyə bağlı)", "KM (optional)")}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-xs text-gray-900 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-gray-400 hover:text-[#14b8a6] disabled:opacity-40"
+                          title={tr("Klaviatura", "Keyboard")}
+                          disabled={!selectedVehicleId}
+                          onClick={() => openTouchKb("numpad", "mileage", true)}
+                        >
+                          <Keyboard className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2 mb-3">
+                <div className="space-y-1 mb-2">
                 {cart.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-24 text-center">
-                    <ShoppingCart className="w-10 h-10 text-gray-300 dark:text-gray-700 mb-2" />
+                  <div className="flex flex-col items-center justify-center h-20 text-center">
+                    <ShoppingCart className="w-8 h-8 text-gray-300 dark:text-gray-700 mb-1.5" />
                     <p className="text-xs text-gray-400">{tr("Səbət boşdur", "Cart is empty")}</p>
                   </div>
                 ) : (
@@ -3358,34 +3549,26 @@ export function CorporatePOS() {
                       item.quantity > available;
 
                     return (
-                    <div key={item.id} className={`bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border ${
+                    <div key={item.id} className={`bg-gray-50 dark:bg-gray-800/50 rounded-md px-2 py-1.5 border ${
                       itemOutOfStock || itemExceedsStock
                         ? "border-red-300 dark:border-red-900/60"
                         : "border-gray-200 dark:border-gray-700"
                     }`}>
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center text-xl border border-gray-300 dark:border-gray-600 flex-shrink-0 overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-md bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center border border-gray-300 dark:border-gray-600 flex-shrink-0 overflow-hidden">
                           <ProductThumb image={item.image} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-xs font-medium text-gray-900 dark:text-white mb-0.5 truncate">{item.name}</h3>
-                          {isService && (
-                            <span className="inline-flex mb-1 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                              {tr("Xidmət", "Service")}
-                            </span>
-                          )}
-                          {(itemOutOfStock || itemExceedsStock) && (
-                            <p className="text-[10px] font-medium text-red-600 dark:text-red-400 mb-1">
-                              {itemOutOfStock
-                                ? tr("Stokda yoxdur", "Out of stock")
-                                : tr(
-                                    `Yalnız ${available} ədəd mövcuddur`,
-                                    `Only ${available} available`,
-                                  )}
-                            </p>
-                          )}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <h3 className="text-[11px] font-medium text-gray-900 dark:text-white truncate">{item.name}</h3>
+                            {isService && (
+                              <span className="shrink-0 px-1 py-px text-[8px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                {tr("Xidmət", "Service")}
+                              </span>
+                            )}
+                          </div>
                           {isService ? (
-                            <div className="flex items-center gap-1 mb-1.5">
+                            <div className="flex items-center gap-1 mt-0.5">
                               <input
                                 type="text"
                                 inputMode="decimal"
@@ -3399,46 +3582,59 @@ export function CorporatePOS() {
                                     ),
                                   );
                                 }}
-                                className="w-24 px-2 py-1 text-xs font-semibold text-[#14b8a6] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-20 px-1.5 py-0.5 text-[11px] font-semibold text-[#14b8a6] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                               />
-                              <span className="text-[10px] text-gray-400">₼</span>
+                              <span className="text-[9px] text-gray-400">₼</span>
                             </div>
                           ) : (
-                            <p className="text-xs font-semibold text-[#14b8a6] dark:text-[#14b8a6] mb-1.5">{formatCurrency(item.price)}</p>
+                            <p className="text-[11px] font-semibold text-[#14b8a6] dark:text-[#14b8a6] leading-tight">
+                              {formatCurrency(item.price)}
+                            </p>
                           )}
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg">
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.id, -1, available)}
-                                disabled={!canMutateCart}
-                                className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-lg transition-colors disabled:opacity-40"
-                                aria-label={tr("Azalt", "Decrease quantity")}
-                              >
-                                <Minus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                              </button>
-                              <span className="text-xs font-medium text-gray-900 dark:text-white px-2 min-w-[1.25rem] text-center">
-                                {item.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.id, 1, available)}
-                                disabled={!canMutateCart || (!isService && stockEnabled && available > 0 && item.quantity >= available)}
-                                className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                aria-label={tr("Artır", "Increase quantity")}
-                              >
-                                <Plus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                              </button>
-                            </div>
+                          {(itemOutOfStock || itemExceedsStock) && (
+                            <p className="text-[9px] font-medium text-red-600 dark:text-red-400 leading-tight">
+                              {itemOutOfStock
+                                ? tr("Stokda yoxdur", "Out of stock")
+                                : tr(
+                                    `Yalnız ${available} ədəd mövcuddur`,
+                                    `Only ${available} available`,
+                                  )}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md">
                             <button
                               type="button"
-                              onClick={() => removeFromCart(item.id)}
+                              onClick={() => updateQuantity(item.id, -1, available)}
                               disabled={!canMutateCart}
-                              className="ml-auto p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-40"
+                              className="p-0.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-md transition-colors disabled:opacity-40"
+                              aria-label={tr("Azalt", "Decrease quantity")}
                             >
-                              <X className="w-3.5 h-3.5" />
+                              <Minus className="w-2.5 h-2.5 text-gray-600 dark:text-gray-400" />
+                            </button>
+                            <span className="text-[11px] font-medium text-gray-900 dark:text-white px-1.5 min-w-[1rem] text-center">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(item.id, 1, available)}
+                              disabled={!canMutateCart || (!isService && stockEnabled && available > 0 && item.quantity >= available)}
+                              className="p-0.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              aria-label={tr("Artır", "Increase quantity")}
+                            >
+                              <Plus className="w-2.5 h-2.5 text-gray-600 dark:text-gray-400" />
                             </button>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => removeFromCart(item.id)}
+                            disabled={!canMutateCart}
+                            className="p-0.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-40"
+                            aria-label={tr("Sil", "Remove")}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -3450,88 +3646,12 @@ export function CorporatePOS() {
               {/* Order Summary */}
               {cart.length > 0 && (
                 <div>
-                  <div className="space-y-1.5 mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-500 dark:text-gray-400">{tr("Ara cəm", "Subtotal")}</span>
-                      <span className="text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs gap-2">
-                      <span className="text-gray-500 dark:text-gray-400 shrink-0">
-                        {tr("Çatdırılma", "Shipping")}
-                      </span>
-                      <div className="relative w-28">
-                        <input
-                          type="text"
-                          inputMode="none"
-                          value={shippingInput}
-                          onChange={(e) =>
-                            setShippingInput(
-                              sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
-                            )
-                          }
-                          onFocus={() => openTouchKb("numpad", "shipping")}
-                          className="w-full pr-7 pl-2 py-1 text-xs text-right bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
-                          ₼
-                        </span>
-                      </div>
-                    </div>
-                    {posServiceFeeEnabled && (
-                      <div className="flex items-center justify-between text-xs gap-2">
-                        <span className="text-gray-500 dark:text-gray-400 shrink-0">
-                          {tr("Xidmət haqqı", "Service fee")}
-                        </span>
-                        <div className="relative w-28">
-                          <input
-                            type="text"
-                            inputMode="none"
-                            value={serviceFeeInput}
-                            onChange={(e) =>
-                              setServiceFeeInput(
-                                sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
-                              )
-                            }
-                            onFocus={() => openTouchKb("numpad", "serviceFee")}
-                            className="w-full pr-7 pl-2 py-1 text-xs text-right bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-                          />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
-                            ₼
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5">
-                        {appliedDiscount ? (
-                          <>
-                            <span className="text-green-600 dark:text-green-400">
-                              {tr("Endirim", "Discount")} ({appliedDiscount.type === "percent" ? `${appliedDiscount.value}%` : formatCurrency(appliedDiscount.value)})
-                            </span>
-                            <button onClick={() => setAppliedDiscount(null)} className="text-red-400 hover:text-red-600 transition-colors">
-                              <X className="w-3 h-3" />
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setDiscountModalOpen(true)}
-                            className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-[#14b8a6] dark:hover:text-[#14b8a6] hover:underline"
-                          >
-                            <Tag className="w-3 h-3" />
-                            {tr("Endirim əlavə et", "Add Discount")}
-                          </button>
-                        )}
-                      </div>
-                      {appliedDiscount && (
-                        <span className="text-green-600 dark:text-green-400 font-medium">-{formatCurrency(discountAmount)}</span>
-                      )}
-                    </div>
-                  </div>
-
                   {/* Payment Methods */}
-                  <div className="mb-2">
-                    <p className="text-xs font-medium text-gray-900 dark:text-white mb-2">{tr("Ödəniş Üsulu", "Payment Method")}</p>
-                    <div className="grid grid-cols-3 gap-2">
+                  <div className="mb-2.5 flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-gray-900 dark:text-white shrink-0">
+                      {tr("Ödəniş Üsulu", "Payment Method")}
+                    </p>
+                    <div className="flex items-center gap-1.5 ml-auto">
                       {paymentMethods.map((m) => {
                         const Icon = m.icon;
                         return (
@@ -3541,18 +3661,72 @@ export function CorporatePOS() {
                             onClick={() =>
                               setSelectedPaymentMethod((prev) => (prev === m.id ? null : m.id))
                             }
-                            className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg border text-xs font-medium transition-all ${
+                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
                               selectedPaymentMethod === m.id
                                 ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border-[#14b8a6] dark:border-[#14b8a6] text-[#14b8a6] dark:text-[#14b8a6]"
                                 : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                             }`}
                           >
-                            <Icon className="w-3.5 h-3.5" />
+                            <Icon className="w-3.5 h-3.5 flex-shrink-0" />
                             <span>{m.name}</span>
                           </button>
                         );
                       })}
                     </div>
+                  </div>
+
+                  <div className="space-y-1.5 mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      {posServiceFeeEnabled ? (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-gray-500 dark:text-gray-400 shrink-0">
+                            {tr("Xidmət haqqı", "Service fee")}
+                          </span>
+                          <div className="relative w-24">
+                            <input
+                              type="text"
+                              inputMode="none"
+                              value={serviceFeeInput}
+                              onChange={(e) =>
+                                setServiceFeeInput(
+                                  sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                                )
+                              }
+                              onFocus={() => openTouchKb("numpad", "serviceFee")}
+                              className="w-full pr-7 pl-2 py-1 text-xs text-right bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                              ₼
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span />
+                      )}
+                      <div className="flex items-center gap-2 shrink-0 ml-auto">
+                        <span className="text-gray-500 dark:text-gray-400">{tr("Ara cəm", "Subtotal")}</span>
+                        <span className="text-gray-900 dark:text-white font-medium">{formatCurrency(subtotal)}</span>
+                      </div>
+                    </div>
+                    {parsePrice(shippingInput) > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">{tr("Çatdırılma", "Shipping")}</span>
+                        <span className="text-gray-900 dark:text-white">{formatCurrency(parsePrice(shippingInput))}</span>
+                      </div>
+                    )}
+                    {appliedDiscount && (
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-green-600 dark:text-green-400">
+                            {tr("Endirim", "Discount")} ({appliedDiscount.type === "percent" ? `${appliedDiscount.value}%` : formatCurrency(appliedDiscount.value)})
+                          </span>
+                          <button onClick={() => setAppliedDiscount(null)} className="text-red-400 hover:text-red-600 transition-colors">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <span className="text-green-600 dark:text-green-400 font-medium">-{formatCurrency(discountAmount)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -3564,33 +3738,6 @@ export function CorporatePOS() {
                   <div className="flex justify-between items-baseline mb-2.5 pb-2 border-b border-gray-200 dark:border-gray-800">
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Cəmi", "Total")}</span>
                     <span className="text-base font-bold text-[#14b8a6] dark:text-[#14b8a6]">{formatCurrency(total)}</span>
-                  </div>
-
-                  <div className="mb-2">
-                    <p className="text-[11px] font-medium text-gray-900 dark:text-white mb-1.5">
-                      {tr("Status", "Status")}
-                    </p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {(
-                        [
-                          { id: "paid" as const, name: tr("Ödənilib", "Paid") },
-                          { id: "pending" as const, name: tr("Gözləyir", "Pending") },
-                        ] as const
-                      ).map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setPaymentStatusChoice(s.id)}
-                          className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] font-medium transition-all ${
-                            paymentStatusChoice === s.id
-                              ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border-[#14b8a6] dark:border-[#14b8a6] text-[#14b8a6] dark:text-[#14b8a6]"
-                              : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                          }`}
-                        >
-                          <span>{s.name}</span>
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   {(canCreate || (editingOrderId && canEdit)) && (
@@ -3806,6 +3953,71 @@ export function CorporatePOS() {
                 {tr("Ləğv et", "Cancel")}
               </button>
               <button onClick={handleApplyDiscount} className="flex-1 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors">
+                {tr("Tətbiq et", "Apply")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shipping Modal */}
+      {shippingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-5 w-80">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Truck className="w-4 h-4 text-[#14b8a6] dark:text-[#14b8a6]" />
+                {tr("Çatdırılma", "Shipping")}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShippingModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="relative mb-4">
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={shippingInput}
+                onChange={(e) =>
+                  setShippingInput(
+                    sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                  )
+                }
+                onFocus={() => openTouchKb("numpad", "shipping")}
+                autoFocus
+                className="w-full px-3 py-2 pr-16 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+              />
+              <button
+                type="button"
+                className="absolute right-8 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-[#14b8a6]"
+                title={tr("Klaviatura", "Keyboard")}
+                onClick={() => openTouchKb("numpad", "shipping", true)}
+              >
+                <Keyboard className="w-3.5 h-3.5" />
+              </button>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">₼</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShippingInput("");
+                  setShippingModalOpen(false);
+                }}
+                className="flex-1 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                {tr("Təmizlə", "Clear")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShippingModalOpen(false)}
+                className="flex-1 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg transition-colors"
+              >
                 {tr("Tətbiq et", "Apply")}
               </button>
             </div>

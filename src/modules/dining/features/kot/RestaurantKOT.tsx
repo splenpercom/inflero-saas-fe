@@ -130,7 +130,7 @@ function mapOrder(o: KotOrder): UiKotOrder {
   return {
     id: o.id,
     tableNumber: o.table?.number ?? null,
-    tableName: o.table ? `#${o.table.number} ${o.table.name}` : "—",
+    tableName: o.table ? o.table.name : "—",
     orderNumber: o.reference || o.documentNo || o.id.slice(0, 8),
     status,
     expected: o.kotStatus,

@@ -39,6 +39,7 @@ export interface TenantSettingsRecord {
   posSendToBarEnabled?: boolean;
   posBarBillShowPricesEnabled?: boolean;
   posPrintProductBrandEnabled?: boolean;
+  posQrOrderAlarmEnabled?: boolean;
   inventoryServicesEnabled?: boolean;
 }
 
@@ -60,6 +61,7 @@ export type TenantSettingsUpdate = Partial<{
   posSendToBarEnabled: boolean;
   posBarBillShowPricesEnabled: boolean;
   posPrintProductBrandEnabled: boolean;
+  posQrOrderAlarmEnabled: boolean;
   inventoryServicesEnabled: boolean;
 }>;
 

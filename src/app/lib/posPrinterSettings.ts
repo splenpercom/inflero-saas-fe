@@ -7,6 +7,8 @@ export type PosPrinterSettings = {
   kotPrinter: string;
   /** Bar ticket printer (Dining + Send to Bar). Falls back to receipt when empty. */
   barPrinter: string;
+  /** Product barcode / price-label printer. Falls back to receipt when empty. */
+  barcodePrinter: string;
   paperWidthMm: PaperWidthMm;
   /** Prefer QZ Tray silent print when connected; else browser dialog. */
   preferQz: boolean;
@@ -19,6 +21,7 @@ const DEFAULT_SETTINGS: PosPrinterSettings = {
   receiptPrinter: "",
   kotPrinter: "",
   barPrinter: "",
+  barcodePrinter: "",
   paperWidthMm: 80,
   preferQz: true,
 };
@@ -51,6 +54,7 @@ export function loadPosPrinterSettings(): PosPrinterSettings {
       receiptPrinter: typeof parsed.receiptPrinter === "string" ? parsed.receiptPrinter : "",
       kotPrinter: typeof parsed.kotPrinter === "string" ? parsed.kotPrinter : "",
       barPrinter: typeof parsed.barPrinter === "string" ? parsed.barPrinter : "",
+      barcodePrinter: typeof parsed.barcodePrinter === "string" ? parsed.barcodePrinter : "",
       paperWidthMm: parsed.paperWidthMm === 58 ? 58 : 80,
       preferQz: parsed.preferQz !== false,
     };
@@ -64,6 +68,7 @@ export function savePosPrinterSettings(next: PosPrinterSettings): void {
     receiptPrinter: next.receiptPrinter.trim(),
     kotPrinter: next.kotPrinter.trim(),
     barPrinter: next.barPrinter.trim(),
+    barcodePrinter: next.barcodePrinter.trim(),
     paperWidthMm: next.paperWidthMm === 58 ? 58 : 80,
     preferQz: next.preferQz !== false,
   };

@@ -3,14 +3,12 @@ import {
   bankAccountsListQueryString,
   expensesListQueryString,
   incomesListQueryString,
-  trialBalanceQueryString,
   type BankAccountsListQuery,
   type BankAccountStatusApi,
   type BankAccountTypeApi,
   type ExpenseStatusApi,
   type ExpensesListQuery,
   type IncomesListQuery,
-  type TrialBalanceQuery,
 } from "../lib/financeMappers";
 
 type ApiEnvelope<T> = { success: boolean; data: T };
@@ -71,23 +69,6 @@ export interface BankAccountRow {
   notes: string;
   status: BankAccountStatusApi;
   createdAt: string;
-}
-
-export interface TrialBalanceRow {
-  accountId: string;
-  code: string;
-  name: string;
-  type: string | null;
-  debit: string;
-  credit: string;
-}
-
-export interface TrialBalanceResult {
-  dateFrom: string;
-  dateTo: string;
-  items: TrialBalanceRow[];
-  totalDebit: string;
-  totalCredit: string;
 }
 
 // --- Categories ---
@@ -282,14 +263,5 @@ export async function updateIncome(
 
 export async function deleteIncome(id: string): Promise<{ ok: true }> {
   const res = await apiDelete<ApiEnvelope<{ ok: true }>>(`/tenant/finance/incomes/${id}`);
-  return res.data;
-}
-
-// --- Reports ---
-
-export async function fetchTrialBalance(query: TrialBalanceQuery): Promise<TrialBalanceResult> {
-  const res = await apiGet<ApiEnvelope<TrialBalanceResult>>(
-    `/tenant/finance/reports/trial-balance${trialBalanceQueryString(query)}`,
-  );
   return res.data;
 }

@@ -10,7 +10,6 @@ import { CorporateDashboard } from "./components/corporate/CorporateDashboard";
 import { NewDashboard } from "./components/corporate/NewDashboard";
 import { CorporateOrders } from "./components/corporate/CorporateOrders";
 import { Settings as CorporateSettings } from "./components/corporate/Settings";
-import { Plugins } from "./components/corporate/Plugins";
 import { Profile } from "./components/corporate/Profile";
 import { Products } from "./components/corporate/Products";
 import { ProductDetails } from "./components/corporate/ProductDetails";
@@ -33,8 +32,6 @@ import { Purchase } from "./components/corporate/Purchase";
 import { PurchaseReturn } from "./components/corporate/PurchaseReturn";
 import { FinanceExpenses } from "./components/corporate/FinanceExpenses";
 import { Income } from "./components/corporate/Income";
-import { BankAccounts } from "./components/corporate/BankAccounts";
-import { TrialBalance } from "./components/corporate/TrialBalance";
 import { PeopleCustomers } from "./components/corporate/people/PeopleCustomers";
 import { CustomerProfile } from "./components/corporate/CustomerProfile";
 import { Suppliers } from "./components/corporate/people/Suppliers";
@@ -42,11 +39,6 @@ import { Warehouses } from "./components/corporate/people/Warehouses";
 import { Reports } from "./components/corporate/Reports";
 import { UserManagement } from "./components/corporate/UserManagement";
 import { UserDetail } from "./components/corporate/UserDetail";
-import { SalesReport } from "./components/corporate/reports/SalesReport";
-import { FinanceReport } from "./components/corporate/reports/FinanceReport";
-import { ProductReport } from "./components/corporate/reports/ProductReport";
-import { AnnualReport } from "./components/corporate/reports/AnnualReport";
-import { EmployeeSalesReport } from "./components/corporate/reports/EmployeeSalesReport";
 import { Login } from "./components/Login";
 import { Reservations } from "./components/corporate/Reservations";
 import { Services } from "./components/corporate/Services";
@@ -342,8 +334,6 @@ function AppShell() {
               {/* Finance Routes */}
               <Route path="finances/expenses" element={<FinanceExpenses />} />
               <Route path="finances/income" element={<Income />} />
-              <Route path="finances/bank-accounts" element={<BankAccounts />} />
-              <Route path="finances/trial-balance" element={<TrialBalance />} />
 
               {/* People Routes */}
               <Route path="people/customers" element={<PeopleCustomers />} />
@@ -360,16 +350,14 @@ function AppShell() {
 
               {/* Reports and User Management */}
               <Route path="reports" element={<Reports />} />
+              <Route path="reports/sales" element={<Navigate to="/dashboard/reports" replace />} />
+              <Route path="reports/employee-sales" element={<Navigate to="/dashboard/reports" replace />} />
+              <Route path="reports/finance" element={<Navigate to="/dashboard/reports" replace />} />
+              <Route path="reports/product" element={<Navigate to="/dashboard/reports" replace />} />
+              <Route path="reports/annual" element={<Navigate to="/dashboard/reports" replace />} />
               <Route path="user-management/users/:id" element={<UserDetail />} />
               <Route path="user-management/roles" element={<UserManagement />} />
               <Route path="user-management" element={<UserManagement />} />
-
-              {/* Report Pages */}
-              <Route path="reports/sales" element={<SalesReport />} />
-              <Route path="reports/employee-sales" element={<EmployeeSalesReport />} />
-              <Route path="reports/finance" element={<FinanceReport />} />
-              <Route path="reports/product" element={<ProductReport />} />
-              <Route path="reports/annual" element={<AnnualReport />} />
 
               {/* Settings */}
               <Route path="reservations" element={<ModuleRouteGuard module="RESERVATIONS"><Reservations /></ModuleRouteGuard>} />
@@ -398,7 +386,6 @@ function AppShell() {
                   </ModuleRouteGuard>
                 }
               />
-              <Route path="plugins" element={<Plugins />} />
               <Route path="settings" element={<CorporateSettings />} />
               <Route
                 path="pos-printers"

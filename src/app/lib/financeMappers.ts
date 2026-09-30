@@ -123,11 +123,6 @@ export type BankAccountsListQuery = FinancePagedQuery & {
   sort?: "latest" | "oldest" | "name";
 };
 
-export type TrialBalanceQuery = {
-  dateFrom: string;
-  dateTo: string;
-};
-
 function financeQueryString(params: Record<string, string | number | undefined>): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -169,13 +164,6 @@ export function bankAccountsListQueryString(q: BankAccountsListQuery = {}): stri
     search: q.search?.trim(),
     status: q.status && q.status !== "all" ? mapBankAccountStatusToApi(q.status) : undefined,
     sort: q.sort && q.sort !== "latest" ? q.sort : undefined,
-  });
-}
-
-export function trialBalanceQueryString(q: TrialBalanceQuery): string {
-  return financeQueryString({
-    dateFrom: q.dateFrom,
-    dateTo: q.dateTo,
   });
 }
 

@@ -19,6 +19,7 @@ import {
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
 import { resolveProductsListReturn } from "../../lib/productsNavigation";
+import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { ModernSelect } from "../ui/ModernSelect";
 import { ModernMultiSelect } from "../ui/ModernMultiSelect";
@@ -81,26 +82,26 @@ export function CreateProduct() {
       },
       subtitle: {
         en: duplicateId
-          ? "Review and save as a new product or service"
-          : "Add a new product or service",
+          ? "Review and save as a new product"
+          : "Add a new product",
         az: duplicateId
-          ? "Yoxlayın və yeni məhsul və ya xidmət kimi saxlayın"
-          : "Yeni məhsul və ya xidmət əlavə edin",
+          ? "Yoxlayın və yeni məhsul kimi saxlayın"
+          : "Yeni məhsul əlavə edin",
       },
-      backToProduct: { en: "Back to Products/Services", az: "Məhsullar/Xidmətlərə Geri" },
-      productInformation: { en: "Product/Service Information", az: "Məhsul/Xidmət Məlumatı" },
+      backToProduct: { en: "Back to Products", az: "Məhsullara Geri" },
+      productInformation: { en: "Product Information", az: "Məhsul Məlumatı" },
       pricingStocks: { en: "Pricing & Stocks", az: "Qiymət və Ehtiyatlar" },
       images: { en: "Images", az: "Şəkillər" },
       customFields: { en: "Custom Fields", az: "Xüsusi Sahələr" },
-      productName: { en: "Product/Service Name", az: "Məhsul/Xidmət Adı" },
-      productService: { en: "Product/Service", az: "Məhsul/Xidmət" },
+      productName: { en: "Product Name", az: "Məhsul Adı" },
+      productService: { en: "Product", az: "Məhsul" },
       sku: { en: "SKU", az: "SKU" },
       generate: { en: "Generate", az: "Yarat" },
       category: { en: "Category", az: "Kateqoriya" },
       subCategory: { en: "Sub Categories", az: "Alt Kateqoriyalar" },
       brand: { en: "Brand", az: "Brend" },
       unit: { en: "Unit", az: "Vahid" },
-      itemBarcode: { en: "Item Barcode", az: "Məhsul/Xidmət Barkodu" },
+      itemBarcode: { en: "Item Barcode", az: "Məhsul Barkodu" },
       description: { en: "Description", az: "Təsvir" },
       productType: { en: "Product Type", az: "Məhsul Növü" },
       single: { en: "Single", az: "Tək" },
@@ -124,7 +125,7 @@ export function CreateProduct() {
       submit: { en: "Submit", az: "Təsdiq et" },
       saveAndNew: { en: "Save and New", az: "Saxla və Yenisi" },
       select: { en: "Select", az: "Seç" },
-      productCreated: { en: "Product/Service created successfully!", az: "Məhsul/Xidmət uğurla yaradıldı!" },
+      productCreated: { en: "Product created successfully!", az: "Məhsul uğurla yaradıldı!" },
       print: { en: "Print", az: "Çap et" },
       addNewCategory: { en: "Add New Category", az: "Yeni Kateqoriya Əlavə et" },
       categoryName: { en: "Category Name", az: "Kateqoriya Adı" },
@@ -438,50 +439,11 @@ export function CreateProduct() {
   }, [itemBarcode]);
 
   const handlePrintBarcode = () => {
-    if (!barcodeCanvasRef.current) return;
-
-    const printWindow = window.open("", "", "width=400,height=300");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Print Barcode</title>
-            <style>
-              body {
-                margin: 0;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                font-family: Arial, sans-serif;
-              }
-              .barcode-container {
-                text-align: center;
-                padding: 20px;
-                border: 1px solid #ddd;
-              }
-              @media print {
-                body { padding: 0; }
-                .no-print { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="barcode-container">
-              ${barcodeCanvasRef.current.outerHTML}
-              <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                ${productName || pt("productService")}
-              </div>
-            </div>
-            <button class="no-print" onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">
-              Print
-            </button>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
+    if (!barcodeCanvasRef.current || !itemBarcode) return;
+    void printBarcodeLabel({
+      barcodeSvgHtml: barcodeCanvasRef.current.outerHTML,
+      priceLabel: formatBarcodePriceLabel(price),
+    }).catch((err) => notifyFromError(err));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -533,7 +495,7 @@ export function CreateProduct() {
   const handleSubmit = async (opts?: { andNew?: boolean }) => {
     if (isDemo || !isAuthenticated || !canCreate) return;
     if (!productName.trim()) {
-      notifyFromError(new Error(tr("Məhsul/Xidmət adı tələb olunur", "Product/Service name is required")));
+      notifyFromError(new Error(tr("Məhsul adı tələb olunur", "Product name is required")));
       return;
     }
     if (!category.trim()) {

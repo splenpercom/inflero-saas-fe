@@ -128,7 +128,7 @@ export function ExpiredProducts() {
         setCurrentPage(data.totalPages);
       }
     } catch (err) {
-      notifyFromError(err, tr("Vaxtı keçmiş məhsulları/xidmətləri yükləmək alınmadı", "Failed to load expired products/services"));
+      notifyFromError(err, tr("Vaxtı keçmiş məhsulları yükləmək alınmadı", "Failed to load expired products"));
     } finally {
       setLoading(false);
     }
@@ -141,7 +141,7 @@ export function ExpiredProducts() {
   const handleExportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text(tr("Vaxtı Keçmiş Məhsullar/Xidmətlər Hesabatı", "Expired Products/Services Report"), 14, 20);
+    doc.text(tr("Vaxtı Keçmiş Məhsullar Hesabatı", "Expired Products Report"), 14, 20);
     doc.setFontSize(10);
     doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDateTime(language)}`, 14, 28);
 
@@ -155,7 +155,7 @@ export function ExpiredProducts() {
     autoTable(doc, {
       head: [[
         "SKU",
-        tr("Məhsul/Xidmət Adı", "Product/Service Name"),
+        tr("Məhsul Adı", "Product Name"),
         tr("Kateqoriya", "Category"),
         tr("Son İstifadə Tarixi", "Expired Date"),
       ]],
@@ -179,7 +179,7 @@ export function ExpiredProducts() {
   const handleExportCSV = () => {
     const headers = [
       "SKU",
-      tr("Məhsul/Xidmət Adı", "Product/Service Name"),
+      tr("Məhsul Adı", "Product Name"),
       tr("Kateqoriya", "Category"),
       tr("Son İstifadə Tarixi", "Expired Date"),
     ];
@@ -213,14 +213,14 @@ export function ExpiredProducts() {
   const handleDownloadDemo = () => {
     const headers = [
       "SKU",
-      tr("Məhsul/Xidmət Adı", "Product/Service Name"),
+      tr("Məhsul Adı", "Product Name"),
       tr("Kateqoriya", "Category"),
       tr("Son İstifadə Tarixi", "Expired Date"),
     ];
     const demoData = [
-      ["PT009", tr("Demo Məhsul/Xidmət 1", "Demo Product/Service 1"), tr("Elektronika", "Electronics"), "01 Jan 2024"],
-      ["PT010", tr("Demo Məhsul/Xidmət 2", "Demo Product/Service 2"), tr("Kompüterlər", "Computers"), "15 Jan 2024"],
-      ["PT011", tr("Demo Məhsul/Xidmət 3", "Demo Product/Service 3"), tr("Mebel", "Furniture"), "20 Feb 2024"],
+      ["PT009", tr("Demo Məhsul 1", "Demo Product 1"), tr("Elektronika", "Electronics"), "01 Jan 2024"],
+      ["PT010", tr("Demo Məhsul 2", "Demo Product 2"), tr("Kompüterlər", "Computers"), "15 Jan 2024"],
+      ["PT011", tr("Demo Məhsul 3", "Demo Product 3"), tr("Mebel", "Furniture"), "20 Feb 2024"],
     ];
 
     const csvContent = [headers, ...demoData]
@@ -251,7 +251,7 @@ export function ExpiredProducts() {
             setTimeout(() => {
               setIsImporting(false);
               setImportProgress(0);
-              alert(tr("Məhsullar/Xidmətlər uğurla idxal edildi!", "Products/Services imported successfully!"));
+              alert(tr("Məhsullar uğurla idxal edildi!", "Products imported successfully!"));
             }, 500);
             return 100;
           }
@@ -272,7 +272,7 @@ export function ExpiredProducts() {
   const handleDelete = async (id: string) => {
     if (!(await askConfirm({
       title: tr("Silmə təsdiqi", "Confirm deletion"),
-      message: tr("Bu məhsulu/xidməti silmək istədiyinizə əminsiniz?", "Are you sure you want to delete this product/service?"),
+      message: tr("Bu məhsulu silmək istədiyinizə əminsiniz?", "Are you sure you want to delete this product?"),
       variant: "danger",
     }))) {
       return;
@@ -280,7 +280,7 @@ export function ExpiredProducts() {
     if (isDemo || !isAuthenticated || !canDelete) return;
     try {
       await deleteProduct(id);
-      notifySuccess(tr("Məhsul/Xidmət silindi", "Product/Service deleted"));
+      notifySuccess(tr("Məhsul silindi", "Product deleted"));
       void loadItems();
     } catch (err) {
       notifyFromError(err);
@@ -297,7 +297,7 @@ export function ExpiredProducts() {
       <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
         <div className="mb-4">
           <h1 className="text-lg sm:text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 dark:text-white">
-            {tr("Vaxtı Keçmiş Məhsullar/Xidmətlər", "Expired Products/Services")}
+            {tr("Vaxtı Keçmiş Məhsullar", "Expired Products")}
           </h1>
         </div>
 
@@ -307,7 +307,7 @@ export function ExpiredProducts() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input
                 type="text"
-                placeholder={tr("Məhsul/xidmət axtar...", "Search products/services...")}
+                placeholder={tr("Məhsul axtar...", "Search products...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
@@ -365,7 +365,7 @@ export function ExpiredProducts() {
                     SKU
                   </th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
-                    {tr("MƏHSUL/XİDMƏT ADI", "PRODUCT/SERVICE NAME")}
+                    {tr("MƏHSUL ADI", "PRODUCT NAME")}
                   </th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                     {tr("KATEQORİYA", "CATEGORY")}
@@ -388,7 +388,7 @@ export function ExpiredProducts() {
                 ) : items.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
-                      {tr("Məhsul/xidmət tapılmadı", "No products/services found")}
+                      {tr("Məhsul tapılmadı", "No products found")}
                     </td>
                   </tr>
                 ) : (
@@ -466,7 +466,7 @@ export function ExpiredProducts() {
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {tr("Vaxtı Keçmiş Məhsulları/Xidmətləri İdxal Et", "Import Expired Products/Services")}
+                  {tr("Vaxtı Keçmiş Məhsulları İdxal Et", "Import Expired Products")}
                 </h2>
                 <button
                   onClick={() => setIsImportModalOpen(false)}
@@ -490,8 +490,8 @@ export function ExpiredProducts() {
                   </button>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     {tr(
-                      "Vaxtı keçmiş məhsulların/xidmətlərin idxalı üçün düzgün formatı görmək üçün demo faylı yükləyin.",
-                      "Download the demo file to see the correct format for importing expired products/services.",
+                      "Vaxtı keçmiş məhsulların idxalı üçün düzgün formatı görmək üçün demo faylı yükləyin.",
+                      "Download the demo file to see the correct format for importing expired products.",
                     )}
                   </p>
                 </div>
