@@ -325,6 +325,7 @@ export function POSOrders() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [listSums, setListSums] = useState({ grandTotal: 0, paid: 0, due: 0 });
   const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -485,7 +486,7 @@ export function POSOrders() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [columnsOpen]);
 
-  const visibleColCount =
+  const colsBeforeMoney =
     (col("customer") ? 1 : 0) +
     (col("id") ? 1 : 0) +
     (col("date") ? 1 : 0) +
@@ -493,13 +494,19 @@ export function POSOrders() {
     (diningEnabled && col("table") ? 1 : 0) +
     (diningEnabled && col("kot") ? 1 : 0) +
     (showProductionColumn ? 1 : 0) +
-    (col("status") ? 1 : 0) +
+    (col("status") ? 1 : 0);
+  const colsAfterMoney =
+    (col("paymentStatus") ? 1 : 0) + (col("biller") ? 1 : 0) + 1; // actions
+  const visibleColCount =
+    colsBeforeMoney +
     (col("grandTotal") ? 1 : 0) +
     (col("paid") ? 1 : 0) +
     (col("due") ? 1 : 0) +
-    (col("paymentStatus") ? 1 : 0) +
-    (col("biller") ? 1 : 0) +
-    1; // actions
+    colsAfterMoney;
+  const showMoneyFooter =
+    !loading &&
+    totalItems > 0 &&
+    (col("grandTotal") || col("paid") || col("due"));
 
   const loadGenRef = useRef(0);
   const loadAbortRef = useRef<AbortController | null>(null);
@@ -510,6 +517,7 @@ export function POSOrders() {
       setOrders([]);
       setTotalItems(0);
       setTotalPages(1);
+      setListSums({ grandTotal: 0, paid: 0, due: 0 });
       setLoading(false);
       return;
     }
@@ -553,6 +561,11 @@ export function POSOrders() {
         }),
       );
       setTotalItems(data.total ?? 0);
+      setListSums({
+        grandTotal: data.sums?.grandTotal ?? 0,
+        paid: data.sums?.paid ?? 0,
+        due: data.sums?.due ?? 0,
+      });
       const pages = Math.max(1, data.totalPages || 1);
       setTotalPages(pages);
       if (pages > 0 && currentPage > pages) setCurrentPage(pages);
@@ -561,6 +574,7 @@ export function POSOrders() {
       if (gen !== loadGenRef.current) return;
       if (!opts?.silent) {
         notifyFromError(err, tr("Sifarişləri yükləmək alınmadı", "Failed to load orders"));
+        setListSums({ grandTotal: 0, paid: 0, due: 0 });
       }
     } finally {
       if (gen === loadGenRef.current) {
@@ -1892,6 +1906,36 @@ export function POSOrders() {
                   })
                 )}
               </tbody>
+              {showMoneyFooter && (
+                <tfoot>
+                  <tr className="bg-gray-100 dark:bg-gray-800/70 border-t-2 border-gray-300 dark:border-gray-700">
+                    {colsBeforeMoney > 0 && (
+                      <td
+                        colSpan={colsBeforeMoney}
+                        className="px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap"
+                      >
+                        {tr("Cəmi (bütün səhifələr)", "Total (all pages)")}
+                      </td>
+                    )}
+                    {col("grandTotal") && (
+                      <td className="px-4 py-2.5 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap tabular-nums">
+                        {listSums.grandTotal.toFixed(2)} ₼
+                      </td>
+                    )}
+                    {col("paid") && (
+                      <td className="px-4 py-2.5 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap tabular-nums">
+                        {listSums.paid.toFixed(2)} ₼
+                      </td>
+                    )}
+                    {col("due") && (
+                      <td className="px-4 py-2.5 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap tabular-nums">
+                        {listSums.due.toFixed(2)} ₼
+                      </td>
+                    )}
+                    {colsAfterMoney > 0 && <td colSpan={colsAfterMoney} />}
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
           <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">

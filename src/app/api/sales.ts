@@ -376,6 +376,8 @@ export async function fetchPosOrders(query: SalesListQuery = {}, opts?: RequestO
       page: number;
       pageSize: number;
       totalPages: number;
+      /** Totals for the full filtered set (all pages), not just the current page. */
+      sums?: { grandTotal: number; paid: number; due: number };
     };
   }>(`/tenant/sales/pos-orders${salesListQueryString(query)}`, opts);
   return res.data;
@@ -383,6 +385,23 @@ export async function fetchPosOrders(query: SalesListQuery = {}, opts?: RequestO
 
 export async function fetchPosOrder(id: string) {
   const res = await apiGet<{ success: boolean; data: PosOrderDetail }>(`/tenant/sales/pos-orders/${id}`);
+  return res.data;
+}
+
+/** Latest unpaid/open order on a dining table, or null. */
+export async function fetchActivePosOrderByTable(tableId: string) {
+  const res = await apiGet<{ success: boolean; data: PosOrderDetail | null }>(
+    `/tenant/sales/pos-orders/active-by-table/${encodeURIComponent(tableId)}`,
+  );
+  return res.data;
+}
+
+/** Complete+pay (or cancel empty) all open unpaid orders on a table and free occupancy. */
+export async function finishTableActiveOrders(tableId: string) {
+  const res = await apiPost<{
+    success: boolean;
+    data: { tableId: string; finishedOrderIds: string[]; tableStatus: string };
+  }>(`/tenant/sales/pos-orders/finish-table/${encodeURIComponent(tableId)}`, {});
   return res.data;
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car, Printer, ChefHat, Loader2 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -33,6 +34,16 @@ interface SaleDetailModalProps {
   onFinalized?: () => void;
 }
 
+function isUnpaidPaymentStatus(status: string): boolean {
+  const key = status.toLowerCase().replace(/\s+/g, "_");
+  return key === "unpaid" || key === "partial" || key === "overdue" || key === "pending";
+}
+
+function isCancelledStatus(status: string, statusLabel?: string | null): boolean {
+  const key = (status || statusLabel || "").toLowerCase().replace(/\s+/g, "_");
+  return key === "cancelled" || key === "canceled";
+}
+
 export function SaleDetailModal({
   orderId,
   isOpen,
@@ -52,13 +63,17 @@ export function SaleDetailModal({
   const [printing, setPrinting] = useState<"receipt" | "kot" | null>(null);
   const [finalizePaymentMethod, setFinalizePaymentMethod] = useState<PosUiPaymentMethod>("cash");
   const [finalizePaid, setFinalizePaid] = useState(true);
+  const [receiptChoiceOpen, setReceiptChoiceOpen] = useState(false);
+  const [emptyAndPrintBusy, setEmptyAndPrintBusy] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !orderId) {
       setOrder(null);
+      setReceiptChoiceOpen(false);
       return;
     }
     setLoading(true);
+    setReceiptChoiceOpen(false);
     fetchPosOrder(orderId)
       .then((detail) => {
         setOrder(detail);
@@ -86,6 +101,13 @@ export function SaleDetailModal({
   const itemsSubtotal = order?.items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0) ?? 0;
   const taxAmount = (itemsSubtotal * taxPercent) / 100;
   const isDraft = order ? isDraftOrderStatus(order.status) || isDraftOrderStatus(order.statusLabel) : false;
+  const showEmptyTableReceiptChoice =
+    !!order &&
+    diningEnabled &&
+    !!order.table?.id &&
+    order.items.length > 0 &&
+    !isCancelledStatus(order.status, order.statusLabel) &&
+    (isUnpaidPaymentStatus(order.paymentStatus) || due > 0.001);
 
   const translateOrderStatus = (status: string, statusLabel?: string | null) => {
     const key = (status || statusLabel || "").toLowerCase().replace(/\s+/g, "_");
@@ -144,36 +166,134 @@ export function SaleDetailModal({
     }
   };
 
+  const printReceiptForOrder = async (detail: PosOrderDetail) => {
+    const logoSrc =
+      getCompanyLogoUrl(user?.tenant, false) ??
+      getCompanyLogoUrl(user?.tenant, true) ??
+      APP_LOGO_LIGHT;
+    const settings = await fetchTenantSettings().catch(() => null);
+    const result = await printPosOrderTicket({
+      order: detail,
+      role: "receipt",
+      language,
+      companyName: user?.tenant?.name?.trim() || "Inflero",
+      logoSrc,
+      printProductBrand: settings?.posPrintProductBrandEnabled === true,
+      barShowPrices: diningEnabled && settings?.posBarBillShowPricesEnabled === true,
+    });
+    notifySuccess(
+      result.channel === "qz"
+        ? tr(`Çap edildi → ${result.printer}`, `Printed → ${result.printer}`)
+        : tr("Brauzer çap dialoqu açıldı", "Browser print dialog opened"),
+    );
+  };
+
   const handleThermalPrint = async (role: "receipt" | "kot") => {
     if (!order || isDemo) return;
     if (role === "kot" && !diningEnabled) return;
+    if (role === "receipt" && showEmptyTableReceiptChoice) {
+      setReceiptChoiceOpen(true);
+      return;
+    }
     setPrinting(role);
     try {
-      const logoSrc =
-        getCompanyLogoUrl(user?.tenant, false) ??
-        getCompanyLogoUrl(user?.tenant, true) ??
-        APP_LOGO_LIGHT;
-      const settings = await fetchTenantSettings().catch(() => null);
-      const result = await printPosOrderTicket({
-        order,
-        role,
-        language,
-        companyName: user?.tenant?.name?.trim() || "Inflero",
-        logoSrc,
-        printProductBrand: settings?.posPrintProductBrandEnabled === true,
-        barShowPrices: diningEnabled && settings?.posBarBillShowPricesEnabled === true,
-      });
-      notifySuccess(
-        result.channel === "qz"
-          ? tr(`Çap edildi → ${result.printer}`, `Printed → ${result.printer}`)
-          : tr("Brauzer çap dialoqu açıldı", "Browser print dialog opened"),
-      );
+      if (role === "receipt") {
+        await printReceiptForOrder(order);
+      } else {
+        const logoSrc =
+          getCompanyLogoUrl(user?.tenant, false) ??
+          getCompanyLogoUrl(user?.tenant, true) ??
+          APP_LOGO_LIGHT;
+        const settings = await fetchTenantSettings().catch(() => null);
+        const result = await printPosOrderTicket({
+          order,
+          role,
+          language,
+          companyName: user?.tenant?.name?.trim() || "Inflero",
+          logoSrc,
+          printProductBrand: settings?.posPrintProductBrandEnabled === true,
+          barShowPrices: diningEnabled && settings?.posBarBillShowPricesEnabled === true,
+        });
+        notifySuccess(
+          result.channel === "qz"
+            ? tr(`Çap edildi → ${result.printer}`, `Printed → ${result.printer}`)
+            : tr("Brauzer çap dialoqu açıldı", "Browser print dialog opened"),
+        );
+      }
     } catch (err) {
       notifyFromError(err, tr("Çap alınmadı", "Print failed"));
     } finally {
       setPrinting(null);
     }
   };
+
+  const handlePrintBillOnly = async () => {
+    if (!order || isDemo) return;
+    setReceiptChoiceOpen(false);
+    setPrinting("receipt");
+    try {
+      await printReceiptForOrder(order);
+    } catch (err) {
+      notifyFromError(err, tr("Çap alınmadı", "Print failed"));
+    } finally {
+      setPrinting(null);
+    }
+  };
+
+  const handleEmptyTableCompleteAndPrint = async () => {
+    if (!order || isDemo || !canFinalize) return;
+    if (order.items.length === 0) {
+      notifyWarning(tr("Sifarişdə məhsul yoxdur", "This order has no items"));
+      return;
+    }
+    setEmptyAndPrintBusy(true);
+    setPrinting("receipt");
+    try {
+      const method = mapPaymentMethodToApi(
+        mapPaymentMethodFromApi(order.paymentMethod) || "cash",
+      );
+      let detail = order;
+      const statusKey = (order.status || "").toUpperCase();
+      if (statusKey !== "COMPLETED") {
+        detail = await updatePosOrder(order.id, {
+          status: "COMPLETED",
+          paymentMethod: method,
+        });
+      }
+      const remaining = parseFloat(detail.due);
+      if (remaining > 0.001) {
+        detail = await recordPosOrderPayment(order.id, {
+          amount: remaining,
+          method,
+          note: "Empty table / complete from receipt",
+        });
+      } else {
+        detail = await fetchPosOrder(order.id);
+      }
+      setOrder(detail);
+      setReceiptChoiceOpen(false);
+      await printReceiptForOrder(detail);
+      notifySuccess(
+        tr(
+          "Sifariş tamamlandı, masa boşaldıldı və qəbz çap edildi",
+          "Order completed, table emptied, and receipt printed",
+        ),
+      );
+      onFinalized?.();
+    } catch (err) {
+      notifyFromError(
+        err,
+        tr("Masanı boşaltmaq / çap alınmadı", "Failed to empty table / print"),
+      );
+    } finally {
+      setEmptyAndPrintBusy(false);
+      setPrinting(null);
+    }
+  };
+
+  const tableLabel = order?.table
+    ? order.table.name?.trim() || String(order.table.number)
+    : "";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -196,7 +316,7 @@ export function SaleDetailModal({
                 <button
                   type="button"
                   onClick={() => void handleThermalPrint("receipt")}
-                  disabled={!!printing || isDemo || order.items.length === 0}
+                  disabled={!!printing || emptyAndPrintBusy || isDemo || order.items.length === 0}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg disabled:opacity-50"
                 >
                   {printing === "receipt" ? (
@@ -210,7 +330,7 @@ export function SaleDetailModal({
                   <button
                     type="button"
                     onClick={() => void handleThermalPrint("kot")}
-                    disabled={!!printing || isDemo || order.items.length === 0}
+                    disabled={!!printing || emptyAndPrintBusy || isDemo || order.items.length === 0}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50"
                     title={tr(
                       "Kağız KOT — əsas yol rəqəmsal KOT ekranıdır",
@@ -558,6 +678,75 @@ export function SaleDetailModal({
           )}
         </div>
       </div>
+
+      {receiptChoiceOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <button
+              type="button"
+              aria-label={tr("Bağla", "Close")}
+              className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+              disabled={emptyAndPrintBusy}
+              onClick={() => {
+                if (!emptyAndPrintBusy) setReceiptChoiceOpen(false);
+              }}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="relative z-10 w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-5"
+            >
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                {tr("Qəbz çapı", "Print receipt")}
+              </h3>
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {tableLabel
+                  ? tr(
+                      `${tableLabel} üçün ödənilməmiş sifariş. Masanı boşaldıb tamamlayın və ya yalnız qəbzi çap edin.`,
+                      `Unpaid order on ${tableLabel}. Empty the table and complete, or print the bill only.`,
+                    )
+                  : tr(
+                      "Ödənilməmiş masa sifarişi. Masanı boşaldıb tamamlayın və ya yalnız qəbzi çap edin.",
+                      "Unpaid table order. Empty the table and complete, or print the bill only.",
+                    )}
+              </p>
+              <div className="mt-4 flex flex-col gap-2">
+                {canFinalize && (
+                  <button
+                    type="button"
+                    disabled={emptyAndPrintBusy || isDemo}
+                    onClick={() => void handleEmptyTableCompleteAndPrint()}
+                    className="w-full px-3 py-2.5 text-xs font-semibold rounded-lg bg-[#14b8a6] text-white hover:bg-[#0d9488] disabled:opacity-50 transition-colors"
+                  >
+                    {emptyAndPrintBusy
+                      ? tr("Gözləyin…", "Please wait…")
+                      : tr(
+                          "Masanı boşalt, sifarişi tamamla + Çap",
+                          "Empty table and complete order + Print",
+                        )}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={emptyAndPrintBusy || isDemo}
+                  onClick={() => void handlePrintBillOnly()}
+                  className="w-full px-3 py-2.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  {tr("Yalnız qəbzi çap et", "Print bill")}
+                </button>
+                <button
+                  type="button"
+                  disabled={emptyAndPrintBusy}
+                  onClick={() => setReceiptChoiceOpen(false)}
+                  className="w-full px-3 py-2 text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 disabled:opacity-50"
+                >
+                  {tr("Ləğv et", "Cancel")}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

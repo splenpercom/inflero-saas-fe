@@ -57,7 +57,7 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -383,7 +383,7 @@ function SelectDropdown({
 
 const TABLE_STATUS_UI: Record<
   DiningTable["status"],
-  { key: "available" | "occupied" | "reserved"; labelEn: string; labelAz: string; badge: string; ring: string }
+  { key: "available" | "occupied"; labelEn: string; labelAz: string; badge: string; ring: string }
 > = {
   AVAILABLE: {
     key: "available",
@@ -401,13 +401,14 @@ const TABLE_STATUS_UI: Record<
       "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800",
     ring: "ring-red-400/50",
   },
+  // Bookings may still set RESERVED in DB; POS shows Available only.
   RESERVED: {
-    key: "reserved",
-    labelEn: "Reserved",
-    labelAz: "Rezerv",
+    key: "available",
+    labelEn: "Available",
+    labelAz: "Boş",
     badge:
-      "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800",
-    ring: "ring-amber-400/50",
+      "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800",
+    ring: "ring-green-400/60",
   },
 };
 
@@ -435,6 +436,7 @@ function PosTablePickerPortal({
   tables,
   selectedId,
   onSelect,
+  onOccupiedAttempt,
   onClose,
   tr,
 }: {
@@ -442,6 +444,7 @@ function PosTablePickerPortal({
   tables: DiningTable[];
   selectedId: string;
   onSelect: (id: string) => void;
+  onOccupiedAttempt: (table: DiningTable) => void;
   onClose: () => void;
   tr: (az: string, en: string) => string;
 }) {
@@ -509,6 +512,10 @@ function PosTablePickerPortal({
                     key={table.id}
                     type="button"
                     onClick={() => {
+                      if (table.status === "OCCUPIED") {
+                        onOccupiedAttempt(table);
+                        return;
+                      }
                       onSelect(table.id);
                       onClose();
                     }}
@@ -571,6 +578,93 @@ function PosTablePickerPortal({
             className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#14b8a6] text-white hover:bg-[#0d9488] transition-colors"
           >
             {tr("Bağla", "Done")}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function OccupiedTableDialog({
+  open,
+  tableLabel,
+  busy,
+  onEdit,
+  onFinish,
+  onClose,
+  tr,
+}: {
+  open: boolean;
+  tableLabel: string;
+  busy: boolean;
+  onEdit: () => void;
+  onFinish: () => void;
+  onClose: () => void;
+  tr: (az: string, en: string) => string;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, busy, onClose]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6">
+      <button
+        type="button"
+        aria-label={tr("Bağla", "Close")}
+        className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+        disabled={busy}
+        onClick={() => {
+          if (!busy) onClose();
+        }}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative z-10 w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-5"
+      >
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+          {tr("Masada aktiv sifariş var", "This table already has an active order")}
+        </h2>
+        <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+          {tr(
+            `${tableLabel} doludur. Mövcud sifarişi redaktə edin və ya bitirib masanı boşaldın.`,
+            `${tableLabel} is occupied. Edit the current order or finish it and empty the table.`,
+          )}
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onEdit}
+            className="w-full px-3 py-2.5 text-xs font-semibold rounded-lg bg-[#14b8a6] text-white hover:bg-[#0d9488] disabled:opacity-50 transition-colors"
+          >
+            {tr("Cari sifarişi redaktə et", "Edit current order")}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onFinish}
+            className="w-full px-3 py-2.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            {busy
+              ? tr("Gözləyin…", "Please wait…")
+              : tr("Əvvəlki sifarişi bitir və masanı boşalt", "Finish previous order and empty table")}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className="w-full px-3 py-2 text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 disabled:opacity-50"
+          >
+            {tr("Ləğv et", "Cancel")}
           </button>
         </div>
       </div>
@@ -889,6 +983,8 @@ export function CorporatePOS() {
   const [selectedTableId, setSelectedTableId] = useState("");
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const [diningTables, setDiningTables] = useState<DiningTable[]>([]);
+  const [occupiedDialogTable, setOccupiedDialogTable] = useState<DiningTable | null>(null);
+  const [occupiedDialogBusy, setOccupiedDialogBusy] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoiceState>("pending");
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
@@ -1026,6 +1122,19 @@ export function CorporatePOS() {
   useEffect(() => {
     void loadCustomers();
   }, [loadCustomers]);
+
+  const reloadDiningTables = useCallback(async () => {
+    if (!diningEnabled || !(isAuthenticated || isDemo) || isGlobalMode || !branchId) {
+      setDiningTables([]);
+      return;
+    }
+    try {
+      const rows = await fetchDiningTables();
+      setDiningTables(rows);
+    } catch {
+      setDiningTables([]);
+    }
+  }, [diningEnabled, isAuthenticated, isDemo, isGlobalMode, branchId, branchRevision]);
 
   useEffect(() => {
     if (!diningEnabled || !(isAuthenticated || isDemo) || isGlobalMode || !branchId) {
@@ -1327,18 +1436,21 @@ export function CorporatePOS() {
         const detail = await fetchPosOrder(orderId);
         const statusKey = (detail.status || "").toLowerCase();
         if (statusKey === "cancelled") {
+          writePosEditOrderId(null);
           notifyWarning(tr("Ləğv edilmiş sifariş redaktə edilə bilməz", "Cancelled orders cannot be edited"));
           return;
         }
         const refunded = parseFloat(detail.refunded ?? "0") || 0;
         const grand = parseFloat(detail.grandTotal) || 0;
         if (refunded > 0 && grand > 0 && refunded >= grand - 0.001) {
+          writePosEditOrderId(null);
           notifyWarning(
             tr("Tam qaytarılmış sifariş redaktə edilə bilməz", "Fully refunded orders cannot be edited"),
           );
           return;
         }
         if (detail.source === "QR_MENU" && statusKey === "pending") {
+          writePosEditOrderId(null);
           notifyWarning(
             tr(
               "QR sifariş üçün qəbul axınından istifadə edin",
@@ -1366,11 +1478,92 @@ export function CorporatePOS() {
           );
         }
       } catch (err) {
+        // Stale ?orderId= / sessionStorage edit id (deleted, other branch, etc.)
+        writePosEditOrderId(null);
+        editOrderHandledRef.current = null;
         notifyFromError(err, tr("Sifariş yüklənə bilmədi", "Failed to load order"));
       }
     },
     [canCreate, canEdit, isDemo, isAuthenticated, hydrateCartFromExistingOrder, tr],
   );
+
+  const handleOccupiedTableAttempt = useCallback(
+    (table: DiningTable) => {
+      if (editingOrderId && selectedTableId === table.id) {
+        setSelectedTableId(table.id);
+        setTablePickerOpen(false);
+        return;
+      }
+      setOccupiedDialogTable(table);
+    },
+    [editingOrderId, selectedTableId],
+  );
+
+  const handleOccupiedDialogEdit = useCallback(async () => {
+    if (!occupiedDialogTable) return;
+    setOccupiedDialogBusy(true);
+    try {
+      const detail = await fetchActivePosOrderByTable(occupiedDialogTable.id);
+      if (!detail) {
+        notifyWarning(
+          tr("Bu masada aktiv sifariş tapılmadı", "No active order found on this table"),
+        );
+        await reloadDiningTables();
+        setSelectedTableId(occupiedDialogTable.id);
+        setOccupiedDialogTable(null);
+        setTablePickerOpen(false);
+        return;
+      }
+      await handleLoadOrderForEdit(detail.id);
+      setOccupiedDialogTable(null);
+      setTablePickerOpen(false);
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setOccupiedDialogBusy(false);
+    }
+  }, [occupiedDialogTable, handleLoadOrderForEdit, reloadDiningTables, tr]);
+
+  const handleOccupiedDialogFinish = useCallback(async () => {
+    if (!occupiedDialogTable) return;
+    const tableId = occupiedDialogTable.id;
+    const wasEditing = Boolean(editingOrderIdRef.current);
+    setOccupiedDialogBusy(true);
+    try {
+      await finishTableActiveOrders(tableId);
+      await reloadDiningTables();
+      setPendingQrOrderId(null);
+      setEditingOrderId(null);
+      writePosEditOrderId(null);
+      setEditingOrderRef(null);
+      setEditingOrderWasHeld(false);
+      setEditingAlreadyOnKot(false);
+      setEditingStockLocked(false);
+      setEditingOriginalQtyByProduct({});
+      if (wasEditing) {
+        setCart([]);
+        setShippingInput("");
+        setServiceFeeInput("");
+        setSelectedCustomerId("");
+        setSelectedVehicleId("");
+        setMileageInput("");
+        setSelectedBillerId(defaultBillerId || "");
+        setSelectedPaymentMethod(null);
+        setPaymentStatusChoice("pending");
+        setAppliedDiscount(null);
+      }
+      setSelectedTableId(tableId);
+      setOccupiedDialogTable(null);
+      setTablePickerOpen(false);
+      notifySuccess(
+        tr("Əvvəlki sifariş bitdi, masa boşaldıldı", "Previous order finished, table emptied"),
+      );
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setOccupiedDialogBusy(false);
+    }
+  }, [occupiedDialogTable, reloadDiningTables, defaultBillerId, tr]);
 
   const handleAcceptQrOrder = useCallback(
     async (orderId: string) => {
@@ -2110,6 +2303,7 @@ export function CorporatePOS() {
     setAppliedDiscount(null);
     void loadProducts();
     void refreshPendingQr("count");
+    if (diningEnabled) void reloadDiningTables();
   };
 
   const findCartStockIssue = () => {
@@ -3465,14 +3659,33 @@ export function CorporatePOS() {
                   </div>
 
                   {diningEnabled && (
-                    <PosTablePickerPortal
-                      open={tablePickerOpen}
-                      tables={diningTables}
-                      selectedId={selectedTableId}
-                      onSelect={setSelectedTableId}
-                      onClose={() => setTablePickerOpen(false)}
-                      tr={tr}
-                    />
+                    <>
+                      <PosTablePickerPortal
+                        open={tablePickerOpen}
+                        tables={diningTables}
+                        selectedId={selectedTableId}
+                        onSelect={setSelectedTableId}
+                        onOccupiedAttempt={handleOccupiedTableAttempt}
+                        onClose={() => setTablePickerOpen(false)}
+                        tr={tr}
+                      />
+                      <OccupiedTableDialog
+                        open={!!occupiedDialogTable}
+                        tableLabel={
+                          occupiedDialogTable
+                            ? occupiedDialogTable.name?.trim() ||
+                              String(occupiedDialogTable.number)
+                            : ""
+                        }
+                        busy={occupiedDialogBusy}
+                        onEdit={() => void handleOccupiedDialogEdit()}
+                        onFinish={() => void handleOccupiedDialogFinish()}
+                        onClose={() => {
+                          if (!occupiedDialogBusy) setOccupiedDialogTable(null);
+                        }}
+                        tr={tr}
+                      />
+                    </>
                   )}
 
                   {autoEnabled && selectedCustomerId && (

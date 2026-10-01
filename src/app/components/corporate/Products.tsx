@@ -73,7 +73,6 @@ type SortDirection = "asc" | "desc" | null;
 type ProductsColumnKey =
   | "sku"
   | "productName"
-  | "category"
   | "brand"
   | "price"
   | "cost"
@@ -86,7 +85,6 @@ const PRODUCTS_COLUMNS_STORAGE_KEY = "inflero-products-visible-columns";
 const DEFAULT_PRODUCTS_COLUMNS: Record<ProductsColumnKey, boolean> = {
   sku: true,
   productName: true,
-  category: true,
   brand: true,
   price: true,
   cost: true,
@@ -99,8 +97,12 @@ function loadProductsColumns(): Record<ProductsColumnKey, boolean> {
   try {
     const raw = localStorage.getItem(PRODUCTS_COLUMNS_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_PRODUCTS_COLUMNS };
-    const parsed = JSON.parse(raw) as Partial<Record<ProductsColumnKey, boolean>>;
-    return { ...DEFAULT_PRODUCTS_COLUMNS, ...parsed };
+    const parsed = JSON.parse(raw) as Partial<Record<ProductsColumnKey, boolean>> & {
+      category?: boolean;
+    };
+    // Legacy separate "category" column is now shown under product name.
+    const { category: _legacyCategory, ...rest } = parsed;
+    return { ...DEFAULT_PRODUCTS_COLUMNS, ...rest };
   } catch {
     return { ...DEFAULT_PRODUCTS_COLUMNS };
   }
@@ -258,7 +260,6 @@ export function Products() {
     (): { key: ProductsColumnKey; label: string; available: boolean }[] => [
       { key: "sku", label: pt("sku"), available: true },
       { key: "productName", label: pt("productName"), available: true },
-      { key: "category", label: pt("category"), available: true },
       { key: "brand", label: pt("brand"), available: true },
       { key: "price", label: pt("price"), available: true },
       { key: "cost", label: pt("cost"), available: true },
@@ -283,7 +284,6 @@ export function Products() {
   const visibleColCount =
     (col("sku") ? 1 : 0) +
     (col("productName") ? 1 : 0) +
-    (col("category") ? 1 : 0) +
     (col("brand") ? 1 : 0) +
     (col("price") ? 1 : 0) +
     (col("cost") ? 1 : 0) +
@@ -884,25 +884,6 @@ export function Products() {
                     {pt("productName")}
                   </th>
                   )}
-                  {col("category") && (
-                  <th
-                    className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
-                    onClick={() => handleSort("category")}
-                  >
-                    <div className="flex items-center gap-1">
-                      {pt("category")}
-                      {sortField === "category" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="w-3 h-3" />
-                        ) : (
-                          <ArrowDown className="w-3 h-3" />
-                        )
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-50" />
-                      )}
-                    </div>
-                  </th>
-                  )}
                   {col("brand") && (
                   <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
@@ -1037,24 +1018,26 @@ export function Products() {
                     </td>
                     )}
                     {col("productName") && (
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-sm border border-gray-300 dark:border-gray-700 overflow-hidden">
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-sm border border-gray-300 dark:border-gray-700 overflow-hidden">
                           {product.image?.startsWith("http") || product.image?.startsWith("/") ? (
                             <img src={product.image} alt="" className="w-full h-full object-cover" />
                           ) : (
                             product.image || "📦"
                           )}
                         </div>
-                        <span className="text-xs text-gray-900 dark:text-white">
-                          {product.name}
-                        </span>
+                        <div className="min-w-0">
+                          <div className="text-xs text-gray-900 dark:text-white truncate">
+                            {product.name}
+                          </div>
+                          {product.category ? (
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">
+                              {product.category}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    </td>
-                    )}
-                    {col("category") && (
-                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {product.category}
                     </td>
                     )}
                     {col("brand") && (
