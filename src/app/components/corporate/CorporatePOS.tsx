@@ -34,6 +34,7 @@ import {
   Users,
   Bell,
   Truck,
+  Clock,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -57,7 +58,7 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, startPosOrderHourlyTimer, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -77,6 +78,7 @@ import { createQrOrderAlarm } from "../../lib/qrOrderAlarm";
 import { useNavigate, useSearchParams } from "react-router";
 import { pickCurrentUserBillerId } from "../../lib/salesBiller";
 import { ApiError } from "../../api/client";
+import { useConfirm } from "../../context/ConfirmContext";
 
 interface Product {
   id: string;
@@ -686,6 +688,7 @@ interface ReceiptData {
   subtotal: number;
   shipping: number;
   serviceFee: number;
+  tableHourlyCharge?: number;
   discount: number;
   discountLabel: string;
   total: number;
@@ -868,6 +871,12 @@ function ThermalReceipt({
           <div className="flex justify-between"><span className="text-gray-400">{labels.subtotal}:</span><span>{data.subtotal.toFixed(2)} AZN</span></div>
           <div className="flex justify-between"><span className="text-gray-400">{labels.shipping}:</span><span>{data.shipping.toFixed(2)} AZN</span></div>
           {data.serviceFee > 0 && <div className="flex justify-between"><span className="text-gray-400">{labels.serviceFee}:</span><span>{data.serviceFee.toFixed(2)} AZN</span></div>}
+          {(data.tableHourlyCharge ?? 0) > 0 && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">{labels.tableHourlyCharge ?? labels.serviceFee}:</span>
+              <span>{(data.tableHourlyCharge ?? 0).toFixed(2)} AZN</span>
+            </div>
+          )}
           {data.discount > 0 && <div className="flex justify-between"><span className="text-gray-400">{data.discountLabel}:</span><span>-{data.discount.toFixed(2)} AZN</span></div>}
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
           <div className="flex justify-between text-[13px] font-bold"><span>{labels.total}:</span><span>{data.total.toFixed(2)} AZN</span></div>
@@ -944,6 +953,7 @@ export function CorporatePOS() {
 
   // Translation helper — must come before any data that uses it
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const askConfirm = useConfirm();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -1000,6 +1010,12 @@ export function CorporatePOS() {
   const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
   const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
+  const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
+  const [hourlyRateInput, setHourlyRateInput] = useState("");
+  const [hourlyStartedAt, setHourlyStartedAt] = useState<string | null>(null);
+  const [hourlyEndedAt, setHourlyEndedAt] = useState<string | null>(null);
+  const [hourlyTickNow, setHourlyTickNow] = useState(() => Date.now());
+  const [hourlyTimerBusy, setHourlyTimerBusy] = useState(false);
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [touchKb, setTouchKb] = useState<null | {
     mode: "full" | "numpad";
@@ -1020,6 +1036,8 @@ export function CorporatePOS() {
   const [editingOrderWasHeld, setEditingOrderWasHeld] = useState(false);
   const [editingAlreadyOnKot, setEditingAlreadyOnKot] = useState(false);
   const [editingStockLocked, setEditingStockLocked] = useState(false);
+  /** Timer-started session: keep order id for updates, but show normal POS (not Edit Order). */
+  const [suppressEditOrderUi, setSuppressEditOrderUi] = useState(false);
   /** Product qty already on the order being edited — credited back for stock checks. */
   const [editingOriginalQtyByProduct, setEditingOriginalQtyByProduct] = useState<
     Record<string, number>
@@ -1181,6 +1199,7 @@ export function CorporatePOS() {
       setPosBarBillShowPricesEnabled(false);
       setPosPrintProductBrandEnabled(false);
       setPosQrOrderAlarmEnabled(true);
+      setTableHourlyBillingEnabled(false);
       setInventoryServicesEnabled(false);
       return;
     }
@@ -1196,6 +1215,7 @@ export function CorporatePOS() {
           );
           setPosPrintProductBrandEnabled(s.posPrintProductBrandEnabled === true);
           setPosQrOrderAlarmEnabled(diningEnabled && s.posQrOrderAlarmEnabled !== false);
+          setTableHourlyBillingEnabled(diningEnabled && s.tableHourlyBillingEnabled === true);
           setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
       })
@@ -1207,6 +1227,7 @@ export function CorporatePOS() {
           setPosBarBillShowPricesEnabled(false);
           setPosPrintProductBrandEnabled(false);
           setPosQrOrderAlarmEnabled(true);
+          setTableHourlyBillingEnabled(false);
           setInventoryServicesEnabled(false);
         }
       });
@@ -1351,6 +1372,7 @@ export function CorporatePOS() {
       setEditingAlreadyOnKot(false);
       setEditingStockLocked(false);
       setEditingOriginalQtyByProduct({});
+      setSuppressEditOrderUi(false);
       setPendingQrOrderId(detail.id);
       setCart(
         detail.items.map((i) => ({
@@ -1372,6 +1394,13 @@ export function CorporatePOS() {
       setPaymentStatusChoice("pending");
       setShippingInput(detail.shipping ?? "");
       setServiceFeeInput(detail.serviceFee ?? "");
+      setHourlyRateInput(
+        detail.tableHourlyRate != null && Number(detail.tableHourlyRate) > 0
+          ? String(detail.tableHourlyRate)
+          : "",
+      );
+      setHourlyStartedAt(detail.tableHourlyStartedAt ?? null);
+      setHourlyEndedAt(detail.tableHourlyEndedAt ?? null);
       if (detail.discount && Number(detail.discount) > 0) {
         setAppliedDiscount({ type: "fixed", value: Number(detail.discount) });
       } else {
@@ -1382,19 +1411,36 @@ export function CorporatePOS() {
     [],
   );
 
-  const hydrateCartFromExistingOrder = useCallback((detail: PosOrderDetail) => {
+  const hydrateCartFromExistingOrder = useCallback(
+    (detail: PosOrderDetail, opts?: { suppressEditUi?: boolean; preserveCart?: boolean }) => {
     setPendingQrOrderId(null);
     setEditingOrderId(detail.id);
-    writePosEditOrderId(detail.id);
+    // Quiet timer sessions must not sticky-restore as "Edit Order" on next POS open.
+    if (opts?.suppressEditUi) writePosEditOrderId(null);
+    else writePosEditOrderId(detail.id);
     setEditingOrderRef(detail.reference);
+    setSuppressEditOrderUi(opts?.suppressEditUi === true);
     const statusKey = (detail.status || "").toLowerCase();
     setEditingOrderWasHeld(statusKey === "held" || statusKey === "draft");
     setEditingAlreadyOnKot(Boolean(detail.kotStatus));
     const payKey = (detail.paymentStatus || "").toLowerCase().replace(/\s+/g, "_");
     const hasReturns = detail.items.some((i) => (i.returnedQty ?? 0) > 0);
     const fullyRefunded = payKey === "refunded";
-    // Lock line edits only when returns/refunds exist (stock reverse+reapply would double-restock).
     setEditingStockLocked(hasReturns || fullyRefunded);
+
+    if (opts?.preserveCart) {
+      setEditingOriginalQtyByProduct({});
+      if (detail.table?.id) setSelectedTableId(detail.table.id);
+      setHourlyRateInput(
+        detail.tableHourlyRate != null && Number(detail.tableHourlyRate) > 0
+          ? String(detail.tableHourlyRate)
+          : "",
+      );
+      setHourlyStartedAt(detail.tableHourlyStartedAt ?? null);
+      setHourlyEndedAt(detail.tableHourlyEndedAt ?? null);
+      return;
+    }
+
     const originalQty: Record<string, number> = {};
     for (const i of detail.items) {
       originalQty[i.productId] = (originalQty[i.productId] ?? 0) + i.quantity;
@@ -1420,6 +1466,13 @@ export function CorporatePOS() {
     setPaymentStatusChoice(payKey === "paid" ? "paid" : "pending");
     setShippingInput(detail.shipping ?? "");
     setServiceFeeInput(detail.serviceFee ?? "");
+    setHourlyRateInput(
+      detail.tableHourlyRate != null && Number(detail.tableHourlyRate) > 0
+        ? String(detail.tableHourlyRate)
+        : "",
+    );
+    setHourlyStartedAt(detail.tableHourlyStartedAt ?? null);
+    setHourlyEndedAt(detail.tableHourlyEndedAt ?? null);
     if (detail.discount && Number(detail.discount) > 0) {
       setAppliedDiscount({ type: "fixed", value: Number(detail.discount) });
     } else {
@@ -1427,10 +1480,11 @@ export function CorporatePOS() {
     }
     if (detail.vehicleId) setSelectedVehicleId(detail.vehicleId);
     if (detail.mileageAtService != null) setMileageInput(String(detail.mileageAtService));
-  }, []);
+  },
+  []);
 
   const handleLoadOrderForEdit = useCallback(
-    async (orderId: string) => {
+    async (orderId: string, opts?: { fromSession?: boolean }) => {
       if ((!canCreate && !canEdit) || isDemo || !isAuthenticated) return;
       try {
         const detail = await fetchPosOrder(orderId);
@@ -1459,7 +1513,21 @@ export function CorporatePOS() {
           );
           return;
         }
-        hydrateCartFromExistingOrder(detail);
+        // Stale session after timer start — do not reopen POS in Edit Order mode.
+        const isHeldTimerDraft =
+          (statusKey === "held" || statusKey === "draft") &&
+          !!detail.tableHourlyStartedAt;
+        if (opts?.fromSession && isHeldTimerDraft) {
+          writePosEditOrderId(null);
+          editOrderHandledRef.current = null;
+          return;
+        }
+        // Quiet timer drafts reopen without "Edit Order" chrome.
+        const timerOpen =
+          !!detail.tableHourlyStartedAt && !detail.tableHourlyEndedAt;
+        hydrateCartFromExistingOrder(detail, {
+          suppressEditUi: timerOpen,
+        });
         const hasReturns = detail.items.some((i) => (i.returnedQty ?? 0) > 0);
         const payKey = (detail.paymentStatus || "").toLowerCase().replace(/\s+/g, "_");
         if (hasReturns || payKey === "refunded") {
@@ -1469,11 +1537,18 @@ export function CorporatePOS() {
               "This order has returns — line items are locked; other fields can still be updated",
             ),
           );
-        } else {
+        } else if (!timerOpen) {
           notifySuccess(
             tr(
               `Sifariş redaktə üçün açıldı (${detail.reference})`,
               `Order opened for edit (${detail.reference})`,
+            ),
+          );
+        } else {
+          notifySuccess(
+            tr(
+              `Saatlıq taymer sifarişi açıldı (${detail.reference})`,
+              `Hourly timer order opened (${detail.reference})`,
             ),
           );
         }
@@ -1540,6 +1615,7 @@ export function CorporatePOS() {
       setEditingAlreadyOnKot(false);
       setEditingStockLocked(false);
       setEditingOriginalQtyByProduct({});
+      setSuppressEditOrderUi(false);
       if (wasEditing) {
         setCart([]);
         setShippingInput("");
@@ -1650,7 +1726,7 @@ export function CorporatePOS() {
       return;
     }
     editOrderHandledRef.current = orderId;
-    void handleLoadOrderForEdit(orderId).finally(() => {
+    void handleLoadOrderForEdit(orderId, { fromSession: !fromUrl && !!fromSession }).finally(() => {
       if (!fromUrl) return;
       const next = new URLSearchParams(searchParams);
       if (!next.has("orderId")) return;
@@ -1676,6 +1752,103 @@ export function CorporatePOS() {
   const selectedTableLabel = selectedTable
     ? selectedTable.name?.trim() || String(selectedTable.number)
     : "";
+  const showHourlyBillingUi =
+    diningEnabled &&
+    tableHourlyBillingEnabled &&
+    !!selectedTableId &&
+    ((selectedTable?.hourlyRate != null && selectedTable.hourlyRate > 0) ||
+      !!hourlyStartedAt);
+
+  useEffect(() => {
+    if (hourlyStartedAt) return;
+    if (
+      selectedTableId &&
+      selectedTable?.hourlyRate != null &&
+      selectedTable.hourlyRate > 0
+    ) {
+      setHourlyRateInput(String(selectedTable.hourlyRate));
+    } else {
+      setHourlyRateInput("");
+    }
+  }, [selectedTableId, selectedTable?.hourlyRate, hourlyStartedAt]);
+
+  const hourlyRateValue = Math.max(0, parseFloat(hourlyRateInput) || 0);
+  const hourlyTimerRunning = !!hourlyStartedAt && !hourlyEndedAt;
+
+  useEffect(() => {
+    if (!hourlyTimerRunning) return;
+    setPaymentStatusChoice("pending");
+  }, [hourlyTimerRunning]);
+
+  useEffect(() => {
+    if (!hourlyStartedAt || hourlyEndedAt) return;
+    setHourlyTickNow(Date.now());
+    const id = window.setInterval(() => setHourlyTickNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [hourlyStartedAt, hourlyEndedAt]);
+
+  const liveHourlyCharge = (() => {
+    if (!hourlyStartedAt || hourlyRateValue <= 0) return 0;
+    const startMs = Date.parse(hourlyStartedAt);
+    if (!Number.isFinite(startMs)) return 0;
+    const endMs = hourlyEndedAt ? Date.parse(hourlyEndedAt) : hourlyTickNow;
+    const hours = Math.max(0, (endMs - startMs) / 3_600_000);
+    return Math.round(hourlyRateValue * hours * 100) / 100;
+  })();
+  /** Empty-cart checkout allowed when editing a running/frozen hourly timer order. */
+  const canCheckoutHourlyOnly =
+    !!editingOrderId &&
+    (hourlyTimerRunning || liveHourlyCharge > 0);
+  const hourlyElapsedLabel = (() => {
+    if (!hourlyStartedAt) return "00:00:00";
+    const startMs = Date.parse(hourlyStartedAt);
+    if (!Number.isFinite(startMs)) return "00:00:00";
+    const endMs = hourlyEndedAt ? Date.parse(hourlyEndedAt) : hourlyTickNow;
+    const totalSec = Math.max(0, Math.floor((endMs - startMs) / 1000));
+    const hh = String(Math.floor(totalSec / 3600)).padStart(2, "0");
+    const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0");
+    const ss = String(totalSec % 60).padStart(2, "0");
+    return `${hh}:${mm}:${ss}`;
+  })();
+
+  const handleSelectTable = useCallback(
+    (tableId: string) => {
+      if (hourlyStartedAt && !hourlyEndedAt && tableId !== selectedTableId) {
+        notifyWarning(
+          tr(
+            "Saatlıq taymer işləyərkən masa dəyişdirilə bilməz",
+            "Cannot change table while hourly timer is running",
+          ),
+        );
+        return;
+      }
+      setSelectedTableId(tableId);
+    },
+    [hourlyStartedAt, hourlyEndedAt, selectedTableId, tr],
+  );
+
+  const hydrateFromTimerActiveConflict = useCallback(
+    async (err: unknown) => {
+      if (!(err instanceof ApiError) || err.code !== "TABLE_HOURLY_TIMER_ACTIVE") return false;
+      const raw = err.raw as { orderId?: string } | undefined;
+      const orderId = typeof raw?.orderId === "string" ? raw.orderId : null;
+      if (!orderId) return false;
+      try {
+        const detail = await fetchPosOrder(orderId);
+        hydrateCartFromExistingOrder(detail, { suppressEditUi: true });
+        notifyWarning(
+          tr(
+            "Bu masada saatlıq taymer artıq işləyir — mövcud sifariş açıldı",
+            "Hourly timer already running on this table — opened the existing order",
+          ),
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [hydrateCartFromExistingOrder, tr],
+  );
 
   const handleCustomerChange = (id: string) => {
     if (autoEnabled && id !== selectedCustomerId) {
@@ -2229,7 +2402,7 @@ export function CorporatePOS() {
       ? subtotal * (appliedDiscount.value / 100)
       : Math.min(appliedDiscount.value, subtotal)
     : 0;
-  const total = subtotal + shipping + serviceFee - discountAmount;
+  const total = subtotal + shipping + serviceFee + liveHourlyCharge - discountAmount;
 
   const handleApplyDiscount = () => {
     const val = parseFloat(discountValue);
@@ -2290,9 +2463,13 @@ export function CorporatePOS() {
     setEditingAlreadyOnKot(false);
     setEditingStockLocked(false);
     setEditingOriginalQtyByProduct({});
+    setSuppressEditOrderUi(false);
     setCart([]);
     setShippingInput("");
     setServiceFeeInput("");
+    setHourlyRateInput("");
+    setHourlyStartedAt(null);
+    setHourlyEndedAt(null);
     setSelectedCustomerId("");
     setSelectedVehicleId("");
     setMileageInput("");
@@ -2305,6 +2482,83 @@ export function CorporatePOS() {
     void refreshPendingQr("count");
     if (diningEnabled) void reloadDiningTables();
   };
+
+  const handleStartHourlyTimer = useCallback(async () => {
+    if (!selectedTableId || hourlyTimerBusy || isDemo) return;
+    const rate = hourlyRateValue;
+    if (!(rate > 0)) {
+      notifyWarning(tr("Saatlıq tarif daxil edin", "Enter an hourly rate"));
+      return;
+    }
+    const ok = await askConfirm({
+      title: tr("Saatlıq taymer", "Hourly timer"),
+      message: tr(
+        `Taymer ${rate.toFixed(2)} ₼/saat ilə başlayacaq. Məhsullar bu masa sifarişində qalacaq — sonra Sifariş / KOT edə bilərsiniz.`,
+        `Timer will start at ${rate.toFixed(2)}/hr. Your cart stays on this table order — then place Order / KOT when ready.`,
+      ),
+      confirmLabel: tr("Başlat", "Start"),
+      cancelLabel: tr("Ləğv et", "Cancel"),
+    });
+    if (!ok) return;
+    setHourlyTimerBusy(true);
+    try {
+      let detail = await startPosOrderHourlyTimer({
+        tableId: selectedTableId,
+        rate,
+      });
+      // Persist cart onto the timer order so Orders shows products, not timer-only draft.
+      if (cart.length > 0) {
+        detail = await updatePosOrder(detail.id, {
+          status: "HELD",
+          customerId: selectedCustomerId || null,
+          billerId: selectedBillerId || null,
+          ...(selectedPaymentMethod
+            ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) }
+            : {}),
+          shipping,
+          ...(serviceFee > 0 ? { serviceFee } : {}),
+          discount: discountAmount > 0 ? discountAmount : undefined,
+          items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+          tableId: selectedTableId,
+          ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+          ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+            ? { mileageAtService: Number(mileageInput) }
+            : {}),
+        });
+      }
+      // Stay on POS: same cart + running timer; quiet (not "Edit Order") chrome.
+      hydrateCartFromExistingOrder(detail, {
+        suppressEditUi: true,
+        preserveCart: cart.length > 0 && detail.items.length === 0,
+      });
+      setPaymentStatusChoice("pending");
+      await reloadDiningTables();
+      notifySuccess(tr("Taymer başladı — sifarişi tamamlaya bilərsiniz", "Timer started — you can finish the order"));
+    } catch (err) {
+      notifyFromError(err, tr("Taymeri başlatmaq alınmadı", "Failed to start timer"));
+    } finally {
+      setHourlyTimerBusy(false);
+    }
+  }, [
+    selectedTableId,
+    hourlyTimerBusy,
+    isDemo,
+    hourlyRateValue,
+    askConfirm,
+    cart,
+    selectedCustomerId,
+    selectedBillerId,
+    selectedPaymentMethod,
+    shipping,
+    serviceFee,
+    discountAmount,
+    autoEnabled,
+    selectedVehicleId,
+    mileageInput,
+    hydrateCartFromExistingOrder,
+    reloadDiningTables,
+    tr,
+  ]);
 
   const findCartStockIssue = () => {
     if (!stockEnabled) return null;
@@ -2353,8 +2607,18 @@ export function CorporatePOS() {
       );
       return false;
     }
-    if (cart.length === 0) {
+    if (cart.length === 0 && !canCheckoutHourlyOnly) {
       alert(tr("Səbəti doldurun", "Please add items to cart"));
+      return false;
+    }
+    // KOT/Bar need product lines — hourly-only bills have nothing for the kitchen.
+    if ((kind === "kot" || kind === "bar") && cart.length === 0) {
+      notifyWarning(
+        tr(
+          "KOT üçün səbətə məhsul əlavə edin",
+          "Add products to the cart before sending to KOT",
+        ),
+      );
       return false;
     }
     if (!paymentStatusChoice) {
@@ -2447,9 +2711,19 @@ export function CorporatePOS() {
     items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
     // Paid: omit amount → backend collects exact grandTotal (method optional).
     // Pending: explicit 0 so backend does not auto-charge.
-    ...(paymentStatusChoice === "paid" ? {} : { initialPaymentAmount: 0 }),
+    // Hourly timer open: always pending until the order is closed (final amount then).
+    ...(paymentStatusChoice === "paid" && !hourlyTimerRunning
+      ? {}
+      : { initialPaymentAmount: 0 }),
     ...(isGlobalMode ? { storeId: branchId ?? null } : {}),
     ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
+    // Rate is locked on the order once the timer starts — sending it again fails KOT/Order updates.
+    ...(diningEnabled &&
+    tableHourlyBillingEnabled &&
+    hourlyRateValue > 0 &&
+    !hourlyStartedAt
+      ? { tableHourlyRate: hourlyRateValue }
+      : {}),
   });
 
   /** Persist cart changes onto the order opened from Orders (PATCH, not create). */
@@ -2553,6 +2827,12 @@ export function CorporatePOS() {
               ? { mileageAtService: Number(mileageInput) }
               : {}),
             ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
+            ...(diningEnabled &&
+            tableHourlyBillingEnabled &&
+            hourlyRateValue > 0 &&
+            !hourlyStartedAt
+              ? { tableHourlyRate: hourlyRateValue }
+              : {}),
           });
       notifySuccess(
         tr(
@@ -2560,9 +2840,15 @@ export function CorporatePOS() {
           `Draft saved (${detail.reference})`,
         ),
       );
-      resetCartAfterSave();
+      if (detail.tableHourlyStartedAt && !detail.tableHourlyEndedAt) {
+        hydrateCartFromExistingOrder(detail, { suppressEditUi: true });
+      } else {
+        resetCartAfterSave();
+      }
     } catch (err) {
-      notifyFromError(err);
+      if (!(await hydrateFromTimerActiveConflict(err))) {
+        notifyFromError(err);
+      }
     } finally {
       setCheckoutAction(null);
     }
@@ -2592,13 +2878,18 @@ export function CorporatePOS() {
     );
     const apiShipping = parsePrice(detail.shipping);
     const apiServiceFee = parsePrice(detail.serviceFee);
+    // POS/KOT/Bar bills never show hourly — final charge is only on completed Sale Detail receipt/invoice.
+    const apiHourlyCharge = 0;
     const apiDiscount = parsePrice(detail.discount);
-    const apiTotal = parsePrice(detail.grandTotal);
+    const rawTotal = parsePrice(detail.grandTotal);
+    const rawHourly = parsePrice(detail.tableHourlyCharge);
+    const apiTotal = Math.max(0, Math.round((rawTotal - rawHourly) * 100) / 100);
     const apiPaid = parsePrice(detail.paid);
-    const apiDue = Math.max(
+    const rawDue = Math.max(
       0,
-      Math.round((parsePrice(detail.due) || apiTotal - apiPaid) * 100) / 100,
+      Math.round((parsePrice(detail.due) || rawTotal - apiPaid) * 100) / 100,
     );
+    const apiDue = Math.max(0, Math.round((rawDue - rawHourly) * 100) / 100);
     const serverPaymentStatusLabel =
       detail.paymentStatus.toLowerCase() === "paid" || (apiTotal > 0 && apiPaid >= apiTotal)
         ? tr("Ödənilib", "Paid")
@@ -2627,6 +2918,7 @@ export function CorporatePOS() {
       subtotal: apiSubtotal,
       shipping: apiShipping,
       serviceFee: apiServiceFee,
+      tableHourlyCharge: apiHourlyCharge,
       discount: apiDiscount,
       discountLabel: appliedDiscount
         ? appliedDiscount.type === "percent"
@@ -2664,6 +2956,7 @@ export function CorporatePOS() {
       subtotal: data.subtotal,
       shipping: data.shipping,
       serviceFee: data.serviceFee,
+      tableHourlyCharge: data.tableHourlyCharge ?? 0,
       discount: data.discount,
       discountLabel: data.discountLabel,
       total: data.total,
@@ -2809,9 +3102,15 @@ export function CorporatePOS() {
               ),
         );
       }
-      resetCartAfterSave();
+      if (detail.tableHourlyStartedAt && !detail.tableHourlyEndedAt) {
+        hydrateCartFromExistingOrder(detail, { suppressEditUi: true });
+      } else {
+        resetCartAfterSave();
+      }
     } catch (err) {
-      notifyFromError(err);
+      if (!(await hydrateFromTimerActiveConflict(err))) {
+        notifyFromError(err);
+      }
     } finally {
       setCheckoutAction(null);
     }
@@ -2905,9 +3204,15 @@ export function CorporatePOS() {
       } else {
         setReceipt(receiptData);
       }
-      resetCartAfterSave({ skipQrRelease: true });
+      if (detail.tableHourlyStartedAt && !detail.tableHourlyEndedAt) {
+        hydrateCartFromExistingOrder(detail, { suppressEditUi: true });
+      } else {
+        resetCartAfterSave({ skipQrRelease: true });
+      }
     } catch (err) {
-      notifyFromError(err);
+      if (!(await hydrateFromTimerActiveConflict(err))) {
+        notifyFromError(err);
+      }
     } finally {
       setCheckoutAction(null);
     }
@@ -2993,9 +3298,15 @@ export function CorporatePOS() {
       } else {
         setReceipt(receiptData);
       }
-      resetCartAfterSave();
+      if (detail.tableHourlyStartedAt && !detail.tableHourlyEndedAt) {
+        hydrateCartFromExistingOrder(detail, { suppressEditUi: true });
+      } else {
+        resetCartAfterSave();
+      }
     } catch (err) {
-      notifyFromError(err);
+      if (!(await hydrateFromTimerActiveConflict(err))) {
+        notifyFromError(err);
+      }
     } finally {
       setCheckoutAction(null);
     }
@@ -3041,9 +3352,15 @@ export function CorporatePOS() {
           "Order completed, but bill print failed — use Print on the receipt",
         ),
       });
-      resetCartAfterSave();
+      if (detail.tableHourlyStartedAt && !detail.tableHourlyEndedAt) {
+        hydrateCartFromExistingOrder(detail, { suppressEditUi: true });
+      } else {
+        resetCartAfterSave();
+      }
     } catch (err) {
-      notifyFromError(err);
+      if (!(await hydrateFromTimerActiveConflict(err))) {
+        notifyFromError(err);
+      }
     } finally {
       setCheckoutAction(null);
     }
@@ -3454,12 +3771,12 @@ export function CorporatePOS() {
               <div className="shrink-0 flex items-center gap-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
                 <div className="min-w-0 flex-shrink">
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                    {editingOrderId
+                    {editingOrderId && !suppressEditOrderUi
                       ? tr("Sifarişi redaktə et", "Edit Order")
                       : tr("Sifariş", "Order")}
                   </h2>
                   <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-                    {editingOrderRef
+                    {editingOrderRef && !suppressEditOrderUi
                       ? editingOrderRef
                       : `${cart.length} ${tr("məhsul", "items")}`}
                   </p>
@@ -3531,7 +3848,7 @@ export function CorporatePOS() {
                       onClick={() => resetCartAfterSave()}
                       className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-1 rounded-md transition-colors"
                       title={
-                        editingOrderId
+                        editingOrderId && !suppressEditOrderUi
                           ? tr("Redaktəni ləğv et", "Cancel edit")
                           : tr("Səbəti təmizlə", "Clear cart")
                       }
@@ -3546,7 +3863,7 @@ export function CorporatePOS() {
                   {tr("QR sifariş qəbul edildi — KOT & Çap ilə təsdiqləyin", "QR order accepted — confirm with KOT & Print")}
                 </div>
               )}
-              {editingOrderId && !pendingQrOrderId && (
+              {editingOrderId && !pendingQrOrderId && !suppressEditOrderUi && (
                 <div className="shrink-0 mb-2 px-2 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 text-[11px] text-sky-800 dark:text-sky-200">
                   {editingStockLocked
                     ? tr(
@@ -3646,8 +3963,17 @@ export function CorporatePOS() {
                       </button>
                       <button
                         type="button"
+                        disabled={hourlyTimerRunning}
+                        title={
+                          hourlyTimerRunning
+                            ? tr(
+                                "Saatlıq taymer işləyərkən ödəniş gözləmədə qalır — sifariş bağlananda ödəyin",
+                                "Payment stays pending while the hourly timer runs — pay when closing the order",
+                              )
+                            : undefined
+                        }
                         onClick={() => setPaymentStatusChoice("paid")}
-                        className={`flex-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-t border-gray-200 dark:border-gray-700 transition-colors ${
+                        className={`flex-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-t border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                           paymentStatusChoice === "paid"
                             ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/25 text-[#0f766e] dark:text-[#5eead4]"
                             : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -3658,13 +3984,74 @@ export function CorporatePOS() {
                     </div>
                   </div>
 
+                  {showHourlyBillingUi && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="shrink-0 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                        {tr("Saatlıq tarif", "Hourly rate")}
+                      </label>
+                      <div className="relative flex-1 min-w-0">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          disabled={
+                            !!hourlyEndedAt ||
+                            (!!hourlyStartedAt && !hourlyEndedAt) ||
+                            isDemo
+                          }
+                          value={hourlyRateInput}
+                          onChange={(e) =>
+                            setHourlyRateInput(
+                              sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                            )
+                          }
+                          className="w-full pr-7 pl-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                          ₼/h
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={
+                          isDemo ||
+                          hourlyTimerBusy ||
+                          !!hourlyEndedAt ||
+                          (!!hourlyStartedAt && !hourlyEndedAt)
+                        }
+                        onClick={() => void handleStartHourlyTimer()}
+                        title={
+                          hourlyStartedAt && !hourlyEndedAt
+                            ? tr("Taymer işləyir", "Timer running")
+                            : tr("Taymeri başlat", "Start timer")
+                        }
+                        className={`shrink-0 w-10 h-9 rounded-lg border flex items-center justify-center transition-colors ${
+                          hourlyStartedAt && !hourlyEndedAt
+                            ? "border-[#14b8a6] bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#0f766e] dark:text-[#5eead4]"
+                            : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        } disabled:opacity-50`}
+                      >
+                        <Clock className="w-4 h-4" />
+                      </button>
+                      {hourlyStartedAt ? (
+                        <div className="shrink-0 text-right">
+                          <div className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+                            {hourlyElapsedLabel}
+                          </div>
+                          <div className="text-[10px] font-medium text-gray-900 dark:text-white tabular-nums">
+                            {formatCurrency(liveHourlyCharge)}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
                   {diningEnabled && (
                     <>
                       <PosTablePickerPortal
                         open={tablePickerOpen}
                         tables={diningTables}
                         selectedId={selectedTableId}
-                        onSelect={setSelectedTableId}
+                        onSelect={handleSelectTable}
                         onOccupiedAttempt={handleOccupiedTableAttempt}
                         onClose={() => setTablePickerOpen(false)}
                         tr={tr}
@@ -3921,6 +4308,16 @@ export function CorporatePOS() {
                         <span className="text-gray-900 dark:text-white font-medium">{formatCurrency(subtotal)}</span>
                       </div>
                     </div>
+                    {liveHourlyCharge > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          {tr("Saatlıq ödəniş", "Hourly charge")}
+                        </span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {formatCurrency(liveHourlyCharge)}
+                        </span>
+                      </div>
+                    )}
                     {parsePrice(shippingInput) > 0 && (
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-500 dark:text-gray-400">{tr("Çatdırılma", "Shipping")}</span>
@@ -3946,7 +4343,7 @@ export function CorporatePOS() {
               </div>
 
               {/* Fixed checkout: Total + actions stay visible while cart scrolls */}
-              {cart.length > 0 && (
+              {(cart.length > 0 || canCheckoutHourlyOnly) && (
                 <div className="shrink-0 border-t border-gray-200 dark:border-gray-800 pt-2.5 mt-1 bg-white dark:bg-gray-900">
                   <div className="flex justify-between items-baseline mb-2.5 pb-2 border-b border-gray-200 dark:border-gray-800">
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Cəmi", "Total")}</span>
@@ -3957,7 +4354,7 @@ export function CorporatePOS() {
                   <div className="space-y-1.5">
                     {(() => {
                       const baseDisabled =
-                        cart.length === 0 ||
+                        (cart.length === 0 && !canCheckoutHourlyOnly) ||
                         checkoutBusy ||
                         isGlobalMode ||
                         !branchId;
@@ -3965,7 +4362,7 @@ export function CorporatePOS() {
                       const btnBase =
                         "px-2.5 py-2 text-[11px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1";
 
-                      if (editingOrderId) {
+                      if (editingOrderId && !suppressEditOrderUi) {
                         return (
                           <div className="grid grid-cols-2 gap-1.5">
                             <button

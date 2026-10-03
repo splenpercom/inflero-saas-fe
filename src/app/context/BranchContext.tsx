@@ -56,6 +56,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       setBranches([]);
     } finally {
       setIsLoading(false);
+      // Restore tenant-scoped branch before marking ready so refresh does not
+      // briefly look like all-branches mode and kick the user to /dashboard.
+      const stored = getBranchStoreId();
+      if (stored) setBranchIdState(stored);
       setBranchesLoaded(true);
     }
   }, [isDemo, isAuthenticated]);
@@ -182,14 +186,18 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   const isGlobalMode = branchManagementEnabled && !isBranchLocked && branchId === null;
   const hasBranches = branches.length > 0;
+  // Wait for branches (+ stored selection restore) before ready so scope guards
+  // never treat a mid-refresh null branchId as intentional global mode.
   const ready =
     authLoading || !(isAuthenticated || isDemo)
       ? true
       : !modulesLoaded && !isDemo
         ? false
-        : branchManagementEnabled
-          ? true
-          : branchesLoaded && (branches.length === 0 || branchId !== null);
+        : !branchesLoaded
+          ? false
+          : branchManagementEnabled
+            ? true
+            : branches.length === 0 || branchId !== null;
 
   const value = useMemo(
     () => ({

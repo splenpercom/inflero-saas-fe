@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car, Printer, ChefHat, Loader2 } from "lucide-react";
+import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car, Printer, ChefHat, Loader2, Clock } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import {
   fetchPosOrder,
+  finishTableActiveOrders,
   recordPosOrderPayment,
   updatePosOrder,
   type PosOrderDetail,
@@ -65,11 +66,13 @@ export function SaleDetailModal({
   const [finalizePaid, setFinalizePaid] = useState(true);
   const [receiptChoiceOpen, setReceiptChoiceOpen] = useState(false);
   const [emptyAndPrintBusy, setEmptyAndPrintBusy] = useState(false);
+  const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !orderId) {
       setOrder(null);
       setReceiptChoiceOpen(false);
+      setTableHourlyBillingEnabled(false);
       return;
     }
     setLoading(true);
@@ -87,6 +90,24 @@ export function SaleDetailModal({
       .finally(() => setLoading(false));
   }, [isOpen, orderId, language]);
 
+  useEffect(() => {
+    if (!isOpen || !diningEnabled) {
+      setTableHourlyBillingEnabled(false);
+      return;
+    }
+    let cancelled = false;
+    fetchTenantSettings()
+      .then((s) => {
+        if (!cancelled) setTableHourlyBillingEnabled(s.tableHourlyBillingEnabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setTableHourlyBillingEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, diningEnabled]);
+
   if (!isOpen || !orderId) return null;
 
   const grandTotal = order ? parseFloat(order.grandTotal) : 0;
@@ -96,16 +117,33 @@ export function SaleDetailModal({
   const discount = order?.discount ? parseFloat(order.discount) : 0;
   const shippingCost = order?.shipping ? parseFloat(order.shipping) : 0;
   const serviceFee = order?.serviceFee ? parseFloat(order.serviceFee) : 0;
+  const tableHourlyCharge = (() => {
+    if (order?.tableHourlyCharge == null || order.tableHourlyCharge === "") return 0;
+    const n = Number(order.tableHourlyCharge);
+    return Number.isFinite(n) ? n : 0;
+  })();
+  const tableHourlyRate = (() => {
+    if (order?.tableHourlyRate == null || order.tableHourlyRate === "") return 0;
+    const n = Number(order.tableHourlyRate);
+    return Number.isFinite(n) ? n : 0;
+  })();
+  const showHourlyBillingDetails =
+    diningEnabled &&
+    tableHourlyBillingEnabled &&
+    !!order?.tableHourlyStartedAt;
   const commissionAmount = order?.commissionAmount ? parseFloat(order.commissionAmount) : 0;
   const taxPercent = order?.taxPercent ? parseFloat(order.taxPercent) : 0;
   const itemsSubtotal = order?.items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0) ?? 0;
   const taxAmount = (itemsSubtotal * taxPercent) / 100;
   const isDraft = order ? isDraftOrderStatus(order.status) || isDraftOrderStatus(order.statusLabel) : false;
+  const hasHourlyTimerOpen =
+    !!order?.tableHourlyStartedAt && !order?.tableHourlyEndedAt;
+  const hasHourlyBill = tableHourlyCharge > 0 || hasHourlyTimerOpen;
   const showEmptyTableReceiptChoice =
     !!order &&
     diningEnabled &&
     !!order.table?.id &&
-    order.items.length > 0 &&
+    (order.items.length > 0 || hasHourlyBill) &&
     !isCancelledStatus(order.status, order.statusLabel) &&
     (isUnpaidPaymentStatus(order.paymentStatus) || due > 0.001);
 
@@ -138,18 +176,19 @@ export function SaleDetailModal({
 
   const handleFinalize = async () => {
     if (!order || !canFinalize || isDemo) return;
-    if (order.items.length === 0) {
+    if (order.items.length === 0 && !hasHourlyBill) {
       notifyWarning(tr("Sifarişdə məhsul yoxdur", "This order has no items"));
       return;
     }
     setFinalizing(true);
     try {
+      // COMPLETED finalizes an open hourly timer; due on the response is post-freeze.
       const updated = await updatePosOrder(order.id, {
         status: "COMPLETED",
         paymentMethod: mapPaymentMethodToApi(finalizePaymentMethod),
       });
       const remaining = parseFloat(updated.due);
-      if (finalizePaid && remaining > 0) {
+      if (finalizePaid && remaining > 0.001) {
         await recordPosOrderPayment(order.id, {
           amount: remaining,
           method: mapPaymentMethodToApi(finalizePaymentMethod),
@@ -172,6 +211,11 @@ export function SaleDetailModal({
       getCompanyLogoUrl(user?.tenant, true) ??
       APP_LOGO_LIGHT;
     const settings = await fetchTenantSettings().catch(() => null);
+    const statusKey = (detail.status || "").toUpperCase();
+    const hourlyFinalized =
+      statusKey === "COMPLETED" &&
+      !!detail.tableHourlyEndedAt &&
+      Number(detail.tableHourlyCharge) > 0;
     const result = await printPosOrderTicket({
       order: detail,
       role: "receipt",
@@ -180,6 +224,7 @@ export function SaleDetailModal({
       logoSrc,
       printProductBrand: settings?.posPrintProductBrandEnabled === true,
       barShowPrices: diningEnabled && settings?.posBarBillShowPricesEnabled === true,
+      includeTableHourlyCharge: hourlyFinalized,
     });
     notifySuccess(
       result.channel === "qz"
@@ -242,7 +287,7 @@ export function SaleDetailModal({
 
   const handleEmptyTableCompleteAndPrint = async () => {
     if (!order || isDemo || !canFinalize) return;
-    if (order.items.length === 0) {
+    if (order.items.length === 0 && !hasHourlyBill) {
       notifyWarning(tr("Sifarişdə məhsul yoxdur", "This order has no items"));
       return;
     }
@@ -252,23 +297,27 @@ export function SaleDetailModal({
       const method = mapPaymentMethodToApi(
         mapPaymentMethodFromApi(order.paymentMethod) || "cash",
       );
-      let detail = order;
-      const statusKey = (order.status || "").toUpperCase();
-      if (statusKey !== "COMPLETED") {
+      let detail: PosOrderDetail;
+      // Prefer finish-table: freezes hourly first, then settles the post-finalize due.
+      // DIY complete+pay used a stale due when KOT had already marked Completed
+      // while the timer was still running — leaving Partial (e.g. paid 3.86 / total 3.95).
+      if (order.table?.id) {
+        await finishTableActiveOrders(order.table.id);
+        detail = await fetchPosOrder(order.id);
+      } else {
+        // Always patch COMPLETED so an open timer is finalized before reading due.
         detail = await updatePosOrder(order.id, {
           status: "COMPLETED",
           paymentMethod: method,
         });
-      }
-      const remaining = parseFloat(detail.due);
-      if (remaining > 0.001) {
-        detail = await recordPosOrderPayment(order.id, {
-          amount: remaining,
-          method,
-          note: "Empty table / complete from receipt",
-        });
-      } else {
-        detail = await fetchPosOrder(order.id);
+        const remaining = parseFloat(detail.due);
+        if (remaining > 0.001) {
+          detail = await recordPosOrderPayment(order.id, {
+            amount: remaining,
+            method,
+            note: "Empty table / complete from receipt",
+          });
+        }
       }
       setOrder(detail);
       setReceiptChoiceOpen(false);
@@ -316,7 +365,12 @@ export function SaleDetailModal({
                 <button
                   type="button"
                   onClick={() => void handleThermalPrint("receipt")}
-                  disabled={!!printing || emptyAndPrintBusy || isDemo || order.items.length === 0}
+                  disabled={
+                    !!printing ||
+                    emptyAndPrintBusy ||
+                    isDemo ||
+                    (order.items.length === 0 && !hasHourlyBill)
+                  }
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-lg disabled:opacity-50"
                 >
                   {printing === "receipt" ? (
@@ -570,6 +624,46 @@ export function SaleDetailModal({
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-600 dark:text-gray-400">{tr("Xidmət haqqı", "Service fee")}:</span>
                         <span className="font-medium text-gray-900 dark:text-white">₼{serviceFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {showHourlyBillingDetails && (
+                      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/40 px-2.5 py-2 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-900 dark:text-white">
+                          <Clock className="w-3.5 h-3.5 text-[#14b8a6]" />
+                          {tr("Saatlıq taymer", "Hourly timer")}
+                        </div>
+                        {tableHourlyRate > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-400">{tr("Tarif", "Rate")}:</span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              ₼{tableHourlyRate.toFixed(2)}/h
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-600 dark:text-gray-400">{tr("Başladı", "Started")}:</span>
+                          <span className="font-medium text-gray-900 dark:text-white tabular-nums">
+                            {order.tableHourlyStartedAt
+                              ? formatSalesDateTime(order.tableHourlyStartedAt, language)
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-600 dark:text-gray-400">{tr("Dayandı", "Stopped")}:</span>
+                          <span className="font-medium text-gray-900 dark:text-white tabular-nums">
+                            {order.tableHourlyEndedAt
+                              ? formatSalesDateTime(order.tableHourlyEndedAt, language)
+                              : tr("İşləyir", "Running")}
+                          </span>
+                        </div>
+                        {tableHourlyCharge > 0 && (
+                          <div className="flex justify-between text-xs pt-0.5 border-t border-gray-200 dark:border-gray-700">
+                            <span className="text-gray-600 dark:text-gray-400">{tr("Saatlıq ödəniş", "Hourly charge")}:</span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              ₼{tableHourlyCharge.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                     {order.commissionEnabled && commissionAmount > 0 && (

@@ -6,6 +6,7 @@ export type DiningTable = {
   name: string;
   seats: number;
   area: string | null;
+  hourlyRate: number | null;
   status: "AVAILABLE" | "OCCUPIED" | "RESERVED";
   storeId: string;
   updatedAt: string;
@@ -60,6 +61,7 @@ export async function createDiningTable(body: {
   seats?: number;
   area?: string | null;
   status?: DiningTable["status"];
+  hourlyRate?: number | null;
 }) {
   const res = await apiPost<{ success: true; data: DiningTable }>("/tenant/dining/tables", body);
   return res.data;
@@ -71,6 +73,7 @@ export async function updateDiningTable(id: string, body: Partial<{
   seats: number;
   area: string | null;
   status: DiningTable["status"];
+  hourlyRate: number | null;
 }>) {
   const res = await apiPatch<{ success: true; data: DiningTable }>(`/tenant/dining/tables/${id}`, body);
   return res.data;

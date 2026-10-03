@@ -137,6 +137,7 @@ export function Settings() {
   const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
   const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
+  const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [billers, setBillers] = useState<SalesBillerRow[]>([]);
   const [commissionDrafts, setCommissionDrafts] = useState<Record<string, CommissionDraft>>({});
@@ -150,6 +151,7 @@ export function Settings() {
     posBarBillShowPricesEnabled: boolean;
     posPrintProductBrandEnabled: boolean;
     posQrOrderAlarmEnabled: boolean;
+    tableHourlyBillingEnabled: boolean;
     inventoryServicesEnabled: boolean;
     billers: SalesBillerRow[];
   } | null>(null);
@@ -204,6 +206,7 @@ export function Settings() {
     );
     setPosPrintProductBrandEnabled(data.posPrintProductBrandEnabled === true);
     setPosQrOrderAlarmEnabled(diningEnabled && data.posQrOrderAlarmEnabled !== false);
+    setTableHourlyBillingEnabled(diningEnabled && data.tableHourlyBillingEnabled === true);
     setInventoryServicesEnabled(data.inventoryServicesEnabled === true);
     setSavedLogoUrl(data.companyLogo);
     setLogoFile(null);
@@ -252,6 +255,7 @@ export function Settings() {
           posBarBillShowPricesEnabled: data.posBarBillShowPricesEnabled === true,
           posPrintProductBrandEnabled: data.posPrintProductBrandEnabled === true,
           posQrOrderAlarmEnabled: data.posQrOrderAlarmEnabled !== false,
+          tableHourlyBillingEnabled: data.tableHourlyBillingEnabled === true,
           inventoryServicesEnabled: data.inventoryServicesEnabled === true,
           billers: billerRows,
         };
@@ -435,6 +439,7 @@ export function Settings() {
                     posSendToBarEnabled,
                     posBarBillShowPricesEnabled,
                     posQrOrderAlarmEnabled,
+                    tableHourlyBillingEnabled,
                   }
                 : {}),
             }
@@ -478,6 +483,7 @@ export function Settings() {
         posBarBillShowPricesEnabled,
         posPrintProductBrandEnabled,
         posQrOrderAlarmEnabled,
+        tableHourlyBillingEnabled,
         inventoryServicesEnabled,
         billers: refreshedBillers,
       };
@@ -531,6 +537,7 @@ export function Settings() {
         setPosBarBillShowPricesEnabled(addonSnapshotRef.current.posBarBillShowPricesEnabled);
         setPosPrintProductBrandEnabled(addonSnapshotRef.current.posPrintProductBrandEnabled);
         setPosQrOrderAlarmEnabled(addonSnapshotRef.current.posQrOrderAlarmEnabled);
+        setTableHourlyBillingEnabled(addonSnapshotRef.current.tableHourlyBillingEnabled);
         setInventoryServicesEnabled(addonSnapshotRef.current.inventoryServicesEnabled);
         applyBillerDrafts(addonSnapshotRef.current.billers);
       }
@@ -559,7 +566,16 @@ export function Settings() {
     if (!diningEnabled && posQrOrderAlarmEnabled) {
       setPosQrOrderAlarmEnabled(false);
     }
-  }, [diningEnabled, posSendToBarEnabled, posBarBillShowPricesEnabled, posQrOrderAlarmEnabled]);
+    if (!diningEnabled && tableHourlyBillingEnabled) {
+      setTableHourlyBillingEnabled(false);
+    }
+  }, [
+    diningEnabled,
+    posSendToBarEnabled,
+    posBarBillShowPricesEnabled,
+    posQrOrderAlarmEnabled,
+    tableHourlyBillingEnabled,
+  ]);
 
   const navItemClass = (section: SettingsSection) =>
     `w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
@@ -1267,6 +1283,35 @@ export function Settings() {
                       <span
                         className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
                           posBarBillShowPricesEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Table hourly billing", "Masa saatlıq ödəniş")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, tables can set an optional hourly rate and POS can start a timer billed by minutes until the table is emptied.",
+                          "Aktiv olduqda masalara istəyə bağlı saatlıq tarif təyin edilə bilər və POS-da masa boşaldılana qədər dəqiqə üzrə hesablanan taymer işə salına bilər.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => setTableHourlyBillingEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        tableHourlyBillingEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={tableHourlyBillingEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          tableHourlyBillingEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
                         }`}
                       />
                     </button>

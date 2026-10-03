@@ -442,7 +442,7 @@ export function Reports() {
                 </tbody>
               </table>
             </div>
-          </div>
+        </div>
 
           {/* Block B — Employee Breakdown */}
           {posEnabled && (
@@ -480,7 +480,7 @@ export function Reports() {
                         const id = e.billerId ?? e.billerCode;
                         const open = expandedId === id;
                         const due = e.dueAmount + e.unpaidAmount;
-                        return (
+            return (
                           <Fragment key={id}>
                             <tr
                               className="border-b border-gray-50 dark:border-gray-800/80 cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-800/40"

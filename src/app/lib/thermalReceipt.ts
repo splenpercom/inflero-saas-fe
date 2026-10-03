@@ -173,6 +173,7 @@ export function thermalReceiptLabels(language: Language) {
     subtotal: t("Ara cəm", "Subtotal"),
     shipping: t("Çatdırılma", "Shipping"),
     serviceFee: t("Xidmət haqqı", "Service fee"),
+    tableHourlyCharge: t("Saatlıq ödəniş", "Hourly charge"),
     total: t("CƏMİ", "TOTAL"),
     paid: t("Ödənilib", "Paid"),
     amountDue: t("Qalan borc", "Amount due"),
@@ -212,6 +213,8 @@ export type ThermalReceiptPayload = {
   subtotal: number;
   shipping: number;
   serviceFee: number;
+  /** Table hourly timer charge (Dining add-on). */
+  tableHourlyCharge?: number;
   discount: number;
   discountLabel: string;
   total: number;
@@ -272,6 +275,7 @@ export function buildThermalReceiptHtml(
     subtotal: data.subtotal,
     shipping: data.shipping,
     serviceFee: data.serviceFee,
+    tableHourlyCharge: data.tableHourlyCharge ?? 0,
     discount: data.discount,
     total: data.total,
     paid: data.paid ?? 0,
@@ -292,6 +296,7 @@ export function buildThermalReceiptHtml(
     subtotal: p(labels.subtotal),
     shipping: p(labels.shipping),
     serviceFee: p(labels.serviceFee),
+    tableHourlyCharge: p(labels.tableHourlyCharge),
     total: p(labels.total),
     paid: p(labels.paid),
     amountDue: p(labels.amountDue),
@@ -366,6 +371,7 @@ export function buildThermalReceiptHtml(
   <div class="row"><span class="label">${L.subtotal}:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
   <div class="row"><span class="label">${L.shipping}:</span><span>${d.shipping.toFixed(2)} AZN</span></div>
   ${d.serviceFee > 0 ? `<div class="row"><span class="label">${L.serviceFee}:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
+  ${(d.tableHourlyCharge ?? 0) > 0 ? `<div class="row"><span class="label">${L.tableHourlyCharge}:</span><span>${(d.tableHourlyCharge ?? 0).toFixed(2)} AZN</span></div>` : ""}
   ${d.discount > 0 ? `<div class="row"><span class="label">${d.discountLabel}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
   <div class="divider-solid"></div>
   <div class="total-row"><span>${L.total}:</span><span>${d.total.toFixed(2)} AZN</span></div>

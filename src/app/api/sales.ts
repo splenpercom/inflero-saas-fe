@@ -98,6 +98,10 @@ export interface PosOrderDetail {
   taxPercent: string | null;
   discount: string | null;
   serviceFee?: string | null;
+  tableHourlyRate?: string | null;
+  tableHourlyStartedAt?: string | null;
+  tableHourlyEndedAt?: string | null;
+  tableHourlyCharge?: string | null;
   commissionEnabled?: boolean;
   commissionType?: "FIXED" | "PERCENT" | null;
   commissionValue?: string | null;
@@ -265,6 +269,8 @@ export type CreatePosOrderBody = {
   mileageAtService?: number | null;
   /** Dining: optional table (requires DINING module). */
   tableId?: string | null;
+  /** Dining hourly billing: rate snapshot for this order. */
+  tableHourlyRate?: number | null;
 };
 
 export type CreateInvoiceBody = {
@@ -402,6 +408,15 @@ export async function finishTableActiveOrders(tableId: string) {
     success: boolean;
     data: { tableId: string; finishedOrderIds: string[]; tableStatus: string };
   }>(`/tenant/sales/pos-orders/finish-table/${encodeURIComponent(tableId)}`, {});
+  return res.data;
+}
+
+/** Start (or resume) table hourly timer; creates empty HELD draft when no open order. */
+export async function startPosOrderHourlyTimer(body: { tableId: string; rate?: number }) {
+  const res = await apiPost<{ success: boolean; data: PosOrderDetail }>(
+    "/tenant/sales/pos-orders/hourly-timer/start",
+    body,
+  );
   return res.data;
 }
 

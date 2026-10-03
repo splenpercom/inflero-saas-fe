@@ -478,6 +478,11 @@ export function posOrderToThermalPayload(
     customerPhone?: string;
     /** When true, include product brand under each line (Settings add-on). */
     printProductBrand?: boolean;
+    /**
+     * Hourly charge is final only after timer ends on a completed order.
+     * POS/KOT/Bar bills omit it; Sale Detail receipt may include it.
+     */
+    includeTableHourlyCharge?: boolean;
   },
 ): ThermalReceiptPayload {
   const language = opts.language;
@@ -499,12 +504,17 @@ export function posOrderToThermalPayload(
     (sum, item) => sum + parseMoney(item.price) * item.quantity,
     0,
   );
-  const total = parseMoney(order.grandTotal);
+  const hourlyCharge = parseMoney(order.tableHourlyCharge);
+  const includeHourly = opts.includeTableHourlyCharge === true && hourlyCharge > 0;
+  const rawTotal = parseMoney(order.grandTotal);
+  const total = includeHourly
+    ? rawTotal
+    : Math.max(0, Math.round((rawTotal - hourlyCharge) * 100) / 100);
   const paid = parseMoney(order.paid);
-  const amountDue = Math.max(
-    0,
-    Math.round((parseMoney(order.due) || total - paid) * 100) / 100,
-  );
+  const rawDue = parseMoney(order.due) || Math.max(0, rawTotal - paid);
+  const amountDue = includeHourly
+    ? Math.max(0, Math.round(rawDue * 100) / 100)
+    : Math.max(0, Math.round((rawDue - hourlyCharge) * 100) / 100);
   const paymentStatusLabel =
     order.paymentStatus.toLowerCase() === "paid" || (total > 0 && paid >= total)
       ? t("Ödənilib", "Paid")
@@ -535,6 +545,7 @@ export function posOrderToThermalPayload(
     subtotal,
     shipping: parseMoney(order.shipping),
     serviceFee: parseMoney(order.serviceFee),
+    tableHourlyCharge: includeHourly ? hourlyCharge : 0,
     discount: parseMoney(order.discount),
     discountLabel: t("Endirim", "Discount"),
     total,
@@ -560,6 +571,8 @@ export async function printPosOrderTicket(opts: {
   printProductBrand?: boolean;
   /** When role is bar, print line prices + totals. */
   barShowPrices?: boolean;
+  /** Include finalized hourly charge (Sale Detail completed receipt only). */
+  includeTableHourlyCharge?: boolean;
 }): Promise<PosPrintResult> {
   const payload = posOrderToThermalPayload(opts.order, {
     language: opts.language,
@@ -567,6 +580,7 @@ export async function printPosOrderTicket(opts: {
     logoSrc: opts.logoSrc,
     customerPhone: opts.customerPhone,
     printProductBrand: opts.printProductBrand,
+    includeTableHourlyCharge: opts.includeTableHourlyCharge === true,
   });
   return printPosTicket({
     role: opts.role,

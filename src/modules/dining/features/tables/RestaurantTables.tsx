@@ -26,6 +26,7 @@ import {
   upsertDiningRestaurantInfo,
   type DiningTable,
 } from "../../../../app/api/dining";
+import { fetchTenantSettings } from "../../../../app/api/tenantSettings";
 import { ApiError } from "../../../../app/api/client";
 import { ModernSelect } from "../../../../app/components/ui/ModernSelect";
 
@@ -111,18 +112,29 @@ function makeQrUrl(slug: string | null | undefined, tableId: string) {
 function TableModal({
   initial,
   defaultNumber,
+  showHourlyRate,
   onSave,
   onClose,
 }: {
   initial?: DiningTable;
   defaultNumber: number;
-  onSave: (d: { name: string; seats: number; area: string; number: number }) => void;
+  showHourlyRate: boolean;
+  onSave: (d: {
+    name: string;
+    seats: number;
+    area: string;
+    number: number;
+    hourlyRate: number | null;
+  }) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [number, setNumber] = useState(initial?.number ?? defaultNumber);
   const [seats, setSeats] = useState(initial?.seats ?? 4);
   const [area, setArea] = useState(initial?.area ?? "Indoor");
+  const [hourlyRate, setHourlyRate] = useState(
+    initial?.hourlyRate != null && initial.hourlyRate > 0 ? String(initial.hourlyRate) : "",
+  );
 
   const active = "bg-[#14b8a6] border-[#14b8a6] text-white";
   const idle =
@@ -205,6 +217,22 @@ function TableModal({
               ))}
             </div>
           </div>
+          {showHourlyRate && (
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                Hourly rate (optional)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={hourlyRate}
+                onChange={(e) => setHourlyRate(e.target.value)}
+                placeholder="e.g. 10"
+                className={inputCls}
+              />
+            </div>
+          )}
         </div>
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
           <button
@@ -218,7 +246,15 @@ function TableModal({
             type="button"
             disabled={!name.trim() || !number}
             onClick={() => {
-              onSave({ name: name.trim(), seats, area, number });
+              const parsed = hourlyRate.trim() === "" ? null : Number(hourlyRate);
+              onSave({
+                name: name.trim(),
+                seats,
+                area,
+                number,
+                hourlyRate:
+                  parsed != null && Number.isFinite(parsed) && parsed >= 0 ? parsed : null,
+              });
               onClose();
             }}
             className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
@@ -415,12 +451,18 @@ export function RestaurantTables() {
   const [areaFilter, setAreaFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState<"all" | UiStatus>("all");
   const [search, setSearch] = useState("");
+  const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [t, i] = await Promise.all([fetchDiningTables(), fetchDiningRestaurantInfo()]);
+      const [t, i, settings] = await Promise.all([
+        fetchDiningTables(),
+        fetchDiningRestaurantInfo(),
+        fetchTenantSettings().catch(() => null),
+      ]);
       setTables(t);
+      setTableHourlyBillingEnabled(settings?.tableHourlyBillingEnabled === true);
       setInfo({
         name: String(i.name ?? ""),
         tagline: String(i.tagline ?? ""),
@@ -696,6 +738,7 @@ export function RestaurantTables() {
       {modal === "add" && (
         <TableModal
           defaultNumber={nextNumber}
+          showHourlyRate={tableHourlyBillingEnabled}
           onClose={() => setModal(null)}
           onSave={(d) => {
             void (async () => {
@@ -705,6 +748,7 @@ export function RestaurantTables() {
                   name: d.name,
                   seats: d.seats,
                   area: d.area,
+                  ...(tableHourlyBillingEnabled ? { hourlyRate: d.hourlyRate } : {}),
                 });
                 setTables((prev) => [...prev, row].sort((a, b) => a.number - b.number));
                 toast.success(`"${d.name}" ${tr("əlavə edildi", "added")}`);
@@ -719,11 +763,18 @@ export function RestaurantTables() {
         <TableModal
           initial={modal.table}
           defaultNumber={modal.table.number}
+          showHourlyRate={tableHourlyBillingEnabled}
           onClose={() => setModal(null)}
           onSave={(d) => {
             void (async () => {
               try {
-                const row = await updateDiningTable(modal.table.id, d);
+                const row = await updateDiningTable(modal.table.id, {
+                  number: d.number,
+                  name: d.name,
+                  seats: d.seats,
+                  area: d.area,
+                  ...(tableHourlyBillingEnabled ? { hourlyRate: d.hourlyRate } : {}),
+                });
                 setTables((prev) =>
                   prev.map((t) => (t.id === row.id ? row : t)).sort((a, b) => a.number - b.number),
                 );
