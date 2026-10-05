@@ -34,7 +34,7 @@ export function CustomerDueReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const customerDueItems: CustomerDueItem[] = [
     { id: "1", reference: "INV2011", code: "CU006", customerName: "Martha Betts", customerIcon: "👩", totalAmount: 2000, paid: 2000, due: 0, status: "Paid" },

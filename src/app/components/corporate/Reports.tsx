@@ -2,11 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type React
 import { Link } from "react-router";
 import {
   AlertTriangle,
+  Banknote,
   ChevronDown,
   ChevronUp,
+  CreditCard,
+  Download,
+  Package,
   Search,
+  ShoppingCart,
   Target,
   TrendingUp,
+  Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Area,
@@ -78,26 +85,37 @@ function moneyLabel(value: string | number | null | undefined): string {
   return formatReportCurrency(parseMoney(value));
 }
 
-function MetricStrip({
-  cells,
-}: {
-  cells: Array<{ label: string; value: string; content?: ReactNode }>;
-}) {
+type MetricCardItem = {
+  label: string;
+  value?: string;
+  icon: LucideIcon;
+  color: string;
+  bgColor: string;
+  content?: ReactNode;
+};
+
+function MetricCards({ cards, cols }: { cards: MetricCardItem[]; cols?: string }) {
   return (
-    <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
-      <div
-        className="grid divide-x divide-gray-300 dark:divide-gray-700"
-        style={{ gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))` }}
-      >
-        {cells.map((c) => (
-          <div key={c.label} className="p-4 min-w-0">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{c.label}</p>
-            {c.content ?? (
-              <p className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">{c.value}</p>
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${cols ?? "lg:grid-cols-3"} gap-3`}>
+      {cards.map((card) => {
+        const Icon = card.icon;
+        return (
+          <div
+            key={card.label}
+            className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className={`p-2 rounded-lg ${card.bgColor}`}>
+                <Icon className={`w-4 h-4 ${card.color}`} />
+              </div>
+            </div>
+            <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">{card.label}</h3>
+            {card.content ?? (
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{card.value}</p>
             )}
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
@@ -147,7 +165,7 @@ export function Reports() {
     setCustomTo,
     dateFrom,
     dateTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const [overview, setOverview] = useState<ReportsOverview>(EMPTY_OVERVIEW);
   const [products, setProducts] = useState<SalesReportItem[]>([]);
@@ -303,37 +321,47 @@ export function Reports() {
   }
 
   return (
-    <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4 space-y-4">
-      {/* Block A — period + KPI strips */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-700 dark:text-gray-300">
-        {periodLinks.map((p, i) => (
-          <span key={p.key} className="inline-flex items-center gap-3">
-            {i > 0 && <span className="text-gray-300 dark:text-gray-600">/</span>}
-            <button
-              type="button"
-              onClick={() => setPreset(p.key)}
-              className={
-                preset === p.key
-                  ? "font-semibold text-[#14b8a6]"
-                  : "hover:text-[#14b8a6]"
-              }
-            >
-              {p.label}
-            </button>
-          </span>
-        ))}
-        <button
-          type="button"
-          onClick={() => void handleExportPdf()}
-          disabled={exporting || loading}
-          className="ml-auto text-sm text-gray-600 dark:text-gray-400 hover:text-[#14b8a6] disabled:opacity-50"
-        >
-          ({exporting ? pt("Exporting…", "İxrac olunur…") : pt("Export PDF", "PDF ixrac")})
-        </button>
+    <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4 space-y-4 flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-lg sm:text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 dark:text-white">
+            {pt("Reports", "Hesabatlar")}
+          </h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{periodLabel}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-0.5 gap-0.5 shadow-sm">
+            {periodLinks.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPreset(p.key)}
+                className={
+                  preset === p.key
+                    ? "px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#14b8a6] text-white shadow-sm"
+                    : "px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                }
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleExportPdf()}
+            disabled={exporting || loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0f766e] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {exporting ? pt("Exporting…", "İxrac olunur…") : pt("Export PDF", "PDF ixrac")}
+            </span>
+          </button>
+        </div>
       </div>
 
       {preset === "custom" && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="glass-card p-3 rounded-xl border border-white/20 dark:border-white/10 flex flex-wrap items-center gap-2">
           <DateInput value={customFrom} onChange={setCustomFrom} className="w-36" defaultYearsAgo={0} />
           <span className="text-xs text-gray-400">—</span>
           <DateInput value={customTo} onChange={setCustomTo} className="w-36" defaultYearsAgo={0} />
@@ -341,46 +369,99 @@ export function Reports() {
       )}
 
       {loading ? (
-        <div className="text-sm text-gray-400 py-8 text-center">{pt("Loading…", "Yüklənir…")}</div>
+        <div className="glass-card p-8 rounded-xl border border-white/20 dark:border-white/10 text-center text-sm text-gray-500 dark:text-gray-400">
+          {pt("Loading…", "Yüklənir…")}
+        </div>
       ) : (
-        <div ref={reportPdfRef} className="space-y-4 bg-white dark:bg-gray-950 rounded-xl p-1">
-          <div className="px-1 pt-1">
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {pt("Reports", "Hesabatlar")}
-            </h1>
-            <p className="text-xs text-gray-500 mt-0.5">{periodLabel}</p>
-          </div>
-          <MetricStrip
-            cells={[
-              { label: pt("Total Income", "Ümumi Gəlir"), value: moneyLabel(overview.totalIncome) },
-              { label: pt("Total Expenses", "Ümumi Xərclər"), value: moneyLabel(overview.totalExpenses) },
-              { label: pt("Profit", "Mənfəət"), value: moneyLabel(overview.profit) },
+        <div ref={reportPdfRef} className="space-y-4">
+          <MetricCards
+            cards={[
+              {
+                label: pt("Total Income", "Ümumi Gəlir"),
+                value: moneyLabel(overview.totalIncome),
+                icon: Banknote,
+                color: "text-green-600 dark:text-green-400",
+                bgColor: "bg-green-50 dark:bg-green-900/20",
+              },
+              {
+                label: pt("Total Expenses", "Ümumi Xərclər"),
+                value: moneyLabel(overview.totalExpenses),
+                icon: CreditCard,
+                color: "text-red-600 dark:text-red-400",
+                bgColor: "bg-red-50 dark:bg-red-900/20",
+              },
+              {
+                label: pt("Profit", "Mənfəət"),
+                value: moneyLabel(overview.profit),
+                icon: Wallet,
+                color: "text-[#14b8a6]",
+                bgColor: "bg-[#14b8a6]/10 dark:bg-[#14b8a6]/20",
+              },
             ]}
           />
-          <MetricStrip
-            cells={[
-              { label: pt("Total Orders", "Ümumi Sifarişlər"), value: moneyLabel(overview.totalOrders) },
-              { label: pt("Paid", "Ödənilib"), value: moneyLabel(overview.paid) },
-              { label: pt("Unpaid", "Ödənilməyib"), value: moneyLabel(overview.unpaid) },
+          <MetricCards
+            cols="lg:grid-cols-4"
+            cards={[
+              {
+                label: pt("Total Orders", "Ümumi Sifarişlər"),
+                value: moneyLabel(overview.totalOrders),
+                icon: Package,
+                color: "text-teal-600 dark:text-teal-400",
+                bgColor: "bg-teal-50 dark:bg-teal-900/20",
+              },
+              {
+                label: pt("Paid", "Ödənilib"),
+                value: moneyLabel(overview.paid),
+                icon: Banknote,
+                color: "text-green-600 dark:text-green-400",
+                bgColor: "bg-green-50 dark:bg-green-900/20",
+              },
+              {
+                label: pt("Unpaid", "Ödənilməyib"),
+                value: moneyLabel(overview.unpaid),
+                icon: AlertTriangle,
+                color: "text-orange-600 dark:text-orange-400",
+                bgColor: "bg-orange-50 dark:bg-orange-900/20",
+              },
               {
                 label: pt("Payment Type", "Ödəniş növü"),
-                value: "",
+                icon: CreditCard,
+                color: "text-sky-600 dark:text-sky-400",
+                bgColor: "bg-sky-50 dark:bg-sky-900/20",
                 content: (
                   <PaymentTypePie cash={overview.paymentType.cash} card={overview.paymentType.card} />
                 ),
               },
             ]}
           />
-          <MetricStrip
-            cells={[
-              { label: pt("Purchases", "Satınalmalar"), value: moneyLabel(overview.purchases) },
-              { label: pt("Paid", "Ödənilib"), value: moneyLabel(overview.purchasesPaid) },
-              { label: pt("Debt", "Borc"), value: moneyLabel(overview.purchasesDebt) },
+          <MetricCards
+            cards={[
+              {
+                label: pt("Purchases", "Satınalmalar"),
+                value: moneyLabel(overview.purchases),
+                icon: ShoppingCart,
+                color: "text-violet-600 dark:text-violet-400",
+                bgColor: "bg-violet-50 dark:bg-violet-900/20",
+              },
+              {
+                label: pt("Paid", "Ödənilib"),
+                value: moneyLabel(overview.purchasesPaid),
+                icon: Banknote,
+                color: "text-green-600 dark:text-green-400",
+                bgColor: "bg-green-50 dark:bg-green-900/20",
+              },
+              {
+                label: pt("Debt", "Borc"),
+                value: moneyLabel(overview.purchasesDebt),
+                icon: AlertTriangle,
+                color: "text-orange-600 dark:text-orange-400",
+                bgColor: "bg-orange-50 dark:bg-orange-900/20",
+              },
             ]}
           />
 
           {/* Block B — Products */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+          <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {pt("Products", "Məhsullar")}
@@ -446,7 +527,7 @@ export function Reports() {
 
           {/* Block B — Employee Breakdown */}
           {posEnabled && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+            <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 overflow-hidden">
               <div className="p-4 border-b border-gray-100 dark:border-gray-800">
                 <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                   {pt("Employee Breakdown", "İşçi bölgüsü")}
@@ -513,7 +594,7 @@ export function Reports() {
                                     {(e.categories ?? []).map((c) => (
                                       <div
                                         key={c.category}
-                                        className="flex justify-between gap-2 rounded-lg bg-white dark:bg-gray-900 px-3 py-2 border border-gray-100 dark:border-gray-800"
+                                        className="flex justify-between gap-2 rounded-lg glass-card px-3 py-2 border border-white/20 dark:border-white/10"
                                       >
                                         <span className="text-gray-600 dark:text-gray-400 truncate">{c.category}</span>
                                         <span className="font-medium text-gray-900 dark:text-white whitespace-nowrap">
@@ -540,7 +621,7 @@ export function Reports() {
 
           {/* Block C — Heatmap */}
           {posEnabled && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+            <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 p-5">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {pt("Order Activity Heatmap", "Sifariş Aktivliyi")}
               </h3>
@@ -578,117 +659,118 @@ export function Reports() {
           )}
 
           {/* Block D — Category | Low Stock */}
-          <div className="rounded-2xl bg-gray-100 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className={`grid grid-cols-1 ${stockEnabled ? "lg:grid-cols-2" : ""} divide-y lg:divide-y-0 lg:divide-x divide-gray-200 dark:divide-gray-700`}>
-              <div className="p-5 bg-white/70 dark:bg-gray-900/50">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {pt("Sales by Category", "Kateqoriya üzrə satış")}
-                </h3>
-                <p className="text-xs text-gray-500 mb-4">
-                  {categoryUnits} {pt("units sold", "satılan vahid")}
+          <div className={`grid grid-cols-1 ${stockEnabled ? "lg:grid-cols-2" : ""} gap-4`}>
+            <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 p-5">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                {pt("Sales by Category", "Kateqoriya üzrə satış")}
+              </h3>
+              <p className="text-xs text-gray-500 mb-4">
+                {categoryUnits} {pt("units sold", "satılan vahid")}
+              </p>
+              {categoryPie.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-10">
+                  {pt("No category data yet", "Hələ məlumat yoxdur")}
                 </p>
-                {categoryPie.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-10">
-                    {pt("No category data yet", "Hələ məlumat yoxdur")}
-                  </p>
-                ) : (
-                  <>
-                    <div className="flex justify-center">
-                      <ResponsiveContainer width="100%" height={180}>
-                        <PieChart>
-                          <Pie
-                            data={categoryPie}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={48}
-                            outerRadius={74}
-                            paddingAngle={2}
-                            dataKey="value"
-                          >
-                            {categoryPie.map((e, i) => (
-                              <Cell key={i} fill={e.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(v: number) => [`${v}%`, ""]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="space-y-2 mt-2">
-                      {categoryPie.map((s) => (
-                        <div key={s.name} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-                            <span className="text-xs text-gray-600 dark:text-gray-400 truncate">{s.name}</span>
-                          </div>
-                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{s.value}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {stockEnabled && (
-                <div className="p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-orange-500" />
-                      {pt("Low Stock", "Az Stok")}
-                    </h3>
-                    <Link
-                      to="/dashboard/inventory/products/low-stocks"
-                      className="text-xs text-[#14b8a6] hover:underline"
-                    >
-                      {pt("View All", "Hamısını Gör")} →
-                    </Link>
+              ) : (
+                <>
+                  <div className="flex justify-center">
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie
+                          data={categoryPie}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={48}
+                          outerRadius={74}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {categoryPie.map((e, i) => (
+                            <Cell key={i} fill={e.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [`${v}%`, ""]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                  {lowStock.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-8 text-center">
-                      {pt("Stock levels OK", "Stok səviyyəsi normaldır")}
-                    </p>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {lowStock.slice(0, 6).map((p) => (
-                        <div key={p.productId} className="p-3 bg-white dark:bg-gray-900 rounded-xl shadow-sm">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{p.name}</p>
-                              <p className="text-[10px] text-gray-400">{p.sku}</p>
-                            </div>
-                            <span className="text-xs font-bold text-red-600 dark:text-red-400 whitespace-nowrap ml-2">
-                              {p.quantity} {pt("left", "qaldı")}
-                            </span>
-                          </div>
-                          <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${p.quantity <= 0 ? "bg-gray-300" : "bg-orange-500"}`}
-                              style={{
-                                width: `${Math.min(
-                                  100,
-                                  p.quantityAlert > 0 ? (p.quantity / p.quantityAlert) * 100 : 0,
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                          <p className="text-[9px] text-gray-400 mt-1">
-                            {pt("Min", "Min")}: {p.quantityAlert}
-                          </p>
+                  <div className="space-y-2 mt-2">
+                    {categoryPie.map((s) => (
+                      <div key={s.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                          <span className="text-xs text-gray-600 dark:text-gray-400 truncate">{s.name}</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{s.value}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
+
+            {stockEnabled && (
+              <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    {pt("Low Stock", "Az Stok")}
+                  </h3>
+                  <Link
+                    to="/dashboard/inventory/products/low-stocks"
+                    className="text-xs text-[#14b8a6] hover:underline"
+                  >
+                    {pt("View All", "Hamısını Gör")} →
+                  </Link>
+                </div>
+                {lowStock.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-8 text-center">
+                    {pt("Stock levels OK", "Stok səviyyəsi normaldır")}
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {lowStock.slice(0, 6).map((p) => (
+                      <div
+                        key={p.productId}
+                        className="p-3 rounded-xl bg-white/60 dark:bg-gray-900/60 border border-white/30 dark:border-white/10 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{p.name}</p>
+                            <p className="text-[10px] text-gray-400">{p.sku}</p>
+                          </div>
+                          <span className="text-xs font-bold text-red-600 dark:text-red-400 whitespace-nowrap ml-2">
+                            {p.quantity} {pt("left", "qaldı")}
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${p.quantity <= 0 ? "bg-gray-300" : "bg-orange-500"}`}
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                p.quantityAlert > 0 ? (p.quantity / p.quantityAlert) * 100 : 0,
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <p className="text-[9px] text-gray-400 mt-1">
+                          {pt("Min", "Min")}: {p.quantityAlert}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Block E — Avg / YoY + Monthly */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-              <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3">
+            <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 p-5">
+              <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3">
                 <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
                 {pt("Avg Monthly Revenue", "Orta aylıq gəlir")}
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -697,11 +779,11 @@ export function Reports() {
                   : "N/A"}
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-              <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mb-3">
+            <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 p-5">
+              <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mb-3">
                 <TrendingUp className="w-4 h-4 text-orange-500" />
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
                 {pt("YoY Growth", "İllik artım")}
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -710,7 +792,7 @@ export function Reports() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+          <div className="glass-card rounded-xl border border-white/20 dark:border-white/10 p-5">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
               {pt("Monthly Performance", "Aylıq performans")}
             </h3>

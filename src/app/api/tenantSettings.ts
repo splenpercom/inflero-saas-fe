@@ -42,6 +42,7 @@ export interface TenantSettingsRecord {
   posQrOrderAlarmEnabled?: boolean;
   inventoryServicesEnabled?: boolean;
   tableHourlyBillingEnabled?: boolean;
+  posStaffPasscodeEnabled?: boolean;
 }
 
 export type TenantSettingsUpdate = Partial<{
@@ -65,6 +66,7 @@ export type TenantSettingsUpdate = Partial<{
   posQrOrderAlarmEnabled: boolean;
   inventoryServicesEnabled: boolean;
   tableHourlyBillingEnabled: boolean;
+  posStaffPasscodeEnabled: boolean;
 }>;
 
 export async function fetchTenantSettings() {

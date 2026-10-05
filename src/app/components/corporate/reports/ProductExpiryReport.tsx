@@ -33,7 +33,7 @@ export function ProductExpiryReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const productExpiryItems: ProductExpiryItem[] = [
     {

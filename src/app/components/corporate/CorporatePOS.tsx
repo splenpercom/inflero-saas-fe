@@ -62,6 +62,8 @@ import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, send
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
+import { usePosStaffPasscodeGate } from "../../hooks/usePosStaffPasscodeGate";
+import { PosStaffPasscodeOverlay } from "./PosStaffPasscodeOverlay";
 import { parsePrice } from "../../lib/inventoryMappers";
 import { formatDateTime } from "../../lib/dateFormat";
 import { notifyFromError, notifySuccess, notifyWarning, isAbortError, isNetworkError, notifyError } from "../../lib/toast";
@@ -86,6 +88,7 @@ interface Product {
   price: number;
   image: string;
   category: string;
+  brand: string;
   stock: number;
   code: string;
   barcode: string;
@@ -137,6 +140,66 @@ function loadPosCategoryOrder(storageKey: string): string[] {
 
 function savePosCategoryOrder(storageKey: string, order: string[]) {
   savePosIdOrder(storageKey, order);
+}
+
+/** Editable cart/product quantity — type a value or use +/-. Commits on blur/Enter. */
+function PosQtyInput({
+  value,
+  disabled,
+  onCommit,
+  className,
+  ariaLabel,
+}: {
+  value: number;
+  disabled?: boolean;
+  onCommit: (qty: number) => void;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const n = parseInt(text.replace(/\D/g, ""), 10);
+    if (!Number.isFinite(n) || n < 1) {
+      setText(String(value));
+      return;
+    }
+    if (n !== value) onCommit(n);
+    else setText(String(value));
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      disabled={disabled}
+      value={text}
+      aria-label={ariaLabel}
+      onClick={(e) => e.stopPropagation()}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setText(e.target.value.replace(/\D/g, "").slice(0, 5))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.target as HTMLInputElement).blur();
+        }
+        if (e.key === "Escape") {
+          setText(String(value));
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className={
+        className ??
+        "text-[11px] font-medium text-gray-900 dark:text-white px-0.5 w-8 min-w-[1.5rem] text-center bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-40"
+      }
+    />
+  );
 }
 
 function sortCategoriesByOrder(
@@ -1011,6 +1074,7 @@ export function CorporatePOS() {
   const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
+  const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
   const [hourlyRateInput, setHourlyRateInput] = useState("");
   const [hourlyStartedAt, setHourlyStartedAt] = useState<string | null>(null);
   const [hourlyEndedAt, setHourlyEndedAt] = useState<string | null>(null);
@@ -1035,6 +1099,7 @@ export function CorporatePOS() {
   const [editingOrderRef, setEditingOrderRef] = useState<string | null>(null);
   const [editingOrderWasHeld, setEditingOrderWasHeld] = useState(false);
   const [editingAlreadyOnKot, setEditingAlreadyOnKot] = useState(false);
+  const [editingAlreadySentToBar, setEditingAlreadySentToBar] = useState(false);
   const [editingStockLocked, setEditingStockLocked] = useState(false);
   /** Timer-started session: keep order id for updates, but show normal POS (not Edit Order). */
   const [suppressEditOrderUi, setSuppressEditOrderUi] = useState(false);
@@ -1050,9 +1115,13 @@ export function CorporatePOS() {
   const pendingQrOrderIdRef = useRef<string | null>(null);
   const acceptOrderHandledRef = useRef<string | null>(null);
   const editOrderHandledRef = useRef<string | null>(null);
+  /** Prevents duplicate ?orderId= / session loads (effect re-runs + Strict Mode). */
+  const editOrderInFlightRef = useRef<string | null>(null);
   const editingOrderIdRef = useRef<string | null>(null);
   const pendingQrPortalOpenRef = useRef(false);
   const pendingQrInFlightRef = useRef(false);
+  /** Bumped on each fetch so a stale in-flight poll cannot revive a rejected order's alarm. */
+  const pendingQrFetchGenRef = useRef(0);
   const prevPendingQrCountRef = useRef(0);
   const posQrOrderAlarmEnabledRef = useRef(true);
   const qrOrderAlarmRef = useRef(createQrOrderAlarm(2800));
@@ -1065,6 +1134,7 @@ export function CorporatePOS() {
       price: parsePrice(item.price),
       image: item.image || "📦",
       category: item.category || "",
+      brand: item.brand || "",
       stock: isService ? Number.MAX_SAFE_INTEGER : (item.quantity ?? 0),
       code: item.sku,
       barcode: (item.itemBarcode ?? "").trim(),
@@ -1086,6 +1156,12 @@ export function CorporatePOS() {
   >(null);
   const checkoutBusy = checkoutAction !== null;
   const { billers, defaultBillerId } = useSalesBillers((isAuthenticated || isDemo));
+  const {
+    ensureWithPasscode,
+    passcodeSession,
+    closePasscode,
+    confirmPasscode,
+  } = usePosStaffPasscodeGate();
   const isEmployee = !isDemo && user?.role?.name.trim().toLowerCase() === "employee";
   const currentUserBillerId = useMemo(
     () => pickCurrentUserBillerId(billers, user),
@@ -1200,6 +1276,7 @@ export function CorporatePOS() {
       setPosPrintProductBrandEnabled(false);
       setPosQrOrderAlarmEnabled(true);
       setTableHourlyBillingEnabled(false);
+      setPosStaffPasscodeEnabled(false);
       setInventoryServicesEnabled(false);
       return;
     }
@@ -1216,6 +1293,7 @@ export function CorporatePOS() {
           setPosPrintProductBrandEnabled(s.posPrintProductBrandEnabled === true);
           setPosQrOrderAlarmEnabled(diningEnabled && s.posQrOrderAlarmEnabled !== false);
           setTableHourlyBillingEnabled(diningEnabled && s.tableHourlyBillingEnabled === true);
+          setPosStaffPasscodeEnabled(diningEnabled && s.posStaffPasscodeEnabled === true);
           setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
       })
@@ -1228,6 +1306,7 @@ export function CorporatePOS() {
           setPosPrintProductBrandEnabled(false);
           setPosQrOrderAlarmEnabled(true);
           setTableHourlyBillingEnabled(false);
+          setPosStaffPasscodeEnabled(false);
           setInventoryServicesEnabled(false);
         }
       });
@@ -1238,9 +1317,9 @@ export function CorporatePOS() {
 
   useEffect(() => {
     posQrOrderAlarmEnabledRef.current = posQrOrderAlarmEnabled;
-    if (!posQrOrderAlarmEnabled) {
+    if (!posQrOrderAlarmEnabled || pendingQrCount <= 0) {
       qrOrderAlarmRef.current.stop();
-    } else if (pendingQrCount > 0) {
+    } else {
       qrOrderAlarmRef.current.start();
     }
   }, [posQrOrderAlarmEnabled, pendingQrCount]);
@@ -1278,7 +1357,7 @@ export function CorporatePOS() {
 
   /** Poll pending QR: auto-open popup + soft alarm when new orders arrive. */
   const refreshPendingQr = useCallback(
-    async (mode: "count" | "list" | "auto" = "auto") => {
+    async (mode: "count" | "list" | "auto" | "force" = "auto") => {
       if (!canPollPendingQr) {
         prevPendingQrCountRef.current = 0;
         setPendingQrCount(0);
@@ -1286,10 +1365,14 @@ export function CorporatePOS() {
         qrOrderAlarmRef.current.stop();
         return;
       }
-      if (pendingQrInFlightRef.current) return;
+      // Mutations use "force" so a concurrent poll cannot drop the post-reject refresh.
+      if (mode !== "force" && pendingQrInFlightRef.current) return;
       pendingQrInFlightRef.current = true;
+      const fetchGen = ++pendingQrFetchGenRef.current;
       const wantList =
-        mode === "list" || (mode === "auto" && pendingQrPortalOpenRef.current);
+        mode === "list" ||
+        mode === "force" ||
+        (mode === "auto" && pendingQrPortalOpenRef.current);
       try {
         let nextCount = 0;
         let list: PendingQrPosOrderRow[] | null = null;
@@ -1297,20 +1380,25 @@ export function CorporatePOS() {
         if (wantList) {
           list = await fetchPendingQrPosOrders();
           nextCount = list.filter((r) => r.claimStatus === "open").length;
-          setPendingQrList(list);
         } else {
           const countRes = await fetchPendingQrPosOrderCount();
           nextCount = countRes.count;
         }
 
+        // A newer force/poll started — discard this response.
+        if (fetchGen !== pendingQrFetchGenRef.current) return;
+
+        if (list) setPendingQrList(list);
+
         const prev = prevPendingQrCountRef.current;
         const grew = nextCount > prev;
 
-        if (grew) {
+        if (grew && mode !== "force") {
           // New QR order(s) — open popup immediately and load full list.
           setPendingQrPortalOpen(true);
           if (!list) {
             list = await fetchPendingQrPosOrders();
+            if (fetchGen !== pendingQrFetchGenRef.current) return;
             nextCount = list.filter((r) => r.claimStatus === "open").length;
             setPendingQrList(list);
           }
@@ -1327,7 +1415,9 @@ export function CorporatePOS() {
       } catch {
         // Poll quietly — do not spam toasts
       } finally {
-        pendingQrInFlightRef.current = false;
+        if (fetchGen === pendingQrFetchGenRef.current) {
+          pendingQrInFlightRef.current = false;
+        }
       }
     },
     [canPollPendingQr],
@@ -1370,6 +1460,7 @@ export function CorporatePOS() {
       setEditingOrderRef(null);
       setEditingOrderWasHeld(false);
       setEditingAlreadyOnKot(false);
+      setEditingAlreadySentToBar(false);
       setEditingStockLocked(false);
       setEditingOriginalQtyByProduct({});
       setSuppressEditOrderUi(false);
@@ -1423,6 +1514,7 @@ export function CorporatePOS() {
     const statusKey = (detail.status || "").toLowerCase();
     setEditingOrderWasHeld(statusKey === "held" || statusKey === "draft");
     setEditingAlreadyOnKot(Boolean(detail.kotStatus));
+    setEditingAlreadySentToBar(detail.sentToBar === true);
     const payKey = (detail.paymentStatus || "").toLowerCase().replace(/\s+/g, "_");
     const hasReturns = detail.items.some((i) => (i.returnedQty ?? 0) > 0);
     const fullyRefunded = payKey === "refunded";
@@ -1530,6 +1622,7 @@ export function CorporatePOS() {
         });
         const hasReturns = detail.items.some((i) => (i.returnedQty ?? 0) > 0);
         const payKey = (detail.paymentStatus || "").toLowerCase().replace(/\s+/g, "_");
+        // Banner already shows edit/timer state — only warn when lines are locked.
         if (hasReturns || payKey === "refunded") {
           notifyWarning(
             tr(
@@ -1537,25 +1630,12 @@ export function CorporatePOS() {
               "This order has returns — line items are locked; other fields can still be updated",
             ),
           );
-        } else if (!timerOpen) {
-          notifySuccess(
-            tr(
-              `Sifariş redaktə üçün açıldı (${detail.reference})`,
-              `Order opened for edit (${detail.reference})`,
-            ),
-          );
-        } else {
-          notifySuccess(
-            tr(
-              `Saatlıq taymer sifarişi açıldı (${detail.reference})`,
-              `Hourly timer order opened (${detail.reference})`,
-            ),
-          );
         }
       } catch (err) {
         // Stale ?orderId= / sessionStorage edit id (deleted, other branch, etc.)
         writePosEditOrderId(null);
         editOrderHandledRef.current = null;
+        editOrderInFlightRef.current = null;
         notifyFromError(err, tr("Sifariş yüklənə bilmədi", "Failed to load order"));
       }
     },
@@ -1605,14 +1685,38 @@ export function CorporatePOS() {
     const wasEditing = Boolean(editingOrderIdRef.current);
     setOccupiedDialogBusy(true);
     try {
-      await finishTableActiveOrders(tableId);
+      const biller = billers.find((b) => b.id === selectedBillerId);
+      const ok = await ensureWithPasscode({
+        featureOn: diningEnabled && posStaffPasscodeEnabled,
+        hasPosPasscode: biller?.hasPosPasscode === true,
+        staffName: biller?.name ?? tr("İşçi", "Staff"),
+        invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
+        run: async (staffPasscode) => {
+          if (diningEnabled && posStaffPasscodeEnabled && !selectedBillerId) {
+            throw new ApiError(
+              400,
+              tr("Kassir seçin", "Please select an employee / biller"),
+              undefined,
+              "BILLER_REQUIRED",
+            );
+          }
+          await finishTableActiveOrders(tableId, {
+            ...(selectedBillerId ? { billerId: selectedBillerId } : {}),
+            ...(staffPasscode ? { staffPasscode } : {}),
+          });
+        },
+      });
+      if (!ok) return;
       await reloadDiningTables();
       setPendingQrOrderId(null);
       setEditingOrderId(null);
       writePosEditOrderId(null);
+      editOrderHandledRef.current = null;
+      editOrderInFlightRef.current = null;
       setEditingOrderRef(null);
       setEditingOrderWasHeld(false);
       setEditingAlreadyOnKot(false);
+      setEditingAlreadySentToBar(false);
       setEditingStockLocked(false);
       setEditingOriginalQtyByProduct({});
       setSuppressEditOrderUi(false);
@@ -1639,17 +1743,28 @@ export function CorporatePOS() {
     } finally {
       setOccupiedDialogBusy(false);
     }
-  }, [occupiedDialogTable, reloadDiningTables, defaultBillerId, tr]);
+  }, [
+    occupiedDialogTable,
+    reloadDiningTables,
+    defaultBillerId,
+    tr,
+    billers,
+    selectedBillerId,
+    diningEnabled,
+    posStaffPasscodeEnabled,
+    ensureWithPasscode,
+  ]);
 
   const handleAcceptQrOrder = useCallback(
     async (orderId: string) => {
-      if (!canCreate || isDemo || !isAuthenticated) return;
+      // Backend accept/reject require Sales edit (same as POS Orders).
+      if (!canEdit || isDemo || !isAuthenticated) return;
       setPendingQrBusyId(orderId);
       try {
         const detail = await acceptQrPosOrder(orderId);
         hydrateCartFromQrOrder(detail);
         notifySuccess(tr("QR sifariş qəbul edildi", "QR order accepted"));
-        void refreshPendingQr("count");
+        void refreshPendingQr("force");
       } catch (err) {
         if (err instanceof ApiError && err.code === "ALREADY_CLAIMED") {
           const raw = err.raw && typeof err.raw === "object" ? (err.raw as Record<string, unknown>) : {};
@@ -1662,40 +1777,48 @@ export function CorporatePOS() {
         } else {
           notifyFromError(err);
         }
-        void refreshPendingQr(pendingQrPortalOpenRef.current ? "list" : "count");
+        void refreshPendingQr("force");
       } finally {
         setPendingQrBusyId(null);
       }
     },
-    [canCreate, isDemo, isAuthenticated, hydrateCartFromQrOrder, refreshPendingQr, tr],
+    [canEdit, isDemo, isAuthenticated, hydrateCartFromQrOrder, refreshPendingQr, tr],
   );
 
   const handleRejectQrOrder = useCallback(
     async (orderId: string) => {
-      if (!canCreate || isDemo || !isAuthenticated) return;
+      if (!canEdit || isDemo || !isAuthenticated) return;
       setPendingQrBusyId(orderId);
       try {
         await rejectQrPosOrder(orderId);
+        // Optimistic clear so the ringtone stops even if a poll was in flight.
+        setPendingQrList((prev) => prev.filter((r) => r.id !== orderId));
+        setPendingQrCount((prev) => {
+          const next = Math.max(0, prev - 1);
+          prevPendingQrCountRef.current = next;
+          if (next <= 0) qrOrderAlarmRef.current.stop();
+          return next;
+        });
         if (pendingQrOrderIdRef.current === orderId) {
           setPendingQrOrderId(null);
           setCart([]);
         }
         notifySuccess(tr("QR sifariş rədd edildi", "QR order rejected"));
-        void refreshPendingQr(pendingQrPortalOpenRef.current ? "list" : "count");
+        void refreshPendingQr("force");
       } catch (err) {
         notifyFromError(err);
-        void refreshPendingQr(pendingQrPortalOpenRef.current ? "list" : "count");
+        void refreshPendingQr("force");
       } finally {
         setPendingQrBusyId(null);
       }
     },
-    [canCreate, isDemo, isAuthenticated, refreshPendingQr, tr],
+    [canEdit, isDemo, isAuthenticated, refreshPendingQr, tr],
   );
 
   // Deep-link from POS Orders: ?acceptOrder=id
   useEffect(() => {
     const acceptId = searchParams.get("acceptOrder");
-    if (!acceptId || !diningEnabled || !canCreate || isDemo || !isAuthenticated) return;
+    if (!acceptId || !diningEnabled || !canEdit || isDemo || !isAuthenticated) return;
     if (acceptOrderHandledRef.current === acceptId) return;
     acceptOrderHandledRef.current = acceptId;
     void handleAcceptQrOrder(acceptId).finally(() => {
@@ -1707,7 +1830,7 @@ export function CorporatePOS() {
     searchParams,
     setSearchParams,
     diningEnabled,
-    canCreate,
+    canEdit,
     isDemo,
     isAuthenticated,
     handleAcceptQrOrder,
@@ -1720,13 +1843,20 @@ export function CorporatePOS() {
     const orderId = fromUrl || (!editingOrderIdRef.current ? fromSession : null);
     if (!orderId || isDemo || !isAuthenticated) return;
     if (!canCreate && !canEdit) return;
-    if (editOrderHandledRef.current === orderId && editingOrderIdRef.current === orderId) return;
+    // Already editing this order, or a load for it is in flight / just handled.
     if (editingOrderIdRef.current === orderId) {
       editOrderHandledRef.current = orderId;
       return;
     }
+    if (editOrderInFlightRef.current === orderId) return;
+    if (editOrderHandledRef.current === orderId && !fromUrl) return;
+
     editOrderHandledRef.current = orderId;
+    editOrderInFlightRef.current = orderId;
     void handleLoadOrderForEdit(orderId, { fromSession: !fromUrl && !!fromSession }).finally(() => {
+      if (editOrderInFlightRef.current === orderId) {
+        editOrderInFlightRef.current = null;
+      }
       if (!fromUrl) return;
       const next = new URLSearchParams(searchParams);
       if (!next.has("orderId")) return;
@@ -2351,7 +2481,7 @@ export function CorporatePOS() {
     setCart((p) => p.filter((i) => i.id !== id));
   };
 
-  const updateQuantity = (id: string, delta: number, maxStock?: number) => {
+  const setQuantity = (id: string, quantity: number, maxStock?: number) => {
     if (!canMutateCart) return;
     const product = products.find((p) => p.id === id);
     const item = cart.find((i) => i.id === id);
@@ -2362,29 +2492,38 @@ export function CorporatePOS() {
       !product?.trackStock ||
       product?.productType === "SERVICE";
 
-    const next = item.quantity + delta;
+    let next = Math.floor(quantity);
+    if (!Number.isFinite(next) || next < 1) {
+      setCart((p) => p.filter((i) => i.id !== id));
+      return;
+    }
+
     const available =
       maxStock != null
         ? maxStock
         : product
           ? getAvailableStock(product.id, product.stock)
           : 0;
-    if (delta > 0 && !isService) {
-      if (stockEnabled && available <= 0) {
+    if (!isService && stockEnabled) {
+      if (available <= 0) {
         if (product) warnOutOfStock(product);
         return;
       }
-      if (stockEnabled && available > 0 && next > available) {
+      if (available > 0 && next > available) {
         if (product) warnInsufficientStock(product, available);
-        return;
+        next = available;
       }
     }
 
-    setCart((p) =>
-      p
-        .map((i) => (i.id === id ? { ...i, quantity: next } : i))
-        .filter((i) => i.quantity > 0),
-    );
+    if (next === item.quantity) return;
+    setCart((p) => p.map((i) => (i.id === id ? { ...i, quantity: next } : i)));
+  };
+
+  const updateQuantity = (id: string, delta: number, maxStock?: number) => {
+    if (!canMutateCart) return;
+    const item = cart.find((i) => i.id === id);
+    if (!item) return;
+    setQuantity(id, item.quantity + delta, maxStock);
   };
 
   const getCartQuantity = (productId: string) =>
@@ -2458,9 +2597,12 @@ export function CorporatePOS() {
     setPendingQrOrderId(null);
     setEditingOrderId(null);
     writePosEditOrderId(null);
+    editOrderHandledRef.current = null;
+    editOrderInFlightRef.current = null;
     setEditingOrderRef(null);
     setEditingOrderWasHeld(false);
     setEditingAlreadyOnKot(false);
+    setEditingAlreadySentToBar(false);
     setEditingStockLocked(false);
     setEditingOriginalQtyByProduct({});
     setSuppressEditOrderUi(false);
@@ -2506,10 +2648,10 @@ export function CorporatePOS() {
         tableId: selectedTableId,
         rate,
       });
-      // Persist cart onto the timer order so Orders shows products, not timer-only draft.
+      // Persist cart onto the timer order. Status already set by startPosOrderHourlyTimer
+      // (Pending for new/draft; leave Completed alone if timer was attached to an open bill).
       if (cart.length > 0) {
         detail = await updatePosOrder(detail.id, {
-          status: "HELD",
           customerId: selectedCustomerId || null,
           billerId: selectedBillerId || null,
           ...(selectedPaymentMethod
@@ -2694,7 +2836,7 @@ export function CorporatePOS() {
     return fallbackWalkIn ? tr("Gələn müştəri", "Walk-in") : undefined;
   };
 
-  const buildCheckoutBody = () => ({
+  const buildCheckoutBody = (staffPasscode?: string) => ({
     status: "COMPLETED" as const,
     customerId: selectedCustomerId || null,
     ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
@@ -2724,6 +2866,7 @@ export function CorporatePOS() {
     !hourlyStartedAt
       ? { tableHourlyRate: hourlyRateValue }
       : {}),
+    ...(staffPasscode ? { staffPasscode } : {}),
   });
 
   /** Persist cart changes onto the order opened from Orders (PATCH, not create). */
@@ -2734,6 +2877,7 @@ export function CorporatePOS() {
     finalize?: boolean;
     sendToKot?: boolean;
     sendToBar?: boolean;
+    staffPasscode?: string;
   }) => {
     const id = editingOrderId;
     if (!id) throw new Error("No order loaded for edit");
@@ -2745,7 +2889,7 @@ export function CorporatePOS() {
         ),
       );
     }
-    const body = buildCheckoutBody();
+    const body = buildCheckoutBody(opts?.staffPasscode);
     const {
       initialPaymentAmount: _pay,
       storeId: _store,
@@ -2756,25 +2900,44 @@ export function CorporatePOS() {
     void _store;
     void _status;
 
-    // Update Order on a draft keeps HELD; Update & Print finalizes to COMPLETED.
-    // Completed orders always stay COMPLETED.
-    const nextStatus: "HELD" | "COMPLETED" = opts?.asDraft
+    // Draft save → HELD. Finalize / KOT → COMPLETED. Active timer item edits: omit status
+    // so Pending stays Pending and Completed (after KOT) is not demoted.
+    const nextStatus: "HELD" | "PENDING" | "COMPLETED" | undefined = opts?.asDraft
       ? "HELD"
-      : opts?.finalize || !editingOrderWasHeld
+      : opts?.finalize
         ? "COMPLETED"
-        : "HELD";
+        : hourlyTimerRunning
+          ? undefined
+          : editingOrderWasHeld
+            ? "HELD"
+            : "COMPLETED";
 
     const payload: Parameters<typeof updatePosOrder>[1] = {
       ...rest,
-      status: nextStatus,
+      ...(nextStatus ? { status: nextStatus } : {}),
       ...(diningEnabled ? { tableId: selectedTableId || null } : {}),
+      // Avoid ALREADY_SENT_TO_KOT — reprint still updates lines + prints client-side.
       ...(opts?.sendToKot && !editingAlreadyOnKot ? { sendToKot: true } : {}),
-      ...(opts?.sendToBar && !editingAlreadyOnKot ? { sendToBar: true } : {}),
+      // BAR can still be marked after kitchen; skip only if already flagged.
+      ...(opts?.sendToBar && !editingAlreadySentToBar ? { sendToBar: true } : {}),
     };
     if (editingStockLocked) {
       delete payload.items;
     }
     return updatePosOrder(id, payload);
+  };
+
+  const runWithStaffPasscode = async (
+    action: (staffPasscode?: string) => Promise<void>,
+  ): Promise<boolean> => {
+    const biller = billers.find((b) => b.id === selectedBillerId);
+    return ensureWithPasscode({
+      featureOn: diningEnabled && posStaffPasscodeEnabled,
+      hasPosPasscode: biller?.hasPosPasscode === true,
+      staffName: biller?.name ?? tr("İşçi", "Staff"),
+      invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
+      run: action,
+    });
   };
 
   const handleSaveDraft = async () => {
@@ -3033,12 +3196,20 @@ export function CorporatePOS() {
 
     setCheckoutAction(printBill ? "orderBill" : "order");
     try {
+      await runWithStaffPasscode(async (staffPasscode) => {
       let detail = editingOrderId
         ? await submitEditingOrder({
-            // Update & Print finalizes drafts; Update Order keeps draft as HELD.
-            finalize: printBill || !editingOrderWasHeld,
+            // Active hourly timer must stay open (Pending) — never finalize/Complete on edit/add.
+            // Print bill alone must not stop the timer; payment / finish-table does.
+            finalize: hourlyTimerRunning
+              ? false
+              : printBill || !editingOrderWasHeld,
+            staffPasscode,
           })
-        : await posCheckout({ ...buildCheckoutBody(), date: new Date().toISOString() });
+        : await posCheckout({
+            ...buildCheckoutBody(staffPasscode),
+            date: new Date().toISOString(),
+          });
 
       // Never block bill print if payment sync fails after order already saved.
       try {
@@ -3107,6 +3278,7 @@ export function CorporatePOS() {
       } else {
         resetCartAfterSave();
       }
+      });
     } catch (err) {
       if (!(await hydrateFromTimerActiveConflict(err))) {
         notifyFromError(err);
@@ -3127,11 +3299,21 @@ export function CorporatePOS() {
 
     setCheckoutAction(printBill ? "kotBill" : "kot");
     try {
-      const body = { ...buildCheckoutBody(), date: new Date().toISOString() };
+      await runWithStaffPasscode(async (staffPasscode) => {
+      const body = {
+        ...buildCheckoutBody(staffPasscode),
+        date: new Date().toISOString(),
+      };
+      const reprintKot = Boolean(editingOrderId && editingAlreadyOnKot);
       let detail = pendingQrOrderId
         ? await approveQrAndSendToKot(pendingQrOrderId, body)
         : editingOrderId
-          ? await submitEditingOrder({ sendToKot: true, finalize: true })
+          ? await submitEditingOrder({
+              sendToKot: true,
+              // Keep hourly timer open — Complete alone must not stop it.
+              finalize: !hourlyTimerRunning,
+              staffPasscode,
+            })
           : await sendPosOrderToKot(body);
       try {
         detail = await collectRemainingIfPaid(detail);
@@ -3156,22 +3338,26 @@ export function CorporatePOS() {
           printProductBrand: posPrintProductBrandEnabled,
         });
         notifySuccess(
-          selectedTableId
-            ? tr(
-                "KOT-a göndərildi və mətbəx çapı göndərildi",
-                "Sent to KOT and kitchen ticket printed",
-              )
-            : tr(
-                "KOT-a göndərildi (gələn müştəri) və mətbəx çapı göndərildi",
-                "Sent to KOT (walk-in) and kitchen ticket printed",
-              ),
+          reprintKot
+            ? tr("KOT bileti yenidən çap olundu", "KOT ticket reprinted")
+            : selectedTableId
+              ? tr(
+                  "KOT-a göndərildi və mətbəx çapı göndərildi",
+                  "Sent to KOT and kitchen ticket printed",
+                )
+              : tr(
+                  "KOT-a göndərildi (gələn müştəri) və mətbəx çapı göndərildi",
+                  "Sent to KOT (walk-in) and kitchen ticket printed",
+                ),
         );
       } catch (printErr) {
         notifyWarning(
-          tr(
-            "KOT-a göndərildi, amma mətbəx çapı alınmadı",
-            "Sent to KOT, but kitchen print failed",
-          ),
+          reprintKot
+            ? tr("KOT çapı alınmadı", "KOT print failed")
+            : tr(
+                "KOT-a göndərildi, amma mətbəx çapı alınmadı",
+                "Sent to KOT, but kitchen print failed",
+              ),
         );
         notifyFromError(printErr);
       }
@@ -3209,6 +3395,7 @@ export function CorporatePOS() {
       } else {
         resetCartAfterSave({ skipQrRelease: true });
       }
+      });
     } catch (err) {
       if (!(await hydrateFromTimerActiveConflict(err))) {
         notifyFromError(err);
@@ -3229,9 +3416,18 @@ export function CorporatePOS() {
 
     setCheckoutAction(printBill ? "barBill" : "bar");
     try {
+      await runWithStaffPasscode(async (staffPasscode) => {
+      const reprintBar = Boolean(editingOrderId && editingAlreadySentToBar);
       let detail = editingOrderId
-        ? await submitEditingOrder({ sendToBar: true, finalize: true })
-        : await sendPosOrderToBar({ ...buildCheckoutBody(), date: new Date().toISOString() });
+        ? await submitEditingOrder({
+            sendToBar: true,
+            finalize: !hourlyTimerRunning,
+            staffPasscode,
+          })
+        : await sendPosOrderToBar({
+            ...buildCheckoutBody(staffPasscode),
+            date: new Date().toISOString(),
+          });
       try {
         detail = await collectRemainingIfPaid(detail);
       } catch (payErr) {
@@ -3255,17 +3451,21 @@ export function CorporatePOS() {
           barShowPrices: diningEnabled && posBarBillShowPricesEnabled,
         });
         notifySuccess(
-          tr(
-            "BAR-a göndərildi və BAR bileti çap olundu",
-            "Sent to Bar and BAR ticket printed",
-          ),
+          reprintBar
+            ? tr("BAR bileti yenidən çap olundu", "BAR ticket reprinted")
+            : tr(
+                "BAR-a göndərildi və BAR bileti çap olundu",
+                "Sent to Bar and BAR ticket printed",
+              ),
         );
       } catch (printErr) {
         notifyWarning(
-          tr(
-            "BAR-a göndərildi, amma BAR çapı alınmadı",
-            "Sent to Bar, but BAR print failed",
-          ),
+          reprintBar
+            ? tr("BAR çapı alınmadı", "BAR print failed")
+            : tr(
+                "BAR-a göndərildi, amma BAR çapı alınmadı",
+                "Sent to Bar, but BAR print failed",
+              ),
         );
         notifyFromError(printErr);
       }
@@ -3303,6 +3503,7 @@ export function CorporatePOS() {
       } else {
         resetCartAfterSave();
       }
+      });
     } catch (err) {
       if (!(await hydrateFromTimerActiveConflict(err))) {
         notifyFromError(err);
@@ -3322,9 +3523,16 @@ export function CorporatePOS() {
 
     setCheckoutAction("production");
     try {
+      await runWithStaffPasscode(async (staffPasscode) => {
       let detail = editingOrderId
-        ? await submitEditingOrder({ finalize: true })
-        : await sendPosOrderToProduction({ ...buildCheckoutBody(), date: new Date().toISOString() });
+        ? await submitEditingOrder({
+            finalize: !hourlyTimerRunning,
+            staffPasscode,
+          })
+        : await sendPosOrderToProduction({
+            ...buildCheckoutBody(staffPasscode),
+            date: new Date().toISOString(),
+          });
       try {
         detail = await collectRemainingIfPaid(detail);
       } catch (payErr) {
@@ -3357,6 +3565,7 @@ export function CorporatePOS() {
       } else {
         resetCartAfterSave();
       }
+      });
     } catch (err) {
       if (!(await hydrateFromTimerActiveConflict(err))) {
         notifyFromError(err);
@@ -3368,13 +3577,17 @@ export function CorporatePOS() {
 
   const filteredProducts = sortProductsByOrder(
     products.filter((p) => {
-      const q = searchQuery.trim().toLowerCase();
+      const q = searchQuery.trim().toLocaleLowerCase();
       if (q) {
         const matchesSearch =
-          p.name.toLowerCase().includes(q) ||
-          p.code.toLowerCase().includes(q) ||
-          (p.barcode && p.barcode.toLowerCase().includes(q));
+          p.name.toLocaleLowerCase().includes(q) ||
+          p.code.toLocaleLowerCase().includes(q) ||
+          (p.barcode && p.barcode.toLocaleLowerCase().includes(q)) ||
+          (p.category && p.category.toLocaleLowerCase().includes(q)) ||
+          (p.brand && p.brand.toLocaleLowerCase().includes(q));
         if (!matchesSearch) return false;
+        // Free-text search spans all categories (incl. matching by category/brand name).
+        return true;
       }
       if (selectedCategory === "services") {
         return p.productType === "SERVICE" || p.trackStock === false;
@@ -3740,9 +3953,12 @@ export function CorporatePOS() {
                           >
                             <Minus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
                           </button>
-                          <span className="text-[11px] font-semibold text-gray-900 dark:text-white px-1.5 min-w-[1.25rem] text-center">
-                            {qtyInCart}
-                          </span>
+                          <PosQtyInput
+                            value={qtyInCart}
+                            onCommit={(qty) => setQuantity(product.id, qty, available)}
+                            ariaLabel={tr("Miqdar", "Quantity")}
+                            className="text-[11px] font-semibold text-gray-900 dark:text-white px-0.5 w-8 min-w-[1.5rem] text-center bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-[#14b8a6] rounded"
+                          />
                           <button
                             type="button"
                             onClick={() => updateQuantity(product.id, 1, available)}
@@ -4213,9 +4429,13 @@ export function CorporatePOS() {
                             >
                               <Minus className="w-2.5 h-2.5 text-gray-600 dark:text-gray-400" />
                             </button>
-                            <span className="text-[11px] font-medium text-gray-900 dark:text-white px-1.5 min-w-[1rem] text-center">
-                              {item.quantity}
-                            </span>
+                            <PosQtyInput
+                              value={item.quantity}
+                              disabled={!canMutateCart}
+                              onCommit={(qty) => setQuantity(item.id, qty, available)}
+                              ariaLabel={tr("Miqdar", "Quantity")}
+                              className="text-[11px] font-medium text-gray-900 dark:text-white px-0.5 w-8 min-w-[1.5rem] text-center bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-[#14b8a6] rounded disabled:opacity-40"
+                            />
                             <button
                               type="button"
                               onClick={() => updateQuantity(item.id, 1, available)}
@@ -4364,30 +4584,101 @@ export function CorporatePOS() {
 
                       if (editingOrderId && !suppressEditOrderUi) {
                         return (
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => void handlePlaceOrder()}
-                              disabled={baseDisabled}
-                              className={`${btnBase} text-white bg-[#14b8a6] hover:bg-[#0d9488]`}
-                            >
-                              <ClipboardList className="w-3 h-3" />
-                              {checkoutAction === "order"
-                                ? tr("Yenilənir...", "Updating...")
-                                : tr("Sifarişi yenilə", "Update Order")}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handlePlaceOrder({ printBill: true })}
-                              disabled={baseDisabled}
-                              className={`${btnBase} text-white bg-[#14b8a6] hover:bg-[#0d9488]`}
-                            >
-                              <Printer className="w-3 h-3" />
-                              {checkoutAction === "orderBill"
-                                ? tr("Yenilənir...", "Updating...")
-                                : tr("Yenilə & Çap", "Update & Print")}
-                            </button>
-                          </div>
+                          <>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => void handlePlaceOrder()}
+                                disabled={baseDisabled}
+                                className={`${btnBase} text-white bg-[#14b8a6] hover:bg-[#0d9488]`}
+                              >
+                                <ClipboardList className="w-3 h-3" />
+                                {checkoutAction === "order"
+                                  ? tr("Yenilənir...", "Updating...")
+                                  : tr("Sifarişi yenilə", "Update Order")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handlePlaceOrder({ printBill: true })}
+                                disabled={baseDisabled}
+                                className={`${btnBase} text-white bg-[#14b8a6] hover:bg-[#0d9488]`}
+                              >
+                                <Printer className="w-3 h-3" />
+                                {checkoutAction === "orderBill"
+                                  ? tr("Yenilənir...", "Updating...")
+                                  : tr("Yenilə & Çap", "Update & Print")}
+                              </button>
+                            </div>
+                            {diningEnabled && (
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSendToKot()}
+                                  disabled={baseDisabled}
+                                  className={`${btnBase} text-white bg-orange-500 hover:bg-orange-600`}
+                                >
+                                  <ChefHat className="w-3 h-3" />
+                                  {checkoutAction === "kot"
+                                    ? tr("Göndərilir...", "Sending...")
+                                    : editingAlreadyOnKot
+                                      ? tr("KOT çapı", "Print KOT")
+                                      : tr("KOT & Çap", "KOT & Print")}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSendToKot({ printBill: true })}
+                                  disabled={baseDisabled}
+                                  className={`${btnBase} text-white bg-orange-600 hover:bg-orange-700`}
+                                >
+                                  <Printer className="w-3 h-3" />
+                                  {checkoutAction === "kotBill"
+                                    ? tr("Göndərilir...", "Sending...")
+                                    : tr("KOT & Çap & Qəbz", "KOT & Print & Bill")}
+                                </button>
+                              </div>
+                            )}
+                            {diningEnabled && posSendToBarEnabled && (
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSendToBar()}
+                                  disabled={baseDisabled}
+                                  className={`${btnBase} text-white bg-violet-600 hover:bg-violet-700`}
+                                >
+                                  <Wine className="w-3 h-3" />
+                                  {checkoutAction === "bar"
+                                    ? tr("Göndərilir...", "Sending...")
+                                    : editingAlreadySentToBar
+                                      ? tr("BAR çapı", "Print BAR")
+                                      : tr("BAR & Çap", "Bar & Print")}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSendToBar({ printBill: true })}
+                                  disabled={baseDisabled}
+                                  className={`${btnBase} text-white bg-violet-700 hover:bg-violet-800`}
+                                >
+                                  <Printer className="w-3 h-3" />
+                                  {checkoutAction === "barBill"
+                                    ? tr("Göndərilir...", "Sending...")
+                                    : tr("BAR & Çap & Qəbz", "Bar & Print & Bill")}
+                                </button>
+                              </div>
+                            )}
+                            {posSendToProductionEnabled && (
+                              <button
+                                type="button"
+                                onClick={() => void handleSendToProduction()}
+                                disabled={baseDisabled}
+                                className={`${btnBase} w-full text-white bg-[#0d9488] hover:bg-[#0f766e]`}
+                              >
+                                <Factory className="w-3 h-3" />
+                                {checkoutAction === "production"
+                                  ? tr("İstehsala göndərilir...", "Sending to production...")
+                                  : tr("İstehsala göndər", "Send to Production")}
+                              </button>
+                            )}
+                          </>
                         );
                       }
 
@@ -4766,7 +5057,7 @@ export function CorporatePOS() {
                           <div className="flex flex-col gap-1 shrink-0">
                             <button
                               type="button"
-                              disabled={busy || isClaimedOther || !canCreate}
+                              disabled={busy || isClaimedOther || !canEdit || isDemo}
                               onClick={() => void handleAcceptQrOrder(row.id)}
                               className="px-2.5 py-1 text-[11px] font-medium text-white bg-[#14b8a6] hover:bg-[#0d9488] rounded-md disabled:opacity-40"
                             >
@@ -4778,7 +5069,7 @@ export function CorporatePOS() {
                             </button>
                             <button
                               type="button"
-                              disabled={busy || (isClaimedOther && !canCreate) || !canCreate}
+                              disabled={busy || !canEdit || isDemo}
                               onClick={() => void handleRejectQrOrder(row.id)}
                               className="px-2.5 py-1 text-[11px] font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40"
                             >
@@ -4835,6 +5126,16 @@ export function CorporatePOS() {
           }
         />
       )}
+      {passcodeSession ? (
+        <PosStaffPasscodeOverlay
+          open
+          staffName={passcodeSession.staffName}
+          busy={passcodeSession.busy}
+          error={passcodeSession.error}
+          onCancel={closePasscode}
+          onConfirm={confirmPasscode}
+        />
+      ) : null}
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   ClipboardList,
   FileBarChart,
   ExternalLink,
+  ScrollText,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -131,6 +132,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       employees: { en: "Employee", az: "İşçi" },
       userRoles: { en: "User roles", az: "İstifadəçi rolları" },
       settings: { en: "Settings", az: "Parametrlər" },
+      deletionLogs: { en: "Logs", az: "Jurnallar" },
       reservations: { en: "Bookings", az: "Rezervasiyalar" },
       reservationsList: { en: "Bookings", az: "Rezervasiyalar" },
       serviceTypes: { en: "Service Types", az: "Xidmət Növləri" },
@@ -178,6 +180,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       // Finances Sub-items
       financeExpenses: { en: "Expenses", az: "Xərclər" },
       income: { en: "Income", az: "Gəlir" },
+      financePayments: { en: "Payments", az: "Ödənişlər" },
       
       // Users Sub-items
       peopleCustomers: { en: "Customers", az: "Müştərilər" },
@@ -256,6 +259,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       userRoles: Users,
       warehouses: Building2,
       settings: Settings,
+      deletionLogs: ScrollText,
       myWebsite: Globe,
     };
     const items: NavItem[] = ALL_BRANCHES_NAV_ENTRIES.map((entry) => ({
@@ -350,6 +354,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       subItems: [
         { labelKey: "financeExpenses", label: st("financeExpenses"), path: "/dashboard/finances/expenses" },
         { labelKey: "income", label: st("income"), path: "/dashboard/finances/income" },
+        { labelKey: "financePayments", label: st("financePayments"), path: "/dashboard/finances/payments" },
       ],
     },
     {
@@ -429,6 +434,13 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       label: st("tableBookings"),
       path: "/dashboard/restaurant/bookings",
       permissionModule: "Dining",
+    },
+    {
+      icon: ScrollText,
+      labelKey: "deletionLogs",
+      label: st("deletionLogs"),
+      path: "/dashboard/settings/logs",
+      permissionModule: "Settings",
     },
     {
       icon: Settings,

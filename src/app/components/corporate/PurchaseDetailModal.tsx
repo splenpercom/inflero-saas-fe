@@ -1,12 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { Ban, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
+import { useModulePermissions } from "../../hooks/useModulePermissions";
 import {
   fetchPurchase,
   recordPurchasePayment,
   type PurchaseDetail,
 } from "../../api/purchases";
+import { voidFinancePayment } from "../../api/finance";
 import {
   formatPurchaseDate,
   parsePurchaseAmount,
@@ -69,6 +72,8 @@ export function PurchaseDetailModal({
 }: PurchaseDetailModalProps) {
   const { language } = useLanguage();
   const { isDemo } = useAuth();
+  const askConfirm = useConfirm();
+  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [purchase, setPurchase] = useState<PurchaseDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,6 +82,7 @@ export function PurchaseDetailModal({
   const [paymentNote, setPaymentNote] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
 
   const loadPurchase = async (id: string) => {
     setLoading(true);
@@ -134,6 +140,33 @@ export function PurchaseDetailModal({
     if (key === "received") return tr("Qəbul edildi", "Received");
     return purchase.statusLabel || purchase.status;
   })();
+
+  const handleVoidPayment = async (paymentId: string) => {
+    if (!purchase || isDemo || !canVoidFinance) return;
+    if (
+      !(await askConfirm({
+        title: tr("Ödənişi ləğv et", "Void payment"),
+        message: tr(
+          "Bu ödəniş ləğv ediləcək və satınalma borcu yenilənəcək. Davam edilsin?",
+          "This payment will be voided and the purchase balance will be recalculated. Continue?",
+        ),
+        variant: "danger",
+      }))
+    ) {
+      return;
+    }
+    setVoidingPaymentId(paymentId);
+    try {
+      await voidFinancePayment(paymentId);
+      await loadPurchase(purchase.id);
+      notifySuccess(tr("Ödəniş ləğv edildi", "Payment voided"));
+      onChanged?.();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setVoidingPaymentId(null);
+    }
+  };
 
   const handleRecordPayment = async () => {
     if (!purchase || isDemo || !canEdit) return;
@@ -354,16 +387,29 @@ export function PurchaseDetailModal({
                   {purchase.payments.map((p) => (
                     <div
                       key={p.paymentId}
-                      className="flex justify-between text-xs border-b border-gray-100 dark:border-gray-800 pb-2 last:border-0 last:pb-0"
+                      className="flex justify-between items-center gap-2 text-xs border-b border-gray-100 dark:border-gray-800 pb-2 last:border-0 last:pb-0"
                     >
-                      <span className="text-gray-600 dark:text-gray-400">
+                      <span className="text-gray-600 dark:text-gray-400 min-w-0">
                         {formatPurchaseDate(p.date)} — {p.method}
                         {p.reference ? ` · ${p.reference}` : ""}
                         {p.note ? ` · ${p.note}` : ""}
                       </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        ₼{parsePurchaseAmount(p.allocatedAmount).toFixed(2)}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          ₼{parsePurchaseAmount(p.allocatedAmount).toFixed(2)}
+                        </span>
+                        {canVoidFinance && !isDemo ? (
+                          <button
+                            type="button"
+                            disabled={voidingPaymentId === p.paymentId}
+                            onClick={() => void handleVoidPayment(p.paymentId)}
+                            className="inline-flex items-center gap-1 px-1.5 py-1 rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                            title={tr("Ləğv et", "Void")}
+                          >
+                            <Ban className="w-3 h-3" />
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
                 </div>

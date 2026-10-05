@@ -35,6 +35,7 @@ const routeImports: Record<string, () => Promise<any>> = {
   '/user-management': () => import('../components/corporate/UserManagement'),
   '/user-management/roles': () => import('../components/corporate/UserManagement'),
   '/settings': () => import('../components/corporate/Settings'),
+  '/settings/logs': () => import('../components/corporate/DeletionLogs'),
   '/dashboard/restaurant/menu': () => import('../../modules/dining/pages/MenuPage'),
   '/dashboard/restaurant/tables': () => import('../../modules/dining/pages/TablesPage'),
   '/dashboard/restaurant/kot': () => import('../../modules/dining/pages/KotPage'),

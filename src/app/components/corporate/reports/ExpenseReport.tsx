@@ -32,7 +32,7 @@ export function ExpenseReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const expenseItems: ExpenseItem[] = [
     {

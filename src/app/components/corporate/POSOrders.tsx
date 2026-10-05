@@ -8,9 +8,11 @@ import {
   RefreshCw,
   Search,
   Eye,
+  EyeOff,
   Edit2,
   Trash2,
   Plus,
+  DollarSign,
   Download,
   CheckCircle2,
   ChefHat,
@@ -35,6 +37,7 @@ import { useSalesCustomers } from "../../hooks/useSalesCustomers";
 import { AddSalesModal } from "./AddSalesModal";
 import { SaleDetailModal } from "./SaleDetailModal";
 import { CreatePaymentModal } from "./CreatePaymentModal";
+import { ShowPaymentsModal } from "./ShowPaymentsModal";
 import {
   fetchPosOrders,
   deletePosOrder,
@@ -49,6 +52,9 @@ import {
 } from "../../api/sales";
 import { ApiError } from "../../api/client";
 import { fetchTenantSettings } from "../../api/tenantSettings";
+import { usePosStaffPasscodeGate } from "../../hooks/usePosStaffPasscodeGate";
+import { useSalesBillers } from "../../hooks/useSalesBillers";
+import { PosStaffPasscodeOverlay } from "./PosStaffPasscodeOverlay";
 import {
   formatSalesDateTime,
   mapPaymentMethodToApi,
@@ -270,6 +276,13 @@ export function POSOrders() {
   const posEnabled = hasModule("POS");
   const diningEnabled = hasModule("DINING");
   const webEditorEnabled = hasModule("WEB_EDITOR");
+  const {
+    ensureWithPasscode,
+    passcodeSession,
+    closePasscode,
+    confirmPasscode,
+  } = usePosStaffPasscodeGate();
+  const { billers } = useSalesBillers(isAuthenticated || isDemo);
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Sales");
   const branchRevision = useBranchRevision();
   const prefersTouchKeyboard = usePrefersTouchKeyboard();
@@ -284,6 +297,8 @@ export function POSOrders() {
   const [touchKbOpen, setTouchKbOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  /** When false, completed orders are excluded (status filter "all" only). */
+  const [showCompleted, setShowCompleted] = useState(true);
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("all");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("all");
   const [selectedSource, setSelectedSource] = useState(() => {
@@ -299,6 +314,7 @@ export function POSOrders() {
   const [selectedKotStatus, setSelectedKotStatus] = useState("all");
   const [selectedProductionStatus, setSelectedProductionStatus] = useState("all");
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
+  const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
   const [updatingProductionId, setUpdatingProductionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("last7days");
   const [customFromDate, setCustomFromDate] = useState(() => datesForSortPreset("last7days").fromDate);
@@ -315,6 +331,8 @@ export function POSOrders() {
   const [isAddSalesModalOpen, setIsAddSalesModalOpen] = useState(false);
   const [isSaleDetailModalOpen, setIsSaleDetailModalOpen] = useState(false);
   const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
+  const [isShowPaymentsModalOpen, setIsShowPaymentsModalOpen] = useState(false);
+  const [paymentsReloadKey, setPaymentsReloadKey] = useState(0);
   const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [invoicePreviewOrderId, setInvoicePreviewOrderId] = useState<string | null>(null);
@@ -355,6 +373,7 @@ export function POSOrders() {
     debouncedSearch,
     selectedCustomer,
     selectedStatus,
+    showCompleted,
     selectedPaymentStatus,
     selectedPaymentMethod,
     selectedSource,
@@ -425,20 +444,27 @@ export function POSOrders() {
   useEffect(() => {
     if (!(isAuthenticated || isDemo)) {
       setPosSendToProductionEnabled(false);
+      setPosStaffPasscodeEnabled(false);
       return;
     }
     let cancelled = false;
     fetchTenantSettings()
       .then((s) => {
-        if (!cancelled) setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
+        if (!cancelled) {
+          setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
+          setPosStaffPasscodeEnabled(diningEnabled && s.posStaffPasscodeEnabled === true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setPosSendToProductionEnabled(false);
+        if (!cancelled) {
+          setPosSendToProductionEnabled(false);
+          setPosStaffPasscodeEnabled(false);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, isDemo, branchRevision]);
+  }, [isAuthenticated, isDemo, branchRevision, diningEnabled]);
 
   const showProductionColumn = posSendToProductionEnabled && visibleColumns.production;
 
@@ -537,6 +563,7 @@ export function POSOrders() {
           search: debouncedSearch.trim() || undefined,
           customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
           status: selectedStatus,
+          hideCompleted: selectedStatus === "all" && !showCompleted,
           paymentStatus: selectedPaymentStatus,
           paymentMethod: selectedPaymentMethod,
           source: selectedSource,
@@ -589,6 +616,7 @@ export function POSOrders() {
     debouncedSearch,
     selectedCustomer,
     selectedStatus,
+    showCompleted,
     selectedPaymentStatus,
     selectedPaymentMethod,
     selectedSource,
@@ -762,6 +790,7 @@ export function POSOrders() {
       search: debouncedSearch.trim() || undefined,
       customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
       status: selectedStatus,
+      hideCompleted: selectedStatus === "all" && !showCompleted,
       paymentStatus: selectedPaymentStatus,
       paymentMethod: selectedPaymentMethod,
       sortBy,
@@ -1034,6 +1063,11 @@ export function POSOrders() {
     navigate(`/dashboard/sales/pos?orderId=${encodeURIComponent(orderId)}`);
   };
 
+  const handleShowPayments = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setIsShowPaymentsModalOpen(true);
+  };
+
   const handleCreatePayment = (orderId: string) => {
     if (!canCreate || isDemo) return;
     const row = orders.find((o) => o.id === orderId);
@@ -1075,6 +1109,7 @@ export function POSOrders() {
         note: paymentData.note || null,
       });
       notifySuccess(tr("Ödəniş uğurla yaradıldı", "Payment created successfully"));
+      setPaymentsReloadKey((k) => k + 1);
       await loadItems();
     } catch (err) {
       notifyFromError(err, tr("Ödəniş yaradıla bilmədi", "Failed to create payment"));
@@ -1096,6 +1131,15 @@ export function POSOrders() {
       notifySuccess(tr("Satış silindi", "Sale deleted"));
       await loadItems();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "ORDER_HAS_REFUND") {
+        notifyWarning(
+          tr(
+            "Əvvəlcə geri qaytarma (refund) qeydini silin, sonra sifarişi silə bilərsiniz",
+            "Delete the refund record first, then you can delete this order",
+          ),
+        );
+        return;
+      }
       notifyFromError(err, tr("Satış silinə bilmədi", "Failed to delete sale"));
     }
   };
@@ -1248,6 +1292,31 @@ export function POSOrders() {
                   { value: "held", label: tr("Qaralama", "Draft") },
                 ]}
               />
+
+              {selectedStatus === "all" && (
+                <button
+                  type="button"
+                  onClick={() => setShowCompleted((v) => !v)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg font-medium border transition-colors",
+                    showCompleted
+                      ? "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      : "bg-[#14b8a6]/10 border-[#14b8a6]/40 text-[#0f766e] dark:text-[#5eead4]",
+                  )}
+                  title={
+                    showCompleted
+                      ? tr("Tamamlanmışları gizlət", "Hide completed orders")
+                      : tr("Tamamlanmışları göstər", "Show completed orders")
+                  }
+                >
+                  {showCompleted ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>
+                    {showCompleted
+                      ? tr("Tamamlanmışları gizlət", "Hide completed")
+                      : tr("Tamamlanmışları göstər", "Show completed")}
+                  </span>
+                </button>
+              )}
 
               <ModernSelect
                 value={selectedPaymentStatus}
@@ -1821,36 +1890,51 @@ export function POSOrders() {
                                 onClick={() => {
                                   void (async () => {
                                     try {
-                                      const detail = await sendHeldPosOrderToKot(order.id, {
-                                        tableId: order.table?.id ?? null,
+                                      const matched = billers.find(
+                                        (b) =>
+                                          b.name.trim().toLowerCase() ===
+                                          (order.biller ?? "").trim().toLowerCase(),
+                                      );
+                                      await ensureWithPasscode({
+                                        featureOn: diningEnabled && posStaffPasscodeEnabled,
+                                        hasPosPasscode: matched?.hasPosPasscode === true,
+                                        staffName: matched?.name || order.biller || tr("İşçi", "Staff"),
+                                        invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
+                                        run: async (staffPasscode) => {
+                                          const detail = await sendHeldPosOrderToKot(order.id, {
+                                            tableId: order.table?.id ?? null,
+                                            ...(matched?.id ? { billerId: matched.id } : {}),
+                                            ...(staffPasscode ? { staffPasscode } : {}),
+                                          });
+                                          try {
+                                            const logoSrc =
+                                              getCompanyLogoUrl(user?.tenant, false) ??
+                                              getCompanyLogoUrl(user?.tenant, true) ??
+                                              APP_LOGO_LIGHT;
+                                            await printPosOrderTicket({
+                                              order: detail,
+                                              role: "kot",
+                                              language,
+                                              companyName: user?.tenant?.name?.trim() || "Inflero",
+                                              logoSrc,
+                                            });
+                                            notifySuccess(
+                                              tr(
+                                                "KOT-a göndərildi və mətbəx çapı göndərildi",
+                                                "Sent to KOT and kitchen ticket printed",
+                                              ),
+                                            );
+                                          } catch (printErr) {
+                                            notifyWarning(
+                                              tr(
+                                                "KOT-a göndərildi, amma çap alınmadı",
+                                                "Sent to KOT, but print failed",
+                                              ),
+                                            );
+                                            notifyFromError(printErr);
+                                          }
+                                        },
                                       });
-                                      try {
-                                        const logoSrc =
-                                          getCompanyLogoUrl(user?.tenant, false) ??
-                                          getCompanyLogoUrl(user?.tenant, true) ??
-                                          APP_LOGO_LIGHT;
-                                        await printPosOrderTicket({
-                                          order: detail,
-                                          role: "kot",
-                                          language,
-                                          companyName: user?.tenant?.name?.trim() || "Inflero",
-                                          logoSrc,
-                                        });
-                                        notifySuccess(
-                                          tr(
-                                            "KOT-a göndərildi və mətbəx çapı göndərildi",
-                                            "Sent to KOT and kitchen ticket printed",
-                                          ),
-                                        );
-                                      } catch (printErr) {
-                                        notifyWarning(
-                                          tr(
-                                            "KOT-a göndərildi, amma çap alınmadı",
-                                            "Sent to KOT, but print failed",
-                                          ),
-                                        );
-                                        notifyFromError(printErr);
-                                      }
                                       await loadItems();
                                     } catch (err) {
                                       notifyFromError(err);
@@ -1871,14 +1955,14 @@ export function POSOrders() {
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          {!isWebOrder(order) && canCreate && !isDraftOrderStatus(order.status) && (
+                          {!isWebOrder(order) && !isDraftOrderStatus(order.status) && (
                             <button
                               type="button"
                               className={iconBtn}
-                              title={tr("Ödəniş Yarat", "Create Payment")}
-                              onClick={() => handleCreatePayment(order.id)}
+                              title={tr("Ödənişlər", "Payments")}
+                              onClick={() => handleShowPayments(order.id)}
                             >
-                              <Plus className="w-3.5 h-3.5" />
+                              <DollarSign className="w-3.5 h-3.5" />
                             </button>
                           )}
                           <button
@@ -1966,6 +2050,17 @@ export function POSOrders() {
         onFinalized={() => void loadItems()}
       />
 
+      <ShowPaymentsModal
+        orderId={selectedOrderId}
+        isOpen={isShowPaymentsModalOpen}
+        onClose={() => setIsShowPaymentsModalOpen(false)}
+        reloadKey={paymentsReloadKey}
+        onChanged={() => void loadItems()}
+        onCreatePayment={() => {
+          if (selectedOrderId) handleCreatePayment(selectedOrderId);
+        }}
+      />
+
       <CreatePaymentModal
         orderId={selectedOrderId}
         isOpen={isCreatePaymentModalOpen}
@@ -2008,6 +2103,16 @@ export function POSOrders() {
           title={tr("Axtarış", "Search")}
         />
       )}
+      {passcodeSession ? (
+        <PosStaffPasscodeOverlay
+          open
+          staffName={passcodeSession.staffName}
+          busy={passcodeSession.busy}
+          error={passcodeSession.error}
+          onCancel={closePasscode}
+          onConfirm={confirmPasscode}
+        />
+      ) : null}
     </div>
   );
 }

@@ -277,12 +277,19 @@ function QRModal({
   onClose: () => void;
 }) {
   const qrRef = useRef<HTMLDivElement>(null);
-  const downloadQR = () => {
+
+  const getQrSvgMarkup = (): string | null => {
     const svg = qrRef.current?.querySelector("svg");
-    if (!svg) return;
-    const blob = new Blob([new XMLSerializer().serializeToString(svg)], {
-      type: "image/svg+xml",
-    });
+    if (!svg) return null;
+    const clone = svg.cloneNode(true) as SVGElement;
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    return new XMLSerializer().serializeToString(clone);
+  };
+
+  const downloadQR = () => {
+    const markup = getQrSvgMarkup();
+    if (!markup) return;
+    const blob = new Blob([markup], { type: "image/svg+xml" });
     const a = Object.assign(document.createElement("a"), {
       href: URL.createObjectURL(blob),
       download: `qr-${table.name.replace(/\s+/g, "-")}.svg`,
@@ -290,6 +297,60 @@ function QRModal({
     a.click();
     URL.revokeObjectURL(a.href);
     toast.success("QR code downloaded");
+  };
+
+  const printQR = () => {
+    const markup = getQrSvgMarkup();
+    if (!markup) return;
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText =
+      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
+    if (!doc || !win) {
+      iframe.remove();
+      return;
+    }
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><title></title>
+<style>
+  @page { margin: 0; size: auto; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  svg { width: 70mm; height: 70mm; max-width: 90vw; max-height: 90vh; }
+</style></head><body>${markup}</body></html>`);
+    doc.close();
+    const cleanup = () => {
+      try {
+        iframe.remove();
+      } catch {
+        /* ignore */
+      }
+    };
+    win.onafterprint = cleanup;
+    // Give the SVG a tick to layout before print dialog.
+    setTimeout(() => {
+      try {
+        win.focus();
+        win.print();
+      } catch {
+        cleanup();
+      }
+      // Fallback cleanup if afterprint never fires (some browsers).
+      setTimeout(cleanup, 60_000);
+    }, 50);
   };
 
   return (
@@ -326,8 +387,9 @@ function QRModal({
           </button>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={printQR}
             className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            title="Print QR"
           >
             <Printer className="w-3.5 h-3.5" />
           </button>

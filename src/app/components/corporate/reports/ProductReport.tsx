@@ -44,7 +44,7 @@ export function ProductReport() {
     setCustomTo,
     dateFrom,
     dateTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [items, setItems] = useState<ProductReportItem[]>([]);

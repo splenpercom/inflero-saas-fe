@@ -1225,6 +1225,81 @@ export function resolveDemoApiResponse(path: string, method: string): unknown {
     const pageSize = Number(params.get("pageSize") ?? 20);
     return ok(paged(DEMO_INCOMES, page, pageSize));
   }
+  if (pathname === "/tenant/finance/payments") {
+    const page = Number(params.get("page") ?? 1);
+    const pageSize = Number(params.get("pageSize") ?? 20);
+    return ok(
+      paged(
+        [
+          {
+            id: "demo-pay-1",
+            paymentNumber: "PAY-DEMO0001",
+            date: `${DATE}T10:00:00.000Z`,
+            method: "CASH",
+            amount: "120.00",
+            reference: "RCP-1",
+            note: null,
+            status: "POSTED",
+            voidedAt: null,
+            direction: "IN",
+            targetType: "POS_ORDER",
+            targetId: "demo-pos-1",
+            documentLabel: "POS-1001",
+            partyName: "Walk-in",
+            storeId: null,
+            storeName: "Main",
+            allocations: [],
+            createdAt: `${DATE}T10:00:00.000Z`,
+          },
+          {
+            id: "demo-pay-2",
+            paymentNumber: "PAY-DEMO0002",
+            date: `${DATE}T12:00:00.000Z`,
+            method: "BANK_TRANSFER",
+            amount: "450.00",
+            reference: "SUP-22",
+            note: "Partial",
+            status: "POSTED",
+            voidedAt: null,
+            direction: "OUT",
+            targetType: "PURCHASE",
+            targetId: "demo-purchase-1",
+            documentLabel: "PO-88",
+            partyName: "Acme Supply",
+            storeId: null,
+            storeName: "Main",
+            allocations: [],
+            createdAt: `${DATE}T12:00:00.000Z`,
+          },
+        ],
+        page,
+        pageSize,
+      ),
+    );
+  }
+  if (pathname.startsWith("/tenant/finance/payments/") && method === "GET") {
+    const id = pathname.split("/").pop()!;
+    return ok({
+      id,
+      paymentNumber: "PAY-DEMO0001",
+      date: `${DATE}T10:00:00.000Z`,
+      method: "CASH",
+      amount: "120.00",
+      reference: "RCP-1",
+      note: null,
+      status: "POSTED",
+      voidedAt: null,
+      direction: "IN",
+      targetType: "POS_ORDER",
+      targetId: "demo-pos-1",
+      documentLabel: "POS-1001",
+      partyName: "Walk-in",
+      storeId: null,
+      storeName: "Main",
+      allocations: [],
+      createdAt: `${DATE}T10:00:00.000Z`,
+    });
+  }
   if (pathname === "/tenant/finance/reports/profit-loss") return ok(profitLossResult());
   if (pathname === "/tenant/finance/reports/expense") {
     return ok({

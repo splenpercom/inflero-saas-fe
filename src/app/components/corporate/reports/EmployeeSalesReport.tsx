@@ -62,7 +62,7 @@ export function EmployeeSalesReport() {
     setCustomTo,
     dateFrom,
     dateTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<BillerReportItem[]>([]);
   const [totals, setTotals] = useState({

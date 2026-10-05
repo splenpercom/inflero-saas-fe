@@ -32,7 +32,7 @@ export function InventoryReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const inventoryItems: InventoryItem[] = [
     {

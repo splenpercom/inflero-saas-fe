@@ -55,17 +55,18 @@ import {
 import { pickLang } from "../../i18n/pickLang";
 type ChartRange = "1M" | "3M" | "6M";
 
-function chartRangeToPeriod(range: ChartRange): DashboardPeriod {
-  if (range === "1M") return "1M";
-  if (range === "3M") return "1Y";
-  return "1Y";
-}
-
 function chartMonthCount(range: ChartRange): number {
   if (range === "1M") return 6;
   if (range === "3M") return 3;
   return 6;
 }
+
+const SUMMARY_PERIODS: { key: DashboardPeriod; en: string; az: string; ru?: string }[] = [
+  { key: "1D", en: "Today", az: "Bu gün", ru: "Сегодня" },
+  { key: "1W", en: "Week", az: "Həftə", ru: "Неделя" },
+  { key: "1M", en: "Month", az: "Ay", ru: "Месяц" },
+  { key: "1Y", en: "Year", az: "İl", ru: "Год" },
+];
 
 export function NewDashboard() {
   const { language } = useLanguage();
@@ -77,13 +78,13 @@ export function NewDashboard() {
   const stockEnabled =
     hasModule("STOCK") && (hasPermission("Stock", "view") || hasPermission("Inventory", "view"));
   const posEnabled = hasModule("POS") && hasPermission("Sales", "view");
+  const [summaryPeriod, setSummaryPeriod] = useState<DashboardPeriod>("1D");
   const [selectedPeriod, setSelectedPeriod] = useState<ChartRange>("1M");
   const [finPeriod, setFinPeriod] = useState<ChartRange>("1M");
   const [txTab, setTxTab] = useState<"all" | "completed" | "pending">("all");
 
-  const period = chartRangeToPeriod(selectedPeriod);
   const { loading, error, summary, todaySummary, todayReservations, pendingReservationCount, reload } =
-    useDashboardData(period);
+    useDashboardData(summaryPeriod);
 
   const tr = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -181,11 +182,16 @@ export function NewDashboard() {
   const expensesNum = parseMoney(totals?.approvedExpenses);
   const profitNum = parseMoney(totals?.profitApprox);
 
+  const periodSub =
+    summaryPeriod === "1D"
+      ? tr("Today", "Bu gün", "Сегодня")
+      : tr("Selected period", "Seçilmiş dövr");
+
   const financeStats = [
     {
       label: tr("Total Revenue", "Ümumi Gəlir"),
       value: formatMoney(totals?.salesPaid),
-      sub: tr("Selected period", "Seçilmiş dövr"),
+      sub: periodSub,
       trend: "up" as const,
       icon: Banknote,
       color: "from-green-500 to-green-600",
@@ -275,7 +281,23 @@ export function NewDashboard() {
               )}
             </p>}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex bg-white/10 border border-white/20 rounded-xl p-0.5 gap-0.5">
+              {SUMMARY_PERIODS.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => setSummaryPeriod(p.key)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    summaryPeriod === p.key
+                      ? "bg-white text-[#14b8a6] shadow-sm"
+                      : "text-white/80 hover:text-white"
+                  }`}
+                >
+                  {pickLang(language, p.az, p.en, p.ru)}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs">
               <Calendar className="w-3.5 h-3.5 text-white/70" />
               <span className="text-white/80">{todayDateLabel}</span>
@@ -322,7 +344,10 @@ export function NewDashboard() {
             iconColor: "text-teal-600 dark:text-teal-400",
           }] : []),
           {
-            label: tr("Period Revenue", "Dövr Gəliri"),
+            label:
+              summaryPeriod === "1D"
+                ? tr("Today's Revenue", "Bugünkü Gəlir")
+                : tr("Period Revenue", "Dövr Gəliri"),
             value: formatMoney(totals?.salesPaid),
             sub: tr("Paid sales", "Ödənilmiş satışlar"),
             icon: DollarSign,

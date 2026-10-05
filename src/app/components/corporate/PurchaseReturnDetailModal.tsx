@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { Ban, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
+import { useModulePermissions } from "../../hooks/useModulePermissions";
 import {
   fetchPurchaseReturn,
   updatePurchaseReturn,
   recordPurchaseReturnPayment,
   type PurchaseReturnDetail,
 } from "../../api/purchases";
+import { voidFinancePayment } from "../../api/finance";
 import {
   formatPurchaseDate,
   parsePurchaseAmount,
@@ -40,6 +42,7 @@ export function PurchaseReturnDetailModal({
   const stockEnabled = hasModule("STOCK");
   const { branchId, isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
+  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
   const [detail, setDetail] = useState<PurchaseReturnDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [statusUi, setStatusUi] = useState("");
@@ -48,6 +51,7 @@ export function PurchaseReturnDetailModal({
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PosUiPaymentMethod>("cash");
   const [paymentNote, setPaymentNote] = useState("");
+  const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState("");
   const [recordingPayment, setRecordingPayment] = useState(false);
 
@@ -149,6 +153,33 @@ export function PurchaseReturnDetailModal({
       notifyFromError(err);
     } finally {
       setSavingStatus(false);
+    }
+  };
+
+  const handleVoidPayment = async (paymentId: string) => {
+    if (!detail || isDemo || !canVoidFinance) return;
+    if (
+      !(await askConfirm({
+        title: tr("Ödənişi ləğv et", "Void payment"),
+        message: tr(
+          "Bu ödəniş ləğv ediləcək və qaytarma borcu yenilənəcək. Davam edilsin?",
+          "This payment will be voided and the return balance will be recalculated. Continue?",
+        ),
+        variant: "danger",
+      }))
+    ) {
+      return;
+    }
+    setVoidingPaymentId(paymentId);
+    try {
+      await voidFinancePayment(paymentId);
+      await loadDetail(detail.id);
+      notifySuccess(tr("Ödəniş ləğv edildi", "Payment voided"));
+      onChanged();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setVoidingPaymentId(null);
     }
   };
 
@@ -369,11 +400,24 @@ export function PurchaseReturnDetailModal({
                     {tr("Ödəniş tarixçəsi", "Payment history")}
                   </p>
                   {detail.payments.map((p) => (
-                    <div key={p.paymentId} className="flex justify-between text-xs">
-                      <span className="text-gray-500">
+                    <div key={p.paymentId} className="flex justify-between items-center gap-2 text-xs">
+                      <span className="text-gray-500 min-w-0">
                         {formatPurchaseDate(p.date)} — {p.method}
                       </span>
-                      <span>₼{parsePurchaseAmount(p.allocatedAmount).toFixed(2)}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span>₼{parsePurchaseAmount(p.allocatedAmount).toFixed(2)}</span>
+                        {canVoidFinance && !isDemo ? (
+                          <button
+                            type="button"
+                            disabled={voidingPaymentId === p.paymentId}
+                            onClick={() => void handleVoidPayment(p.paymentId)}
+                            className="inline-flex items-center gap-1 px-1.5 py-1 rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                            title={tr("Ləğv et", "Void")}
+                          >
+                            <Ban className="w-3 h-3" />
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
                 </div>

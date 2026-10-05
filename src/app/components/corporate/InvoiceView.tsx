@@ -1,7 +1,7 @@
 import { pickLang } from "../../i18n/pickLang";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Download, Printer, Mail, DollarSign, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Printer, Mail, DollarSign, Trash2, Ban } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
@@ -14,6 +14,7 @@ import {
   type PosOrderDetail,
   type PaymentMethodApi,
 } from "../../api/sales";
+import { voidFinancePayment } from "../../api/finance";
 import { formatSalesDate } from "../../lib/salesMappers";
 import {
   downloadInvoicePdf,
@@ -43,6 +44,7 @@ export function InvoiceView() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user } = useAuth();
   const { canEdit, canDelete } = useModulePermissions("Sales");
+  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
   const askConfirm = useConfirm();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [sourceOrder, setSourceOrder] = useState<PosOrderDetail | null>(null);
@@ -51,6 +53,7 @@ export function InvoiceView() {
   );
   const [loading, setLoading] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -101,6 +104,32 @@ export function InvoiceView() {
       navigate("/dashboard/sales/invoices");
     } catch (err) {
       notifyFromError(err);
+    }
+  };
+
+  const handleVoidPayment = async (paymentId: string) => {
+    if (!id || isDemo || !canVoidFinance) return;
+    if (
+      !(await askConfirm({
+        title: tr("Ödənişi ləğv et", "Void payment"),
+        message: tr(
+          "Bu ödəniş ləğv ediləcək və qaimə borcu yenilənəcək. Davam edilsin?",
+          "This payment will be voided and the invoice balance will be recalculated. Continue?",
+        ),
+        variant: "danger",
+      }))
+    ) {
+      return;
+    }
+    setVoidingPaymentId(paymentId);
+    try {
+      await voidFinancePayment(paymentId);
+      notifySuccess(tr("Ödəniş ləğv edildi", "Payment voided"));
+      await loadInvoice();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setVoidingPaymentId(null);
     }
   };
 
@@ -402,6 +431,9 @@ export function InvoiceView() {
                       <th className="text-left text-xs font-medium text-gray-500 pb-2">{tr("Üsul", "Method")}</th>
                       <th className="text-right text-xs font-medium text-gray-500 pb-2">{tr("Məbləğ", "Amount")}</th>
                       <th className="text-left text-xs font-medium text-gray-500 pb-2">{tr("İstinad", "Reference")}</th>
+                      {canVoidFinance && !isDemo ? (
+                        <th className="text-right text-xs font-medium text-gray-500 pb-2">{tr("Əməliyyat", "Action")}</th>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -417,6 +449,19 @@ export function InvoiceView() {
                         <td className="py-2 text-xs text-gray-600 dark:text-gray-400">
                           {payment.reference || payment.note || "—"}
                         </td>
+                        {canVoidFinance && !isDemo ? (
+                          <td className="py-2 text-right">
+                            <button
+                              type="button"
+                              disabled={voidingPaymentId === payment.paymentId}
+                              onClick={() => void handleVoidPayment(payment.paymentId)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                              title={tr("Ləğv et", "Void")}
+                            >
+                              <Ban className="w-3 h-3" />
+                            </button>
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>

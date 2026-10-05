@@ -38,7 +38,7 @@ export function BestSeller() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const bestSellers: BestSellerItem[] = [
     {

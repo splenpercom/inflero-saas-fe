@@ -32,7 +32,7 @@ export function InvoiceReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const invoiceItems: InvoiceItem[] = [
     { id: "1", invoiceNo: "INV001", customer: "Carl Evans", dueDate: "24 Dec 2024", amount: 500, paid: 500, amountDue: 0, status: "Paid" },

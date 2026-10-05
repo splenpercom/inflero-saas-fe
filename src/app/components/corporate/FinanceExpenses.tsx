@@ -9,6 +9,7 @@ import {
   FolderTree,
   Edit2,
   Eye,
+  Trash2,
   RefreshCw,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -360,6 +361,11 @@ export function FinanceExpenses() {
                               {tr("Satınalma", "Purchase")}
                             </span>
                           ) : null}
+                          {expense.salesReturnId ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                              {tr("Müştəri geri qaytarma", "Client refund")}
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{expense.category}</td>
@@ -380,13 +386,22 @@ export function FinanceExpenses() {
                               <Eye className="w-3 h-3" />
                             </button>
                           )}
-                          {canEdit && !isDemo && expense.status === "PENDING" && !expense.purchaseId && (
+                          {canEdit && !isDemo && expense.status === "PENDING" && !expense.purchaseId && !expense.salesReturnId && (
                             <button
                               onClick={() => { setEditExpense(expense); setIsAddExpenseModalOpen(true); }}
                               className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                               title={tr("Redaktə Et", "Edit")}
                             >
                               <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
+                          {canDelete && !isDemo && (
+                            <button
+                              onClick={() => void handleDelete(expense)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              title={tr("Sil", "Delete")}
+                            >
+                              <Trash2 className="w-3 h-3" />
                             </button>
                           )}
                         </div>

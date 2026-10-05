@@ -24,7 +24,7 @@ export function ProfitLoss() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const monthlyData: MonthlyData[] = [
     {

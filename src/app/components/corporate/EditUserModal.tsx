@@ -21,6 +21,7 @@ export interface EditUserFormData {
   status: UiUserStatus;
   password: string;
   confirmPassword: string;
+  canPlacePosOrder: boolean;
 }
 
 interface EditUserModalProps {
@@ -33,6 +34,8 @@ interface EditUserModalProps {
   showManagedBranches?: boolean;
   managerRoleId?: string;
   saving?: boolean;
+  /** Show POS can-place-order checkbox (Dining staff only). */
+  showPosOrderControls?: boolean;
 }
 
 export function EditUserModal({
@@ -45,10 +48,12 @@ export function EditUserModal({
   showManagedBranches = false,
   managerRoleId = "",
   saving,
+  showPosOrderControls = false,
 }: EditUserModalProps) {
   const { language } = useLanguage();
   const t = (key: Parameters<typeof getUserManagementTranslation>[0]) =>
     getUserManagementTranslation(key, language);
+  const tr = (az: string, en: string) => pickLang(language, az, en);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -65,10 +70,20 @@ export function EditUserModal({
     status: "Active",
     password: "",
     confirmPassword: "",
+    canPlacePosOrder: true,
   });
 
   const editAsBranchManager =
     !!managerRoleId && formData.roleId === managerRoleId;
+
+  const selectedRoleName =
+    roles.find((r) => r.id === formData.roleId)?.name?.toLowerCase() ?? "";
+  const canShowPosControls =
+    showPosOrderControls &&
+    !user?.isTenantOwner &&
+    selectedRoleName !== "administrator" &&
+    selectedRoleName !== "manager" &&
+    selectedRoleName !== "admin";
 
   useEffect(() => {
     if (user) {
@@ -85,6 +100,7 @@ export function EditUserModal({
         status: user.status,
         password: "",
         confirmPassword: "",
+        canPlacePosOrder: user.canPlacePosOrder !== false,
       });
     }
   }, [user]);
@@ -258,6 +274,30 @@ export function EditUserModal({
                 />
               </div>
             </div>
+
+            {canShowPosControls ? (
+              <label className="flex items-start gap-2 rounded-lg border border-gray-200 dark:border-gray-800 px-3 py-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.canPlacePosOrder}
+                  onChange={(e) =>
+                    setFormData({ ...formData, canPlacePosOrder: e.target.checked })
+                  }
+                  className="mt-0.5 rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                />
+                <span>
+                  <span className="block text-xs font-medium text-gray-900 dark:text-white">
+                    {tr("Sifariş verə bilər", "Can place order")}
+                  </span>
+                  <span className="block text-[10px] text-gray-500 mt-0.5">
+                    {tr(
+                      "Söndürüldükdə bu işçi POS işçilər siyahısından gizlədilir (işçi kodu aktivdirsə).",
+                      "When off, this staff member is hidden from the POS employee list (when staff passcode is enabled).",
+                    )}
+                  </span>
+                </span>
+              </label>
+            ) : null}
 
             <div className="border-t border-gray-200 dark:border-gray-800 pt-3 mt-3">
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{t("leavePasswordFieldsEmpty")}</p>

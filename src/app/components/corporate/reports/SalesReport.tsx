@@ -42,7 +42,7 @@ export function SalesReport() {
     setCustomTo,
     dateFrom,
     dateTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
   const [items, setItems] = useState<SalesReportItem[]>([]);
   const [totals, setTotals] = useState({ totalPaid: 0, totalDue: 0, totalUnpaid: 0, purchase: 0 });
   const [loading, setLoading] = useState(true);

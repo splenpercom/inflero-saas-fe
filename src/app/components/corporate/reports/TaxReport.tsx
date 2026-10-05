@@ -35,7 +35,7 @@ export function TaxReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const purchaseTaxItems: TaxItem[] = [
     {

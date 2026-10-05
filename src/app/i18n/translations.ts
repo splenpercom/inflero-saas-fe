@@ -788,6 +788,18 @@ export interface Translations {
     noCancelledOrders: string;
   };
 
+  deletionLogsPage: {
+    title: string;
+    subtitle: string;
+    noDeletions: string;
+    deletedBy: string;
+    dateTime: string;
+    type: string;
+    record: string;
+    via: string;
+    reason: string;
+  };
+
   // Settings Page
   settingsPage: {
     title: string;
@@ -2184,6 +2196,19 @@ export const translations: Record<Language, Translations> = {
       noCancelledOrders: "No cancelled orders found for the selected filters",
     },
 
+    deletionLogsPage: {
+      title: "Deletion logs",
+      subtitle:
+        "Deleted records with date/time and who deleted them. Only deletions after this feature was enabled are listed.",
+      noDeletions: "No deletions found. Older deletions may not appear in this log.",
+      deletedBy: "Deleted by",
+      dateTime: "Date / time",
+      type: "Type",
+      record: "Record",
+      via: "Via",
+      reason: "Reason",
+    },
+
     // Settings Page
     settingsPage: {
       title: "Settings",
@@ -3471,6 +3496,19 @@ export const translations: Record<Language, Translations> = {
       noCancelledOrders: "Seçilmiş filtrlər üçün ləğv edilmiş sifariş tapılmadı",
     },
 
+    deletionLogsPage: {
+      title: "Silinmə jurnalları",
+      subtitle:
+        "Silinmiş qeydlər — tarix/saat və kim sildiyi. Yalnız bu funksiya işə salındıqdan sonra silinmələr göstərilir.",
+      noDeletions: "Silinmə tapılmadı. Köhnə silinmələr jurnalda görünməyə bilər.",
+      deletedBy: "Silən",
+      dateTime: "Tarix / saat",
+      type: "Tip",
+      record: "Qeyd",
+      via: "Vasitası ilə",
+      reason: "Səbəb",
+    },
+
     // Settings Page
     settingsPage: {
       title: "Parametrlər",
@@ -4681,6 +4719,20 @@ export const translations: Record<Language, Translations> = {
       orderTotal: "Сумма заказа",
       noCancelledOrders: "По выбранным фильтрам отменённые заказы не найдены",
     },
+
+    deletionLogsPage: {
+      title: "Журнал удалений",
+      subtitle:
+        "Удалённые записи с датой/временем и автором. Показаны только удаления после включения функции.",
+      noDeletions: "Удаления не найдены. Старые удаления могут не отображаться.",
+      deletedBy: "Удалил",
+      dateTime: "Дата / время",
+      type: "Тип",
+      record: "Запись",
+      via: "Через",
+      reason: "Причина",
+    },
+
     settingsPage: {
       title: "Настройки",
       cashRegister: "Касса",

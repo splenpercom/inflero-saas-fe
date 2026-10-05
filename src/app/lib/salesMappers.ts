@@ -62,6 +62,8 @@ export type SalesListQuery = {
   search?: string;
   customerId?: string;
   status?: string;
+  /** Exclude COMPLETED when status is all / unset. */
+  hideCompleted?: boolean;
   paymentStatus?: string;
   /** cash | card | all */
   paymentMethod?: string;
@@ -83,6 +85,7 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   if (q.search?.trim()) params.set("search", q.search.trim());
   if (q.customerId) params.set("customerId", q.customerId);
   if (q.status && q.status !== "all") params.set("status", q.status);
+  if (q.hideCompleted) params.set("hideCompleted", "true");
   if (q.paymentStatus && q.paymentStatus !== "all") params.set("paymentStatus", q.paymentStatus);
   if (q.paymentMethod && q.paymentMethod !== "all") params.set("paymentMethod", q.paymentMethod);
   if (q.sortBy && q.sortBy !== "all") params.set("sortBy", q.sortBy);

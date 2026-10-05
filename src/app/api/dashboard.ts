@@ -119,7 +119,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
   },
 };
 
-export async function fetchDashboardSummary(period: DashboardPeriod = "1M"): Promise<DashboardSummary> {
+export async function fetchDashboardSummary(period: DashboardPeriod = "1D"): Promise<DashboardSummary> {
   const res = await apiGet<ApiEnvelope<DashboardSummary>>(
     `/tenant/dashboard/summary?period=${encodeURIComponent(period)}`,
   );

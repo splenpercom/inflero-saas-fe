@@ -26,7 +26,7 @@ export function ProductQuantityAlert() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const productQuantityAlertItems: ProductQuantityAlertItem[] = [
     {

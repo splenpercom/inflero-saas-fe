@@ -50,6 +50,7 @@ export interface SalesBillerRow {
   email: string | null;
   commissionType?: "FIXED" | "PERCENT" | null;
   commissionValue?: string | null;
+  hasPosPasscode?: boolean;
 }
 
 export interface PosOrderLineItem {
@@ -245,6 +246,7 @@ export interface SalesReturnDetail {
   paymentStatus: string;
   /** Linked order refund status: Refunded / Partially Refunded / — */
   orderPaymentStatus?: string;
+  payments?: PosOrderPaymentRow[];
   items: SalesReturnLineItem[];
 }
 
@@ -271,6 +273,8 @@ export type CreatePosOrderBody = {
   tableId?: string | null;
   /** Dining hourly billing: rate snapshot for this order. */
   tableHourlyRate?: number | null;
+  /** Dining staff passcode (4 digits) when required. */
+  staffPasscode?: string | null;
 };
 
 export type CreateInvoiceBody = {
@@ -403,11 +407,14 @@ export async function fetchActivePosOrderByTable(tableId: string) {
 }
 
 /** Complete+pay (or cancel empty) all open unpaid orders on a table and free occupancy. */
-export async function finishTableActiveOrders(tableId: string) {
+export async function finishTableActiveOrders(
+  tableId: string,
+  body?: { billerId?: string; staffPasscode?: string | null },
+) {
   const res = await apiPost<{
     success: boolean;
     data: { tableId: string; finishedOrderIds: string[]; tableStatus: string };
-  }>(`/tenant/sales/pos-orders/finish-table/${encodeURIComponent(tableId)}`, {});
+  }>(`/tenant/sales/pos-orders/finish-table/${encodeURIComponent(tableId)}`, body ?? {});
   return res.data;
 }
 
@@ -461,7 +468,10 @@ export async function updatePosOrderProductionStatus(id: string, status: Product
 }
 
 /** Finalize a HELD draft onto the kitchen board. */
-export async function sendHeldPosOrderToKot(id: string, body?: { tableId?: string | null }) {
+export async function sendHeldPosOrderToKot(
+  id: string,
+  body?: { tableId?: string | null; billerId?: string; staffPasscode?: string | null },
+) {
   const res = await apiPost<{ success: boolean; data: PosOrderDetail }>(
     `/tenant/sales/pos-orders/${id}/send-to-kot`,
     body ?? {},

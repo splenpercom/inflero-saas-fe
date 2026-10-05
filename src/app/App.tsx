@@ -10,6 +10,7 @@ import { CorporateDashboard } from "./components/corporate/CorporateDashboard";
 import { NewDashboard } from "./components/corporate/NewDashboard";
 import { CorporateOrders } from "./components/corporate/CorporateOrders";
 import { Settings as CorporateSettings } from "./components/corporate/Settings";
+import { DeletionLogs } from "./components/corporate/DeletionLogs";
 import { Profile } from "./components/corporate/Profile";
 import { Products } from "./components/corporate/Products";
 import { ProductDetails } from "./components/corporate/ProductDetails";
@@ -32,6 +33,7 @@ import { Purchase } from "./components/corporate/Purchase";
 import { PurchaseReturn } from "./components/corporate/PurchaseReturn";
 import { FinanceExpenses } from "./components/corporate/FinanceExpenses";
 import { Income } from "./components/corporate/Income";
+import { Payments } from "./components/corporate/Payments";
 import { PeopleCustomers } from "./components/corporate/people/PeopleCustomers";
 import { CustomerProfile } from "./components/corporate/CustomerProfile";
 import { Suppliers } from "./components/corporate/people/Suppliers";
@@ -334,6 +336,7 @@ function AppShell() {
               {/* Finance Routes */}
               <Route path="finances/expenses" element={<FinanceExpenses />} />
               <Route path="finances/income" element={<Income />} />
+              <Route path="finances/payments" element={<Payments />} />
 
               {/* People Routes */}
               <Route path="people/customers" element={<PeopleCustomers />} />
@@ -387,6 +390,7 @@ function AppShell() {
                 }
               />
               <Route path="settings" element={<CorporateSettings />} />
+              <Route path="settings/logs" element={<DeletionLogs />} />
               <Route
                 path="pos-printers"
                 element={<Navigate to="/dashboard/settings?section=printers" replace />}
@@ -421,7 +425,7 @@ export default function App() {
           <AppShell />
         </ThemeProvider>
       </LanguageProvider>
-      <Toaster position="top-right" richColors closeButton style={{ zIndex: 100000 }} />
+      <Toaster position="bottom-right" richColors closeButton style={{ zIndex: 100000 }} />
     </BrowserRouter>
   );
 }

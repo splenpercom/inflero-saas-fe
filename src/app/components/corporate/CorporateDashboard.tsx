@@ -63,7 +63,7 @@ import { pickLang } from "../../i18n/pickLang";
 export function CorporateDashboard() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
-  const [selectedPeriod, setSelectedPeriod] = useState("1Y");
+  const [selectedPeriod, setSelectedPeriod] = useState("1D");
   const [showLowStockAlert, setShowLowStockAlert] = useState(true);
 
   // Get real stats from shared data

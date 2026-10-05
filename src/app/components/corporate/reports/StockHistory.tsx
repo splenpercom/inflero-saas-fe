@@ -28,7 +28,7 @@ export function StockHistory() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const stockHistoryItems: StockHistoryItem[] = [
     {

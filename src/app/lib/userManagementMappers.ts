@@ -57,6 +57,8 @@ export interface RawTenantUser {
   store: { id: string; name: string; code: string } | null;
   branchesAsManager?: { id: string; name: string; code: string }[];
   role: { id: string; name: string } | null;
+  hasPosPasscode?: boolean;
+  canPlacePosOrder?: boolean;
 }
 
 export interface TenantUserRow {
@@ -90,6 +92,8 @@ export interface TenantUserRow {
   shift: string;
   bloodGroup: string;
   gender: string;
+  hasPosPasscode: boolean;
+  canPlacePosOrder: boolean;
 }
 
 export interface RawTenantRole {
@@ -159,6 +163,8 @@ export function mapTenantUser(raw: RawTenantUser, language?: Language): TenantUs
     shift: raw.shift ?? "",
     bloodGroup: raw.bloodGroup ?? "",
     gender: raw.gender ?? "",
+    hasPosPasscode: raw.hasPosPasscode === true,
+    canPlacePosOrder: raw.canPlacePosOrder !== false,
   };
 }
 

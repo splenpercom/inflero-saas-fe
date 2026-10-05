@@ -27,7 +27,7 @@ export function SoldStock() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const soldStockItems: SoldStockItem[] = [
     {

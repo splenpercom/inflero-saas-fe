@@ -34,7 +34,7 @@ export function SupplierDueReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const supplierDueItems: SupplierDueItem[] = [
     { id: "1", reference: "INVPO2011", supplierId: "SU006", supplierName: "Hatimi Hardwares", supplierIcon: "🔨", totalAmount: 750, paid: 750, due: 0, status: "Paid" },

@@ -32,7 +32,7 @@ export function IncomeReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const incomeItems: IncomeItem[] = [
     {

@@ -50,6 +50,7 @@ export async function updateTenantUser(
     dateOfJoin?: string | null;
     dateOfBirth?: string | null;
     newPassword?: string | null;
+    canPlacePosOrder?: boolean;
   },
 ) {
   const payload: Record<string, unknown> = { ...body };
@@ -59,6 +60,17 @@ export async function updateTenantUser(
   const res = await apiPatch<{ success: boolean; data: RawTenantUser }>(
     `/tenant/users/${id}`,
     payload,
+  );
+  return mapTenantUser(res.data);
+}
+
+export async function updateTenantUserPosPasscode(
+  id: string,
+  body: { passcode: string | null },
+) {
+  const res = await apiPatch<{ success: boolean; data: RawTenantUser }>(
+    `/tenant/users/${id}/pos-passcode`,
+    body,
   );
   return mapTenantUser(res.data);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import {
   ArrowLeft,
@@ -23,6 +23,270 @@ import {
   fetchPublicDiningBookingConfig,
 } from "../../../../app/api/publicDining";
 import { ApiError } from "../../../../app/api/client";
+
+type BookLang = "az" | "en" | "ru";
+
+const BOOK_LANG_KEY = "inflero-book-table-lang";
+
+const BOOK_STRINGS = {
+  az: {
+    back: "Geri",
+    tableReservation: "Masa bronu",
+    bookATable: "Masa bron et",
+    missingLink: "Restoran keçidi yoxdur",
+    bookingUnavailable: "Bron əlçatan deyil",
+    bookingUnavailableHint: "Bu restoran hələ onlayn masa bronunu aktivləşdirməyib.",
+    chooseTable: "Masa seçin",
+    yourDetails: "Məlumatlarınız",
+    fullName: "Ad, soyad",
+    yourName: "Adınız",
+    phone: "Telefon",
+    dateTimeGuests: "Tarix, vaxt və qonaqlar",
+    date: "Tarix",
+    time: "Vaxt",
+    guests: "Qonaqlar",
+    max: "maks.",
+    people: "nəfər",
+    notes: "Qeyd",
+    optional: "(istəyə bağlı)",
+    notesPlaceholder: "Allergiya, xüsusi istəklər, bayram…",
+    seats: "yer",
+    required: "Tələb olunur",
+    selectTable: "Zəhmət olmasa masa seçin",
+    closedThisDay: "Bu gün bağlıdır",
+    closedThisDayBody:
+      "Restoran bu həftə günü bron qəbul etmir. Zəhmət olmasa başqa tarix seçin.",
+    restaurantClosedDay: "Restoran bu gün bağlıdır",
+    restaurantClosedDayShort: "Restoran bu gün bağlıdır.",
+    chooseDateWithin: (days: number) => `Növbəti ${days} gün ərzində tarix seçin`,
+    noticeHours: (hours: number) => `Bron üçün ən azı ${hours} saat əvvəldən müraciət lazımdır`,
+    selectDateForTimes: "Mövcud vaxtları görmək üçün tarix seçin.",
+    noSlots: "Uyğun vaxt yoxdur",
+    hoursNotConfigured: "İş saatları hələ tənzimlənməyib. Bron üçün restoranı axtarın.",
+    noSlotsLeft: (open: string, close: string, hours: number) =>
+      `Bu tarix üçün yer qalmayıb (iş saatı ${open}–${close}, ${hours} saat əvvəlcədən).`,
+    noTablesSetup: "Hələ masa əlavə edilməyib",
+    noTablesSetupBody:
+      "Bu restoran onlayn bron üçün masa dərc etməyib. Zəng edin və ya sonra yenidən yoxlayın.",
+    noTablesAvailable: "Hazırda boş masa yoxdur",
+    noTablesAvailableBody:
+      "Bütün masalar məşğuldur. Mövcudluğu öyrənmək üçün zəng edin və ya başqa vaxt seçin.",
+    onlineNotSetup: "Onlayn bron hələ hazır deyil. Zəhmət olmasa restoranı axtarın.",
+    noTablesNow: "Hazırda boş masa yoxdur.",
+    bookingSubmitted: "Bron göndərildi!",
+    at: "saat",
+    guest: "qonaq",
+    guestsWord: "qonaq",
+    tableFallback: (n: string | number) => `Masa ${n}`,
+    confirmSoon: "Tezliklə bronunuzu təsdiqləyəcəyik. Yeniliklər üçün telefonunuza baxın.",
+    bookAnother: "Başqa masa bron et",
+    sending: "Göndərilir…",
+    confirmBooking: "Bronu təsdiqlə",
+    restaurantInfo: "Restoran məlumatı",
+    infoNotPublished: "Restoran məlumatları hələ dərc edilməyib",
+    infoNotPublishedBody:
+      "Ünvan, telefon və Wi‑Fi məlumatları restoran əlavə edəndən sonra burada görünəcək.",
+    openHours: (open: string, close: string) => `Açıqdır ${open} – ${close}`,
+    freeWifi: "Pulsuz Wi‑Fi",
+    network: "Şəbəkə",
+    password: "Şifrə",
+    copyNetwork: "Şəbəkə adını kopyala",
+    copyPassword: "Şifrəni kopyala",
+    showPassword: "Şifrəni göstər",
+    hidePassword: "Şifrəni gizlət",
+    language: "Dil",
+    requestFailed: "Sorğu uğursuz oldu",
+  },
+  en: {
+    back: "Back",
+    tableReservation: "Table Reservation",
+    bookATable: "Book a table",
+    missingLink: "Missing restaurant link",
+    bookingUnavailable: "Booking unavailable",
+    bookingUnavailableHint: "This restaurant hasn’t enabled online table booking yet.",
+    chooseTable: "Choose a Table",
+    yourDetails: "Your Details",
+    fullName: "Full Name",
+    yourName: "Your name",
+    phone: "Phone",
+    dateTimeGuests: "Date, Time & Guests",
+    date: "Date",
+    time: "Time",
+    guests: "Guests",
+    max: "max",
+    people: "people",
+    notes: "Notes",
+    optional: "(optional)",
+    notesPlaceholder: "Allergies, special requests, celebrations…",
+    seats: "seats",
+    required: "Required",
+    selectTable: "Please select a table",
+    closedThisDay: "Closed this day",
+    closedThisDayBody:
+      "The restaurant does not take bookings on this weekday. Please pick another date.",
+    restaurantClosedDay: "Restaurant is closed on this day",
+    restaurantClosedDayShort: "Restaurant is closed on this day.",
+    chooseDateWithin: (days: number) => `Choose a date within the next ${days} day(s)`,
+    noticeHours: (hours: number) => `Bookings require at least ${hours} hour(s) notice`,
+    selectDateForTimes: "Select a date to see available times.",
+    noSlots: "No time slots available",
+    hoursNotConfigured: "Booking hours aren’t configured yet. Please call the restaurant to reserve.",
+    noSlotsLeft: (open: string, close: string, hours: number) =>
+      `No slots left for this date (open ${open}–${close}, ${hours}h notice required).`,
+    noTablesSetup: "No tables set up yet",
+    noTablesSetupBody:
+      "This restaurant hasn’t published tables for online booking. Please call them to reserve, or try again later.",
+    noTablesAvailable: "No tables available right now",
+    noTablesAvailableBody:
+      "All tables are currently occupied. Please call us to check availability or try a different time.",
+    onlineNotSetup: "Online booking isn’t set up yet. Please call the restaurant.",
+    noTablesNow: "No tables are available right now.",
+    bookingSubmitted: "Booking Submitted!",
+    at: "at",
+    guest: "guest",
+    guestsWord: "guests",
+    tableFallback: (n: string | number) => `Table ${n}`,
+    confirmSoon: "We’ll confirm your reservation shortly. Check your phone for updates.",
+    bookAnother: "Book Another Table",
+    sending: "Sending…",
+    confirmBooking: "Confirm Booking",
+    restaurantInfo: "Restaurant Info",
+    infoNotPublished: "Restaurant info not published yet",
+    infoNotPublishedBody:
+      "Address, phone, and Wi‑Fi details will appear here once the restaurant adds them.",
+    openHours: (open: string, close: string) => `Open ${open} – ${close}`,
+    freeWifi: "Free WiFi",
+    network: "Network",
+    password: "Password",
+    copyNetwork: "Copy network name",
+    copyPassword: "Copy password",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    language: "Language",
+    requestFailed: "Request failed",
+  },
+  ru: {
+    back: "Назад",
+    tableReservation: "Бронь стола",
+    bookATable: "Забронировать стол",
+    missingLink: "Ссылка на ресторан отсутствует",
+    bookingUnavailable: "Бронирование недоступно",
+    bookingUnavailableHint: "Этот ресторан ещё не включил онлайн-бронирование столов.",
+    chooseTable: "Выберите стол",
+    yourDetails: "Ваши данные",
+    fullName: "Имя и фамилия",
+    yourName: "Ваше имя",
+    phone: "Телефон",
+    dateTimeGuests: "Дата, время и гости",
+    date: "Дата",
+    time: "Время",
+    guests: "Гости",
+    max: "макс.",
+    people: "чел.",
+    notes: "Комментарий",
+    optional: "(необязательно)",
+    notesPlaceholder: "Аллергии, особые пожелания, праздник…",
+    seats: "мест",
+    required: "Обязательно",
+    selectTable: "Пожалуйста, выберите стол",
+    closedThisDay: "В этот день закрыто",
+    closedThisDayBody:
+      "Ресторан не принимает брони в этот день недели. Выберите другую дату.",
+    restaurantClosedDay: "Ресторан закрыт в этот день",
+    restaurantClosedDayShort: "Ресторан закрыт в этот день.",
+    chooseDateWithin: (days: number) => `Выберите дату в ближайшие ${days} дн.`,
+    noticeHours: (hours: number) => `Бронь нужна минимум за ${hours} ч.`,
+    selectDateForTimes: "Выберите дату, чтобы увидеть доступное время.",
+    noSlots: "Нет доступного времени",
+    hoursNotConfigured: "Часы бронирования ещё не настроены. Позвоните в ресторан.",
+    noSlotsLeft: (open: string, close: string, hours: number) =>
+      `На эту дату мест нет (открыто ${open}–${close}, нужно за ${hours} ч.).`,
+    noTablesSetup: "Столы ещё не добавлены",
+    noTablesSetupBody:
+      "Ресторан ещё не опубликовал столы для онлайн-брони. Позвоните или зайдите позже.",
+    noTablesAvailable: "Сейчас нет свободных столов",
+    noTablesAvailableBody:
+      "Все столы заняты. Позвоните, чтобы уточнить наличие, или выберите другое время.",
+    onlineNotSetup: "Онлайн-бронирование ещё не настроено. Позвоните в ресторан.",
+    noTablesNow: "Сейчас нет свободных столов.",
+    bookingSubmitted: "Бронь отправлена!",
+    at: "в",
+    guest: "гость",
+    guestsWord: "гостей",
+    tableFallback: (n: string | number) => `Стол ${n}`,
+    confirmSoon: "Мы скоро подтвердим бронь. Следите за обновлениями на телефоне.",
+    bookAnother: "Забронировать ещё",
+    sending: "Отправка…",
+    confirmBooking: "Подтвердить бронь",
+    restaurantInfo: "О ресторане",
+    infoNotPublished: "Данные ресторана ещё не опубликованы",
+    infoNotPublishedBody:
+      "Адрес, телефон и Wi‑Fi появятся здесь, когда ресторан их добавит.",
+    openHours: (open: string, close: string) => `Открыто ${open} – ${close}`,
+    freeWifi: "Бесплатный Wi‑Fi",
+    network: "Сеть",
+    password: "Пароль",
+    copyNetwork: "Скопировать имя сети",
+    copyPassword: "Скопировать пароль",
+    showPassword: "Показать пароль",
+    hidePassword: "Скрыть пароль",
+    language: "Язык",
+    requestFailed: "Запрос не выполнен",
+  },
+} as const;
+
+type BookStrings = (typeof BOOK_STRINGS)[BookLang];
+
+function readBookLang(searchParams: URLSearchParams): BookLang {
+  const fromUrl = searchParams.get("lang");
+  if (fromUrl === "az" || fromUrl === "en" || fromUrl === "ru") return fromUrl;
+  try {
+    const saved = sessionStorage.getItem(BOOK_LANG_KEY);
+    if (saved === "az" || saved === "en" || saved === "ru") return saved;
+  } catch {
+    /* ignore */
+  }
+  return "az";
+}
+
+function LangSwitcher({
+  lang,
+  onChange,
+  ariaLabel,
+}: {
+  lang: BookLang;
+  onChange: (lang: BookLang) => void;
+  ariaLabel: string;
+}) {
+  const options: { id: BookLang; label: string }[] = [
+    { id: "az", label: "AZ" },
+    { id: "en", label: "EN" },
+    { id: "ru", label: "RU" },
+  ];
+  return (
+    <div
+      className="inline-flex items-center rounded-lg border border-white/30 bg-white/15 p-0.5 flex-shrink-0"
+      role="group"
+      aria-label={ariaLabel}
+    >
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          style={{ touchAction: "manipulation", minHeight: "28px" }}
+          className={`px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${
+            lang === o.id
+              ? "bg-white text-[#0f766e] shadow-sm"
+              : "text-white/80 hover:text-white"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const inp = (err?: string) =>
   `w-full px-4 py-3.5 text-base border rounded-2xl bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors ${
@@ -58,10 +322,10 @@ type RestaurantInfo = {
   wifiPassword: string | null;
 };
 
-function errMsg(err: unknown) {
+function errMsg(err: unknown, fallback: string) {
   if (err instanceof ApiError) return err.message;
   if (err instanceof Error) return err.message;
-  return "Request failed";
+  return fallback;
 }
 
 function ymdLocal(d: Date): string {
@@ -80,7 +344,7 @@ function addDaysYmd(ymd: string, days: number): string {
 
 function weekdayIndex(ymd: string): number {
   const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(y, m - 1, d).getDay(); // 0=Sun local
+  return new Date(y, m - 1, d).getDay();
 }
 
 function isWeekdayOpen(ymd: string, weekdaysOpen: boolean[] | undefined): boolean {
@@ -146,6 +410,7 @@ function BookingForm({
   tables,
   settings,
   info,
+  t,
 }: {
   tenantSlug: string;
   branchCode?: string;
@@ -153,6 +418,7 @@ function BookingForm({
   tables: TableOpt[];
   settings: Settings;
   info: RestaurantInfo;
+  t: BookStrings;
 }) {
   const [selectedTableId, setSelectedTableId] = useState(initialTableId ?? "");
   const [submitted, setSubmitted] = useState(false);
@@ -167,8 +433,8 @@ function BookingForm({
   });
   const [errors, setErrors] = useState<Partial<typeof form & { table: string }>>({});
 
-  const selectedTable = tables.find((t) => t.id === selectedTableId);
-  const availableTables = tables.filter((t) => t.status !== "OCCUPIED");
+  const selectedTable = tables.find((x) => x.id === selectedTableId);
+  const availableTables = tables.filter((x) => x.status !== "OCCUPIED");
   const noTablesConfigured = tables.length === 0;
   const noTablesAvailable = tables.length > 0 && availableTables.length === 0;
   const today = ymdLocal(new Date());
@@ -177,7 +443,7 @@ function BookingForm({
   const dayOpen = form.date ? isWeekdayOpen(form.date, settings.weekdaysOpen) : true;
   const slots = useMemo(() => {
     if (!form.date || !dayOpen) return [];
-    return allSlots.filter((t) => slotMeetsNotice(form.date, t, settings.minNoticeHours ?? 0));
+    return allSlots.filter((tm) => slotMeetsNotice(form.date, tm, settings.minNoticeHours ?? 0));
   }, [allSlots, form.date, dayOpen, settings.minNoticeHours]);
 
   useEffect(() => {
@@ -188,18 +454,18 @@ function BookingForm({
 
   const validate = () => {
     const e: Partial<typeof form & { table: string }> = {};
-    if (!selectedTableId) e.table = "Please select a table";
-    if (!form.name.trim()) e.name = "Required";
-    if (!form.phone.trim()) e.phone = "Required";
-    if (!form.date) e.date = "Required";
+    if (!selectedTableId) e.table = t.selectTable;
+    if (!form.name.trim()) e.name = t.required;
+    if (!form.phone.trim()) e.phone = t.required;
+    if (!form.date) e.date = t.required;
     else if (!isWeekdayOpen(form.date, settings.weekdaysOpen)) {
-      e.date = "Restaurant is closed on this day";
+      e.date = t.restaurantClosedDay;
     } else if (form.date < today || form.date > maxDate) {
-      e.date = `Choose a date within the next ${settings.advanceBookingDays} day(s)`;
+      e.date = t.chooseDateWithin(settings.advanceBookingDays);
     }
-    if (!form.time) e.time = "Required";
+    if (!form.time) e.time = t.required;
     else if (!slotMeetsNotice(form.date, form.time, settings.minNoticeHours ?? 0)) {
-      e.time = `Bookings require at least ${settings.minNoticeHours} hour(s) notice`;
+      e.time = t.noticeHours(settings.minNoticeHours);
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -207,11 +473,7 @@ function BookingForm({
 
   const handleSubmit = async () => {
     if (noTablesConfigured || noTablesAvailable) {
-      toast.error(
-        noTablesConfigured
-          ? "Online booking isn’t set up yet. Please call the restaurant."
-          : "No tables are available right now.",
-      );
+      toast.error(noTablesConfigured ? t.onlineNotSetup : t.noTablesNow);
       return;
     }
     if (!validate()) return;
@@ -230,7 +492,7 @@ function BookingForm({
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      toast.error(errMsg(err));
+      toast.error(errMsg(err, t.requestFailed));
     } finally {
       setSubmitting(false);
     }
@@ -242,20 +504,18 @@ function BookingForm({
         <div className="w-20 h-20 rounded-full bg-[#ccfbf1] flex items-center justify-center mb-5">
           <Check className="w-10 h-10 text-[#0f766e]" />
         </div>
-        <p className="text-2xl font-bold text-gray-900 mb-2">Booking Submitted!</p>
+        <p className="text-2xl font-bold text-gray-900 mb-2">{t.bookingSubmitted}</p>
         <p className="text-base text-gray-600 mb-1">
-          {selectedTable?.name ?? `Table ${selectedTableId}`}
+          {selectedTable?.name ?? t.tableFallback(selectedTableId)}
         </p>
         <p className="text-sm text-gray-500 mb-1">
-          {form.date} at {form.time}
+          {form.date} {t.at} {form.time}
         </p>
         <p className="text-sm text-gray-500 mb-6">
-          {form.guests} guest{form.guests !== 1 ? "s" : ""} · {form.name}
+          {form.guests} {form.guests === 1 ? t.guest : t.guestsWord} · {form.name}
         </p>
         <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl px-4 py-4 mb-8">
-          <p className="text-sm text-amber-700">
-            We&apos;ll confirm your reservation shortly. Check your phone for updates.
-          </p>
+          <p className="text-sm text-amber-700">{t.confirmSoon}</p>
         </div>
         <button
           type="button"
@@ -267,7 +527,7 @@ function BookingForm({
           style={{ touchAction: "manipulation", minHeight: "54px" }}
           className="w-full rounded-2xl bg-[#14b8a6] active:bg-[#0d9488] text-white text-base font-bold transition-colors"
         >
-          Book Another Table
+          {t.bookAnother}
         </button>
       </div>
     );
@@ -281,62 +541,58 @@ function BookingForm({
             1
           </span>
           <p className="text-sm font-bold text-gray-900">
-            Choose a Table <span className="text-red-500">*</span>
+            {t.chooseTable} <span className="text-red-500">*</span>
           </p>
         </div>
 
         {noTablesConfigured ? (
-          <EmptySetupNotice
-            title="No tables set up yet"
-            body="This restaurant hasn’t published tables for online booking. Please call them to reserve, or try again later."
-            phone={info.phone}
-          />
+          <EmptySetupNotice title={t.noTablesSetup} body={t.noTablesSetupBody} phone={info.phone} />
         ) : noTablesAvailable ? (
           <EmptySetupNotice
-            title="No tables available right now"
-            body="All tables are currently occupied. Please call us to check availability or try a different time."
+            title={t.noTablesAvailable}
+            body={t.noTablesAvailableBody}
             phone={info.phone}
           />
         ) : (
           <div className="grid grid-cols-2 gap-2.5">
-            {availableTables.map((t) => (
+            {availableTables.map((tbl) => (
               <button
-                key={t.id}
+                key={tbl.id}
                 type="button"
                 onClick={() => {
-                  setSelectedTableId(t.id);
+                  setSelectedTableId(tbl.id);
                   setForm((f) => ({
                     ...f,
-                    guests: Math.min(t.seats, Math.max(f.guests, 1)),
+                    guests: Math.min(tbl.seats, Math.max(f.guests, 1)),
                   }));
                 }}
                 style={{ touchAction: "manipulation", minHeight: "72px" }}
                 className={`flex items-center gap-3 p-3.5 rounded-2xl border-2 text-left transition-all ${
-                  selectedTableId === t.id
+                  selectedTableId === tbl.id
                     ? "border-[#14b8a6] bg-[#ccfbf1] shadow-sm"
                     : "border-gray-200 bg-white active:border-gray-300"
                 }`}
               >
                 <div
                   className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    selectedTableId === t.id
+                    selectedTableId === tbl.id
                       ? "bg-[#14b8a6] text-white"
                       : "bg-gray-100 text-gray-500"
                   }`}
                 >
-                  <span className="text-base font-bold">{t.number}</span>
+                  <span className="text-base font-bold">{tbl.number}</span>
                 </div>
                 <div className="min-w-0">
                   <p
                     className={`text-sm font-bold leading-tight ${
-                      selectedTableId === t.id ? "text-[#0f766e]" : "text-gray-800"
+                      selectedTableId === tbl.id ? "text-[#0f766e]" : "text-gray-800"
                     }`}
                   >
-                    {t.name}
+                    {tbl.name}
                   </p>
                   <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                    <Users className="w-3 h-3" /> {t.seats} seats
-                    {t.area ? ` · ${t.area}` : ""}
+                    <Users className="w-3 h-3" /> {tbl.seats} {t.seats}
+                    {tbl.area ? ` · ${tbl.area}` : ""}
                   </p>
                 </div>
               </button>
@@ -351,17 +607,17 @@ function BookingForm({
           <span className="w-6 h-6 rounded-full bg-[#14b8a6] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
             2
           </span>
-          <p className="text-sm font-bold text-gray-900">Your Details</p>
+          <p className="text-sm font-bold text-gray-900">{t.yourDetails}</p>
         </div>
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Full Name <span className="text-red-500">*</span>
+              {t.fullName} <span className="text-red-500">*</span>
             </label>
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Your name"
+              placeholder={t.yourName}
               autoComplete="name"
               className={inp(errors.name)}
               style={{ fontSize: "16px" }}
@@ -370,7 +626,7 @@ function BookingForm({
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Phone <span className="text-red-500">*</span>
+              {t.phone} <span className="text-red-500">*</span>
             </label>
             <input
               value={form.phone}
@@ -391,12 +647,12 @@ function BookingForm({
           <span className="w-6 h-6 rounded-full bg-[#14b8a6] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
             3
           </span>
-          <p className="text-sm font-bold text-gray-900">Date, Time & Guests</p>
+          <p className="text-sm font-bold text-gray-900">{t.dateTimeGuests}</p>
         </div>
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Date <span className="text-red-500">*</span>
+              {t.date} <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -409,47 +665,47 @@ function BookingForm({
             />
             {errors.date && <p className="text-sm text-red-500 mt-1">{errors.date}</p>}
             {form.date && !dayOpen && (
-              <p className="text-sm text-amber-600 mt-1">Restaurant is closed on this day.</p>
+              <p className="text-sm text-amber-600 mt-1">{t.restaurantClosedDayShort}</p>
             )}
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Time <span className="text-red-500">*</span>
+              {t.time} <span className="text-red-500">*</span>
             </label>
             {!form.date ? (
-              <p className="text-xs text-gray-400">Select a date to see available times.</p>
+              <p className="text-xs text-gray-400">{t.selectDateForTimes}</p>
             ) : !dayOpen ? (
               <EmptySetupNotice
-                title="Closed this day"
-                body="The restaurant does not take bookings on this weekday. Please pick another date."
+                title={t.closedThisDay}
+                body={t.closedThisDayBody}
                 phone={info.phone}
               />
             ) : slots.length === 0 ? (
               <EmptySetupNotice
-                title="No time slots available"
+                title={t.noSlots}
                 body={
                   allSlots.length === 0
-                    ? "Booking hours aren’t configured yet. Please call the restaurant to reserve."
-                    : `No slots left for this date (open ${settings.openTime}–${settings.closeTime}, ${settings.minNoticeHours}h notice required).`
+                    ? t.hoursNotConfigured
+                    : t.noSlotsLeft(settings.openTime, settings.closeTime, settings.minNoticeHours)
                 }
                 phone={info.phone}
               />
             ) : (
               <div className="grid grid-cols-4 gap-2">
-                {slots.map((t) => (
+                {slots.map((tm) => (
                   <button
-                    key={t}
+                    key={tm}
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, time: t }))}
+                    onClick={() => setForm((f) => ({ ...f, time: tm }))}
                     style={{ touchAction: "manipulation", minHeight: "44px" }}
                     className={`rounded-xl text-sm font-semibold border-2 transition-all ${
-                      form.time === t
+                      form.time === tm
                         ? "border-[#14b8a6] bg-[#ccfbf1] text-[#0f766e]"
                         : "border-gray-200 bg-white text-gray-700 active:border-gray-300"
                     }`}
                   >
-                    {t}
+                    {tm}
                   </button>
                 ))}
               </div>
@@ -459,9 +715,12 @@ function BookingForm({
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Guests
+              {t.guests}
               {selectedTable && (
-                <span className="text-gray-400 font-normal"> (max {selectedTable.seats})</span>
+                <span className="text-gray-400 font-normal">
+                  {" "}
+                  ({t.max} {selectedTable.seats})
+                </span>
               )}
             </label>
             <div className="flex items-center gap-4">
@@ -490,19 +749,19 @@ function BookingForm({
               >
                 <Plus className="w-5 h-5" />
               </button>
-              <span className="text-sm text-gray-400">people</span>
+              <span className="text-sm text-gray-400">{t.people}</span>
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Notes <span className="text-gray-400 font-normal">(optional)</span>
+              {t.notes} <span className="text-gray-400 font-normal">{t.optional}</span>
             </label>
             <textarea
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               rows={3}
-              placeholder="Allergies, special requests, celebrations…"
+              placeholder={t.notesPlaceholder}
               className={`${inp()} resize-none`}
               style={{ fontSize: "16px" }}
             />
@@ -518,13 +777,21 @@ function BookingForm({
         className="w-full rounded-2xl bg-[#14b8a6] active:bg-[#0d9488] text-white font-bold text-base transition-colors shadow-md shadow-teal-200/50 flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
       >
         <CalendarDays className="w-5 h-5" />
-        {submitting ? "Sending…" : "Confirm Booking"}
+        {submitting ? t.sending : t.confirmBooking}
       </button>
     </div>
   );
 }
 
-function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settings }) {
+function InfoFooter({
+  info,
+  settings,
+  t,
+}: {
+  info: RestaurantInfo;
+  settings: Settings;
+  t: BookStrings;
+}) {
   const [copied, setCopied] = useState<"ssid" | "password" | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const hasContact = Boolean(info.address || info.phone || info.email || info.wifiSsid);
@@ -540,10 +807,8 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
   if (!hasContact) {
     return (
       <div className="mx-4 mt-4 mb-8 rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-5 text-center">
-        <p className="text-sm font-semibold text-gray-700 mb-1">Restaurant info not published yet</p>
-        <p className="text-xs text-gray-500">
-          Address, phone, and Wi‑Fi details will appear here once the restaurant adds them.
-        </p>
+        <p className="text-sm font-semibold text-gray-700 mb-1">{t.infoNotPublished}</p>
+        <p className="text-xs text-gray-500">{t.infoNotPublishedBody}</p>
       </div>
     );
   }
@@ -551,7 +816,7 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
   return (
     <div className="mx-4 mt-4 mb-8 rounded-2xl border border-gray-200 bg-white overflow-hidden">
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-        <p className="text-sm font-bold text-gray-700">Restaurant Info</p>
+        <p className="text-sm font-bold text-gray-700">{t.restaurantInfo}</p>
       </div>
       <div className="px-4 py-3 space-y-3">
         {info.address && (
@@ -590,7 +855,7 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
           <Clock className="w-4 h-4 text-[#14b8a6] mt-0.5 flex-shrink-0" />
           <div>
             <p className="text-sm text-gray-600">
-              Open {settings.openTime} – {settings.closeTime}
+              {t.openHours(settings.openTime, settings.closeTime)}
             </p>
           </div>
         </div>
@@ -598,10 +863,12 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
           <div className="rounded-xl bg-gray-50 border border-gray-200 px-3 py-3 space-y-2.5">
             <div className="flex items-center gap-2">
               <Wifi className="w-4 h-4 text-gray-500" />
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Free WiFi</span>
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                {t.freeWifi}
+              </span>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-0.5">Network</p>
+              <p className="text-xs text-gray-400 mb-0.5">{t.network}</p>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-gray-800 truncate">{info.wifiSsid}</p>
                 <button
@@ -609,7 +876,7 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
                   onClick={() => copy(info.wifiSsid!, "ssid")}
                   style={{ touchAction: "manipulation" }}
                   className="flex-shrink-0 p-1"
-                  aria-label="Copy network name"
+                  aria-label={t.copyNetwork}
                 >
                   {copied === "ssid" ? (
                     <Check className="w-4 h-4 text-green-500" />
@@ -621,7 +888,7 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
             </div>
             {wifiPassword && (
               <div>
-                <p className="text-xs text-gray-400 mb-0.5">Password</p>
+                <p className="text-xs text-gray-400 mb-0.5">{t.password}</p>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-gray-800 truncate font-mono tracking-wide">
                     {showPassword
@@ -633,7 +900,7 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
                     onClick={() => setShowPassword((v) => !v)}
                     style={{ touchAction: "manipulation" }}
                     className="flex-shrink-0 p-1"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? t.hidePassword : t.showPassword}
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4 text-gray-400" />
@@ -646,7 +913,7 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
                     onClick={() => copy(wifiPassword, "password")}
                     style={{ touchAction: "manipulation" }}
                     className="flex-shrink-0 p-1"
-                    aria-label="Copy password"
+                    aria-label={t.copyPassword}
                   >
                     {copied === "password" ? (
                       <Check className="w-4 h-4 text-green-500" />
@@ -666,14 +933,32 @@ function InfoFooter({ info, settings }: { info: RestaurantInfo; settings: Settin
 
 export function BookTablePage() {
   const { tenantSlug, tableId } = useParams<{ tenantSlug: string; tableId?: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const branchCode = searchParams.get("branch") || undefined;
+  const [lang, setLang] = useState<BookLang>(() => readBookLang(searchParams));
+  const t = BOOK_STRINGS[lang];
+
+  const setLanguage = useCallback(
+    (next: BookLang) => {
+      setLang(next);
+      try {
+        sessionStorage.setItem(BOOK_LANG_KEY, next);
+      } catch {
+        /* ignore */
+      }
+      const params = new URLSearchParams(searchParams);
+      params.set("lang", next);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tables, setTables] = useState<TableOpt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [info, setInfo] = useState<RestaurantInfo>({
-    name: "Book a table",
+    name: BOOK_STRINGS.az.bookATable,
     tagline: null,
     address: null,
     phone: null,
@@ -682,9 +967,17 @@ export function BookTablePage() {
     wifiPassword: null,
   });
 
+  const menuHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (branchCode) params.set("branch", branchCode);
+    params.set("lang", lang);
+    const q = params.toString();
+    return `/menu/${tenantSlug}${q ? `?${q}` : ""}`;
+  }, [tenantSlug, branchCode, lang]);
+
   useEffect(() => {
     if (!tenantSlug) {
-      setError("Missing restaurant link");
+      setError(t.missingLink);
       setLoading(false);
       return;
     }
@@ -716,7 +1009,7 @@ export function BookTablePage() {
               : [true, true, true, true, true, true, true],
         });
         setInfo({
-          name: data.restaurant?.name || data.restaurantName || "Book a table",
+          name: data.restaurant?.name || data.restaurantName || t.bookATable,
           tagline: data.restaurant?.tagline ?? null,
           address: data.restaurant?.address ?? null,
           phone: data.restaurant?.phone ?? null,
@@ -725,11 +1018,13 @@ export function BookTablePage() {
           wifiPassword: data.restaurant?.wifiPassword ?? null,
         });
       } catch (err) {
-        setError(errMsg(err));
+        setError(errMsg(err, t.requestFailed));
       } finally {
         setLoading(false);
       }
     })();
+    // Intentionally omit `t` — reload only when route/config inputs change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- lang-only UI strings don't need refetch
   }, [tenantSlug, branchCode, tableId]);
 
   if (loading) {
@@ -744,11 +1039,12 @@ export function BookTablePage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
         <div className="text-center space-y-3 max-w-sm">
+          <div className="flex justify-center mb-2">
+            <LangSwitcher lang={lang} onChange={setLanguage} ariaLabel={t.language} />
+          </div>
           <UtensilsCrossed className="w-8 h-8 text-gray-300 mx-auto" />
-          <p className="text-sm font-semibold text-gray-900">Booking unavailable</p>
-          <p className="text-xs text-gray-500">
-            {error || "This restaurant hasn’t enabled online table booking yet."}
-          </p>
+          <p className="text-sm font-semibold text-gray-900">{t.bookingUnavailable}</p>
+          <p className="text-xs text-gray-500">{error || t.bookingUnavailableHint}</p>
         </div>
       </div>
     );
@@ -768,16 +1064,17 @@ export function BookTablePage() {
       />
 
       <div className="bg-gradient-to-br from-[#14b8a6] via-[#14b8a6] to-[#0f766e]">
-        <div className="flex items-center px-4 pt-4 pb-2">
+        <div className="flex items-center px-4 pt-4 pb-2 gap-2">
           <Link
-            to={`/menu/${tenantSlug}`}
+            to={menuHref}
             style={{ touchAction: "manipulation", minHeight: "44px", minWidth: "44px" }}
             className="flex items-center gap-2 text-white/80 active:text-white text-sm font-semibold transition-colors -ml-1"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>Back</span>
+            <span>{t.back}</span>
           </Link>
           <div className="flex-1" />
+          <LangSwitcher lang={lang} onChange={setLanguage} ariaLabel={t.language} />
           <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
             <UtensilsCrossed className="w-4 h-4 text-white" />
           </div>
@@ -787,7 +1084,7 @@ export function BookTablePage() {
           <div className="flex items-center gap-2 mb-2">
             <CalendarDays className="w-4 h-4 text-teal-100" />
             <span className="text-teal-100 text-xs font-semibold uppercase tracking-wider">
-              Table Reservation
+              {t.tableReservation}
             </span>
           </div>
           <h1 className="text-3xl font-bold text-white leading-tight mb-1">{info.name}</h1>
@@ -823,11 +1120,12 @@ export function BookTablePage() {
             tables={tables}
             settings={settings}
             info={info}
+            t={t}
           />
         </div>
       </div>
 
-      <InfoFooter info={info} settings={settings} />
+      <InfoFooter info={info} settings={settings} t={t} />
     </div>
   );
 }

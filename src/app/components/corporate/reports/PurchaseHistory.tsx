@@ -27,7 +27,7 @@ export function PurchaseHistory() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const purchaseItems: PurchaseItem[] = [
     {

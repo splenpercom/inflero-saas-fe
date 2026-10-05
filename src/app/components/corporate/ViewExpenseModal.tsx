@@ -34,6 +34,8 @@ export function ViewExpenseModal({
   if (!expense) return null;
 
   const fromPurchase = !!expense.purchaseId;
+  const fromClientRefund = !!expense.salesReturnId;
+  const isLinkedMirror = fromPurchase || fromClientRefund;
   const bankAccount = bankAccounts.find((a) => a.id === expense.accountId);
   const bankLabel = bankAccount
     ? `${bankAccount.accountHolderName} (${bankAccount.accountNo})`
@@ -83,6 +85,14 @@ export function ViewExpenseModal({
               )}
             </div>
           )}
+          {fromClientRefund && (
+            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+              {tr(
+                "Bu xərc müştəri geri qaytarmasından avtomatik yaradılıb. Dəyişiklik üçün Satış qaytarmaları səhifəsindən redaktə edin.",
+                "This expense was created from a client refund. Edit it from the Sales Returns page.",
+              )}
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -92,6 +102,11 @@ export function ViewExpenseModal({
                 {fromPurchase && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-200 border border-teal-200 dark:border-teal-800">
                     {tr("Satınalma", "Purchase")}
+                  </span>
+                )}
+                {fromClientRefund && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                    {tr("Müştəri geri qaytarma", "Client refund")}
                   </span>
                 )}
               </div>
@@ -123,7 +138,7 @@ export function ViewExpenseModal({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800">
-          {!fromPurchase && canDelete && expense.status !== "APPROVED" && onDelete && (
+          {canDelete && onDelete && (
             <button
               type="button"
               onClick={() => onDelete(expense)}
@@ -133,7 +148,7 @@ export function ViewExpenseModal({
               {tr("Sil", "Delete")}
             </button>
           )}
-          {!fromPurchase && canEdit && expense.status === "PENDING" && onReject && (
+          {!isLinkedMirror && canEdit && expense.status === "PENDING" && onReject && (
             <button
               type="button"
               onClick={() => onReject(expense)}
@@ -143,7 +158,7 @@ export function ViewExpenseModal({
               {tr("Rədd et", "Reject")}
             </button>
           )}
-          {!fromPurchase && canEdit && expense.status === "PENDING" && onApprove && (
+          {!isLinkedMirror && canEdit && expense.status === "PENDING" && onApprove && (
             <button
               type="button"
               onClick={() => onApprove(expense)}
@@ -153,7 +168,7 @@ export function ViewExpenseModal({
               {tr("Təsdiqlə", "Approve")}
             </button>
           )}
-          {!fromPurchase && canEdit && expense.status === "PENDING" && onEdit && (
+          {!isLinkedMirror && canEdit && expense.status === "PENDING" && onEdit && (
             <button
               type="button"
               onClick={() => onEdit(expense)}

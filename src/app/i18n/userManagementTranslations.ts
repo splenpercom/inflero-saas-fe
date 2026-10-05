@@ -121,6 +121,7 @@ export const userManagementTranslations = {
     // Finances sub-items
     expenses: "Expenses",
     income: "Income",
+    financePayments: "Payments",
 
     // People sub-items
     customers: "Customers",
@@ -317,6 +318,7 @@ export const userManagementTranslations = {
     // Finances sub-items
     expenses: "Xərclər",
     income: "Gəlir",
+    financePayments: "Ödənişlər",
 
     // People sub-items
     customers: "Müştərilər",
@@ -480,6 +482,7 @@ export const userManagementTranslations = {
     purchasereturn: "Возврат закупки",
     expenses: "Расходы",
     income: "Доходы",
+    financePayments: "Платежи",
     customers: "Клиенты",
     suppliers: "Поставщики",
     warehouses: "Склады",

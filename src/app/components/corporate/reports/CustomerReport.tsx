@@ -34,7 +34,7 @@ export function CustomerReport() {
     setCustomFrom,
     customTo,
     setCustomTo,
-  } = useReportDateRange("month");
+  } = useReportDateRange("today");
 
   const customerItems: CustomerItem[] = [
     { id: "1", reference: "INV2011", code: "CU006", customerName: "Martha Betts", customerIcon: "👩", totalOrders: 46, amount: 750, paymentMethod: "Cash", status: "Completed" },

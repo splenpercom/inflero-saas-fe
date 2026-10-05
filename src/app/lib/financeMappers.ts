@@ -118,6 +118,15 @@ export type IncomesListQuery = FinancePagedQuery & {
   dateTo?: string;
 };
 
+export type FinancePaymentsListQuery = FinancePagedQuery & {
+  method?: string;
+  targetType?: "POS_ORDER" | "INVOICE" | "PURCHASE" | "PURCHASE_RETURN" | "SALES_RETURN";
+  storeId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  includeVoided?: boolean;
+};
+
 export type BankAccountsListQuery = FinancePagedQuery & {
   status?: string;
   sort?: "latest" | "oldest" | "name";
@@ -154,6 +163,20 @@ export function incomesListQueryString(q: IncomesListQuery = {}): string {
     accountId: q.accountId,
     dateFrom: q.dateFrom,
     dateTo: q.dateTo,
+  });
+}
+
+export function financePaymentsListQueryString(q: FinancePaymentsListQuery = {}): string {
+  return financeQueryString({
+    page: q.page,
+    pageSize: q.pageSize,
+    search: q.search?.trim(),
+    method: q.method && q.method !== "all" ? q.method : undefined,
+    targetType: q.targetType,
+    storeId: q.storeId && q.storeId !== "all" ? q.storeId : undefined,
+    dateFrom: q.dateFrom,
+    dateTo: q.dateTo,
+    includeVoided: q.includeVoided ? "true" : undefined,
   });
 }
 

@@ -11,6 +11,7 @@ import {
   Trash2,
   Shield,
   UserPlus,
+  KeyRound,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -37,11 +38,13 @@ import {
   fetchTenantUsers,
   updateTenantRole,
   updateTenantUser,
+  updateTenantUserPosPasscode,
   type TenantRoleRow,
   type TenantUserRow,
 } from "../../api/userManagement";
 import { fetchStores } from "../../api/stores";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { UserPosPasscodeModal } from "./UserPosPasscodeModal";
 import { useConfirm } from "../../context/ConfirmContext";
 import { DataPagination } from "../ui/DataPagination";
 import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
@@ -55,6 +58,9 @@ export function UserManagement() {
   const branchRevision = useBranchRevision();
   const { isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
+  const diningEnabled = hasModule("DINING");
+  const posEnabled = hasModule("POS");
+  const showPosPasscodeUi = diningEnabled && posEnabled;
 
   const activeTab: "users" | "roles" = /\/user-management\/roles\/?$/.test(
     location.pathname.replace(/\/+$/, "") || location.pathname,
@@ -76,6 +82,8 @@ export function UserManagement() {
   const [addRoleModalOpen, setAddRoleModalOpen] = useState(false);
   const [editRoleModalOpen, setEditRoleModalOpen] = useState(false);
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
+  const [passcodeModalOpen, setPasscodeModalOpen] = useState(false);
+  const [passcodeSaving, setPasscodeSaving] = useState(false);
   const [selectedUser, setSelectedUser] = useState<TenantUserRow | null>(null);
   const [selectedRole, setSelectedRole] = useState<TenantRoleRow | null>(null);
 
@@ -419,6 +427,12 @@ export function UserManagement() {
         dateOfBirth: data.dateOfBirth || null,
         dateOfJoin: data.joiningDate || null,
         newPassword: data.password || null,
+        ...(!isOwner &&
+        showPosPasscodeUi &&
+        selectedRoleName !== "manager" &&
+        selectedRoleName !== "administrator"
+          ? { canPlacePosOrder: data.canPlacePosOrder }
+          : {}),
       });
       notifySuccess(ut("userUpdated"));
       setEditUserModalOpen(false);
@@ -428,6 +442,54 @@ export function UserManagement() {
       notifyFromError(err, tr("İstifadəçi yenilənə bilmədi", "Failed to update user"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const isPasscodeEligibleUser = (user: TenantUserRow) => {
+    if (user.isTenantOwner) return false;
+    const role = user.role.trim().toLowerCase();
+    return role !== "administrator" && role !== "manager" && role !== "admin";
+  };
+
+  const handleSavePasscode = async (passcode: string) => {
+    if (!selectedUser || !canEdit) return;
+    setPasscodeSaving(true);
+    try {
+      await updateTenantUserPosPasscode(selectedUser.id, { passcode });
+      notifySuccess(tr("Kod saxlanıldı", "Passcode saved"));
+      setPasscodeModalOpen(false);
+      setSelectedUser(null);
+      void loadUsers();
+    } catch (err) {
+      notifyFromError(err, tr("Kod saxlanılmadı", "Failed to save passcode"));
+    } finally {
+      setPasscodeSaving(false);
+    }
+  };
+
+  const handleClearPasscode = async () => {
+    if (!selectedUser || !canEdit) return;
+    const ok = await askConfirm({
+      title: tr("Kodu sil", "Clear passcode"),
+      message: tr(
+        "Bu işçinin POS kodu silinsin?",
+        "Remove this staff member’s POS passcode?",
+      ),
+      confirmLabel: tr("Sil", "Clear"),
+      variant: "danger",
+    });
+    if (!ok) return;
+    setPasscodeSaving(true);
+    try {
+      await updateTenantUserPosPasscode(selectedUser.id, { passcode: null });
+      notifySuccess(tr("Kod silindi", "Passcode cleared"));
+      setPasscodeModalOpen(false);
+      setSelectedUser(null);
+      void loadUsers();
+    } catch (err) {
+      notifyFromError(err, tr("Kod silinmədi", "Failed to clear passcode"));
+    } finally {
+      setPasscodeSaving(false);
     }
   };
 
@@ -745,6 +807,26 @@ export function UserManagement() {
                                 <Edit2 className="w-3 h-3" />
                               </button>
                             </PermissionGate>
+                            {showPosPasscodeUi && isPasscodeEligibleUser(user) ? (
+                              <PermissionGate module="User Management" action="edit">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setPasscodeModalOpen(true);
+                                  }}
+                                  disabled={isDemo}
+                                  title={
+                                    user.hasPosPasscode
+                                      ? tr("Kodu redaktə et", "Edit Passcode")
+                                      : tr("Kod yarat", "Create Passcode")
+                                  }
+                                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                                >
+                                  <KeyRound className="w-3 h-3" />
+                                </button>
+                              </PermissionGate>
+                            ) : null}
                             <PermissionGate module="User Management" action="delete">
                               <button
                                 type="button"
@@ -946,6 +1028,7 @@ export function UserManagement() {
         branches={branches}
         showManagedBranches={isOwnerActor && branches.length > 0}
         managerRoleId={managerRoleId}
+        showPosOrderControls={showPosPasscodeUi}
         roles={
           !isOwnerActor &&
           selectedUser &&
@@ -958,6 +1041,18 @@ export function UserManagement() {
             : editUserRoleOptions
         }
         saving={saving}
+      />
+      <UserPosPasscodeModal
+        open={passcodeModalOpen}
+        staffName={selectedUser?.name ?? ""}
+        hasPasscode={selectedUser?.hasPosPasscode === true}
+        saving={passcodeSaving}
+        onClose={() => {
+          setPasscodeModalOpen(false);
+          setSelectedUser(null);
+        }}
+        onSave={handleSavePasscode}
+        onClear={handleClearPasscode}
       />
     </div>
   );

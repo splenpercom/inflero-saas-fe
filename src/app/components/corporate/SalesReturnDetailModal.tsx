@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { Ban, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
+import { useModulePermissions } from "../../hooks/useModulePermissions";
 import {
   fetchSalesReturn,
   recordSalesReturnPayment,
   type SalesReturnDetail,
 } from "../../api/sales";
+import { voidFinancePayment } from "../../api/finance";
 import {
   formatSalesDate,
   mapPaymentMethodToApi,
@@ -34,6 +37,8 @@ export function SalesReturnDetailModal({
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
+  const askConfirm = useConfirm();
+  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
   const [detail, setDetail] = useState<SalesReturnDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -41,6 +46,7 @@ export function SalesReturnDetailModal({
   const [paymentNote, setPaymentNote] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -88,6 +94,33 @@ export function SalesReturnDetailModal({
     if (key === "refunded") return tr("Qaytarılıb", "Refunded");
     if (key === "partially_refunded") return tr("Qismən qaytarılıb", "Partially Refunded");
     return status === "—" ? "—" : status;
+  };
+
+  const handleVoidPayment = async (paymentId: string) => {
+    if (!detail || isDemo || !canVoidFinance) return;
+    if (
+      !(await askConfirm({
+        title: tr("Ödənişi ləğv et", "Void payment"),
+        message: tr(
+          "Bu ödəniş ləğv ediləcək və qaytarma borcu yenilənəcək. Davam edilsin?",
+          "This payment will be voided and the return balance will be recalculated. Continue?",
+        ),
+        variant: "danger",
+      }))
+    ) {
+      return;
+    }
+    setVoidingPaymentId(paymentId);
+    try {
+      await voidFinancePayment(paymentId);
+      await loadDetail(detail.id);
+      notifySuccess(tr("Ödəniş ləğv edildi", "Payment voided"));
+      onChanged();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setVoidingPaymentId(null);
+    }
   };
 
   const handleRecordPayment = async () => {
@@ -245,6 +278,35 @@ export function SalesReturnDetailModal({
                   </div>
                 </div>
               </div>
+
+              {(detail.payments ?? []).length > 0 && (
+                <div className="border-t border-gray-200 dark:border-gray-800 pt-3 space-y-2">
+                  <p className="text-xs font-medium text-gray-900 dark:text-white">
+                    {tr("Ödəniş tarixçəsi", "Payment history")}
+                  </p>
+                  {(detail.payments ?? []).map((p) => (
+                    <div key={p.paymentId} className="flex justify-between items-center gap-2 text-xs">
+                      <span className="text-gray-500 min-w-0">
+                        {formatSalesDate(p.date)} — {p.method}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span>₼{parseFloat(p.allocatedAmount).toFixed(2)}</span>
+                        {canVoidFinance && !isDemo ? (
+                          <button
+                            type="button"
+                            disabled={voidingPaymentId === p.paymentId}
+                            onClick={() => void handleVoidPayment(p.paymentId)}
+                            className="inline-flex items-center gap-1 px-1.5 py-1 rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                            title={tr("Ləğv et", "Void")}
+                          >
+                            <Ban className="w-3 h-3" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {dueAmount > 0 && !isDemo && (
                 <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-2">

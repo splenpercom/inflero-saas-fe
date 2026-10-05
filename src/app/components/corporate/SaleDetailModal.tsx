@@ -23,6 +23,9 @@ import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { printPosOrderTicket } from "../../lib/posPrint";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
+import { usePosStaffPasscodeGate } from "../../hooks/usePosStaffPasscodeGate";
+import { useSalesBillers } from "../../hooks/useSalesBillers";
+import { PosStaffPasscodeOverlay } from "./PosStaffPasscodeOverlay";
 
 import { pickLang } from "../../i18n/pickLang";
 
@@ -58,6 +61,13 @@ export function SaleDetailModal({
   const diningEnabled = hasModule("DINING");
   const { canView: canViewSales } = useModulePermissions("Sales");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const {
+    ensureWithPasscode,
+    passcodeSession,
+    closePasscode,
+    confirmPasscode,
+  } = usePosStaffPasscodeGate();
+  const { billers } = useSalesBillers(isOpen);
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
@@ -67,12 +77,14 @@ export function SaleDetailModal({
   const [receiptChoiceOpen, setReceiptChoiceOpen] = useState(false);
   const [emptyAndPrintBusy, setEmptyAndPrintBusy] = useState(false);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
+  const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !orderId) {
       setOrder(null);
       setReceiptChoiceOpen(false);
       setTableHourlyBillingEnabled(false);
+      setPosStaffPasscodeEnabled(false);
       return;
     }
     setLoading(true);
@@ -93,15 +105,22 @@ export function SaleDetailModal({
   useEffect(() => {
     if (!isOpen || !diningEnabled) {
       setTableHourlyBillingEnabled(false);
+      setPosStaffPasscodeEnabled(false);
       return;
     }
     let cancelled = false;
     fetchTenantSettings()
       .then((s) => {
-        if (!cancelled) setTableHourlyBillingEnabled(s.tableHourlyBillingEnabled === true);
+        if (!cancelled) {
+          setTableHourlyBillingEnabled(s.tableHourlyBillingEnabled === true);
+          setPosStaffPasscodeEnabled(s.posStaffPasscodeEnabled === true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setTableHourlyBillingEnabled(false);
+        if (!cancelled) {
+          setTableHourlyBillingEnabled(false);
+          setPosStaffPasscodeEnabled(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -302,14 +321,46 @@ export function SaleDetailModal({
       // DIY complete+pay used a stale due when KOT had already marked Completed
       // while the timer was still running — leaving Partial (e.g. paid 3.86 / total 3.95).
       if (order.table?.id) {
-        await finishTableActiveOrders(order.table.id);
+        const matched = billers.find((b) => b.id === order.billerId);
+        const needsPin =
+          matched?.hasPosPasscode === true ||
+          (diningEnabled && posStaffPasscodeEnabled && !matched && Boolean(order.billerId));
+        const ok = await ensureWithPasscode({
+          featureOn: diningEnabled && posStaffPasscodeEnabled,
+          hasPosPasscode: needsPin,
+          staffName: matched?.name || order.billerName || tr("İşçi", "Staff"),
+          invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
+          run: async (staffPasscode) => {
+            await finishTableActiveOrders(order.table!.id, {
+              ...(order.billerId ? { billerId: order.billerId } : {}),
+              ...(staffPasscode ? { staffPasscode } : {}),
+            });
+          },
+        });
+        if (!ok) return;
         detail = await fetchPosOrder(order.id);
       } else {
         // Always patch COMPLETED so an open timer is finalized before reading due.
-        detail = await updatePosOrder(order.id, {
-          status: "COMPLETED",
-          paymentMethod: method,
+        const matched = billers.find((b) => b.id === order.billerId);
+        const needsPin =
+          matched?.hasPosPasscode === true ||
+          (diningEnabled && posStaffPasscodeEnabled && !matched && Boolean(order.billerId));
+        let completed: PosOrderDetail | null = null;
+        const ok = await ensureWithPasscode({
+          featureOn: diningEnabled && posStaffPasscodeEnabled,
+          hasPosPasscode: needsPin,
+          staffName: matched?.name || order.billerName || tr("İşçi", "Staff"),
+          invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
+          run: async (staffPasscode) => {
+            completed = await updatePosOrder(order.id, {
+              status: "COMPLETED",
+              paymentMethod: method,
+              ...(staffPasscode ? { staffPasscode } : {}),
+            });
+          },
         });
+        if (!ok || !completed) return;
+        detail = completed;
         const remaining = parseFloat(detail.due);
         if (remaining > 0.001) {
           detail = await recordPosOrderPayment(order.id, {
@@ -841,6 +892,16 @@ export function SaleDetailModal({
           </div>,
           document.body,
         )}
+      {passcodeSession ? (
+        <PosStaffPasscodeOverlay
+          open
+          staffName={passcodeSession.staffName}
+          busy={passcodeSession.busy}
+          error={passcodeSession.error}
+          onCancel={closePasscode}
+          onConfirm={confirmPasscode}
+        />
+      ) : null}
     </div>
   );
 }

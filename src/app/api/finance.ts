@@ -2,12 +2,14 @@ import { apiDelete, apiGet, apiPatch, apiPost } from "./client";
 import {
   bankAccountsListQueryString,
   expensesListQueryString,
+  financePaymentsListQueryString,
   incomesListQueryString,
   type BankAccountsListQuery,
   type BankAccountStatusApi,
   type BankAccountTypeApi,
   type ExpenseStatusApi,
   type ExpensesListQuery,
+  type FinancePaymentsListQuery,
   type IncomesListQuery,
 } from "../lib/financeMappers";
 
@@ -43,6 +45,8 @@ export interface ExpenseListRow {
   status: ExpenseStatusApi;
   /** When set, this expense mirrors a purchase and should be managed from Purchases. */
   purchaseId?: string | null;
+  /** When set, this expense mirrors a client refund (sales return). */
+  salesReturnId?: string | null;
 }
 
 export interface IncomeListRow {
@@ -263,5 +267,78 @@ export async function updateIncome(
 
 export async function deleteIncome(id: string): Promise<{ ok: true }> {
   const res = await apiDelete<ApiEnvelope<{ ok: true }>>(`/tenant/finance/incomes/${id}`);
+  return res.data;
+}
+
+// --- Payments ledger ---
+
+export type FinancePaymentTargetType =
+  | "POS_ORDER"
+  | "INVOICE"
+  | "PURCHASE"
+  | "PURCHASE_RETURN"
+  | "SALES_RETURN";
+
+export interface FinancePaymentAllocation {
+  targetType: FinancePaymentTargetType;
+  targetId: string;
+  allocatedAmount: string;
+  documentLabel: string;
+  partyName: string;
+  storeId: string | null;
+  storeName: string | null;
+}
+
+export interface FinancePaymentRow {
+  id: string;
+  paymentNumber: string;
+  date: string;
+  method: string;
+  amount: string;
+  reference: string | null;
+  note: string | null;
+  status: "POSTED" | "VOIDED";
+  voidedAt: string | null;
+  direction: "IN" | "OUT";
+  targetType: FinancePaymentTargetType | null;
+  targetId: string | null;
+  documentLabel: string;
+  partyName: string;
+  storeId: string | null;
+  storeName: string | null;
+  allocations: FinancePaymentAllocation[];
+  createdAt: string;
+}
+
+export async function fetchFinancePayments(
+  query: FinancePaymentsListQuery = {},
+): Promise<FinancePagedResult<FinancePaymentRow>> {
+  const res = await apiGet<ApiEnvelope<FinancePagedResult<FinancePaymentRow>>>(
+    `/tenant/finance/payments${financePaymentsListQueryString(query)}`,
+  );
+  return res.data ?? { items: [], total: 0, page: 1, pageSize: 50, totalPages: 0 };
+}
+
+export async function fetchFinancePayment(id: string): Promise<FinancePaymentRow> {
+  const res = await apiGet<ApiEnvelope<FinancePaymentRow>>(`/tenant/finance/payments/${id}`);
+  return res.data;
+}
+
+export async function updateFinancePayment(
+  id: string,
+  body: { note?: string | null; reference?: string | null; date?: string },
+): Promise<FinancePaymentRow> {
+  const res = await apiPatch<ApiEnvelope<FinancePaymentRow>>(`/tenant/finance/payments/${id}`, body);
+  return res.data;
+}
+
+export async function voidFinancePayment(
+  id: string,
+  body: { reason?: string | null } = {},
+): Promise<FinancePaymentRow> {
+  const res = await apiPost<ApiEnvelope<FinancePaymentRow>>(
+    `/tenant/finance/payments/${id}/void`,
+    body,
+  );
   return res.data;
 }

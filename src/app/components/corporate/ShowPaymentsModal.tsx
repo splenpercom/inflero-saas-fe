@@ -1,16 +1,21 @@
 import { useEffect, useState, useCallback } from "react";
-import { X, DollarSign, Plus } from "lucide-react";
+import { X, DollarSign, Plus, Ban } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
+import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { fetchPosOrder, type PosOrderDetail } from "../../api/sales";
+import { voidFinancePayment } from "../../api/finance";
 import { formatSalesDate, isDraftOrderStatus } from "../../lib/salesMappers";
-import { notifyFromError } from "../../lib/toast";
-
+import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { pickLang } from "../../i18n/pickLang";
+
 interface ShowPaymentsModalProps {
   orderId: string | null;
   isOpen: boolean;
   onClose: () => void;
   onCreatePayment: () => void;
+  onChanged?: () => void;
   reloadKey?: number;
 }
 
@@ -32,12 +37,17 @@ export function ShowPaymentsModal({
   isOpen,
   onClose,
   onCreatePayment,
+  onChanged,
   reloadKey = 0,
 }: ShowPaymentsModalProps) {
   const { language } = useLanguage();
+  const { isDemo } = useAuth();
+  const askConfirm = useConfirm();
+  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
 
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
@@ -71,6 +81,33 @@ export function ShowPaymentsModal({
   const isFullyRefunded =
     (order?.paymentStatus ?? "").toLowerCase().replace(/\s+/g, "_") === "refunded";
   const paymentBlocked = isDraft || isFullyRefunded;
+
+  const handleVoidPayment = async (paymentId: string) => {
+    if (!order || isDemo || !canVoidFinance) return;
+    if (
+      !(await askConfirm({
+        title: tr("Ödənişi ləğv et", "Void payment"),
+        message: tr(
+          "Bu ödəniş ləğv ediləcək və sifariş borcu yenilənəcək. Davam edilsin?",
+          "This payment will be voided and the order balance will be recalculated. Continue?",
+        ),
+        variant: "danger",
+      }))
+    ) {
+      return;
+    }
+    setVoidingPaymentId(paymentId);
+    try {
+      await voidFinancePayment(paymentId);
+      await loadOrder();
+      notifySuccess(tr("Ödəniş ləğv edildi", "Payment voided"));
+      onChanged?.();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setVoidingPaymentId(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -171,6 +208,11 @@ export function ShowPaymentsModal({
                           <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
                             {tr("İstinad / Qeyd", "Reference / Note")}
                           </th>
+                          {canVoidFinance && !isDemo ? (
+                            <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
+                              {tr("Əməliyyat", "Action")}
+                            </th>
+                          ) : null}
                         </tr>
                       </thead>
                       <tbody>
@@ -188,6 +230,19 @@ export function ShowPaymentsModal({
                             <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">
                               {payment.reference || payment.note || "—"}
                             </td>
+                            {canVoidFinance && !isDemo ? (
+                              <td className="py-2 px-3 text-right">
+                                <button
+                                  type="button"
+                                  disabled={voidingPaymentId === payment.paymentId}
+                                  onClick={() => void handleVoidPayment(payment.paymentId)}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                                  title={tr("Ləğv et", "Void")}
+                                >
+                                  <Ban className="w-3 h-3" />
+                                </button>
+                              </td>
+                            ) : null}
                           </tr>
                         ))}
                       </tbody>
