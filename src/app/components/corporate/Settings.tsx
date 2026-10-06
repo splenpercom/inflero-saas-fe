@@ -136,6 +136,7 @@ export function Settings() {
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
   const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
   const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
+  const [posEditableProductPricesEnabled, setPosEditableProductPricesEnabled] = useState(false);
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
@@ -151,6 +152,7 @@ export function Settings() {
     posSendToBarEnabled: boolean;
     posBarBillShowPricesEnabled: boolean;
     posPrintProductBrandEnabled: boolean;
+    posEditableProductPricesEnabled: boolean;
     posQrOrderAlarmEnabled: boolean;
     tableHourlyBillingEnabled: boolean;
     posStaffPasscodeEnabled: boolean;
@@ -207,6 +209,7 @@ export function Settings() {
       diningEnabled && data.posBarBillShowPricesEnabled === true,
     );
     setPosPrintProductBrandEnabled(data.posPrintProductBrandEnabled === true);
+    setPosEditableProductPricesEnabled(data.posEditableProductPricesEnabled === true);
     setPosQrOrderAlarmEnabled(diningEnabled && data.posQrOrderAlarmEnabled !== false);
     setTableHourlyBillingEnabled(diningEnabled && data.tableHourlyBillingEnabled === true);
     setPosStaffPasscodeEnabled(diningEnabled && data.posStaffPasscodeEnabled === true);
@@ -257,6 +260,7 @@ export function Settings() {
           posSendToBarEnabled: data.posSendToBarEnabled === true,
           posBarBillShowPricesEnabled: data.posBarBillShowPricesEnabled === true,
           posPrintProductBrandEnabled: data.posPrintProductBrandEnabled === true,
+          posEditableProductPricesEnabled: data.posEditableProductPricesEnabled === true,
           posQrOrderAlarmEnabled: data.posQrOrderAlarmEnabled !== false,
           tableHourlyBillingEnabled: data.tableHourlyBillingEnabled === true,
           posStaffPasscodeEnabled: data.posStaffPasscodeEnabled === true,
@@ -438,6 +442,7 @@ export function Settings() {
               posServiceFeeEnabled,
               posSendToProductionEnabled,
               posPrintProductBrandEnabled,
+              posEditableProductPricesEnabled,
               ...(diningEnabled
                 ? {
                     posSendToBarEnabled,
@@ -487,6 +492,7 @@ export function Settings() {
         posSendToBarEnabled,
         posBarBillShowPricesEnabled,
         posPrintProductBrandEnabled,
+        posEditableProductPricesEnabled,
         posQrOrderAlarmEnabled,
         tableHourlyBillingEnabled,
         posStaffPasscodeEnabled,
@@ -542,6 +548,7 @@ export function Settings() {
         setPosSendToBarEnabled(addonSnapshotRef.current.posSendToBarEnabled);
         setPosBarBillShowPricesEnabled(addonSnapshotRef.current.posBarBillShowPricesEnabled);
         setPosPrintProductBrandEnabled(addonSnapshotRef.current.posPrintProductBrandEnabled);
+        setPosEditableProductPricesEnabled(addonSnapshotRef.current.posEditableProductPricesEnabled);
         setPosQrOrderAlarmEnabled(addonSnapshotRef.current.posQrOrderAlarmEnabled);
         setTableHourlyBillingEnabled(addonSnapshotRef.current.tableHourlyBillingEnabled);
         setPosStaffPasscodeEnabled(addonSnapshotRef.current.posStaffPasscodeEnabled);
@@ -1199,6 +1206,35 @@ export function Settings() {
                       <span
                         className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
                           posPrintProductBrandEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Editable POS product prices", "POS-da məhsul qiymətini dəyiş")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, cashiers can change any product’s unit price on POS, including below catalog price or COGS. Reports use the sold amount.",
+                          "Aktiv olduqda kassir POS-da istənilən məhsulun vahid qiymətini dəyişə bilər, kataloq və ya maya dəyərindən aşağı da. Hesabatlar satılan məbləği istifadə edir.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => setPosEditableProductPricesEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        posEditableProductPricesEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={posEditableProductPricesEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          posEditableProductPricesEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
                         }`}
                       />
                     </button>

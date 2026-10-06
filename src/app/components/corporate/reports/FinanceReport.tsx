@@ -124,8 +124,14 @@ export function FinanceReport() {
       title: pt("Net Profit", "Xalis Mənfəət"),
       value: formatCurrency(totals.profit),
       icon: Wallet,
-      color: "text-[#14b8a6] dark:text-[#14b8a6]",
-      bgColor: "bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20",
+      color:
+        totals.profit < 0
+          ? "text-red-600 dark:text-red-400"
+          : "text-[#14b8a6] dark:text-[#14b8a6]",
+      bgColor:
+        totals.profit < 0
+          ? "bg-red-50 dark:bg-red-900/20"
+          : "bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20",
     },
   ];
 
@@ -287,7 +293,7 @@ export function FinanceReport() {
                         <td className="py-2 px-3 text-xs font-medium text-gray-900 dark:text-white">{row.month}</td>
                         <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(row.revenue)}</td>
                         <td className="py-2 px-3 text-xs text-right text-red-600 dark:text-red-400">{formatCurrency(row.expenses)}</td>
-                        <td className="py-2 px-3 text-xs text-right text-green-600 dark:text-green-400 font-semibold">{formatCurrency(row.profit)}</td>
+                        <td className={`py-2 px-3 text-xs text-right font-semibold ${row.profit < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>{formatCurrency(row.profit)}</td>
                         <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{margin === "—" ? margin : `${margin}%`}</td>
                       </tr>
                     );

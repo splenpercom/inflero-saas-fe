@@ -130,8 +130,14 @@ export function AnnualReport() {
       value: formatCurrency(totalProfit),
       sub: profitMargin !== "—" ? `${profitMargin}% ${pt("margin", "marja")}` : undefined,
       icon: Award,
-      color: "text-[#14b8a6] dark:text-[#14b8a6]",
-      bgColor: "bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20",
+      color:
+        totalProfit < 0
+          ? "text-red-600 dark:text-red-400"
+          : "text-[#14b8a6] dark:text-[#14b8a6]",
+      bgColor:
+        totalProfit < 0
+          ? "bg-red-50 dark:bg-red-900/20"
+          : "bg-[#14b8a6]/5 dark:bg-[#14b8a6]/20",
     },
     {
       title: pt("Avg Monthly Revenue", "Orta Aylıq Gəlir"),
@@ -320,7 +326,7 @@ export function AnnualReport() {
                         <td className="py-2 px-3 text-xs font-medium text-gray-900 dark:text-white">{row.month}</td>
                         <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(row.revenue)}</td>
                         <td className="py-2 px-3 text-xs text-right text-red-600 dark:text-red-400">{formatCurrency(row.expenses)}</td>
-                        <td className="py-2 px-3 text-xs text-right text-green-600 dark:text-green-400 font-semibold">{formatCurrency(row.profit)}</td>
+                        <td className={`py-2 px-3 text-xs text-right font-semibold ${row.profit < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>{formatCurrency(row.profit)}</td>
                         <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{margin === "—" ? margin : `${margin}%`}</td>
                       </tr>
                     );
@@ -329,7 +335,7 @@ export function AnnualReport() {
                     <td className="py-2 px-3 text-xs text-gray-900 dark:text-white">{pt("Total", "Cəmi")}</td>
                     <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(totalRevenue)}</td>
                     <td className="py-2 px-3 text-xs text-right text-red-600 dark:text-red-400">{formatCurrency(totalExpenses)}</td>
-                    <td className="py-2 px-3 text-xs text-right text-green-600 dark:text-green-400">{formatCurrency(totalProfit)}</td>
+                    <td className={`py-2 px-3 text-xs text-right ${totalProfit < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>{formatCurrency(totalProfit)}</td>
                     <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{profitMargin === "—" ? profitMargin : `${profitMargin}%`}</td>
                   </tr>
                 </tbody>

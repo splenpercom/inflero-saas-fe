@@ -3,7 +3,7 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 import { useAuth } from "../../../context/AuthContext";
 import { useModulePermissions } from "../../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../../hooks/useBranchRevision";
-import { Download, Search, Package, TrendingUp, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
+import { Download, Search, Package, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Wallet } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import {
   fetchProductReport,
@@ -100,6 +100,18 @@ export function ProductReport() {
     () => items.reduce((s, i) => s + (i.totalOrdered ?? 0), 0),
     [items],
   );
+  const profitTotals = useMemo(
+    () =>
+      items.reduce(
+        (acc, i) => ({
+          revenue: acc.revenue + (i.revenue ?? 0),
+          cogs: acc.cogs + (i.purchaseCost ?? 0),
+          profit: acc.profit + (i.profit ?? 0),
+        }),
+        { revenue: 0, cogs: 0, profit: 0 },
+      ),
+    [items],
+  );
 
   const topByOrdered = useMemo(
     () =>
@@ -154,6 +166,26 @@ export function ProductReport() {
       bgColor: "bg-green-50 dark:bg-green-900/20",
     },
     {
+      title: pt("COGS", "Maya dəyəri"),
+      value: formatCurrency(profitTotals.cogs),
+      icon: Wallet,
+      color: "text-orange-600 dark:text-orange-400",
+      bgColor: "bg-orange-50 dark:bg-orange-900/20",
+    },
+    {
+      title: pt("Gross Profit", "Ümumi mənfəət"),
+      value: formatCurrency(profitTotals.profit),
+      icon: TrendingUp,
+      color:
+        profitTotals.profit < 0
+          ? "text-red-600 dark:text-red-400"
+          : "text-green-600 dark:text-green-400",
+      bgColor:
+        profitTotals.profit < 0
+          ? "bg-red-50 dark:bg-red-900/20"
+          : "bg-green-50 dark:bg-green-900/20",
+    },
+    {
       title: pt("Low Stock Items", "Az Stoklu Məhsullar"),
       value: alertCounts.low.toLocaleString(),
       icon: AlertTriangle,
@@ -167,7 +199,7 @@ export function ProductReport() {
       color: "text-red-600 dark:text-red-400",
       bgColor: "bg-red-50 dark:bg-red-900/20",
     },
-  ].filter((_, index) => stockEnabled || index < 2);
+  ].filter((_, index) => stockEnabled || index < 4);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -203,19 +235,21 @@ export function ProductReport() {
       p.category,
       p.totalOrdered ?? 0,
       p.revenue ?? 0,
+      p.purchaseCost ?? 0,
+      p.profit ?? 0,
       ...(stockEnabled ? [p.qty ?? 0, stockStatusFromQty(p.qty ?? 0)] : []),
     ]);
     const doc = new jsPDF();
     doc.text(pt("Product Report", "Məhsul Hesabatı"), 14, 15);
     autoTable(doc, {
-      head: [[pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold", "Satılan"), pt("Revenue", "Gəlir"), ...(stockEnabled ? [pt("Stock", "Stok"), pt("Status", "Status")] : [])]],
+      head: [[pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold", "Satılan"), pt("Revenue", "Gəlir"), pt("COGS", "Maya dəyəri"), pt("Profit", "Mənfəət"), ...(stockEnabled ? [pt("Stock", "Stok"), pt("Status", "Status")] : [])]],
       body: rows,
       startY: 22,
       styles: { fontSize: 8 },
     });
     doc.save("product-report.pdf");
     const ws = XLSX.utils.aoa_to_sheet([
-      [pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold", "Satılan"), pt("Revenue", "Gəlir"), ...(stockEnabled ? [pt("Stock", "Stok"), pt("Status", "Status")] : [])],
+      [pt("Product", "Məhsul"), pt("Category", "Kateqoriya"), pt("Sold", "Satılan"), pt("Revenue", "Gəlir"), pt("COGS", "Maya dəyəri"), pt("Profit", "Mənfəət"), ...(stockEnabled ? [pt("Stock", "Stok"), pt("Status", "Status")] : [])],
       ...rows,
     ]);
     const wb = XLSX.utils.book_new();
@@ -336,6 +370,8 @@ export function ProductReport() {
                 <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Category", "Kateqoriya")}</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Units Sold", "Satılan")}</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Revenue", "Gəlir")}</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("COGS", "Maya dəyəri")}</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Profit", "Mənfəət")}</th>
                 {stockEnabled && <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Stock", "Stok")}</th>}
                 {stockEnabled && <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Status", "Status")}</th>}
               </tr>
@@ -343,7 +379,7 @@ export function ProductReport() {
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={stockEnabled ? 6 : 4} className="py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                  <td colSpan={stockEnabled ? 8 : 6} className="py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                     {loading ? pt("Loading...", "Yüklənir...") : pt("No products found", "Məhsul tapılmadı")}
                   </td>
                 </tr>
@@ -354,6 +390,8 @@ export function ProductReport() {
                       <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">{product.category}</td>
                       <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{(product.totalOrdered ?? 0).toLocaleString()}</td>
                       <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(product.revenue ?? 0)}</td>
+                      <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(product.purchaseCost ?? 0)}</td>
+                      <td className={`py-2 px-3 text-xs text-right font-medium ${(product.profit ?? 0) < 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"}`}>{formatCurrency(product.profit ?? 0)}</td>
                       {stockEnabled && <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{product.qty ?? 0}</td>}
                       {stockEnabled && <td className="py-2 px-3 text-xs">{getStatusBadge(stockStatusFromQty(product.qty ?? 0))}</td>}
                     </tr>

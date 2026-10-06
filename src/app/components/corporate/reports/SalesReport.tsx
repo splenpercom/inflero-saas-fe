@@ -3,7 +3,7 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 import { useAuth } from "../../../context/AuthContext";
 import { useModulePermissions } from "../../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../../hooks/useBranchRevision";
-import { Download, DollarSign, CreditCard, AlertCircle, RefreshCw } from "lucide-react";
+import { Download, DollarSign, CreditCard, AlertCircle, RefreshCw, Wallet } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { fetchSalesReport, type SalesReportItem } from "../../../api/reports";
 import { useReportDateRange } from "../../../hooks/useReportDateRange";
@@ -99,6 +99,17 @@ export function SalesReport() {
   const topByQty = useMemo(() => topProductsByQty(items), [items]);
   const categoryBars = useMemo(() => topCategoriesBar(items), [items]);
   const categoryBreakdown = useMemo(() => aggregateCategoriesFromSalesItems(items), [items]);
+  const profitTotals = useMemo(
+    () =>
+      items.reduce(
+        (acc, i) => ({
+          cogs: acc.cogs + parseReportMoney(i.purchaseCost),
+          profit: acc.profit + parseReportMoney(i.profit),
+        }),
+        { cogs: 0, profit: 0 },
+      ),
+    [items],
+  );
 
   const summaryCards = [
     {
@@ -129,6 +140,26 @@ export function SalesReport() {
       color: "text-red-600 dark:text-red-400",
       bgColor: "bg-red-50 dark:bg-red-900/20",
     },
+    {
+      title: pt("COGS", "Maya dəyəri"),
+      value: formatCurrency(profitTotals.cogs),
+      icon: Wallet,
+      color: "text-orange-600 dark:text-orange-400",
+      bgColor: "bg-orange-50 dark:bg-orange-900/20",
+    },
+    {
+      title: pt("Gross Profit", "Ümumi mənfəət"),
+      value: formatCurrency(profitTotals.profit),
+      icon: DollarSign,
+      color:
+        profitTotals.profit < 0
+          ? "text-red-600 dark:text-red-400"
+          : "text-green-600 dark:text-green-400",
+      bgColor:
+        profitTotals.profit < 0
+          ? "bg-red-50 dark:bg-red-900/20"
+          : "bg-green-50 dark:bg-green-900/20",
+    },
   ];
 
   const handleExport = () => {
@@ -137,6 +168,8 @@ export function SalesReport() {
       r.category,
       r.soldQty,
       parseReportMoney(r.soldAmount),
+      parseReportMoney(r.purchaseCost),
+      parseReportMoney(r.profit),
       ...(stockEnabled ? [r.instockQty] : []),
     ]);
     const headers = [
@@ -144,6 +177,8 @@ export function SalesReport() {
       pt("Category", "Kateqoriya"),
       pt("Sold Qty", "Satılan"),
       pt("Amount", "Məbləğ"),
+      pt("COGS", "Maya dəyəri"),
+      pt("Profit", "Mənfəət"),
       ...(stockEnabled ? [pt("In Stock", "Stok")] : []),
     ];
     const doc = new jsPDF();
@@ -315,6 +350,8 @@ export function SalesReport() {
                     <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Category", "Kateqoriya")}</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Sold Qty", "Satılan")}</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Amount", "Məbləğ")}</th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("COGS", "Maya dəyəri")}</th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("Profit", "Mənfəət")}</th>
                     {stockEnabled && (
                       <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600 dark:text-gray-400">{pt("In Stock", "Stok")}</th>
                     )}
@@ -327,6 +364,8 @@ export function SalesReport() {
                       <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">{row.category}</td>
                       <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{row.soldQty}</td>
                       <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(parseReportMoney(row.soldAmount))}</td>
+                      <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{formatCurrency(parseReportMoney(row.purchaseCost))}</td>
+                      <td className={`py-2 px-3 text-xs text-right font-medium ${parseReportMoney(row.profit) < 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"}`}>{formatCurrency(parseReportMoney(row.profit))}</td>
                       {stockEnabled && (
                         <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">{row.instockQty}</td>
                       )}

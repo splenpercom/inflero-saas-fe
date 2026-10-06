@@ -618,16 +618,27 @@ const DEMO_WAREHOUSES = [
   { id: "demo-wh-2", name: "Service Bay Store", code: "WH02", address: "Narimanov", status: "ACTIVE" },
 ];
 
-const DEMO_SALES_REPORT_ITEMS = productListItems().slice(0, 5).map((p, i) => ({
-  productId: p.id,
-  sku: p.sku,
-  productName: p.name,
-  brand: p.brand,
-  category: p.category,
-  soldQty: 12 + i * 3,
-  soldAmount: String((12 + i * 3) * parseFloat(p.price)),
-  instockQty: p.quantity,
-}));
+const DEMO_SALES_REPORT_ITEMS = productListItems().slice(0, 5).map((p, i) => {
+  const soldQty = 12 + i * 3;
+  const unitPrice = parseFloat(p.price);
+  const soldAmount = soldQty * unitPrice;
+  // First row demo below-cost; others ~65% COGS like inflero-auto demos.
+  const unitCogs = i === 0 ? unitPrice * 1.2 : unitPrice * 0.65;
+  const purchaseCost = unitCogs * soldQty;
+  return {
+    productId: p.id,
+    sku: p.sku,
+    productName: p.name,
+    brand: p.brand,
+    category: p.category,
+    soldQty,
+    soldAmount: soldAmount.toFixed(2),
+    purchasePrice: unitCogs.toFixed(2),
+    purchaseCost: purchaseCost.toFixed(2),
+    profit: (soldAmount - purchaseCost).toFixed(2),
+    instockQty: p.quantity,
+  };
+});
 
 function salesReportResult() {
   return {
@@ -783,6 +794,7 @@ function productReportResult() {
     items: DEMO_SALES_REPORT_ITEMS.map((r) => {
       const revenue = parseFloat(r.soldAmount);
       const totalOrdered = r.soldQty;
+      const purchaseCost = parseFloat(r.purchaseCost);
       return {
         productId: r.productId,
         sku: r.sku,
@@ -793,6 +805,9 @@ function productReportResult() {
         price: totalOrdered > 0 ? Math.round((revenue / totalOrdered) * 100) / 100 : 0,
         totalOrdered,
         revenue,
+        purchasePrice: parseFloat(r.purchasePrice),
+        purchaseCost,
+        profit: revenue - purchaseCost,
       };
     }),
   };
@@ -990,6 +1005,7 @@ const DEMO_TENANT_SETTINGS = {
   posSendToBarEnabled: false,
   posBarBillShowPricesEnabled: false,
   posPrintProductBrandEnabled: false,
+  posEditableProductPricesEnabled: false,
   posQrOrderAlarmEnabled: true,
 };
 

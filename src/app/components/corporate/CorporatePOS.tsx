@@ -41,7 +41,7 @@ import {
   useLastPointerType,
   usePrefersTouchKeyboard,
 } from "../../hooks/usePrefersTouchKeyboard";
-import { sanitizeNumericTyping } from "../../lib/numericInput";
+import { parseNumericInput, sanitizeNumericTyping } from "../../lib/numericInput";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -99,11 +99,20 @@ interface Product {
 interface CartItem {
   id: string;
   name: string;
-  price: number;
+  /** Sanitized numeric text so cashiers can clear digits and type decimals. */
+  price: string;
   quantity: number;
   image: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
+}
+
+function cartUnitPrice(price: string): number {
+  return parseNumericInput(price, NaN);
+}
+
+function formatCartPriceInput(raw: string | number): string {
+  return sanitizeNumericTyping(String(raw), { allowDecimal: true });
 }
 
 type PaymentMethod = "cash" | "card";
@@ -1072,6 +1081,7 @@ export function CorporatePOS() {
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
   const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
   const [posPrintProductBrandEnabled, setPosPrintProductBrandEnabled] = useState(false);
+  const [posEditableProductPricesEnabled, setPosEditableProductPricesEnabled] = useState(false);
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
@@ -1274,6 +1284,7 @@ export function CorporatePOS() {
       setPosSendToBarEnabled(false);
       setPosBarBillShowPricesEnabled(false);
       setPosPrintProductBrandEnabled(false);
+      setPosEditableProductPricesEnabled(false);
       setPosQrOrderAlarmEnabled(true);
       setTableHourlyBillingEnabled(false);
       setPosStaffPasscodeEnabled(false);
@@ -1291,6 +1302,7 @@ export function CorporatePOS() {
             diningEnabled && s.posBarBillShowPricesEnabled === true,
           );
           setPosPrintProductBrandEnabled(s.posPrintProductBrandEnabled === true);
+          setPosEditableProductPricesEnabled(s.posEditableProductPricesEnabled === true);
           setPosQrOrderAlarmEnabled(diningEnabled && s.posQrOrderAlarmEnabled !== false);
           setTableHourlyBillingEnabled(diningEnabled && s.tableHourlyBillingEnabled === true);
           setPosStaffPasscodeEnabled(diningEnabled && s.posStaffPasscodeEnabled === true);
@@ -1304,6 +1316,7 @@ export function CorporatePOS() {
           setPosSendToBarEnabled(false);
           setPosBarBillShowPricesEnabled(false);
           setPosPrintProductBrandEnabled(false);
+          setPosEditableProductPricesEnabled(false);
           setPosQrOrderAlarmEnabled(true);
           setTableHourlyBillingEnabled(false);
           setPosStaffPasscodeEnabled(false);
@@ -1469,7 +1482,7 @@ export function CorporatePOS() {
         detail.items.map((i) => ({
           id: i.productId,
           name: i.productName,
-          price: Number(i.price),
+          price: formatCartPriceInput(i.price),
           quantity: i.quantity,
           image: "📦",
           productType: (i as { productType?: CartItem["productType"] }).productType,
@@ -1542,7 +1555,7 @@ export function CorporatePOS() {
       detail.items.map((i) => ({
         id: i.productId,
         name: i.productName,
-        price: Number(i.price),
+        price: formatCartPriceInput(i.price),
         quantity: i.quantity,
         image: "📦",
         productType: (i as { productType?: CartItem["productType"] }).productType,
@@ -2352,7 +2365,7 @@ export function CorporatePOS() {
         {
           id: product.id,
           name: product.name,
-          price: product.price,
+          price: formatCartPriceInput(product.price),
           quantity: 1,
           image: product.image,
           productType: product.productType,
@@ -2529,7 +2542,10 @@ export function CorporatePOS() {
   const getCartQuantity = (productId: string) =>
     cart.find((i) => i.id === productId)?.quantity ?? 0;
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const subtotal = cart.reduce(
+    (s, i) => s + (Number.isFinite(cartUnitPrice(i.price)) ? cartUnitPrice(i.price) : 0) * i.quantity,
+    0,
+  );
   const shipping =
     cart.length > 0 ? Math.max(0, parseFloat(shippingInput) || 0) : 0;
   const serviceFee =
@@ -2632,6 +2648,21 @@ export function CorporatePOS() {
       notifyWarning(tr("Saatlıq tarif daxil edin", "Enter an hourly rate"));
       return;
     }
+    if (cart.length > 0) {
+      const timerBadPrice = cart.find((i) => {
+        const p = cartUnitPrice(i.price);
+        return !Number.isFinite(p) || p <= 0;
+      });
+      if (timerBadPrice) {
+        notifyWarning(
+          tr(
+            `"${timerBadPrice.name}" üçün qiymət 0-dan böyük olmalıdır`,
+            `Price for "${timerBadPrice.name}" must be greater than 0`,
+          ),
+        );
+        return;
+      }
+    }
     const ok = await askConfirm({
       title: tr("Saatlıq taymer", "Hourly timer"),
       message: tr(
@@ -2660,7 +2691,11 @@ export function CorporatePOS() {
           shipping,
           ...(serviceFee > 0 ? { serviceFee } : {}),
           discount: discountAmount > 0 ? discountAmount : undefined,
-          items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+          items: cart.map((i) => ({
+            productId: i.id,
+            quantity: i.quantity,
+            price: cartUnitPrice(i.price),
+          })),
           tableId: selectedTableId,
           ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
           ...(autoEnabled && selectedVehicleId && mileageInput.trim()
@@ -2782,6 +2817,21 @@ export function CorporatePOS() {
         return false;
       }
     }
+    if (cart.length > 0) {
+      const badPrice = cart.find((i) => {
+        const p = cartUnitPrice(i.price);
+        return !Number.isFinite(p) || p <= 0;
+      });
+      if (badPrice) {
+        notifyWarning(
+          tr(
+            `"${badPrice.name}" üçün qiymət 0-dan böyük olmalıdır`,
+            `Price for "${badPrice.name}" must be greater than 0`,
+          ),
+        );
+        return false;
+      }
+    }
     return true;
   };
 
@@ -2850,7 +2900,11 @@ export function CorporatePOS() {
     shipping,
     ...(serviceFee > 0 ? { serviceFee } : {}),
     discount: discountAmount > 0 ? discountAmount : undefined,
-    items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+    items: cart.map((i) => ({
+      productId: i.id,
+      quantity: i.quantity,
+      price: cartUnitPrice(i.price),
+    })),
     // Paid: omit amount → backend collects exact grandTotal (method optional).
     // Pending: explicit 0 so backend does not auto-charge.
     // Hourly timer open: always pending until the order is closed (final amount then).
@@ -2956,6 +3010,19 @@ export function CorporatePOS() {
       notifyWarning(tr("Səbəti doldurun", "Please add items to cart"));
       return;
     }
+    const draftBadPrice = cart.find((i) => {
+      const p = cartUnitPrice(i.price);
+      return !Number.isFinite(p) || p <= 0;
+    });
+    if (draftBadPrice) {
+      notifyWarning(
+        tr(
+          `"${draftBadPrice.name}" üçün qiymət 0-dan böyük olmalıdır`,
+          `Price for "${draftBadPrice.name}" must be greater than 0`,
+        ),
+      );
+      return;
+    }
     if (isGlobalMode || !branchId) {
       notifyWarning(tr("POS üçün filial seçin", "Select a branch before using POS"));
       return;
@@ -2983,7 +3050,11 @@ export function CorporatePOS() {
             shipping,
             ...(serviceFee > 0 ? { serviceFee } : {}),
             discount: discountAmount > 0 ? discountAmount : undefined,
-            items: cart.map((i) => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+            items: cart.map((i) => ({
+      productId: i.id,
+      quantity: i.quantity,
+      price: cartUnitPrice(i.price),
+    })),
             initialPaymentAmount: 0,
             ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
             ...(autoEnabled && selectedVehicleId && mileageInput.trim()
@@ -4352,6 +4423,7 @@ export function CorporatePOS() {
                       item.productType === "SERVICE" ||
                       !product?.trackStock ||
                       product?.productType === "SERVICE";
+                    const canEditLinePrice = isService || posEditableProductPricesEnabled;
                     const available = product
                       ? getAvailableStock(product.id, product.stock)
                       : 0;
@@ -4383,15 +4455,16 @@ export function CorporatePOS() {
                               </span>
                             )}
                           </div>
-                          {isService ? (
+                          {canEditLinePrice ? (
                             <div className="flex items-center gap-1 mt-0.5">
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                value={String(item.price)}
+                                value={item.price}
                                 onChange={(e) => {
-                                  const next = parseFloat(sanitizeNumericTyping(e.target.value));
-                                  if (!Number.isFinite(next) || next < 0) return;
+                                  const next = sanitizeNumericTyping(e.target.value, {
+                                    allowDecimal: true,
+                                  });
                                   setCart((prev) =>
                                     prev.map((i) =>
                                       i.id === item.id ? { ...i, price: next } : i,
@@ -4404,7 +4477,11 @@ export function CorporatePOS() {
                             </div>
                           ) : (
                             <p className="text-[11px] font-semibold text-[#14b8a6] dark:text-[#14b8a6] leading-tight">
-                              {formatCurrency(item.price)}
+                              {formatCurrency(
+                                Number.isFinite(cartUnitPrice(item.price))
+                                  ? cartUnitPrice(item.price)
+                                  : 0,
+                              )}
                             </p>
                           )}
                           {(itemOutOfStock || itemExceedsStock) && (

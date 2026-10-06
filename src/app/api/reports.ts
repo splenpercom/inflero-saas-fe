@@ -21,6 +21,9 @@ export interface SalesReportItem {
   category: string;
   soldQty: number;
   soldAmount: string;
+  purchasePrice?: string;
+  purchaseCost?: string;
+  profit?: string;
   instockQty: number;
 }
 
@@ -195,6 +198,9 @@ export interface ProductReportItem {
   price: number;
   totalOrdered: number;
   revenue: number;
+  purchasePrice?: number;
+  purchaseCost?: number;
+  profit?: number;
 }
 
 export interface ProductReportResult {
