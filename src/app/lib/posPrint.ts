@@ -556,7 +556,7 @@ export function posOrderToThermalPayload(
     tableLabel,
     companyName: opts.companyName,
     logoSrc: opts.logoSrc,
-    siteFooter: "app.inflero.com",
+    siteFooter: "https://www.inflero.com/",
   };
 }
 

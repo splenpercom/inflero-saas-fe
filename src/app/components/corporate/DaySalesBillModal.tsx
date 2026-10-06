@@ -239,7 +239,7 @@ export function DaySalesBillModal({
           date: rangeLabel,
           companyName: user?.tenant?.name?.trim() || "Inflero",
           logoSrc,
-          siteFooter: "app.inflero.com",
+          siteFooter: "https://www.inflero.com/",
           items,
           total,
         },

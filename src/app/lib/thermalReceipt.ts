@@ -319,7 +319,7 @@ export function buildThermalReceiptHtml(
       ? `<div class="center bold big" style="margin:6px 0;">${ticketBanner}</div>
        <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `${L.table}: ${d.tableLabel}` : ""}</div>`
       : "";
-  const footer = receiptPrintText(language, data.siteFooter ?? "app.inflero.com");
+  const footer = receiptPrintText(language, data.siteFooter ?? "https://www.inflero.com/");
   const logo =
     showPrices && data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
   // Company name on priced bills (customer + priced BAR).
@@ -423,7 +423,7 @@ export function buildDailySalesSummaryHtml(
   };
 
   const company = p(data.companyName);
-  const footer = receiptPrintText(language, data.siteFooter ?? "app.inflero.com");
+  const footer = receiptPrintText(language, data.siteFooter ?? "https://www.inflero.com/");
   const logo = data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
   const items = data.items.map((it) => ({ ...it, name: p(it.name) }));
 

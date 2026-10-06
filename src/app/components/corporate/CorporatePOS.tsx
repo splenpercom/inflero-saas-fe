@@ -815,7 +815,7 @@ function ThermalReceipt({
     tableLabel: data.tableLabel,
     companyName,
     logoSrc: printLogoSrc,
-    siteFooter: "app.inflero.com",
+    siteFooter: "https://www.inflero.com/",
   });
 
   const handlePrint = async (opts?: { copy?: "customer" | "kitchen" }) => {
@@ -959,7 +959,7 @@ function ThermalReceipt({
           <div className="flex justify-between mt-1"><span className="text-gray-400">{labels.status}:</span><span className="font-semibold">{data.paymentStatusLabel}</span></div>
           <hr className="border-gray-400 dark:border-gray-500 my-2" />
           <p className="text-center text-[11px] text-gray-400">{labels.thanks}</p>
-          <p className="text-center text-[11px] text-gray-400">app.inflero.com</p>
+          <p className="text-center text-[11px] text-gray-400">https://www.inflero.com/</p>
         </div>
 
         <div className="flex gap-2 p-4">
@@ -3130,7 +3130,7 @@ export function CorporatePOS() {
       tableLabel: data.tableLabel,
       companyName: user?.tenant?.name?.trim() || "Inflero",
       logoSrc,
-      siteFooter: "app.inflero.com",
+      siteFooter: "https://www.inflero.com/",
     };
   };
 

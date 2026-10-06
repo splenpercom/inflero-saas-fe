@@ -54,7 +54,7 @@ function samplePayload(language: "az" | "en" | "ru"): ThermalReceiptPayload {
     paymentStatusLabel: isAz ? "Odenilib" : "Paid",
     tableLabel: isAz ? "Gelən müşteri" : "Walk-in",
     companyName: "Inflero POS",
-    siteFooter: "app.inflero.com",
+    siteFooter: "https://www.inflero.com/",
   };
 }
 
