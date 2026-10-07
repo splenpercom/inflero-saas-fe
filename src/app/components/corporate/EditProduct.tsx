@@ -310,9 +310,10 @@ export function EditProduct() {
   }, [itemBarcode]);
 
   const handlePrintBarcode = () => {
-    if (!barcodeCanvasRef.current || !itemBarcode) return;
+    if (!itemBarcode.trim()) return;
     void printBarcodeLabel({
-      barcodeSvgHtml: barcodeCanvasRef.current.outerHTML,
+      barcodeValue: itemBarcode.trim(),
+      productName: productName.trim(),
       priceLabel: formatBarcodePriceLabel(price),
     }).catch((err) => notifyFromError(err));
   };

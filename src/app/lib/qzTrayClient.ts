@@ -95,6 +95,39 @@ export async function qzPrintHtml(
   ]);
 }
 
+/** Product barcode stickers — 30×20mm landscape (20×30 slip, long edge horizontal). */
+export async function qzPrintBarcodeLabelHtml(
+  printerName: string,
+  html: string,
+  opts?: { widthMm?: number; heightMm?: number },
+): Promise<void> {
+  if (!printerName.trim()) {
+    throw new Error("Printer name is required");
+  }
+  const widthMm = opts?.widthMm ?? 30;
+  const heightMm = opts?.heightMm ?? 20;
+  const qz = await ensureQzConnected();
+  const config = qz.configs.create(printerName, {
+    scaleContent: true,
+    rasterize: true,
+    units: "mm",
+    orientation: "landscape",
+    size: { width: widthMm, height: heightMm },
+    margins: { top: 0, right: 0, bottom: 0, left: 0 },
+    colorType: "blackwhite",
+    interpolation: "bilinear",
+  });
+  await qz.print(config, [
+    {
+      type: "pixel",
+      format: "html",
+      flavor: "plain",
+      data: html,
+      options: { pageWidth: widthMm },
+    },
+  ]);
+}
+
 export function getQzConnectionHint(language: "az" | "en" | "ru" = "en"): string {
   if (language === "az") {
     return "QZ Tray işləmir. POS kompüterində QZ Tray quraşdırın və işə salın (qz.io), sonra yenidən cəhd edin.";

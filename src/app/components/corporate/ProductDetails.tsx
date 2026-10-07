@@ -254,9 +254,10 @@ export function ProductDetails() {
   };
 
   const printBarcode = () => {
-    if (!barcode || !barcodeRef.current) return;
+    if (!barcode) return;
     void printBarcodeLabel({
-      barcodeSvgHtml: barcodeRef.current.outerHTML,
+      barcodeValue: barcode,
+      productName: (product?.name ?? "").trim(),
       priceLabel: formatBarcodePriceLabel(String(product?.price ?? "")),
     }).catch((err) => notifyFromError(err));
   };

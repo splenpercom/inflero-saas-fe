@@ -55,6 +55,7 @@ import {
   diningDashboardRouteElements,
   diningPublicRouteElements,
 } from "../modules/dining";
+import { loyaltyDashboardRouteElements } from "../modules/loyalty";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DemoBanner } from "./components/DemoBanner";
 import { PaymentStatusGate, BillingResultPage } from "./components/billing/PaymentStatusGate";
@@ -398,6 +399,7 @@ function AppShell() {
               <Route path="billing/result" element={<BillingResultPage />} />
 
               {diningDashboardRouteElements}
+              {loyaltyDashboardRouteElements}
 
               {/* Catch all - redirect to dashboard home */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

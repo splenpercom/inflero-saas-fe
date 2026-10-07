@@ -47,7 +47,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
-import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
+import { useBarcodeWedge, useGlobalBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { formatCurrency } from "../../utils/currency";
 import { AddCustomerModal, type CustomerFormData } from "./people/AddCustomerModal";
 import { fetchPosProducts, lookupProductByCode, type ProductListItem } from "../../api/inventory";
@@ -59,6 +59,11 @@ import {
   type PeopleCustomer,
 } from "../../api/people";
 import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, startPosOrderHourlyTimer, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
+import { lookupLoyaltyCard } from "../../api/loyalty";
+import {
+  LoyaltyEarnRedeemDialog,
+  type LoyaltyDialogInfo,
+} from "../../../modules/loyalty/LoyaltyEarnRedeemDialog";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -763,6 +768,8 @@ interface ReceiptData {
   tableHourlyCharge?: number;
   discount: number;
   discountLabel: string;
+  /** Informational cashback earned (earn path); does not change total. */
+  cashbackEarned?: number;
   total: number;
   paid?: number;
   amountDue?: number;
@@ -816,6 +823,7 @@ function ThermalReceipt({
     serviceFee: data.serviceFee,
     discount: data.discount,
     discountLabel: data.discountLabel,
+    cashbackEarned: data.cashbackEarned,
     total: data.total,
     paid: data.paid,
     amountDue: data.amountDue,
@@ -950,6 +958,14 @@ function ThermalReceipt({
             </div>
           )}
           {data.discount > 0 && <div className="flex justify-between"><span className="text-gray-400">{data.discountLabel}:</span><span>-{data.discount.toFixed(2)} AZN</span></div>}
+          {(data.cashbackEarned ?? 0) > 0 && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">
+                {pickLang(language, "Cashback qazanıldı", "Cashback earned")}:
+              </span>
+              <span>{(data.cashbackEarned ?? 0).toFixed(2)} AZN</span>
+            </div>
+          )}
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
           <div className="flex justify-between text-[13px] font-bold"><span>{labels.total}:</span><span>{data.total.toFixed(2)} AZN</span></div>
           {(data.amountDue ?? 0) > 0.009 && (
@@ -1016,6 +1032,7 @@ export function CorporatePOS() {
   const stockEnabled = hasModule("STOCK");
   const autoEnabled = hasModule("AUTO");
   const diningEnabled = hasModule("DINING");
+  const loyaltyEnabled = hasModule("LOYALTY");
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const { canCreate, canEdit } = useModulePermissions("Sales");
@@ -1074,6 +1091,12 @@ export function CorporatePOS() {
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState("");
   const [appliedDiscount, setAppliedDiscount] = useState<{ type: "percent" | "fixed"; value: number } | null>(null);
+  const [loyaltyMode, setLoyaltyMode] = useState<"earn" | "redeem" | null>(null);
+  const [loyaltyWalletBalance, setLoyaltyWalletBalance] = useState(0);
+  const [loyaltyHasRate, setLoyaltyHasRate] = useState(false);
+  const [loyaltyRatePercent, setLoyaltyRatePercent] = useState<number | null>(null);
+  const [loyaltyDialogOpen, setLoyaltyDialogOpen] = useState(false);
+  const [loyaltyDialogInfo, setLoyaltyDialogInfo] = useState<LoyaltyDialogInfo | null>(null);
   const [shippingInput, setShippingInput] = useState("");
   const [serviceFeeInput, setServiceFeeInput] = useState("");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
@@ -1183,10 +1206,15 @@ export function CorporatePOS() {
       setSelectedBillerId(currentUserBillerId);
       return;
     }
+    // After branch switch, drop employees that no longer belong to this branch.
+    if (selectedBillerId && !billers.some((b) => b.id === selectedBillerId)) {
+      setSelectedBillerId(defaultBillerId || "");
+      return;
+    }
     if (defaultBillerId && !selectedBillerId) {
       setSelectedBillerId(defaultBillerId);
     }
-  }, [currentUserBillerId, defaultBillerId, isEmployee, selectedBillerId]);
+  }, [billers, currentUserBillerId, defaultBillerId, isEmployee, selectedBillerId]);
 
   const loadProducts = useCallback(async () => {
     if (!(isAuthenticated || isDemo)) {
@@ -1993,11 +2021,21 @@ export function CorporatePOS() {
     [hydrateCartFromExistingOrder, tr],
   );
 
+  const clearLoyaltySelection = useCallback(() => {
+    setLoyaltyMode(null);
+    setLoyaltyWalletBalance(0);
+    setLoyaltyHasRate(false);
+    setLoyaltyRatePercent(null);
+    setLoyaltyDialogOpen(false);
+    setLoyaltyDialogInfo(null);
+  }, []);
+
   const handleCustomerChange = (id: string) => {
     if (autoEnabled && id !== selectedCustomerId) {
       setSelectedVehicleId("");
       setMileageInput("");
     }
+    if (!id) clearLoyaltySelection();
     setSelectedCustomerId(id);
   };
 
@@ -2436,17 +2474,87 @@ export function CorporatePOS() {
           return true;
         }
 
-        const item = await lookupProductByCode(trimmed, { signal: ac.signal });
-        if (seq !== lookupSeqRef.current || ac.signal.aborted) return "ignored";
-        const added = addToCartRef.current(mapListItemToProduct(item));
-        if (!added) return false;
-        setSearchQuery("");
-        notifySuccess(
-          tr(`Əlavə olundu: ${item.name}`, `Added: ${item.name}`),
-        );
-        // Refresh debounce clock after success so a late second hit can't slip in.
-        lastLookupCodeRef.current = { code: trimmed, at: Date.now() };
-        return true;
+        try {
+          const item = await lookupProductByCode(trimmed, { signal: ac.signal });
+          if (seq !== lookupSeqRef.current || ac.signal.aborted) return "ignored";
+          const added = addToCartRef.current(mapListItemToProduct(item));
+          if (!added) return false;
+          setSearchQuery("");
+          notifySuccess(
+            tr(`Əlavə olundu: ${item.name}`, `Added: ${item.name}`),
+          );
+          lastLookupCodeRef.current = { code: trimmed, at: Date.now() };
+          return true;
+        } catch (productErr) {
+          if (seq !== lookupSeqRef.current || isAbortError(productErr) || ac.signal.aborted) {
+            return "ignored";
+          }
+          if (isNetworkError(productErr)) {
+            notifyError(
+              tr(
+                "Şəbəkə xətası — bağlantını yoxlayın və ya SKU-nu axtarışda əl ilə daxil edin",
+                "Network error — check connection, or type the SKU in search manually",
+              ),
+            );
+            return false;
+          }
+          // Product miss → loyalty card lookup (LOYALTY module).
+          if (loyaltyEnabled && !isDemo) {
+            try {
+              const card = await lookupLoyaltyCard(trimmed);
+              if (seq !== lookupSeqRef.current || ac.signal.aborted) return "ignored";
+              const bal = Number(card.walletBalance) || 0;
+              const ratePct = card.assignedRatePercent != null
+                ? Number(card.assignedRatePercent)
+                : null;
+              setSelectedCustomerId(card.customerId);
+              setLoyaltyWalletBalance(bal);
+              setLoyaltyHasRate(card.hasAssignedRate);
+              setLoyaltyRatePercent(ratePct);
+              setSearchQuery("");
+              // Dialog previews use current cart; open after state flush via functional read below.
+              const merch = cart.reduce(
+                (s, i) =>
+                  s +
+                  (Number.isFinite(cartUnitPrice(i.price)) ? cartUnitPrice(i.price) : 0) *
+                    i.quantity,
+                0,
+              );
+              const manual = appliedDiscount
+                ? appliedDiscount.type === "percent"
+                  ? merch * (appliedDiscount.value / 100)
+                  : Math.min(appliedDiscount.value, merch)
+                : 0;
+              const earn =
+                card.hasAssignedRate && ratePct != null
+                  ? Math.round(((merch * ratePct) / 100) * 100) / 100
+                  : 0;
+              const redeemApply = Math.round(Math.min(bal, Math.max(0, merch - manual)) * 100) / 100;
+              setLoyaltyDialogInfo({
+                customerName: `${card.name} (${card.code})`,
+                walletBalance: bal,
+                hasAssignedRate: card.hasAssignedRate,
+                assignedRatePercent: ratePct,
+                earnPreview: earn,
+                redeemApply,
+                redeemLeftover: Math.round((bal - redeemApply) * 100) / 100,
+              });
+              if (loyaltyMode) {
+                setLoyaltyMode(null);
+              }
+              setLoyaltyDialogOpen(true);
+              lastLookupCodeRef.current = { code: trimmed, at: Date.now() };
+              return true;
+            } catch {
+              /* fall through to product-not-found */
+            }
+          }
+          notifyFromError(
+            productErr,
+            tr("Məhsul tapılmadı", "Product not found for this barcode"),
+          );
+          return false;
+        }
       } catch (err) {
         if (seq !== lookupSeqRef.current || isAbortError(err) || ac.signal.aborted) return "ignored";
         if (isNetworkError(err)) {
@@ -2469,10 +2577,37 @@ export function CorporatePOS() {
         }
       }
     },
-    [canMutateCart, editingStockLocked, receipt, mapListItemToProduct, language],
+    [
+      canMutateCart,
+      editingStockLocked,
+      receipt,
+      mapListItemToProduct,
+      language,
+      loyaltyEnabled,
+      isDemo,
+      cart,
+      appliedDiscount,
+      loyaltyMode,
+    ],
   );
 
   const { handleKeyDown: handleSearchBarcodeKeyDown } = useBarcodeWedge(handleBarcodeScan);
+
+  // Always-ready gun scan when search is not focused (buttons / blank chrome).
+  // Buffer lives in refs — no re-renders while the scanner types.
+  const globalScanReady =
+    !receipt &&
+    !loyaltyDialogOpen &&
+    !discountModalOpen &&
+    !shippingModalOpen &&
+    !addCustomerModalOpen &&
+    !occupiedDialogTable &&
+    !printerSettingsOpen &&
+    !pendingQrPortalOpen &&
+    !tablePickerOpen &&
+    !touchKb;
+
+  useGlobalBarcodeWedge(handleBarcodeScan, { enabled: globalScanReady });
 
   const openTouchKb = useCallback(
     (
@@ -2552,12 +2687,30 @@ export function CorporatePOS() {
     cart.length > 0 && posServiceFeeEnabled
       ? Math.max(0, parseFloat(serviceFeeInput) || 0)
       : 0;
-  const discountAmount = appliedDiscount
+  const manualDiscountAmount = appliedDiscount
     ? appliedDiscount.type === "percent"
       ? subtotal * (appliedDiscount.value / 100)
       : Math.min(appliedDiscount.value, subtotal)
     : 0;
+  const loyaltyRedeemCap = Math.max(0, subtotal - manualDiscountAmount);
+  const loyaltyRedeemAmount =
+    loyaltyMode === "redeem"
+      ? Math.round(Math.min(loyaltyWalletBalance, loyaltyRedeemCap) * 100) / 100
+      : 0;
+  // Cap: loyalty + manual ≤ merchandise; reduce loyalty first (already via redeemCap).
+  const discountAmount = Math.round((manualDiscountAmount + loyaltyRedeemAmount) * 100) / 100;
+  const loyaltyEarnPreview =
+    loyaltyMode === "earn" && loyaltyHasRate && loyaltyRatePercent != null
+      ? Math.round(((subtotal * loyaltyRatePercent) / 100) * 100) / 100
+      : 0;
   const total = subtotal + shipping + serviceFee + liveHourlyCharge - discountAmount;
+
+  // Cart emptied after choosing redeem → clear redeem choice.
+  useEffect(() => {
+    if (loyaltyMode === "redeem" && (subtotal <= 0 || loyaltyRedeemAmount <= 0)) {
+      setLoyaltyMode(null);
+    }
+  }, [loyaltyMode, subtotal, loyaltyRedeemAmount]);
 
   const handleApplyDiscount = () => {
     const val = parseFloat(discountValue);
@@ -2629,6 +2782,7 @@ export function CorporatePOS() {
     setHourlyStartedAt(null);
     setHourlyEndedAt(null);
     setSelectedCustomerId("");
+    clearLoyaltySelection();
     setSelectedVehicleId("");
     setMileageInput("");
     setSelectedBillerId(defaultBillerId || "");
@@ -2690,7 +2844,7 @@ export function CorporatePOS() {
             : {}),
           shipping,
           ...(serviceFee > 0 ? { serviceFee } : {}),
-          discount: discountAmount > 0 ? discountAmount : undefined,
+          discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
           items: cart.map((i) => ({
             productId: i.id,
             quantity: i.quantity,
@@ -2899,7 +3053,9 @@ export function CorporatePOS() {
       : {}),
     shipping,
     ...(serviceFee > 0 ? { serviceFee } : {}),
-    discount: discountAmount > 0 ? discountAmount : undefined,
+    // Manual discount only; server adds loyalty redeem when loyaltyMode=redeem.
+    discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
+    ...(loyaltyMode ? { loyaltyMode } : {}),
     items: cart.map((i) => ({
       productId: i.id,
       quantity: i.quantity,
@@ -2948,6 +3104,7 @@ export function CorporatePOS() {
       initialPaymentAmount: _pay,
       storeId: _store,
       status: _status,
+      loyaltyMode: bodyLoyaltyMode,
       ...rest
     } = body as typeof body & { initialPaymentAmount?: number; storeId?: string | null };
     void _pay;
@@ -2969,6 +3126,10 @@ export function CorporatePOS() {
     const payload: Parameters<typeof updatePosOrder>[1] = {
       ...rest,
       ...(nextStatus ? { status: nextStatus } : {}),
+      // Wallet mutates only on COMPLETED — never send loyaltyMode for drafts/holds.
+      ...(nextStatus === "COMPLETED" && bodyLoyaltyMode
+        ? { loyaltyMode: bodyLoyaltyMode }
+        : { loyaltyMode: null }),
       ...(diningEnabled ? { tableId: selectedTableId || null } : {}),
       // Avoid ALREADY_SENT_TO_KOT — reprint still updates lines + prints client-side.
       ...(opts?.sendToKot && !editingAlreadyOnKot ? { sendToKot: true } : {}),
@@ -3049,7 +3210,8 @@ export function CorporatePOS() {
             ...(selectedPaymentMethod ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) } : {}),
             shipping,
             ...(serviceFee > 0 ? { serviceFee } : {}),
-            discount: discountAmount > 0 ? discountAmount : undefined,
+            // Drafts do not apply loyalty — manual discount only; no wallet mutation.
+            discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
             items: cart.map((i) => ({
       productId: i.id,
       quantity: i.quantity,
@@ -3154,11 +3316,17 @@ export function CorporatePOS() {
       serviceFee: apiServiceFee,
       tableHourlyCharge: apiHourlyCharge,
       discount: apiDiscount,
-      discountLabel: appliedDiscount
-        ? appliedDiscount.type === "percent"
-          ? tr(`Endirim (${appliedDiscount.value}%)`, `Discount (${appliedDiscount.value}%)`)
-          : tr("Endirim", "Discount")
-        : tr("Endirim", "Discount"),
+      discountLabel: (() => {
+        const loyaltyRedeem = parsePrice(detail.loyaltyRedeemAmount);
+        if (loyaltyRedeem > 0) {
+          return tr("Loyalty endirim", "Loyalty discount");
+        }
+        if (appliedDiscount?.type === "percent") {
+          return tr(`Endirim (${appliedDiscount.value}%)`, `Discount (${appliedDiscount.value}%)`);
+        }
+        return tr("Endirim", "Discount");
+      })(),
+      cashbackEarned: parsePrice(detail.loyaltyCashbackEarned),
       total: apiTotal,
       paid: apiPaid,
       amountDue: apiDue,
@@ -3193,6 +3361,7 @@ export function CorporatePOS() {
       tableHourlyCharge: data.tableHourlyCharge ?? 0,
       discount: data.discount,
       discountLabel: data.discountLabel,
+      cashbackEarned: data.cashbackEarned,
       total: data.total,
       paid: data.paid,
       amountDue: data.amountDue,
@@ -4631,7 +4800,30 @@ export function CorporatePOS() {
                             <X className="w-3 h-3" />
                           </button>
                         </div>
-                        <span className="text-green-600 dark:text-green-400 font-medium">-{formatCurrency(discountAmount)}</span>
+                        <span className="text-green-600 dark:text-green-400 font-medium">-{formatCurrency(manualDiscountAmount)}</span>
+                      </div>
+                    )}
+                    {loyaltyMode === "redeem" && loyaltyRedeemAmount > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#14b8a6]">
+                            {tr("Loyalty endirim", "Loyalty discount")}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setLoyaltyMode(null)}
+                            className="text-red-400 hover:text-red-600 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <span className="font-medium text-[#14b8a6]">-{formatCurrency(loyaltyRedeemAmount)}</span>
+                      </div>
+                    )}
+                    {loyaltyMode === "earn" && (
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>{tr("Cashback (qazanc)", "Cashback (earn)")}</span>
+                        <span>~{formatCurrency(loyaltyEarnPreview)}</span>
                       </div>
                     )}
                   </div>
@@ -4875,7 +5067,11 @@ export function CorporatePOS() {
       {/* Discount Modal */}
       {discountModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-5 w-80">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-5 w-80"
+          >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <Tag className="w-4 h-4 text-[#14b8a6] dark:text-[#14b8a6]" />
@@ -4941,7 +5137,11 @@ export function CorporatePOS() {
       {/* Shipping Modal */}
       {shippingModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-5 w-80">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-5 w-80"
+          >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <Truck className="w-4 h-4 text-[#14b8a6] dark:text-[#14b8a6]" />
@@ -5013,6 +5213,25 @@ export function CorporatePOS() {
       />
 
       {/* Thermal Receipt Modal */}
+      <LoyaltyEarnRedeemDialog
+        open={loyaltyDialogOpen}
+        info={loyaltyDialogInfo}
+        tr={tr}
+        onEarn={() => {
+          setLoyaltyMode("earn");
+          setLoyaltyDialogOpen(false);
+        }}
+        onRedeem={() => {
+          setLoyaltyMode("redeem");
+          setLoyaltyDialogOpen(false);
+        }}
+        onSkip={() => {
+          setLoyaltyMode(null);
+          setLoyaltyDialogOpen(false);
+        }}
+        onClose={() => setLoyaltyDialogOpen(false)}
+      />
+
       {receipt && (
         <ThermalReceipt
           data={receipt}

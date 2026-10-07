@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Upload, X, MapPin, Loader2, Printer } from "luc
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
+import { useBranch } from "../../context/BranchContext";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
 import {
   fetchTenantSettings,
@@ -14,7 +15,7 @@ import {
   type TenantSettingsRecord,
 } from "../../api/tenantSettings";
 import { fetchSalesBillers, updateSalesBiller, type SalesBillerRow } from "../../api/sales";
-import { notifyFromError, notifyInfo, notifySuccess } from "../../lib/toast";
+import { notifyFromError, notifyInfo, notifySuccess, notifyWarning } from "../../lib/toast";
 import { ModernSelect } from "../ui/ModernSelect";
 import { LocationMapPicker } from "../ui/LocationMapPicker";
 import { PosPrinterSettings } from "./PosPrinterSettings";
@@ -64,8 +65,7 @@ export function Settings() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, refresh, hasModule, user } = useAuth();
   const posEnabled = hasModule("POS");
-  // Add-ons are tenant-wide: use the tenant module flag (not branch-scoped hasModule),
-  // so Bar & Print only appears when Dining is actually enabled on the tenant.
+  // Dining plugin is tenant-level; Bar & Print add-on visibility still follows tenant DINING.
   const diningEnabled =
     isDemo
       ? hasModule("DINING")
@@ -73,7 +73,10 @@ export function Settings() {
   const reservationsEnabled = hasModule("RESERVATIONS");
   const addonsEnabled = posEnabled || reservationsEnabled;
   const { canView, canEdit } = useModulePermissions("Settings");
+  const { isGlobalMode, branchManagementEnabled, selectedBranch } = useBranch();
   const branchRevision = useBranchRevision();
+  /** Add-ons are per-branch; BM-off resolves sole store via API. */
+  const canEditBranchAddons = !branchManagementEnabled || !isGlobalMode;
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
   // Nav: sidebar section selection (Company group is collapsible)
@@ -378,6 +381,16 @@ export function Settings() {
     if (!requireSignedIn()) return;
     if (!canEdit) return;
 
+    if (activeSection === "addons" && !canEditBranchAddons) {
+      notifyWarning(
+        pt(
+          "Select a branch to manage add-ons for that branch.",
+          "Əlavələri idarə etmək üçün filial seçin.",
+        ),
+      );
+      return;
+    }
+
     if (!companyName.trim() || !companyEmail.trim() || !phoneNumber.trim()) {
       notifyFromError(null, pt("Company name, email, and phone are required.", "Şirkət adı, e-poçt və telefon mütləqdir."));
       return;
@@ -436,7 +449,7 @@ export function Settings() {
         website: emptyToNull(website),
         latitude,
         longitude,
-        ...(posEnabled
+        ...(canEditBranchAddons && posEnabled
           ? {
               employeeCommissionEnabled,
               posServiceFeeEnabled,
@@ -454,7 +467,7 @@ export function Settings() {
                 : {}),
             }
           : {}),
-        ...(addonsEnabled ? { inventoryServicesEnabled } : {}),
+        ...(canEditBranchAddons && addonsEnabled ? { inventoryServicesEnabled } : {}),
         socialLinks: {
           instagram: emptyToNull(instagram),
           facebook: emptyToNull(facebook),
@@ -976,8 +989,31 @@ export function Settings() {
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                     {pt("Add-ons", "Əlavələr")}
                   </h2>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    {canEditBranchAddons
+                      ? pt(
+                          selectedBranch
+                            ? `These toggles apply to ${selectedBranch.name} only.`
+                            : "These toggles apply to this branch only.",
+                          selectedBranch
+                            ? `Bu açarlar yalnız ${selectedBranch.name} filialına aiddir.`
+                            : "Bu açarlar yalnız bu filiala aiddir.",
+                        )
+                      : pt(
+                          "Select a branch in the header to view and edit add-ons for that branch.",
+                          "Filialın əlavələrini görmək və redaktə etmək üçün yuxarıdan filial seçin.",
+                        )}
+                  </p>
                 </div>
                 <div className="px-4 pb-4 space-y-5 pt-4">
+                  {!canEditBranchAddons && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                      {pt(
+                        "All-branches mode: pick a branch to manage add-ons. Company settings can still be saved from other sections.",
+                        "Bütün filiallar rejimi: əlavələr üçün filial seçin. Şirkət parametrlərini digər bölmələrdən saxlamaq olar.",
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-medium text-gray-900 dark:text-white">
@@ -992,7 +1028,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setInventoryServicesEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         inventoryServicesEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1023,7 +1059,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setEmployeeCommissionEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         employeeCommissionEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1138,7 +1174,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setPosServiceFeeEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         posServiceFeeEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1167,7 +1203,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setPosSendToProductionEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         posSendToProductionEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1196,7 +1232,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setPosPrintProductBrandEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         posPrintProductBrandEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1225,7 +1261,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setPosEditableProductPricesEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         posEditableProductPricesEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1256,7 +1292,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setPosQrOrderAlarmEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         posQrOrderAlarmEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1285,7 +1321,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => {
                         setPosSendToBarEnabled((v) => {
                           const next = !v;
@@ -1320,7 +1356,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit || !posSendToBarEnabled}
+                      disabled={!canEdit || !canEditBranchAddons || !posSendToBarEnabled}
                       onClick={() => setPosBarBillShowPricesEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         posBarBillShowPricesEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1349,7 +1385,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setTableHourlyBillingEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         tableHourlyBillingEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
@@ -1378,7 +1414,7 @@ export function Settings() {
                     </div>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canEdit || !canEditBranchAddons}
                       onClick={() => setPosStaffPasscodeEnabled((v) => !v)}
                       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
                         posStaffPasscodeEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"

@@ -12,6 +12,9 @@ export interface PeopleCustomer {
   status: UiPeopleStatus;
   vehicleCount: number;
   plates: string[];
+  /** When LOYALTY module is on. */
+  loyaltyCardBarcode?: string | null;
+  walletBalance?: string | null;
 }
 
 export interface PeopleSupplier {

@@ -28,6 +28,7 @@ import {
   FileBarChart,
   ExternalLink,
   ScrollText,
+  Award,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -147,6 +148,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       tableBookings: { en: "Booking", az: "Rezervasiya" },
       qrMenu: { en: "QR Menu", az: "QR Menyu" },
       bookATable: { en: "Book a Table", az: "Masa Rezervasiya" },
+      loyalty: { en: "Loyalty", az: "Loyalty" },
       
       // Inventory Sub-items
       products: { en: "Products", az: "Məhsullar" },
@@ -436,6 +438,13 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "Dining",
     },
     {
+      icon: Award,
+      labelKey: "loyalty",
+      label: st("loyalty"),
+      path: "/dashboard/loyalty",
+      permissionModule: "Loyalty",
+    },
+    {
       icon: ScrollText,
       labelKey: "deletionLogs",
       label: st("deletionLogs"),
@@ -469,6 +478,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         ) {
           return null;
         }
+        if (item.labelKey === "loyalty" && !hasModule("LOYALTY")) return null;
         if (item.labelKey === "warehouses" && !branchManagementEnabled) return null;
         // Branch users cannot open the website editor when BRANCH_MANAGEMENT is on.
         if (

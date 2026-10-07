@@ -217,6 +217,8 @@ export type ThermalReceiptPayload = {
   tableHourlyCharge?: number;
   discount: number;
   discountLabel: string;
+  /** Informational cashback earned (does not change total). */
+  cashbackEarned?: number;
   total: number;
   /** Amount already collected (omit or 0 when fully unpaid). */
   paid?: number;
@@ -373,6 +375,7 @@ export function buildThermalReceiptHtml(
   ${d.serviceFee > 0 ? `<div class="row"><span class="label">${L.serviceFee}:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
   ${(d.tableHourlyCharge ?? 0) > 0 ? `<div class="row"><span class="label">${L.tableHourlyCharge}:</span><span>${(d.tableHourlyCharge ?? 0).toFixed(2)} AZN</span></div>` : ""}
   ${d.discount > 0 ? `<div class="row"><span class="label">${d.discountLabel}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
+  ${(d.cashbackEarned ?? 0) > 0 ? `<div class="row"><span class="label">${language === "az" ? "Cashback qazanıldı" : "Cashback earned"}:</span><span>${(d.cashbackEarned ?? 0).toFixed(2)} AZN</span></div>` : ""}
   <div class="divider-solid"></div>
   <div class="total-row"><span>${L.total}:</span><span>${d.total.toFixed(2)} AZN</span></div>
   ${

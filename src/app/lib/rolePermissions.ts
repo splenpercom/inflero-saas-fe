@@ -14,6 +14,7 @@ const RBAC_MODULE_TENANT_GATE: Partial<Record<(typeof TENANT_RBAC_MODULES)[numbe
   Stock: "STOCK",
   Reservations: "RESERVATIONS",
   Dining: "DINING",
+  Loyalty: "LOYALTY",
   "My Website": "WEB_EDITOR",
 };
 

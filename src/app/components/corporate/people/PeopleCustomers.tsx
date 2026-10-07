@@ -10,6 +10,7 @@ import {
   Edit2,
   Trash2,
   Car,
+  CreditCard,
 } from "lucide-react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { useAuth } from "../../../context/AuthContext";
@@ -26,17 +27,22 @@ import { notifyFromError, notifySuccess } from "../../../lib/toast";
 import { useConfirm } from "../../../context/ConfirmContext";
 import { AddCustomerModal, type CustomerFormData } from "./AddCustomerModal";
 import { CustomerVehiclesModal } from "./CustomerVehiclesModal";
+import { CustomerLoyaltyModal } from "../../../../modules/loyalty";
 import { DataPagination } from "../../ui/DataPagination";
 import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../hooks/usePagination";
 import { ModernSelect } from "../../ui/ModernSelect";
+import { formatCurrency } from "../../../utils/currency";
 
 import { pickLang } from "../../../i18n/pickLang";
+
 export function PeopleCustomers() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const autoEnabled = hasModule("AUTO");
+  const loyaltyEnabled = hasModule("LOYALTY");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
+  const { canView: canViewLoyalty } = useModulePermissions("Loyalty");
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,8 +55,10 @@ export function PeopleCustomers() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [vehicleCustomer, setVehicleCustomer] = useState<PeopleCustomer | null>(null);
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState<PeopleCustomer | null>(null);
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const showLoyaltyCol = loyaltyEnabled && canViewLoyalty;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -96,6 +104,9 @@ export function PeopleCustomers() {
 
   const translateStatus = (status: string) =>
     status === "Active" ? tr("Aktiv", "Active") : tr("Qeyri-aktiv", "Inactive");
+
+  const colCount =
+    6 + (autoEnabled ? 1 : 0) + (showLoyaltyCol ? 1 : 0);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -150,26 +161,69 @@ export function PeopleCustomers() {
     <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
       <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
         <div className="mb-4">
-          <h1 className="text-lg sm:text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 dark:text-white">{tr("Müştərilər", "Customers")}</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{tr("Müştərilərinizi idarə edin", "Manage your customers")}</p>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white sm:text-lg xl:text-xl 2xl:text-2xl">
+            {tr("Müştərilər", "Customers")}
+          </h1>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {tr("Müştərilərinizi idarə edin", "Manage your customers")}
+          </p>
         </div>
 
-        <div className="flex justify-end gap-2 mb-4">
-          <button onClick={() => alert(tr("PDF ixrac funksiyası tezliklə əlavə olunacaq", "Export PDF coming soon"))} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg"><FileText className="w-3.5 h-3.5 text-red-500" /></button>
-          <button onClick={() => alert(tr("Excel ixrac funksiyası tezliklə əlavə olunacaq", "Export Excel coming soon"))} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg"><FileSpreadsheet className="w-3.5 h-3.5 text-green-500" /></button>
-          <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg disabled:opacity-50"><RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} /></button>
+        <div className="mb-4 flex justify-end gap-2">
+          <button
+            onClick={() =>
+              alert(tr("PDF ixrac funksiyası tezliklə əlavə olunacaq", "Export PDF coming soon"))
+            }
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900"
+          >
+            <FileText className="h-3.5 w-3.5 text-red-500" />
+          </button>
+          <button
+            onClick={() =>
+              alert(tr("Excel ixrac funksiyası tezliklə əlavə olunacaq", "Export Excel coming soon"))
+            }
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-green-500" />
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+          </button>
           {canCreate && (
-          <button onClick={() => { setEditingCustomer(null); setIsModalOpen(true); }} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg"><Plus className="w-3.5 h-3.5" /><span>{tr("Müştəri Əlavə Et", "Add Customer")}</span></button>
+            <button
+              onClick={() => {
+                setEditingCustomer(null);
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-lg bg-[#14b8a6] px-2.5 py-1.5 text-xs text-white"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>{tr("Müştəri Əlavə Et", "Add Customer")}</span>
+            </button>
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 relative max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input type="text" placeholder={tr("Ad, telefon ilə axtar...", "Search name, phone...")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white" />
+        <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            <div className="relative max-w-xs flex-1">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder={
+                  showLoyaltyCol
+                    ? tr("Ad, telefon, kart...", "Search name, phone, card...")
+                    : tr("Ad, telefon ilə axtar...", "Search name, phone...")
+                }
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white py-1.5 pl-9 pr-3 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+              />
             </div>
-            <div className="flex gap-2 ml-auto">
+            <div className="ml-auto flex gap-2">
               <ModernSelect
                 value={selectedStatus}
                 onChange={(value) => setSelectedStatus(value as "all" | "active" | "inactive")}
@@ -183,54 +237,154 @@ export function PeopleCustomers() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
-                  <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("KOD", "CODE")}</th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("MÜŞTƏRİ", "CUSTOMER")}</th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("E-POÇT", "EMAIL")}</th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("TELEFON", "PHONE")}</th>
-                  <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("STATUS", "STATUS")}</th>
-                  {autoEnabled && <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("AVTOMOBİLLƏR", "CARS")}</th>}
-                  <th className="text-left text-[10px] font-medium text-gray-500 uppercase px-3 py-2">{tr("ƏMƏLİYYATLAR", "ACTIONS")}</th>
+                <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/50">
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase text-gray-500">
+                    {tr("KOD", "CODE")}
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase text-gray-500">
+                    {tr("MÜŞTƏRİ", "CUSTOMER")}
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase text-gray-500">
+                    {tr("E-POÇT", "EMAIL")}
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase text-gray-500">
+                    {tr("TELEFON", "PHONE")}
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase text-gray-500">
+                    {tr("STATUS", "STATUS")}
+                  </th>
+                  {showLoyaltyCol && (
+                    <th className="px-3 py-2 text-left text-[10px] font-medium uppercase text-gray-500">
+                      {tr("LOYALTY", "LOYALTY")}
+                    </th>
+                  )}
+                  {autoEnabled && (
+                    <th className="px-3 py-2 text-left text-[10px] font-medium uppercase text-gray-500">
+                      {tr("AVTOMOBİLLƏR", "CARS")}
+                    </th>
+                  )}
+                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase text-gray-500">
+                    {tr("ƏMƏLİYYATLAR", "ACTIONS")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={autoEnabled ? 7 : 6} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
-                ) : customers.length === 0 ? (
-                  <tr><td colSpan={autoEnabled ? 7 : 6} className="px-3 py-8 text-center text-xs text-gray-500">{tr("Müştəri tapılmadı", "No customers found")}</td></tr>
-                ) : paginatedData.map((customer, index) => (
-                  <tr key={customer.id} className={`border-b border-gray-200 dark:border-gray-800 ${index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"}`}>
-                    <td className="px-3 py-2 text-xs text-gray-600">{customer.code}</td>
-                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-white">{customer.name}</td>
-                    <td className="px-3 py-2 text-xs text-gray-600">{customer.email || "—"}</td>
-                    <td className="px-3 py-2 text-xs text-gray-600">{customer.phone || "—"}</td>
-                    <td className="px-3 py-2"><span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 border border-green-300">{translateStatus(customer.status)}</span></td>
-                    {autoEnabled && <td className="px-3 py-2">
-                      <button type="button" onClick={() => setVehicleCustomer(customer)} className="flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs">
-                        <Car className="h-3 w-3" /> {customer.vehicleCount}
-                      </button>
-                    </td>}
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => navigate(`/dashboard/people/customers/${customer.id}`)} className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg"><Eye className="w-3 h-3" /></button>
-                        {canEdit && (
-                        <button onClick={() => { setEditingCustomer(customer); setIsModalOpen(true); }} className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg"><Edit2 className="w-3 h-3" /></button>
-                        )}
-                        {canDelete && (
-                        <button onClick={() => void handleDelete(customer.id)} className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg text-red-600"><Trash2 className="w-3 h-3" /></button>
-                        )}
-                      </div>
+                  <tr>
+                    <td colSpan={colCount} className="px-3 py-8 text-center text-xs text-gray-500">
+                      {tr("Yüklənir...", "Loading...")}
                     </td>
                   </tr>
-                ))}
+                ) : customers.length === 0 ? (
+                  <tr>
+                    <td colSpan={colCount} className="px-3 py-8 text-center text-xs text-gray-500">
+                      {tr("Müştəri tapılmadı", "No customers found")}
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedData.map((customer, index) => (
+                    <tr
+                      key={customer.id}
+                      className={`border-b border-gray-200 dark:border-gray-800 ${
+                        index % 2 === 0
+                          ? "bg-white dark:bg-gray-900"
+                          : "bg-gray-50 dark:bg-gray-800/30"
+                      }`}
+                    >
+                      <td className="px-3 py-2 text-xs text-gray-600">{customer.code}</td>
+                      <td className="px-3 py-2 text-xs text-gray-900 dark:text-white">
+                        {customer.name}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-600">{customer.email || "—"}</td>
+                      <td className="px-3 py-2 text-xs text-gray-600">{customer.phone || "—"}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex rounded border border-green-300 bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                          {translateStatus(customer.status)}
+                        </span>
+                      </td>
+                      {showLoyaltyCol && (
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => setLoyaltyCustomer(customer)}
+                            title={tr("Kart / cüzdan", "Card / wallet")}
+                            className="flex max-w-[11rem] flex-col items-start gap-0.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-left text-xs hover:border-[#14b8a6] dark:border-gray-700"
+                          >
+                            <span className="flex items-center gap-1 font-medium text-gray-900 dark:text-white">
+                              <CreditCard className="h-3 w-3 text-[#14b8a6]" />
+                              <span className="truncate font-mono text-[11px]">
+                                {customer.loyaltyCardBarcode || tr("Kart yox", "No card")}
+                              </span>
+                            </span>
+                            <span className="pl-4 text-[10px] text-[#14b8a6]">
+                              {formatCurrency(Number(customer.walletBalance ?? 0))}
+                            </span>
+                          </button>
+                        </td>
+                      )}
+                      {autoEnabled && (
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => setVehicleCustomer(customer)}
+                            className="flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs dark:border-gray-700"
+                          >
+                            <Car className="h-3 w-3" /> {customer.vehicleCount}
+                          </button>
+                        </td>
+                      )}
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          {showLoyaltyCol && (
+                            <button
+                              type="button"
+                              onClick={() => setLoyaltyCustomer(customer)}
+                              title={tr("Loyalty", "Loyalty")}
+                              className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs dark:border-gray-700"
+                            >
+                              <CreditCard className="h-3 w-3 text-[#14b8a6]" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() =>
+                              navigate(`/dashboard/people/customers/${customer.id}`)
+                            }
+                            className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs dark:border-gray-700"
+                          >
+                            <Eye className="h-3 w-3" />
+                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => {
+                                setEditingCustomer(customer);
+                                setIsModalOpen(true);
+                              }}
+                              className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs dark:border-gray-700"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => void handleDelete(customer.id)}
+                              className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs text-red-600 dark:border-gray-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+          <div className="border-t border-gray-200 px-3 py-3 dark:border-gray-800">
             <DataPagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -249,12 +403,28 @@ export function PeopleCustomers() {
 
         <AddCustomerModal
           isOpen={isModalOpen}
-          onClose={() => { setIsModalOpen(false); setEditingCustomer(null); }}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingCustomer(null);
+          }}
           onSave={handleSaveCustomer}
           customer={editingCustomer}
           saving={saving}
         />
-        {autoEnabled && <CustomerVehiclesModal customer={vehicleCustomer} onClose={() => setVehicleCustomer(null)} onChanged={() => void loadCustomers()} />}
+        {autoEnabled && (
+          <CustomerVehiclesModal
+            customer={vehicleCustomer}
+            onClose={() => setVehicleCustomer(null)}
+            onChanged={() => void loadCustomers()}
+          />
+        )}
+        {showLoyaltyCol && (
+          <CustomerLoyaltyModal
+            customer={loyaltyCustomer}
+            onClose={() => setLoyaltyCustomer(null)}
+            onChanged={() => void loadCustomers()}
+          />
+        )}
       </div>
     </div>
   );

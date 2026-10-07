@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { fetchSalesBillers, type SalesBillerRow } from "../api/sales";
 import { useAuth } from "../context/AuthContext";
 import { pickDefaultBillerId } from "../lib/salesBiller";
+import { useBranchRevision } from "./useBranchRevision";
 
 export function useSalesBillers(enabled: boolean) {
   const { user, isDemo, isAuthenticated } = useAuth();
+  const branchRevision = useBranchRevision();
   const [billers, setBillers] = useState<SalesBillerRow[]>([]);
   const [defaultBillerId, setDefaultBillerId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,8 +41,9 @@ export function useSalesBillers(enabled: boolean) {
       cancelled = true;
     };
     // Key off stable identity fields — a fresh /auth/me object must not refetch.
+    // branchRevision: POS employee list must follow the selected branch.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- user is read for default pick only
-  }, [enabled, isAuthenticated, isDemo, userId, userEmail]);
+  }, [enabled, isAuthenticated, isDemo, userId, userEmail, branchRevision]);
 
   return { billers, defaultBillerId, loading };
 }

@@ -5,6 +5,7 @@ export const TENANT_RBAC_MODULES = [
   "Stock",
   "Sales",
   "Dining",
+  "Loyalty",
   "Purchases",
   "Finances",
   "People",

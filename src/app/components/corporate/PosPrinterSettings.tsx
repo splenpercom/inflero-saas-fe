@@ -187,8 +187,8 @@ export function PosPrinterSettings({
       const result =
         role === "barcode"
           ? await printBarcodeLabel({
-              barcodeSvgHtml:
-                '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60"><text x="10" y="35" font-size="14">*TEST-BARCODE*</text></svg>',
+              barcodeValue: "TEST-BARCODE-001",
+              productName: "Test product",
               priceLabel: "12.50",
             })
           : await printPosTicket({

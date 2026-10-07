@@ -1,4 +1,4 @@
-import { useCallback, useRef, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, type KeyboardEvent } from "react";
 
 const CODE_LIKE = /^[A-Za-z0-9\-._/]+$/;
 
@@ -14,10 +14,31 @@ export type BarcodeWedgeOptions = {
   maxKeyGapMs?: number;
 };
 
+export type GlobalBarcodeWedgeOptions = BarcodeWedgeOptions & {
+  /**
+   * When false, the document listener stays attached but ignores keys.
+   * Pass a value that updates each render — stored in a ref (no rebind).
+   */
+  enabled?: boolean;
+};
+
 /** True when value looks like a barcode/SKU (not a normal multi-word search). */
 export function isBarcodeLikeCode(value: string): boolean {
   const code = value.trim();
   return code.length >= 4 && CODE_LIKE.test(code) && !/\s/.test(code);
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (target.isContentEditable) return true;
+  return Boolean(target.closest("[contenteditable='true']"));
+}
+
+/** Radix/AlertDialog and custom overlays that declare modality. */
+function isModalBlockingScan(): boolean {
+  return Boolean(document.querySelector("[aria-modal='true']"));
 }
 
 /**
@@ -33,6 +54,8 @@ export function useBarcodeWedge(
   const maxKeyGapMs = opts?.maxKeyGapMs ?? DEFAULT_WEDGE_MAX_KEY_GAP_MS;
   const bufferRef = useRef("");
   const lastKeyAtRef = useRef(0);
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
 
   const reset = useCallback(() => {
     bufferRef.current = "";
@@ -59,7 +82,7 @@ export function useBarcodeWedge(
 
         e.preventDefault();
         e.stopPropagation();
-        onScan(code);
+        void onScanRef.current(code);
         return;
       }
 
@@ -75,8 +98,77 @@ export function useBarcodeWedge(
         reset();
       }
     },
-    [maxKeyGapMs, minLength, onScan, reset],
+    [maxKeyGapMs, minLength, reset],
   );
 
   return { handleKeyDown, reset };
+}
+
+/**
+ * Always-ready POS scan: one document keydown listener, buffer in refs only
+ * (no React state / re-renders while the gun types).
+ *
+ * Skips when focus is in an input/textarea/select (those use useBarcodeWedge),
+ * when enabled=false, or when an aria-modal overlay is open.
+ * On a consumed scan, preventDefault so Enter does not activate a focused button.
+ */
+export function useGlobalBarcodeWedge(
+  onScan: (code: string) => void | Promise<unknown>,
+  opts?: GlobalBarcodeWedgeOptions,
+) {
+  const minLength = opts?.minLength ?? 4;
+  const maxKeyGapMs = opts?.maxKeyGapMs ?? DEFAULT_WEDGE_MAX_KEY_GAP_MS;
+  const bufferRef = useRef("");
+  const lastKeyAtRef = useRef(0);
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
+  const enabledRef = useRef(opts?.enabled !== false);
+  enabledRef.current = opts?.enabled !== false;
+
+  useEffect(() => {
+    const reset = () => {
+      bufferRef.current = "";
+      lastKeyAtRef.current = 0;
+    };
+
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (!enabledRef.current) return;
+      if (e.defaultPrevented) return;
+      if (isEditableTarget(e.target)) return;
+      if (isModalBlockingScan()) {
+        reset();
+        return;
+      }
+
+      const now = Date.now();
+      const elapsed = now - lastKeyAtRef.current;
+
+      if (e.key === "Enter") {
+        const code = bufferRef.current.trim();
+        reset();
+        if (code.length < minLength || !isBarcodeLikeCode(code)) return;
+
+        // Stop Enter from activating a focused button / default action.
+        e.preventDefault();
+        e.stopPropagation();
+        void onScanRef.current(code);
+        return;
+      }
+
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (elapsed > maxKeyGapMs) bufferRef.current = "";
+        bufferRef.current += e.key;
+        lastKeyAtRef.current = now;
+        return;
+      }
+
+      if (e.key === "Backspace" || e.key === "Delete" || e.key === "Escape") {
+        reset();
+      }
+    };
+
+    // Capture so we see keys even when a button holds focus, before click handlers.
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [minLength, maxKeyGapMs]);
 }

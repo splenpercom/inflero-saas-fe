@@ -1,9 +1,15 @@
+import JsBarcode from "jsbarcode";
 import type { Language } from "../i18n/translations";
 import { pickLang } from "../i18n/pickLang";
 import type { PosOrderDetail } from "../api/sales";
 import { formatDateTime } from "./dateFormat";
 import { loadPosPrinterSettings } from "./posPrinterSettings";
-import { ensureQzConnected, isQzAvailable, qzPrintHtml } from "./qzTrayClient";
+import {
+  ensureQzConnected,
+  isQzAvailable,
+  qzPrintBarcodeLabelHtml,
+  qzPrintHtml,
+} from "./qzTrayClient";
 import {
   buildDailySalesSummaryHtml,
   buildThermalReceiptHtml,
@@ -75,7 +81,7 @@ function browserPrintHtml(html: string): Promise<void> {
     iframe.setAttribute("aria-hidden", "true");
     // Non-zero size off-screen — some browsers skip print on 0×0 frames.
     iframe.style.cssText =
-      "position:fixed;left:-10000px;top:0;width:800px;height:1200px;border:0;opacity:0;pointer-events:none;z-index:-1;";
+      "position:fixed;left:-10000px;top:0;width:900px;height:500px;border:0;opacity:0;pointer-events:none;z-index:-1;";
     document.body.appendChild(iframe);
 
     const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
@@ -333,64 +339,189 @@ export function formatBarcodePriceLabel(price: string): string {
   return trimmed;
 }
 
+/** Physical slip: 20×30mm printed landscape → 30mm wide × 20mm tall. */
+export const BARCODE_LABEL_WIDTH_MM = 30;
+export const BARCODE_LABEL_HEIGHT_MM = 20;
+
+/** Single print-optimized CODE128 SVG used by every product label path. */
+export function buildBarcodeLabelSvgHtml(barcodeValue: string): string {
+  const code = barcodeValue.trim();
+  if (!code) {
+    throw new Error("Barcode value is required");
+  }
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  JsBarcode(svg, code, {
+    format: "CODE128",
+    // Dense bars so CSS can stretch SVG across full 30mm width without looking sparse.
+    width: 1.2,
+    height: 28,
+    displayValue: true,
+    fontSize: 9,
+    margin: 0,
+    textMargin: 1,
+    background: "#ffffff",
+    lineColor: "#000000",
+  });
+  return svg.outerHTML;
+}
+
+/**
+ * Compact landscape product label: product name + barcode + price only.
+ * Page is fixed 30×20mm so the barcode stretches the full long edge of the slip.
+ */
 export function buildBarcodeLabelHtml(opts: {
   barcodeSvgHtml: string;
+  productName?: string;
   priceLabel: string;
 }): string {
+  const name = escapePrintHtml((opts.productName ?? "").trim());
   const price = escapePrintHtml(opts.priceLabel.trim());
+  const w = BARCODE_LABEL_WIDTH_MM;
+  const h = BARCODE_LABEL_HEIGHT_MM;
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Barcode</title>
+    <title></title>
     <style>
-      body {
+      @page {
+        size: ${w}mm ${h}mm;
         margin: 0;
-        padding: 8px;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: ${w}mm;
+        height: ${h}mm;
+        background: #fff;
+        color: #111;
+        font-family: Arial, Helvetica, sans-serif;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body {
+        display: flex;
+        align-items: stretch;
+        justify-content: stretch;
+        overflow: hidden;
+      }
+      .label {
+        width: ${w}mm;
+        height: ${h}mm;
+        padding: 0.6mm 1mm;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        font-family: Arial, sans-serif;
-      }
-      .barcode-container {
+        align-items: stretch;
+        justify-content: space-between;
+        gap: 0.3mm;
         text-align: center;
-        padding: 8px;
+        overflow: hidden;
+      }
+      .name {
+        font-size: 6pt;
+        font-weight: 700;
+        line-height: 1.05;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .barcode-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        line-height: 0;
+      }
+      .barcode-wrap svg {
+        display: block;
+        width: 100% !important;
+        max-width: 100%;
+        height: 100% !important;
+        max-height: 11mm;
       }
       .price {
-        margin-top: 6px;
-        font-size: 14px;
+        font-size: 7pt;
         font-weight: 700;
-        color: #111;
+        line-height: 1.05;
+        flex-shrink: 0;
       }
       @media print {
-        body { padding: 0; }
+        html, body {
+          width: ${w}mm;
+          height: ${h}mm;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="barcode-container">
-      ${opts.barcodeSvgHtml}
+    <div class="label">
+      ${name ? `<div class="name">${name}</div>` : ""}
+      <div class="barcode-wrap">${opts.barcodeSvgHtml}</div>
       ${price ? `<div class="price">${price}</div>` : ""}
     </div>
   </body>
 </html>`;
 }
 
-/** Print a product barcode label to the mapped barcode printer (QZ or browser). */
+/**
+ * Print a product barcode label (create / edit / details / settings test).
+ * Always: 30×20mm landscape · product name · barcode · price.
+ */
 export async function printBarcodeLabel(opts: {
-  barcodeSvgHtml: string;
+  barcodeValue: string;
+  productName: string;
   priceLabel: string;
   forceBrowser?: boolean;
 }): Promise<PosPrintResult> {
+  const barcodeSvgHtml = buildBarcodeLabelSvgHtml(opts.barcodeValue);
   const html = buildBarcodeLabelHtml({
-    barcodeSvgHtml: opts.barcodeSvgHtml,
+    barcodeSvgHtml,
+    productName: opts.productName,
     priceLabel: opts.priceLabel,
   });
-  return printThermalHtml({
-    role: "barcode",
-    html,
-    forceBrowser: opts.forceBrowser,
+
+  return enqueuePrint(async () => {
+    const settings = loadPosPrinterSettings();
+    const printer = resolvePosPrinterName("barcode");
+
+    const wantQz =
+      !opts.forceBrowser && settings.preferQz && !!printer;
+
+    if (wantQz) {
+      const qzUp = await withTimeout(
+        isQzAvailable().catch(() => false),
+        8000,
+        "QZ availability",
+      ).catch(() => false);
+      if (qzUp) {
+        try {
+          await withTimeout(ensureQzConnected(), 8000, "QZ connect");
+          await withTimeout(
+            qzPrintBarcodeLabelHtml(printer, html, {
+              widthMm: BARCODE_LABEL_WIDTH_MM,
+              heightMm: BARCODE_LABEL_HEIGHT_MM,
+            }),
+            20000,
+            "QZ barcode print",
+          );
+          return { channel: "qz" as const, printer };
+        } catch {
+          /* browser fallback */
+        }
+      }
+    }
+
+    await browserPrintHtml(html);
+    return {
+      channel: "browser" as const,
+      printer: printer || undefined,
+      fellBackFromQz: wantQz,
+    };
   });
 }
 
@@ -547,7 +678,11 @@ export function posOrderToThermalPayload(
     serviceFee: parseMoney(order.serviceFee),
     tableHourlyCharge: includeHourly ? hourlyCharge : 0,
     discount: parseMoney(order.discount),
-    discountLabel: t("Endirim", "Discount"),
+    discountLabel:
+      parseMoney(order.loyaltyRedeemAmount) > 0
+        ? t("Loyalty endirim", "Loyalty discount")
+        : t("Endirim", "Discount"),
+    cashbackEarned: parseMoney(order.loyaltyCashbackEarned),
     total,
     paid,
     amountDue,

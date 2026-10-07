@@ -98,6 +98,8 @@ export interface PosOrderDetail {
   shipping: string | null;
   taxPercent: string | null;
   discount: string | null;
+  loyaltyRedeemAmount?: string | null;
+  loyaltyCashbackEarned?: string | null;
   serviceFee?: string | null;
   tableHourlyRate?: string | null;
   tableHourlyStartedAt?: string | null;
@@ -275,6 +277,8 @@ export type CreatePosOrderBody = {
   tableHourlyRate?: number | null;
   /** Dining staff passcode (4 digits) when required. */
   staffPasscode?: string | null;
+  /** LOYALTY: earn or redeem (never both). Discount is manual portion only when redeeming. */
+  loyaltyMode?: "earn" | "redeem" | null;
 };
 
 export type CreateInvoiceBody = {
