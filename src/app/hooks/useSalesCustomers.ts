@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchCustomers, type PeopleCustomer } from "../api/people";
 import { useAuth } from "../context/AuthContext";
+import { useBranchRevision } from "./useBranchRevision";
 
 export function useSalesCustomers(search: string, enabled = true) {
   const { isDemo, isAuthenticated } = useAuth();
+  const branchRevision = useBranchRevision();
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +23,7 @@ export function useSalesCustomers(search: string, enabled = true) {
     } finally {
       setLoading(false);
     }
-  }, [enabled, isDemo, isAuthenticated, search]);
+  }, [enabled, isDemo, isAuthenticated, search, branchRevision]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 300);

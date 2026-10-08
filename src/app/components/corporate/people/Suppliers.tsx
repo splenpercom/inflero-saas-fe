@@ -13,6 +13,7 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 import { useAuth } from "../../../context/AuthContext";
 import { useModulePermissions } from "../../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../../hooks/useBranchRevision";
+import { useBranch } from "../../../context/BranchContext";
 import {
   fetchSuppliers,
   createSupplier,
@@ -33,6 +34,8 @@ export function Suppliers() {
   const { isDemo, isAuthenticated } = useAuth();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
   const branchRevision = useBranchRevision();
+  const { isGlobalMode, branchManagementEnabled } = useBranch();
+  const canEditBranchPeople = !branchManagementEnabled || !isGlobalMode;
   const askConfirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -174,6 +177,15 @@ export function Suppliers() {
           </p>
         </div>
 
+        {!canEditBranchPeople && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            {tr(
+              "Filialın təchizatçılarını görmək və redaktə etmək üçün yuxarıdan filial seçin.",
+              "Select a branch in the header to view and manage suppliers for that branch.",
+            )}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 mb-4">
           <button
             onClick={() => alert(tr("PDF ixrac funksiyası tezliklə əlavə olunacaq", "Export PDF functionality coming soon"))}
@@ -197,7 +209,7 @@ export function Suppliers() {
           >
             <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
           </button>
-          {canCreate && (
+          {canCreate && canEditBranchPeople && (
           <button
             onClick={handleAddSupplier}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"

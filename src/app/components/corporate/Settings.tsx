@@ -75,8 +75,9 @@ export function Settings() {
   const { canView, canEdit } = useModulePermissions("Settings");
   const { isGlobalMode, branchManagementEnabled, selectedBranch } = useBranch();
   const branchRevision = useBranchRevision();
-  /** Add-ons are per-branch; BM-off resolves sole store via API. */
-  const canEditBranchAddons = !branchManagementEnabled || !isGlobalMode;
+  /** Company profile + add-ons are per-branch; BM-off resolves sole store via API. Printers stay PC-local. */
+  const canEditBranchSettings = !branchManagementEnabled || !isGlobalMode;
+  const canEditBranchAddons = canEditBranchSettings;
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
   // Nav: sidebar section selection (Company group is collapsible)
@@ -381,11 +382,11 @@ export function Settings() {
     if (!requireSignedIn()) return;
     if (!canEdit) return;
 
-    if (activeSection === "addons" && !canEditBranchAddons) {
+    if (activeSection !== "printers" && !canEditBranchSettings) {
       notifyWarning(
         pt(
-          "Select a branch to manage add-ons for that branch.",
-          "Əlavələri idarə etmək üçün filial seçin.",
+          "Select a branch to manage settings for that branch.",
+          "Parametrləri idarə etmək üçün filial seçin.",
         ),
       );
       return;
@@ -1009,8 +1010,8 @@ export function Settings() {
                   {!canEditBranchAddons && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                       {pt(
-                        "All-branches mode: pick a branch to manage add-ons. Company settings can still be saved from other sections.",
-                        "Bütün filiallar rejimi: əlavələr üçün filial seçin. Şirkət parametrlərini digər bölmələrdən saxlamaq olar.",
+                        "All-branches mode: pick a branch to manage company settings and add-ons for that branch.",
+                        "Bütün filiallar rejimi: şirkət parametrləri və əlavələr üçün filial seçin.",
                       )}
                     </div>
                   )}
@@ -1459,6 +1460,14 @@ export function Settings() {
         {/* Action Buttons */}
         {canEdit && activeSection !== "printers" && (
           <div className="flex items-center justify-end gap-3 pt-3">
+            {!canEditBranchSettings && (
+              <p className="mr-auto text-[11px] text-amber-700 dark:text-amber-300">
+                {pt(
+                  "Select a branch in the header to save company settings for that branch.",
+                  "Filial parametrlərini saxlamaq üçün yuxarıdan filial seçin.",
+                )}
+              </p>
+            )}
             <button
               type="button"
               onClick={handleCancel}
@@ -1470,7 +1479,7 @@ export function Settings() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !canEditBranchSettings}
               className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors shadow-lg shadow-[#14b8a6]/20 disabled:opacity-50 flex items-center gap-1.5"
             >
               {saving && <Loader2 className="w-3 h-3 animate-spin" />}

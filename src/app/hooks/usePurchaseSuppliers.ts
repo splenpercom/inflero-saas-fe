@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchSuppliers, type PeopleSupplier } from "../api/people";
 import { useAuth } from "../context/AuthContext";
+import { useBranchRevision } from "./useBranchRevision";
 
 export function usePurchaseSuppliers(search: string, enabled = true) {
   const { isDemo, isAuthenticated } = useAuth();
+  const branchRevision = useBranchRevision();
   const [suppliers, setSuppliers] = useState<PeopleSupplier[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +23,7 @@ export function usePurchaseSuppliers(search: string, enabled = true) {
     } finally {
       setLoading(false);
     }
-  }, [enabled, isDemo, isAuthenticated, search]);
+  }, [enabled, isDemo, isAuthenticated, search, branchRevision]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 300);
