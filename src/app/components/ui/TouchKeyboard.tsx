@@ -10,6 +10,10 @@ export type TouchKeyboardProps = {
   onChange: (next: string) => void;
   onClose: () => void;
   title?: string;
+  /** When mode is numpad, allow leading "-" (e.g. optics SPH/CYL). */
+  allowNegative?: boolean;
+  /** Overlay z-index class; raise above modals (default z-[70]). */
+  zClassName?: string;
 };
 
 const NUMPAD_KEYS: string[][] = [
@@ -57,6 +61,8 @@ function TouchKeyboard({
   onChange,
   onClose,
   title,
+  allowNegative = false,
+  zClassName = "z-[70]",
 }: TouchKeyboardProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
@@ -113,7 +119,10 @@ function TouchKeyboard({
         const next = value.slice(0, -1);
         onChange(
           mode === "numpad"
-            ? sanitizeNumericTyping(next, { allowDecimal: true })
+            ? sanitizeNumericTyping(next, {
+                allowDecimal: true,
+                allowNegative,
+              })
             : next,
         );
         return;
@@ -126,6 +135,13 @@ function TouchKeyboard({
         onChange(`${value} `);
         return;
       }
+      if (key === "+/-" && mode === "numpad" && allowNegative) {
+        const next = value.startsWith("-") ? value.slice(1) : `-${value}`;
+        onChange(
+          sanitizeNumericTyping(next, { allowDecimal: true, allowNegative: true }),
+        );
+        return;
+      }
 
       let ch = key;
       if (mode === "full" && isLetterKey(key)) {
@@ -135,11 +151,14 @@ function TouchKeyboard({
       const next = `${value}${ch}`;
       onChange(
         mode === "numpad"
-          ? sanitizeNumericTyping(next, { allowDecimal: true })
+          ? sanitizeNumericTyping(next, {
+              allowDecimal: true,
+              allowNegative,
+            })
           : next,
       );
     },
-    [mode, onChange, onClose, shift, value],
+    [allowNegative, mode, onChange, onClose, shift, value],
   );
 
   const onPointerDownHandle = (e: ReactPointerEvent) => {
@@ -206,7 +225,7 @@ function TouchKeyboard({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] pointer-events-none">
+    <div className={cn("fixed inset-0 pointer-events-none", zClassName)}>
       <div
         ref={panelRef}
         className="pointer-events-auto absolute w-[min(100vw-16px,560px)] rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 shadow-2xl"
@@ -216,6 +235,8 @@ function TouchKeyboard({
           width: mode === "numpad" ? 320 : undefined,
           maxWidth: mode === "numpad" ? 320 : 560,
         }}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <div
           className="flex items-center justify-between gap-2 px-3 py-2 cursor-grab active:cursor-grabbing border-b border-gray-200 dark:border-gray-700 rounded-t-xl bg-white dark:bg-gray-800"
@@ -249,13 +270,24 @@ function TouchKeyboard({
                   {row.map((k) => renderKey(k, "text-base"))}
                 </div>
               ))}
-              <div className="grid grid-cols-2 gap-1.5 pt-1">
-                {renderKey("Clear", "text-red-600 dark:text-red-400")}
-                {renderKey(
-                  "Done",
-                  "bg-[#14b8a6] text-white border-[#14b8a6] dark:bg-[#0d9488] hover:opacity-90",
-                )}
-              </div>
+              {allowNegative ? (
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  {renderKey("+/-", "text-base")}
+                  {renderKey("Clear", "text-red-600 dark:text-red-400")}
+                  {renderKey(
+                    "Done",
+                    "bg-[#14b8a6] text-white border-[#14b8a6] dark:bg-[#0d9488] hover:opacity-90",
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  {renderKey("Clear", "text-red-600 dark:text-red-400")}
+                  {renderKey(
+                    "Done",
+                    "bg-[#14b8a6] text-white border-[#14b8a6] dark:bg-[#0d9488] hover:opacity-90",
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <>

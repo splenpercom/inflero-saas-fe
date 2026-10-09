@@ -81,6 +81,38 @@ export interface PosOrderPaymentRow {
   reference: string | null;
 }
 
+export type OpticsEyeValues = {
+  sph?: string;
+  cyl?: string;
+  ax?: string;
+  dpp?: string;
+  height?: string;
+  description?: string;
+  /** @deprecated legacy */
+  axis?: string;
+  /** @deprecated legacy */
+  add?: string;
+  /** @deprecated legacy */
+  pd?: string;
+};
+
+export type OpticsPrescriptionSection = {
+  right?: OpticsEyeValues;
+  left?: OpticsEyeValues;
+  /** @deprecated legacy — use right */
+  od?: OpticsEyeValues;
+  /** @deprecated legacy — use left */
+  os?: OpticsEyeValues;
+  productId?: string | null;
+  productName?: string | null;
+};
+
+export type OpticsPrescriptionMeta = {
+  long?: OpticsPrescriptionSection;
+  short?: OpticsPrescriptionSection;
+  extra?: OpticsPrescriptionSection;
+};
+
 export interface PosOrderDetail {
   id: string;
   reference: string;
@@ -131,6 +163,8 @@ export interface PosOrderDetail {
   items: PosOrderLineItem[];
   /** Present when source === WEB */
   web?: PosOrderWebMeta | null;
+  /** OPTICS prescription snapshot when present. */
+  opticsMeta?: OpticsPrescriptionMeta | null;
   /** Linked sales invoice when one exists for this order. */
   invoiceId?: string | null;
 }
@@ -279,6 +313,8 @@ export type CreatePosOrderBody = {
   staffPasscode?: string | null;
   /** LOYALTY: earn or redeem (never both). Discount is manual portion only when redeeming. */
   loyaltyMode?: "earn" | "redeem" | null;
+  /** OPTICS: prescription snapshot. */
+  opticsMeta?: OpticsPrescriptionMeta | null;
 };
 
 export type CreateInvoiceBody = {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car, Printer, ChefHat, Loader2, Clock } from "lucide-react";
+import { X, User, Calendar, Package, FileText, CreditCard, UserCheck, Car, Printer, ChefHat, Loader2, Clock, Glasses } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -20,7 +20,17 @@ import {
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { APP_LOGO_LIGHT } from "../../lib/branding";
 import { getCompanyLogoUrl } from "../../lib/userDisplay";
-import { printPosOrderTicket } from "../../lib/posPrint";
+import { printOpticsPrescription, printPosOrderTicket } from "../../lib/posPrint";
+import {
+  OPTICS_EYE_FIELDS,
+  OPTICS_EYE_SIDES,
+  OPTICS_FIELD_LABELS,
+  OPTICS_SECTION_KEYS,
+  OPTICS_SECTION_LABELS,
+  OPTICS_SIDE_LABELS,
+  normalizeOpticsMeta,
+  opticsMetaHasContent,
+} from "../../../modules/optics/opticsTypes";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { usePosStaffPasscodeGate } from "../../hooks/usePosStaffPasscodeGate";
@@ -59,6 +69,7 @@ export function SaleDetailModal({
   const { language } = useLanguage();
   const { user, hasModule } = useAuth();
   const diningEnabled = hasModule("DINING");
+  const opticsEnabled = hasModule("OPTICS");
   const { canView: canViewSales } = useModulePermissions("Sales");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const {
@@ -71,7 +82,7 @@ export function SaleDetailModal({
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
-  const [printing, setPrinting] = useState<"receipt" | "kot" | null>(null);
+  const [printing, setPrinting] = useState<"receipt" | "kot" | "prescription" | null>(null);
   const [finalizePaymentMethod, setFinalizePaymentMethod] = useState<PosUiPaymentMethod>("cash");
   const [finalizePaid, setFinalizePaid] = useState(true);
   const [receiptChoiceOpen, setReceiptChoiceOpen] = useState(false);
@@ -291,6 +302,28 @@ export function SaleDetailModal({
     }
   };
 
+  const handlePrintPrescription = async () => {
+    if (!order || isDemo || !opticsEnabled) return;
+    if (!order.opticsMeta || !opticsMetaHasContent(order.opticsMeta)) return;
+    setPrinting("prescription");
+    try {
+      const result = await printOpticsPrescription({
+        order,
+        language,
+        companyName: user?.tenant?.name?.trim() || "Inflero",
+      });
+      notifySuccess(
+        result.channel === "qz"
+          ? tr(`Çap edildi → ${result.printer}`, `Printed → ${result.printer}`)
+          : tr("Brauzer çap dialoqu açıldı", "Browser print dialog opened"),
+      );
+    } catch (err) {
+      notifyFromError(err, tr("Çap alınmadı", "Print failed"));
+    } finally {
+      setPrinting(null);
+    }
+  };
+
   const handlePrintBillOnly = async () => {
     if (!order || isDemo) return;
     setReceiptChoiceOpen(false);
@@ -431,6 +464,24 @@ export function SaleDetailModal({
                   )}
                   {tr("Qəbz", "Receipt")}
                 </button>
+                {opticsEnabled &&
+                  order.opticsMeta &&
+                  opticsMetaHasContent(order.opticsMeta) && (
+                  <button
+                    type="button"
+                    onClick={() => void handlePrintPrescription()}
+                    disabled={!!printing || emptyAndPrintBusy || isDemo}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg disabled:opacity-50"
+                    title={tr("Resept çap et", "Print Prescription")}
+                  >
+                    {printing === "prescription" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Glasses className="w-3.5 h-3.5" />
+                    )}
+                    {tr("Resept", "Rx")}
+                  </button>
+                )}
                 {diningEnabled && (
                   <button
                     type="button"
@@ -548,6 +599,78 @@ export function SaleDetailModal({
                   </div>
                 )}
               </div>
+
+              {opticsEnabled &&
+                order.opticsMeta &&
+                opticsMetaHasContent(order.opticsMeta) && (
+                <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <Glasses className="w-4 h-4 text-[#14b8a6]" />
+                    {tr("Resept", "Prescription", "Рецепт")}
+                  </h3>
+                  <div className="space-y-3">
+                    {(() => {
+                      const meta = normalizeOpticsMeta(order.opticsMeta);
+                      return OPTICS_SECTION_KEYS.map((key) => {
+                        const section = meta[key]!;
+                        const label = OPTICS_SECTION_LABELS[key];
+                        return (
+                          <div
+                            key={key}
+                            className="rounded-lg border border-gray-200 dark:border-gray-700 p-2.5"
+                          >
+                            <div className="mb-1.5 flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                                {tr(label.az, label.en, label.ru)}
+                              </span>
+                              {section.productName ? (
+                                <span className="text-[11px] text-gray-600 dark:text-gray-400 truncate">
+                                  {section.productName}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[440px] text-[11px]">
+                                <thead>
+                                  <tr className="text-gray-500">
+                                    <th className="py-1 pr-2 text-left font-medium" />
+                                    {OPTICS_EYE_FIELDS.map((f) => (
+                                      <th key={f} className="py-1 px-1 font-medium">
+                                        {f === "description"
+                                          ? tr("Məlumat", "Description", "Информация")
+                                          : f === "height"
+                                            ? tr("Height", "Height", "Высота")
+                                            : OPTICS_FIELD_LABELS[f]}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {OPTICS_EYE_SIDES.map((eye) => {
+                                    const side = OPTICS_SIDE_LABELS[eye];
+                                    return (
+                                      <tr key={eye} className="text-gray-900 dark:text-white">
+                                        <td className="py-1 pr-2 font-semibold whitespace-nowrap">
+                                          {tr(side.az, side.en, side.ru)}
+                                        </td>
+                                        {OPTICS_EYE_FIELDS.map((f) => (
+                                          <td key={f} className="py-1 px-1 text-center">
+                                            {section[eye]?.[f]?.trim() || "—"}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              )}
 
               <div className="glass-card p-4 rounded-xl border border-white/20 dark:border-white/10">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">

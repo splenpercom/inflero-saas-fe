@@ -35,6 +35,7 @@ import {
   Bell,
   Truck,
   Clock,
+  Glasses,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -58,12 +59,17 @@ import {
   type CustomerVehicle,
   type PeopleCustomer,
 } from "../../api/people";
-import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, startPosOrderHourlyTimer, updatePosOrder, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
+import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, startPosOrderHourlyTimer, updatePosOrder, type OpticsPrescriptionMeta, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import { lookupLoyaltyCard } from "../../api/loyalty";
 import {
   LoyaltyEarnRedeemDialog,
   type LoyaltyDialogInfo,
 } from "../../../modules/loyalty/LoyaltyEarnRedeemDialog";
+import { OpticsPrescriptionDialog } from "../../../modules/optics/OpticsPrescriptionDialog";
+import {
+  normalizeOpticsMeta,
+  opticsMetaHasContent,
+} from "../../../modules/optics/opticsTypes";
 import { fetchDiningTables, type DiningTable } from "../../api/dining";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { useSalesBillers } from "../../hooks/useSalesBillers";
@@ -1033,6 +1039,7 @@ export function CorporatePOS() {
   const autoEnabled = hasModule("AUTO");
   const diningEnabled = hasModule("DINING");
   const loyaltyEnabled = hasModule("LOYALTY");
+  const opticsEnabled = hasModule("OPTICS");
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const { canCreate, canEdit } = useModulePermissions("Sales");
@@ -1097,6 +1104,8 @@ export function CorporatePOS() {
   const [loyaltyRatePercent, setLoyaltyRatePercent] = useState<number | null>(null);
   const [loyaltyDialogOpen, setLoyaltyDialogOpen] = useState(false);
   const [loyaltyDialogInfo, setLoyaltyDialogInfo] = useState<LoyaltyDialogInfo | null>(null);
+  const [opticsMeta, setOpticsMeta] = useState<OpticsPrescriptionMeta | null>(null);
+  const [opticsDialogOpen, setOpticsDialogOpen] = useState(false);
   const [shippingInput, setShippingInput] = useState("");
   const [serviceFeeInput, setServiceFeeInput] = useState("");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
@@ -1538,6 +1547,8 @@ export function CorporatePOS() {
       } else {
         setAppliedDiscount(null);
       }
+      if (detail.opticsMeta) setOpticsMeta(normalizeOpticsMeta(detail.opticsMeta));
+      else setOpticsMeta(null);
       setPendingQrPortalOpen(false);
     },
     [],
@@ -1613,6 +1624,8 @@ export function CorporatePOS() {
     }
     if (detail.vehicleId) setSelectedVehicleId(detail.vehicleId);
     if (detail.mileageAtService != null) setMileageInput(String(detail.mileageAtService));
+    if (detail.opticsMeta) setOpticsMeta(normalizeOpticsMeta(detail.opticsMeta));
+    else setOpticsMeta(null);
   },
   []);
 
@@ -2783,6 +2796,8 @@ export function CorporatePOS() {
     setHourlyEndedAt(null);
     setSelectedCustomerId("");
     clearLoyaltySelection();
+    setOpticsMeta(null);
+    setOpticsDialogOpen(false);
     setSelectedVehicleId("");
     setMileageInput("");
     setSelectedBillerId(defaultBillerId || "");
@@ -3056,6 +3071,9 @@ export function CorporatePOS() {
     // Manual discount only; server adds loyalty redeem when loyaltyMode=redeem.
     discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
     ...(loyaltyMode ? { loyaltyMode } : {}),
+    ...(opticsEnabled && opticsMeta && opticsMetaHasContent(opticsMeta)
+      ? { opticsMeta }
+      : {}),
     items: cart.map((i) => ({
       productId: i.id,
       quantity: i.quantity,
@@ -4174,7 +4192,7 @@ export function CorporatePOS() {
                                 : "text-gray-400 bg-gray-100 dark:bg-gray-800"
                             }`}
                           >
-                            {available < 99 ? `${available}` : "∞"}
+                            {available < 1000 ? `${available}` : "∞"}
                           </span>
                         )}
                       </div>
@@ -4224,7 +4242,7 @@ export function CorporatePOS() {
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 flex flex-col h-full min-h-0">
 
               {/* Order Header */}
-              <div className="shrink-0 flex items-center gap-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
+              <div className="shrink-0 flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
                 <div className="min-w-0 flex-shrink">
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                     {editingOrderId && !suppressEditOrderUi
@@ -4237,7 +4255,7 @@ export function CorporatePOS() {
                       : `${cart.length} ${tr("məhsul", "items")}`}
                   </p>
                 </div>
-                <div className="ml-auto flex items-center gap-1 flex-shrink-0">
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-1 min-w-0">
                   <button
                     type="button"
                     onClick={() => navigate("/dashboard/sales/pos-orders")}
@@ -4277,6 +4295,23 @@ export function CorporatePOS() {
                     >
                       <ChefHat className="w-3.5 h-3.5" />
                       <span className="text-[10px] font-medium hidden sm:inline">{tr("KOT", "KOT")}</span>
+                    </button>
+                  )}
+                  {opticsEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => setOpticsDialogOpen(true)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white shadow-sm transition-all ${
+                        opticsMeta && opticsMetaHasContent(opticsMeta)
+                          ? "bg-[#0f766e] hover:bg-[#0d9488] ring-2 ring-[#14b8a6]/40"
+                          : "bg-[#14b8a6] hover:bg-[#0d9488]"
+                      }`}
+                      title={tr("Resept", "Prescription")}
+                    >
+                      <Glasses className="w-4 h-4" />
+                      <span className="text-[11px] font-semibold">
+                        {tr("Resept", "Prescription")}
+                      </span>
                     </button>
                   )}
                   <button
@@ -5231,6 +5266,30 @@ export function CorporatePOS() {
         }}
         onClose={() => setLoyaltyDialogOpen(false)}
       />
+
+      {opticsEnabled && (
+        <OpticsPrescriptionDialog
+          open={opticsDialogOpen}
+          value={opticsMeta}
+          products={products.map((p) => ({
+            id: p.id,
+            name: p.name,
+            code: p.code,
+            barcode: p.barcode,
+          }))}
+          tr={tr}
+          onClose={() => setOpticsDialogOpen(false)}
+          onApply={(meta) => {
+            setOpticsMeta(meta);
+            setOpticsDialogOpen(false);
+          }}
+          onTryAddProduct={(picked) => {
+            const product = products.find((p) => p.id === picked.id);
+            if (!product) return false;
+            return addToCart(product);
+          }}
+        />
+      )}
 
       {receipt && (
         <ThermalReceipt

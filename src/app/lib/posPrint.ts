@@ -12,10 +12,13 @@ import {
 } from "./qzTrayClient";
 import {
   buildDailySalesSummaryHtml,
+  buildOpticsPrescriptionHtml,
   buildThermalReceiptHtml,
   type DailySalesSummaryPayload,
+  type OpticsPrescriptionPrintPayload,
   type ThermalReceiptPayload,
 } from "./thermalReceipt";
+import type { OpticsPrescriptionMeta } from "../api/sales";
 
 export type PosPrintRole = "receipt" | "kot" | "bar" | "barcode";
 
@@ -723,4 +726,97 @@ export async function printPosOrderTicket(opts: {
     payload,
     barShowPrices: opts.barShowPrices,
   });
+}
+
+function emptyOpticsEyePrint() {
+  return { sph: "", cyl: "", ax: "", dpp: "", height: "", description: "" };
+}
+
+function opticsMetaToPrintPayload(
+  order: PosOrderDetail,
+  meta: OpticsPrescriptionMeta,
+  opts: { language: Language; companyName: string },
+): OpticsPrescriptionPrintPayload {
+  const t = (az: string, en: string, ru?: string) => pickLang(opts.language, az, en, ru);
+  const orderDate = new Date(order.date);
+  const dateStr = Number.isNaN(orderDate.getTime())
+    ? order.date
+    : formatDateTime(orderDate, opts.language);
+
+  const sectionDefs: Array<{
+    key: keyof OpticsPrescriptionMeta;
+    title: string;
+  }> = [
+    { key: "long", title: t("UZAQ", "LONG", "ДАЛЬ") },
+    { key: "short", title: t("YAXIN", "SHORT", "БЛИЗЬ") },
+    { key: "extra", title: t("ƏLAVƏ", "EXTRA", "ДОП.") },
+  ];
+
+  const rightLabel = t("Sağ", "Right", "Правый");
+  const leftLabel = t("Sol", "Left", "Левый");
+  const descriptionLabel = t("Məlumat", "Description", "Информация");
+  const heightLabel = t("Height", "Height", "Высота");
+
+  const sections = sectionDefs.map(({ key, title }) => {
+    const section = meta[key];
+    const rightSrc = section?.right ?? section?.od;
+    const leftSrc = section?.left ?? section?.os;
+    return {
+      title,
+      productName: section?.productName ?? null,
+      right: {
+        ...emptyOpticsEyePrint(),
+        sph: rightSrc?.sph ?? "",
+        cyl: rightSrc?.cyl ?? "",
+        ax: rightSrc?.ax ?? rightSrc?.axis ?? "",
+        dpp: rightSrc?.dpp ?? rightSrc?.pd ?? "",
+        height: rightSrc?.height ?? "",
+        description: rightSrc?.description ?? rightSrc?.add ?? "",
+      },
+      left: {
+        ...emptyOpticsEyePrint(),
+        sph: leftSrc?.sph ?? "",
+        cyl: leftSrc?.cyl ?? "",
+        ax: leftSrc?.ax ?? leftSrc?.axis ?? "",
+        dpp: leftSrc?.dpp ?? leftSrc?.pd ?? "",
+        height: leftSrc?.height ?? "",
+        description: leftSrc?.description ?? leftSrc?.add ?? "",
+      },
+      rightLabel,
+      leftLabel,
+      descriptionLabel,
+      heightLabel,
+    };
+  });
+
+  return {
+    orderNo: order.reference,
+    date: dateStr,
+    customer: order.customerName?.trim() || t("Anonim", "Anonymous", "Аноним"),
+    companyName: opts.companyName,
+    sections,
+    siteFooter: "https://www.inflero.com/",
+  };
+}
+
+/** Print OPTICS prescription slip (uses receipt printer mapping). Receipt/KOT paths unchanged. */
+export async function printOpticsPrescription(opts: {
+  order: PosOrderDetail;
+  language: Language;
+  companyName: string;
+}): Promise<PosPrintResult> {
+  const meta = opts.order.opticsMeta;
+  if (!meta) {
+    throw new Error("No prescription on this order");
+  }
+  const settings = loadPosPrinterSettings();
+  const payload = opticsMetaToPrintPayload(opts.order, meta, {
+    language: opts.language,
+    companyName: opts.companyName,
+  });
+  const html = buildOpticsPrescriptionHtml(payload, {
+    language: opts.language,
+    paperWidthMm: settings.paperWidthMm,
+  });
+  return printThermalHtml({ role: "receipt", html });
 }

@@ -471,3 +471,140 @@ export function buildDailySalesSummaryHtml(
 </body>
 </html>`;
 }
+
+export type OpticsEyePrintValues = {
+  sph: string;
+  cyl: string;
+  ax: string;
+  dpp: string;
+  height: string;
+  description: string;
+};
+
+export type OpticsPrescriptionPrintSection = {
+  title: string;
+  productName?: string | null;
+  right: OpticsEyePrintValues;
+  left: OpticsEyePrintValues;
+  rightLabel: string;
+  leftLabel: string;
+  descriptionLabel: string;
+  heightLabel: string;
+};
+
+export type OpticsPrescriptionPrintPayload = {
+  orderNo: string;
+  date: string;
+  customer: string;
+  companyName: string;
+  sections: OpticsPrescriptionPrintSection[];
+  siteFooter?: string;
+};
+
+function opticsEyeHasValues(vals: OpticsEyePrintValues): boolean {
+  return [vals.sph, vals.cyl, vals.ax, vals.dpp, vals.height, vals.description].some(
+    (v) => (v ?? "").trim().length > 0,
+  );
+}
+
+function opticsCell(v: string): string {
+  const t = (v ?? "").trim();
+  return t || "—";
+}
+
+/** Prescription-only thermal slip (OPTICS). Stacked layout — wide tables break on 58/80mm. */
+export function buildOpticsPrescriptionHtml(
+  data: OpticsPrescriptionPrintPayload,
+  opts: { language: Language; paperWidthMm?: 58 | 80 },
+): string {
+  const language = opts.language;
+  const paperWidthMm = opts.paperWidthMm ?? 80;
+  const p = (value: string) => receiptPrintText(language, value);
+  const company = p(data.companyName);
+  const title = p(pickLang(language, "Resept", "Prescription", "Рецепт"));
+  const orderL = p(pickLang(language, "Sifaris", "Order", "Заказ"));
+  const dateL = p(pickLang(language, "Tarix", "Date", "Дата"));
+  const customerL = p(pickLang(language, "Musteri", "Customer", "Клиент"));
+  const productL = p(pickLang(language, "Mehsul", "Product", "Товар"));
+  const footer = p(data.siteFooter?.trim() || "https://www.inflero.com/");
+
+  const pair = (leftLabel: string, leftVal: string, rightLabel: string, rightVal: string) => `
+    <div class="rx-pair">
+      <div class="cell"><span class="k">${leftLabel}</span> ${p(opticsCell(leftVal))}</div>
+      <div class="cell"><span class="k">${rightLabel}</span> ${p(opticsCell(rightVal))}</div>
+    </div>`;
+
+  const eyeBlock = (
+    eyeLabel: string,
+    vals: OpticsEyePrintValues,
+    heightLabel: string,
+    descriptionLabel: string,
+  ) => {
+    if (!opticsEyeHasValues(vals)) {
+      return `
+    <div style="font-weight:600;margin:4px 0 2px;">${p(eyeLabel)}</div>
+    <div class="row"><span>—</span></div>`;
+    }
+    return `
+    <div style="font-weight:600;margin:4px 0 2px;">${p(eyeLabel)}</div>
+    ${pair("SPH", vals.sph, "CYL", vals.cyl)}
+    ${pair("AX", vals.ax, "DPP", vals.dpp)}
+    <div class="row"><span class="label">${p(heightLabel)}:</span><span>${p(opticsCell(vals.height))}</span></div>
+    <div class="row"><span class="label">${p(descriptionLabel)}:</span><span>${p(opticsCell(vals.description))}</span></div>`;
+  };
+
+  const sectionHtml = data.sections
+    .map((section) => {
+      const hasProduct = Boolean(section.productName?.trim());
+      const hasAny =
+        hasProduct ||
+        opticsEyeHasValues(section.right) ||
+        opticsEyeHasValues(section.left);
+      if (!hasAny) return "";
+      return `
+    <div class="section-title">${p(section.title)}</div>
+    ${
+      hasProduct
+        ? `<div class="row"><span class="label">${productL}:</span><span>${p(section.productName!)}</span></div>`
+        : ""
+    }
+    ${eyeBlock(section.rightLabel, section.right, section.heightLabel, section.descriptionLabel)}
+    ${eyeBlock(section.leftLabel, section.left, section.heightLabel, section.descriptionLabel)}
+    <div class="divider"></div>`;
+    })
+    .join("");
+
+  const rxCss = `
+  .rx-pair {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    margin: 1px 0;
+    font-size: inherit;
+  }
+  .rx-pair .cell { flex: 1 1 50%; min-width: 0; }
+  .rx-pair .cell .k { font-weight: 400; opacity: 0.85; }
+  `;
+
+  return `<!DOCTYPE html>
+<html lang="${language}">
+<head>
+  <meta charset="utf-8" />
+  <title>${company} - ${title}</title>
+  <style>${thermalReceiptPrintCss(paperWidthMm)}${rxCss}</style>
+</head>
+<body>
+  <div class="center bold big" style="margin:6px 0;">${company}</div>
+  <div class="center bold" style="margin-bottom:6px;">${title}</div>
+  <div class="divider-solid"></div>
+  <div class="row"><span class="label">${orderL}:</span><span>${p(data.orderNo)}</span></div>
+  <div class="row"><span class="label">${dateL}:</span><span>${p(data.date)}</span></div>
+  <div class="row"><span class="label">${customerL}:</span><span>${p(data.customer)}</span></div>
+  <div class="divider-solid"></div>
+  ${sectionHtml || `<div class="center" style="margin:10px 0;">—</div>`}
+  <div class="thanks">
+    <div style="margin-top:3px;">${footer}</div>
+  </div>
+</body>
+</html>`;
+}
