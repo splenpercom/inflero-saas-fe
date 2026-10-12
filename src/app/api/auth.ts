@@ -1,4 +1,11 @@
-import { apiGet, apiPatch, apiPost, getAccessToken, setAccessToken } from "./client";
+import {
+  apiGet,
+  apiPatch,
+  apiPost,
+  clearClientAuthState,
+  getAccessToken,
+  setAccessToken,
+} from "./client";
 
 export const TENANT_MODULE_KEYS = [
   "AUTO",
@@ -107,25 +114,33 @@ export interface UpdateProfileBody {
 }
 
 export async function login(email: string, password: string) {
+  // Drop stale branch/session leftovers before auth so /auth/me cannot fail
+  // with a leftover X-Branch-Store-Id from a previous session.
+  clearClientAuthState();
   const res = await apiPost<{
     success: boolean;
     data: { accessToken: string };
-  }>("/auth/login", { email: email.trim(), password }, { skipAuth: true });
-  setAccessToken(res.data.accessToken);
+  }>("/auth/login", { email: email.trim(), password }, { skipAuth: true, skipBranch: true });
+  const token = res.data?.accessToken;
+  if (!token) {
+    throw new Error("Login succeeded but no access token was returned");
+  }
+  setAccessToken(token);
 }
 
 export async function logout() {
   try {
     if (getAccessToken()) {
-      await apiPost("/auth/logout");
+      await apiPost("/auth/logout", undefined, { skipBranch: true });
     }
   } finally {
-    setAccessToken(null);
+    clearClientAuthState();
   }
 }
 
 export async function fetchMe() {
-  const res = await apiGet<MeResponse>("/auth/me");
+  // Never scope /auth/me by branch — stale branch headers break re-login.
+  const res = await apiGet<MeResponse>("/auth/me", { skipBranch: true });
   return res.data;
 }
 

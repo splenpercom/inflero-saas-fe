@@ -38,6 +38,44 @@ function readBranchFromStorage(): string | null {
   }
 }
 
+/** Remove every branch selection key (legacy + tenant-scoped). */
+export function clearAllBranchStorage(): void {
+  branchStoreId = null;
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key === BRANCH_KEY || key.startsWith(`${BRANCH_KEY}:`))) {
+        toRemove.push(key);
+      }
+    }
+    for (const key of toRemove) localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("inflero:branch-changed", { detail: { branchId: null } }));
+    window.dispatchEvent(new CustomEvent("inflero:branch-cleared"));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Full client session wipe used on logout and before a fresh login.
+ * Fixes re-login failures caused by leftover tenant-scoped branch IDs.
+ */
+export function clearClientAuthState(): void {
+  accessToken = null;
+  branchTenantId = null;
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+  clearAllBranchStorage();
+}
+
 export function getAccessToken(): string | null {
   if (accessToken) return accessToken;
   try {
@@ -65,6 +103,12 @@ export function getBranchStoreId(): string | null {
 }
 
 export function setBranchStoreId(id: string | null): void {
+  if (id === null) {
+    // Always wipe every branch key — tenant-scoped keys survive a plain removeItem
+    // on the unscoped key after setBranchTenantId(null).
+    clearAllBranchStorage();
+    return;
+  }
   const prev = branchStoreId !== undefined ? branchStoreId : readBranchFromStorage();
   if (prev === id) {
     branchStoreId = id;
@@ -72,9 +116,7 @@ export function setBranchStoreId(id: string | null): void {
   }
   branchStoreId = id;
   try {
-    const key = branchStorageKey();
-    if (id) localStorage.setItem(key, id);
-    else localStorage.removeItem(key);
+    localStorage.setItem(branchStorageKey(), id);
   } catch {
     /* ignore */
   }
@@ -88,6 +130,7 @@ export function setBranchStoreId(id: string | null): void {
 export function setBranchTenantId(tenantId: string | null): void {
   if (branchTenantId === tenantId) return;
   branchTenantId = tenantId;
+  // Invalidate cached branch so the next read uses the new tenant-scoped key.
   branchStoreId = undefined;
 }
 
@@ -123,6 +166,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const res = await fetch(`${API_URL}${path}`, {
     ...rest,
+    // Needed so login Set-Cookie / logout clearCookie work cross-origin
+    // (app.inflero.com → api.inflero.com).
+    credentials: "include",
     headers,
     body:
       body === undefined

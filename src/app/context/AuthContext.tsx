@@ -7,7 +7,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getAccessToken, getBranchStoreId, setBranchStoreId, setBranchTenantId } from "../api/client";
+import {
+  clearClientAuthState,
+  getAccessToken,
+  getBranchStoreId,
+  setBranchStoreId,
+  setBranchTenantId,
+} from "../api/client";
 import { fetchMe, login as apiLogin, logout as apiLogout } from "../api/auth";
 import type { PlatformUser, TenantModuleKey } from "../api/auth";
 import {
@@ -115,8 +121,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string) => {
       exitDemoSession();
       setIsDemo(false);
-      await apiLogin(email, password);
-      await refresh();
+      setUser(null);
+      setModulesLoaded(false);
+      try {
+        await apiLogin(email, password);
+        await refresh();
+      } catch (err) {
+        // Leave no half-session if /auth/me fails after a successful /auth/login.
+        clearClientAuthState();
+        setUser(null);
+        setModulesLoaded(false);
+        throw err;
+      }
     },
     [refresh],
   );
@@ -129,8 +145,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setModulesLoaded(false);
+      setBranchScopeId(null);
+      // clearClientAuthState already ran inside apiLogout finally; keep tenant/branch
+      // memory in sync if logout short-circuited before the API call.
+      clearClientAuthState();
       setBranchTenantId(null);
-      setBranchStoreId(null);
     }
   }, []);
 

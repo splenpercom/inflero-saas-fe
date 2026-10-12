@@ -55,12 +55,14 @@ export function Login() {
       notifySuccess(t("Signed in successfully.", "Uğurla daxil oldunuz.", "Вход выполнен успешно."));
       navigate(from, { replace: true });
     } catch (err) {
+      // Prefer the real API/network message — the old generic "admin approval"
+      // fallback hid stale-session / CORS / Failed to fetch failures.
       notifyFromError(
         err,
         t(
-          "Sign-in failed. Check your credentials or wait for admin approval.",
-          "Daxil olma uğursuz oldu. Məlumatları yoxlayın və ya admin təsdiqini gözləyin.",
-          "Не удалось войти. Проверьте данные или дождитесь подтверждения администратора.",
+          "Sign-in failed. Check your email and password.",
+          "Daxil olma uğursuz oldu. E-poçt və şifrəni yoxlayın.",
+          "Не удалось войти. Проверьте email и пароль.",
         ),
       );
     } finally {
