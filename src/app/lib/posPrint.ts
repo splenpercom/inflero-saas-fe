@@ -602,6 +602,37 @@ function parseMoney(value: string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Qty already sent to kitchen vs current order lines → only newly added amounts. */
+export function kotDeltaItems(
+  items: PosOrderDetail["items"],
+  printedQtyByProduct: Record<string, number>,
+): PosOrderDetail["items"] {
+  const totals = new Map<string, PosOrderDetail["items"][number]>();
+  for (const item of items) {
+    const prev = totals.get(item.productId);
+    if (prev) {
+      totals.set(item.productId, { ...prev, quantity: prev.quantity + item.quantity });
+    } else {
+      totals.set(item.productId, { ...item });
+    }
+  }
+  const delta: PosOrderDetail["items"] = [];
+  for (const [productId, item] of totals) {
+    const already = printedQtyByProduct[productId] ?? 0;
+    const extra = item.quantity - already;
+    if (extra > 0) delta.push({ ...item, quantity: extra });
+  }
+  return delta;
+}
+
+export function qtyByProductId(items: PosOrderDetail["items"]): Record<string, number> {
+  const q: Record<string, number> = {};
+  for (const item of items) {
+    q[item.productId] = (q[item.productId] ?? 0) + item.quantity;
+  }
+  return q;
+}
+
 /** Map a loaded POS order into the shared thermal print payload. */
 export function posOrderToThermalPayload(
   order: PosOrderDetail,
@@ -617,6 +648,9 @@ export function posOrderToThermalPayload(
      * POS/KOT/Bar bills omit it; Sale Detail receipt may include it.
      */
     includeTableHourlyCharge?: boolean;
+    /** Replace order.items for print (e.g. KOT delta / additional items only). */
+    itemsOverride?: PosOrderDetail["items"];
+    kitchenBannerOverride?: string;
   },
 ): ThermalReceiptPayload {
   const language = opts.language;
@@ -634,12 +668,22 @@ export function posOrderToThermalPayload(
         ? t("Nağd", "Cash")
         : order.paymentMethod?.trim() || t("Göstərilməyib", "Not specified");
 
-  const subtotal = order.items.reduce(
+  const printItems = opts.itemsOverride ?? order.items;
+  const subtotal = printItems.reduce(
     (sum, item) => sum + parseMoney(item.price) * item.quantity,
     0,
   );
   const hourlyCharge = parseMoney(order.tableHourlyCharge);
   const includeHourly = opts.includeTableHourlyCharge === true && hourlyCharge > 0;
+  const hourlyRate = parseMoney(order.tableHourlyRate);
+  const hourlyStartedRaw = order.tableHourlyStartedAt ?? null;
+  const hourlyStartedAtLabel = (() => {
+    if (!hourlyStartedRaw) return undefined;
+    const started = new Date(hourlyStartedRaw);
+    return Number.isNaN(started.getTime())
+      ? hourlyStartedRaw
+      : formatDateTime(started, language);
+  })();
   const rawTotal = parseMoney(order.grandTotal);
   const total = includeHourly
     ? rawTotal
@@ -670,7 +714,7 @@ export function posOrderToThermalPayload(
     vehicle: order.vehicleLabel ?? undefined,
     mileage: order.mileageAtService ?? undefined,
     employee: order.billerName?.trim() || "—",
-    items: order.items.map((item) => ({
+    items: printItems.map((item) => ({
       name: item.productName,
       qty: item.quantity,
       price: parseMoney(item.price),
@@ -679,6 +723,12 @@ export function posOrderToThermalPayload(
     subtotal,
     shipping: parseMoney(order.shipping),
     serviceFee: parseMoney(order.serviceFee),
+    ...(hourlyStartedAtLabel
+      ? {
+          ...(hourlyRate > 0 ? { tableHourlyRate: hourlyRate } : {}),
+          tableHourlyStartedAtLabel: hourlyStartedAtLabel,
+        }
+      : {}),
     tableHourlyCharge: includeHourly ? hourlyCharge : 0,
     discount: parseMoney(order.discount),
     discountLabel:
@@ -695,6 +745,9 @@ export function posOrderToThermalPayload(
     companyName: opts.companyName,
     logoSrc: opts.logoSrc,
     siteFooter: "https://www.inflero.com/",
+    ...(opts.kitchenBannerOverride
+      ? { kitchenBannerOverride: opts.kitchenBannerOverride }
+      : {}),
   };
 }
 
@@ -711,6 +764,9 @@ export async function printPosOrderTicket(opts: {
   barShowPrices?: boolean;
   /** Include finalized hourly charge (Sale Detail completed receipt only). */
   includeTableHourlyCharge?: boolean;
+  /** Print only these lines (additional KOT items). */
+  itemsOverride?: PosOrderDetail["items"];
+  kitchenBannerOverride?: string;
 }): Promise<PosPrintResult> {
   const payload = posOrderToThermalPayload(opts.order, {
     language: opts.language,
@@ -719,6 +775,8 @@ export async function printPosOrderTicket(opts: {
     customerPhone: opts.customerPhone,
     printProductBrand: opts.printProductBrand,
     includeTableHourlyCharge: opts.includeTableHourlyCharge === true,
+    itemsOverride: opts.itemsOverride,
+    kitchenBannerOverride: opts.kitchenBannerOverride,
   });
   return printPosTicket({
     role: opts.role,

@@ -173,6 +173,8 @@ export function thermalReceiptLabels(language: Language) {
     subtotal: t("Ara cəm", "Subtotal"),
     shipping: t("Çatdırılma", "Shipping"),
     serviceFee: t("Xidmət haqqı", "Service fee"),
+    tableHourlyRate: t("Saatlıq tarif", "Hourly rate"),
+    tableHourlyStarted: t("Başladı", "Started"),
     tableHourlyCharge: t("Saatlıq ödəniş", "Hourly charge"),
     total: t("CƏMİ", "TOTAL"),
     paid: t("Ödənilib", "Paid"),
@@ -213,6 +215,10 @@ export type ThermalReceiptPayload = {
   subtotal: number;
   shipping: number;
   serviceFee: number;
+  /** Table hourly rate snapshot (Dining add-on), shown while timer is/was started. */
+  tableHourlyRate?: number;
+  /** Formatted timer start time for the receipt. */
+  tableHourlyStartedAtLabel?: string;
   /** Table hourly timer charge (Dining add-on). */
   tableHourlyCharge?: number;
   discount: number;
@@ -230,6 +236,8 @@ export type ThermalReceiptPayload = {
   companyName: string;
   logoSrc?: string | null;
   siteFooter?: string;
+  /** When set, replaces the default kitchen/bar banner (e.g. additional-items KOT). */
+  kitchenBannerOverride?: string;
 };
 
 export type BuildThermalReceiptOpts = {
@@ -277,6 +285,10 @@ export function buildThermalReceiptHtml(
     subtotal: data.subtotal,
     shipping: data.shipping,
     serviceFee: data.serviceFee,
+    tableHourlyRate: data.tableHourlyRate ?? 0,
+    tableHourlyStartedAtLabel: data.tableHourlyStartedAtLabel
+      ? p(data.tableHourlyStartedAtLabel)
+      : undefined,
     tableHourlyCharge: data.tableHourlyCharge ?? 0,
     discount: data.discount,
     total: data.total,
@@ -298,6 +310,8 @@ export function buildThermalReceiptHtml(
     subtotal: p(labels.subtotal),
     shipping: p(labels.shipping),
     serviceFee: p(labels.serviceFee),
+    tableHourlyRate: p(labels.tableHourlyRate),
+    tableHourlyStarted: p(labels.tableHourlyStarted),
     tableHourlyCharge: p(labels.tableHourlyCharge),
     total: p(labels.total),
     paid: p(labels.paid),
@@ -313,7 +327,11 @@ export function buildThermalReceiptHtml(
 
   const company = p(data.companyName);
   const titleSuffix = isBar ? "BAR" : isKitchen ? "KITCHEN" : d.orderNo;
-  const ticketBanner = isBar ? L.barBanner : L.kitchenBanner;
+  const ticketBanner = data.kitchenBannerOverride
+    ? p(data.kitchenBannerOverride)
+    : isBar
+      ? L.barBanner
+      : L.kitchenBanner;
   const ticketCopy = isBar ? L.barCopy : L.kitchenCopy;
   // BAR priced bill keeps BAR banner; kitchen/qty-only bar keep ticket header.
   const headerBanner =
@@ -373,6 +391,8 @@ export function buildThermalReceiptHtml(
   <div class="row"><span class="label">${L.subtotal}:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
   <div class="row"><span class="label">${L.shipping}:</span><span>${d.shipping.toFixed(2)} AZN</span></div>
   ${d.serviceFee > 0 ? `<div class="row"><span class="label">${L.serviceFee}:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
+  ${(d.tableHourlyRate ?? 0) > 0 ? `<div class="row"><span class="label">${L.tableHourlyRate}:</span><span>${(d.tableHourlyRate ?? 0).toFixed(2)} AZN/h</span></div>` : ""}
+  ${d.tableHourlyStartedAtLabel ? `<div class="row"><span class="label">${L.tableHourlyStarted}:</span><span>${d.tableHourlyStartedAtLabel}</span></div>` : ""}
   ${(d.tableHourlyCharge ?? 0) > 0 ? `<div class="row"><span class="label">${L.tableHourlyCharge}:</span><span>${(d.tableHourlyCharge ?? 0).toFixed(2)} AZN</span></div>` : ""}
   ${d.discount > 0 ? `<div class="row"><span class="label">${d.discountLabel}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
   ${(d.cashbackEarned ?? 0) > 0 ? `<div class="row"><span class="label">${language === "az" ? "Cashback qazanıldı" : "Cashback earned"}:</span><span>${(d.cashbackEarned ?? 0).toFixed(2)} AZN</span></div>` : ""}

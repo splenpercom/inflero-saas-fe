@@ -11,6 +11,7 @@ export function useModulePermissions(module: TenantRbacModule) {
       canCreate: hasPermission(module, "create"),
       canEdit: hasPermission(module, "edit"),
       canDelete: hasPermission(module, "delete"),
+      canManage: hasPermission(module, "manage"),
     }),
     [hasPermission, module],
   );

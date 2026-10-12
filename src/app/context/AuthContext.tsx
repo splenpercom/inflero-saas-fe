@@ -38,7 +38,7 @@ interface AuthContextValue {
   refresh: () => Promise<void>;
   modulesLoaded: boolean;
   hasModule: (module: TenantModuleKey) => boolean;
-  hasPermission: (module: string, action?: "view" | "create" | "edit" | "delete") => boolean;
+  hasPermission: (module: string, action?: "view" | "create" | "edit" | "delete" | "manage") => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasPermission = useCallback(
-    (module: string, action: "view" | "create" | "edit" | "delete" = "view") => {
+    (module: string, action: "view" | "create" | "edit" | "delete" | "manage" = "view") => {
       if (isDemoSession()) return true;
       if (!user) return false;
       if (user.isTenantOwner) return true;

@@ -61,6 +61,8 @@ export const userManagementTranslations = {
     create: "Create",
     edit: "Edit",
     delete: "Delete",
+    manage: "Manage",
+    managePaymentsHint: "Sales: manage payments on POS Orders",
     createRole: "Create Role",
     updateRole: "Update Role",
     
@@ -258,6 +260,8 @@ export const userManagementTranslations = {
     create: "Yarat",
     edit: "Redaktə",
     delete: "Sil",
+    manage: "İdarə et",
+    managePaymentsHint: "Satış: POS sifarişlərində ödənişləri idarə et",
     createRole: "Rol Yarat",
     updateRole: "Rol Yenilə",
     
@@ -438,6 +442,8 @@ export const userManagementTranslations = {
     create: "Создать",
     edit: "Редактировать",
     delete: "Удалить",
+    manage: "Управление",
+    managePaymentsHint: "Продажи: управление оплатами заказов POS",
     createRole: "Создать роль",
     updateRole: "Обновить роль",
     newPassword: "Новый пароль",

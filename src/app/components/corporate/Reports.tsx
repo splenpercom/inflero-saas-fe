@@ -70,6 +70,7 @@ const EMPTY_OVERVIEW: ReportsOverview = {
   purchases: "0.00",
   purchasesPaid: "0.00",
   purchasesDebt: "0.00",
+  stockCogs: "0.00",
   avgMonthlyRevenue: null,
   yoyGrowthPercent: null,
 };
@@ -375,6 +376,7 @@ export function Reports() {
       ) : (
         <div ref={reportPdfRef} className="space-y-4">
           <MetricCards
+            cols={stockEnabled ? "lg:grid-cols-4" : undefined}
             cards={[
               {
                 label: pt("Total Income", "Ümumi Gəlir"),
@@ -397,6 +399,17 @@ export function Reports() {
                 color: "text-[#14b8a6]",
                 bgColor: "bg-[#14b8a6]/10 dark:bg-[#14b8a6]/20",
               },
+              ...(stockEnabled
+                ? [
+                    {
+                      label: pt("COGS", "Maya dəyəri"),
+                      value: moneyLabel(overview.stockCogs),
+                      icon: Package,
+                      color: "text-violet-600 dark:text-violet-400",
+                      bgColor: "bg-violet-50 dark:bg-violet-900/20",
+                    },
+                  ]
+                : []),
             ]}
           />
           <MetricCards

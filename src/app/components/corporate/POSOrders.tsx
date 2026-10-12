@@ -283,7 +283,7 @@ export function POSOrders() {
     confirmPasscode,
   } = usePosStaffPasscodeGate();
   const { billers } = useSalesBillers(isAuthenticated || isDemo);
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Sales");
+  const { canView, canCreate, canEdit, canDelete, canManage } = useModulePermissions("Sales");
   const branchRevision = useBranchRevision();
   const prefersTouchKeyboard = usePrefersTouchKeyboard();
   const lastPointerType = useLastPointerType();
@@ -1069,7 +1069,7 @@ export function POSOrders() {
   };
 
   const handleCreatePayment = (orderId: string) => {
-    if (!canCreate || isDemo) return;
+    if (!canManage || isDemo) return;
     const row = orders.find((o) => o.id === orderId);
     if (row && isDraftOrderStatus(row.status)) {
       notifyFromError(
@@ -1095,7 +1095,7 @@ export function POSOrders() {
     reference: string;
     note: string;
   }) => {
-    if (!canCreate || isDemo || !selectedOrderId) return;
+    if (!canManage || isDemo || !selectedOrderId) return;
     const methodMap: Record<string, PosUiPaymentMethod> = {
       Cash: "cash",
       Card: "card",

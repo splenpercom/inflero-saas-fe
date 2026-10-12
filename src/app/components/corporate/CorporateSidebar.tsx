@@ -41,6 +41,7 @@ import { slugifyBranchPage } from "../../lib/branchBooking";
 import type { TenantRbacModule } from "../../lib/rbacModules";
 import { getNavPermission, type PermissionAction } from "../../lib/permissions";
 import { ALL_BRANCHES_NAV_ENTRIES } from "../../lib/allBranchesNav";
+import { clearPosEditOrderSession } from "../../lib/posEditSession";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface NavSubItem {
@@ -335,7 +336,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       subItems: [
         { labelKey: "posOrders", label: st("posOrders"), path: "/dashboard/sales/pos-orders" },
         { labelKey: "salesReturn", label: st("salesReturn"), path: "/dashboard/sales/return" },
-        { labelKey: "pos", label: st("pos"), path: "/dashboard/sales/pos" },
+        { labelKey: "pos", label: st("pos"), path: "/dashboard/sales/pos?fresh=1" },
       ],
     },
     {
@@ -817,16 +818,20 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
                   >
                     {item.subItems.map((subItem) => {
                       const subLabel = subItem.label;
-                      const isSubActive = subItem.path === location.pathname;
+                      const subPathOnly = (subItem.path || "").split("?")[0];
+                      const isSubActive = subPathOnly === location.pathname;
                       return (
                         <Link
                           key={subItem.labelKey}
                           to={subItem.path || "#"}
-                          onMouseEnter={() => subItem.path && preloadRoute(subItem.path)}
+                          onMouseEnter={() => subItem.path && preloadRoute(subPathOnly || subItem.path)}
                           onClick={() => {
+                            if (subPathOnly === "/dashboard/sales/pos") {
+                              clearPosEditOrderSession();
+                            }
                             if (
                               isReservations &&
-                              subItem.path === "/dashboard/reservations" &&
+                              subPathOnly === "/dashboard/reservations" &&
                               newResCount > 0
                             ) {
                               acknowledgeReservations();

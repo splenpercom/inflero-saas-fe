@@ -84,7 +84,12 @@ import { getCompanyLogoUrl } from "../../lib/userDisplay";
 import { useIsDarkMode } from "../../hooks/useIsDarkMode";
 import { BrandLogo } from "../ui/BrandLogo";
 import { thermalReceiptLabels, type ThermalReceiptPayload } from "../../lib/thermalReceipt";
-import { printPosTicket, printPosOrderTicket } from "../../lib/posPrint";
+import {
+  printPosTicket,
+  printPosOrderTicket,
+  kotDeltaItems,
+  qtyByProductId,
+} from "../../lib/posPrint";
 import { loadPosPrinterSettings } from "../../lib/posPrinterSettings";
 import { PosPrinterSettings } from "./PosPrinterSettings";
 import { createQrOrderAlarm } from "../../lib/qrOrderAlarm";
@@ -92,6 +97,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { pickCurrentUserBillerId } from "../../lib/salesBiller";
 import { ApiError } from "../../api/client";
 import { useConfirm } from "../../context/ConfirmContext";
+import { readPosEditOrderId, writePosEditOrderId } from "../../lib/posEditSession";
 
 interface Product {
   id: string;
@@ -497,25 +503,6 @@ const TABLE_STATUS_UI: Record<
   },
 };
 
-const POS_EDIT_ORDER_KEY = "inflero_pos_edit_order_id";
-
-function readPosEditOrderId(): string | null {
-  try {
-    return sessionStorage.getItem(POS_EDIT_ORDER_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writePosEditOrderId(id: string | null) {
-  try {
-    if (id) sessionStorage.setItem(POS_EDIT_ORDER_KEY, id);
-    else sessionStorage.removeItem(POS_EDIT_ORDER_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
 function PosTablePickerPortal({
   open,
   tables,
@@ -771,6 +758,9 @@ interface ReceiptData {
   subtotal: number;
   shipping: number;
   serviceFee: number;
+  /** Shown on POS bill when table hourly timer has started (informational; not in total). */
+  tableHourlyRate?: number;
+  tableHourlyStartedAtLabel?: string;
   tableHourlyCharge?: number;
   discount: number;
   discountLabel: string;
@@ -827,6 +817,9 @@ function ThermalReceipt({
     subtotal: data.subtotal,
     shipping: data.shipping,
     serviceFee: data.serviceFee,
+    tableHourlyRate: data.tableHourlyRate,
+    tableHourlyStartedAtLabel: data.tableHourlyStartedAtLabel,
+    tableHourlyCharge: data.tableHourlyCharge ?? 0,
     discount: data.discount,
     discountLabel: data.discountLabel,
     cashbackEarned: data.cashbackEarned,
@@ -957,6 +950,18 @@ function ThermalReceipt({
           <div className="flex justify-between"><span className="text-gray-400">{labels.subtotal}:</span><span>{data.subtotal.toFixed(2)} AZN</span></div>
           <div className="flex justify-between"><span className="text-gray-400">{labels.shipping}:</span><span>{data.shipping.toFixed(2)} AZN</span></div>
           {data.serviceFee > 0 && <div className="flex justify-between"><span className="text-gray-400">{labels.serviceFee}:</span><span>{data.serviceFee.toFixed(2)} AZN</span></div>}
+          {(data.tableHourlyRate ?? 0) > 0 && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">{labels.tableHourlyRate}:</span>
+              <span>{(data.tableHourlyRate ?? 0).toFixed(2)} AZN/h</span>
+            </div>
+          )}
+          {data.tableHourlyStartedAtLabel && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">{labels.tableHourlyStarted}:</span>
+              <span>{data.tableHourlyStartedAtLabel}</span>
+            </div>
+          )}
           {(data.tableHourlyCharge ?? 0) > 0 && (
             <div className="flex justify-between">
               <span className="text-gray-400">{labels.tableHourlyCharge ?? labels.serviceFee}:</span>
@@ -1149,6 +1154,10 @@ export function CorporatePOS() {
   const [editingOriginalQtyByProduct, setEditingOriginalQtyByProduct] = useState<
     Record<string, number>
   >({});
+  /** Product qty already printed on a kitchen/KOT ticket — used for additional-items reprints. */
+  const [kotPrintedQtyByProduct, setKotPrintedQtyByProduct] = useState<Record<string, number>>(
+    {},
+  );
   const [pendingQrBusyId, setPendingQrBusyId] = useState<string | null>(null);
   const lookupAbortRef = useRef<AbortController | null>(null);
   const lookupSeqRef = useRef(0);
@@ -1567,6 +1576,8 @@ export function CorporatePOS() {
     setEditingOrderWasHeld(statusKey === "held" || statusKey === "draft");
     setEditingAlreadyOnKot(Boolean(detail.kotStatus));
     setEditingAlreadySentToBar(detail.sentToBar === true);
+    // Only lines already on KOT are treated as printed; fresh orders print the full ticket.
+    setKotPrintedQtyByProduct(detail.kotStatus ? qtyByProductId(detail.items) : {});
     const payKey = (detail.paymentStatus || "").toLowerCase().replace(/\s+/g, "_");
     const hasReturns = detail.items.some((i) => (i.returnedQty ?? 0) > 0);
     const fullyRefunded = payKey === "refunded";
@@ -1892,6 +1903,8 @@ export function CorporatePOS() {
 
   // Deep-link from POS Orders: ?orderId=id → open for edit in POS
   useEffect(() => {
+    // Header/sidebar “open POS” asks for a clean register — do not sticky-restore edit.
+    if (searchParams.get("fresh") === "1") return;
     const fromUrl = searchParams.get("orderId");
     const fromSession = readPosEditOrderId();
     const orderId = fromUrl || (!editingOrderIdRef.current ? fromSession : null);
@@ -2787,6 +2800,7 @@ export function CorporatePOS() {
     setEditingAlreadySentToBar(false);
     setEditingStockLocked(false);
     setEditingOriginalQtyByProduct({});
+    setKotPrintedQtyByProduct({});
     setSuppressEditOrderUi(false);
     setCart([]);
     setShippingInput("");
@@ -2809,6 +2823,19 @@ export function CorporatePOS() {
     void refreshPendingQr("count");
     if (diningEnabled) void reloadDiningTables();
   };
+
+  // Header / sidebar: /pos?fresh=1 → always a blank register (no sticky Edit Order).
+  useEffect(() => {
+    if (searchParams.get("fresh") !== "1") return;
+    resetCartAfterSave({ skipQrRelease: false });
+    const next = new URLSearchParams(searchParams);
+    next.delete("fresh");
+    next.delete("orderId");
+    next.delete("acceptOrder");
+    setSearchParams(next, { replace: true });
+    // resetCartAfterSave is stable enough for this navigation signal; avoid re-running loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, setSearchParams]);
 
   const handleStartHourlyTimer = useCallback(async () => {
     if (!selectedTableId || hourlyTimerBusy || isDemo) return;
@@ -3292,8 +3319,18 @@ export function CorporatePOS() {
     );
     const apiShipping = parsePrice(detail.shipping);
     const apiServiceFee = parsePrice(detail.serviceFee);
-    // POS/KOT/Bar bills never show hourly — final charge is only on completed Sale Detail receipt/invoice.
+    // POS/KOT/Bar bills omit the hourly charge amount (finalized on Sale Detail).
+    // When a table timer has started, still print rate + start time as info.
     const apiHourlyCharge = 0;
+    const apiHourlyRate = parsePrice(detail.tableHourlyRate);
+    const hourlyStartedRaw = detail.tableHourlyStartedAt ?? null;
+    const hourlyStartedAtLabel = (() => {
+      if (!hourlyStartedRaw) return undefined;
+      const started = new Date(hourlyStartedRaw);
+      return Number.isNaN(started.getTime())
+        ? hourlyStartedRaw
+        : formatDateTime(started, language);
+    })();
     const apiDiscount = parsePrice(detail.discount);
     const rawTotal = parsePrice(detail.grandTotal);
     const rawHourly = parsePrice(detail.tableHourlyCharge);
@@ -3332,6 +3369,12 @@ export function CorporatePOS() {
       subtotal: apiSubtotal,
       shipping: apiShipping,
       serviceFee: apiServiceFee,
+      ...(hourlyStartedAtLabel
+        ? {
+            ...(apiHourlyRate > 0 ? { tableHourlyRate: apiHourlyRate } : {}),
+            tableHourlyStartedAtLabel: hourlyStartedAtLabel,
+          }
+        : {}),
       tableHourlyCharge: apiHourlyCharge,
       discount: apiDiscount,
       discountLabel: (() => {
@@ -3376,6 +3419,8 @@ export function CorporatePOS() {
       subtotal: data.subtotal,
       shipping: data.shipping,
       serviceFee: data.serviceFee,
+      tableHourlyRate: data.tableHourlyRate,
+      tableHourlyStartedAtLabel: data.tableHourlyStartedAtLabel,
       tableHourlyCharge: data.tableHourlyCharge ?? 0,
       discount: data.discount,
       discountLabel: data.discountLabel,
@@ -3580,7 +3625,18 @@ export function CorporatePOS() {
       }
 
       const tableLabel = resolveTableLabel(true);
+      const additionalItems = reprintKot
+        ? kotDeltaItems(detail.items, kotPrintedQtyByProduct)
+        : null;
 
+      if (reprintKot && (!additionalItems || additionalItems.length === 0)) {
+        notifyWarning(
+          tr(
+            "Mətbəxə göndərmək üçün yeni məhsul yoxdur",
+            "No new items to send to the kitchen",
+          ),
+        );
+      } else {
       try {
         const logoSrc =
           getCompanyLogoUrl(user?.tenant, false) ??
@@ -3594,10 +3650,24 @@ export function CorporatePOS() {
           logoSrc,
           customerPhone: receiptPhone,
           printProductBrand: posPrintProductBrandEnabled,
+          ...(additionalItems
+            ? {
+                itemsOverride: additionalItems,
+                kitchenBannerOverride: tr(
+                  "*** ƏLAVƏ SİFARİŞ / ADDITIONAL ***",
+                  "*** ADDITIONAL ITEMS ***",
+                ),
+              }
+            : {}),
         });
+        setKotPrintedQtyByProduct(qtyByProductId(detail.items));
+        setEditingAlreadyOnKot(true);
         notifySuccess(
           reprintKot
-            ? tr("KOT bileti yenidən çap olundu", "KOT ticket reprinted")
+            ? tr(
+                "Əlavə məhsullar mətbəxə çap olundu",
+                "Additional items printed to kitchen",
+              )
             : selectedTableId
               ? tr(
                   "KOT-a göndərildi və mətbəx çapı göndərildi",
@@ -3618,6 +3688,7 @@ export function CorporatePOS() {
               ),
         );
         notifyFromError(printErr);
+      }
       }
 
       const receiptData = buildReceiptFromDetail(
@@ -4925,7 +4996,7 @@ export function CorporatePOS() {
                                   {checkoutAction === "kot"
                                     ? tr("Göndərilir...", "Sending...")
                                     : editingAlreadyOnKot
-                                      ? tr("KOT çapı", "Print KOT")
+                                      ? tr("Əlavə KOT", "Print new items")
                                       : tr("KOT & Çap", "KOT & Print")}
                                 </button>
                                 <button

@@ -69,13 +69,14 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
     setPermissions((prev) => {
       const updated = [...prev];
       const row = updated[moduleIndex];
-      const allEnabled = row.view && row.create && row.edit && row.delete;
+      const allEnabled = row.view && row.create && row.edit && row.delete && row.manage;
       updated[moduleIndex] = {
         ...row,
         view: !allEnabled,
         create: !allEnabled,
         edit: !allEnabled,
         delete: !allEnabled,
+        manage: !allEnabled,
       };
       return updated;
     });
@@ -159,6 +160,12 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
                         <th className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                           {t("delete")}
                         </th>
+                        <th
+                          className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap"
+                          title={t("managePaymentsHint")}
+                        >
+                          {t("manage")}
+                        </th>
                         <th className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                           {t("all")}
                         </th>
@@ -240,12 +247,30 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
                             <button
                               type="button"
                               disabled={!moduleAvailable}
+                              title={
+                                permission.module === "Sales" ? t("managePaymentsHint") : undefined
+                              }
+                              onClick={() => togglePermission(index, "manage")}
+                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
+                                permission.manage
+                                  ? "bg-amber-500 text-white"
+                                  : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                              }`}
+                            >
+                              {permission.manage ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <button
+                              type="button"
+                              disabled={!moduleAvailable}
                               onClick={() => toggleAll(index)}
                               className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
                                 permission.view &&
                                 permission.create &&
                                 permission.edit &&
-                                permission.delete
+                                permission.delete &&
+                                permission.manage
                                   ? "bg-purple-500 text-white"
                                   : "bg-gray-200 dark:bg-gray-700 text-gray-400"
                               }`}

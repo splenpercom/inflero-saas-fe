@@ -383,14 +383,14 @@ export function EditProduct() {
 
   const handleAddUnit = async () => {
     const errors = { name: "", shortName: "" };
-    if (!unitFormData.name.trim()) errors.name = tr("Ad tələb olunur", "Name is required");
-    if (!unitFormData.shortName.trim()) errors.shortName = tr("Qısa ad tələb olunur", "Short name is required");
+    const shortName = unitFormData.shortName.trim();
+    if (!shortName) errors.shortName = tr("Qısa ad tələb olunur", "Short name is required");
     setUnitFormErrors(errors);
-    if (errors.name || errors.shortName || isDemo || !isAuthenticated || !canCreate) return;
+    if (errors.shortName || isDemo || !isAuthenticated || !canCreate) return;
     try {
       const created = await createUnit({
-        name: unitFormData.name.trim(),
-        shortName: unitFormData.shortName.trim(),
+        name: shortName,
+        shortName,
         status: unitFormData.status as "active" | "inactive",
       });
       setUnits((prev) => [...prev, { value: created.id, label: created.name }]);
@@ -856,8 +856,7 @@ export function EditProduct() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white dark:bg-gray-900 rounded-lg w-full max-w-sm border p-4 space-y-3">
             <h2 className="text-sm font-semibold">{tr("Vahid Əlavə Et", "Add Unit")}</h2>
-            <input value={unitFormData.name} onChange={(e) => setUnitFormData({ ...unitFormData, name: e.target.value })} className="w-full px-3 py-1.5 text-xs border rounded-lg" placeholder={tr("Vahid adı", "Unit name")} />
-            <input value={unitFormData.shortName} onChange={(e) => setUnitFormData({ ...unitFormData, shortName: e.target.value })} className="w-full px-3 py-1.5 text-xs border rounded-lg" placeholder={tr("Qısa ad", "Short name")} />
+            <input value={unitFormData.shortName} onChange={(e) => setUnitFormData({ ...unitFormData, shortName: e.target.value })} className="w-full px-3 py-1.5 text-xs border rounded-lg" placeholder={tr("Qısa ad", "Short name")} autoFocus />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setIsAddUnitModalOpen(false)} className="px-3 py-1.5 text-xs">{pt("cancel")}</button>
               <button type="button" onClick={() => void handleAddUnit()} className="px-3 py-1.5 text-xs bg-[#14b8a6] text-white rounded-lg">{tr("Əlavə et", "Add")}</button>

@@ -44,6 +44,7 @@ export function ShowPaymentsModal({
   const { isDemo } = useAuth();
   const askConfirm = useConfirm();
   const { canDelete: canVoidFinance } = useModulePermissions("Finances");
+  const { canManage: canManageOrderPayments } = useModulePermissions("Sales");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -160,6 +161,7 @@ export function ShowPaymentsModal({
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                     {tr("Ödəniş Tarixçəsi", "Payment History")}
                   </h3>
+                  {canManageOrderPayments && !isDemo && (
                   <button
                     type="button"
                     onClick={() => {
@@ -182,6 +184,7 @@ export function ShowPaymentsModal({
                     <Plus className="w-3.5 h-3.5" />
                     {tr("Ödəniş Əlavə Et", "Add Payment")}
                   </button>
+                  )}
                 </div>
 
                 {payments.length === 0 ? (

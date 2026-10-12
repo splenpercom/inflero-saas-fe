@@ -45,6 +45,7 @@ export interface PlatformUser {
       create: boolean;
       edit: boolean;
       delete: boolean;
+      manage?: boolean;
     }[];
   } | null;
   tenant: {

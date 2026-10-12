@@ -7,6 +7,8 @@ export interface RolePermission {
   create: boolean;
   edit: boolean;
   delete: boolean;
+  /** Extra action — e.g. Sales: manage payments on POS Orders. */
+  manage: boolean;
 }
 
 /** RBAC rows annotated as unavailable when the matching tenant module is off. */
@@ -36,6 +38,7 @@ export function defaultPermissionMatrix(
     create: false,
     edit: false,
     delete: false,
+    manage: false,
   }));
 }
 
@@ -53,8 +56,9 @@ export function mergeApiPermissions(
           create: existing.create,
           edit: existing.edit,
           delete: existing.delete,
+          manage: existing.manage ?? false,
         }
-      : { module, view: false, create: false, edit: false, delete: false };
+      : { module, view: false, create: false, edit: false, delete: false, manage: false };
   });
 }
 
@@ -68,6 +72,7 @@ export function toApiPermissions(formRows: RolePermission[]): RolePermission[] {
       create: p.create,
       edit: p.edit,
       delete: p.delete,
+      manage: p.manage ?? false,
     }));
 }
 
@@ -94,6 +99,7 @@ export function toApiPermissionsPreservingHidden(
       create: row.create,
       edit: row.edit,
       delete: row.delete,
+      manage: row.manage ?? false,
     });
   }
   return TENANT_RBAC_MODULES.filter((module) => byModule.has(module)).map(

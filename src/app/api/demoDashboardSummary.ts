@@ -72,6 +72,7 @@ export function buildDemoDashboardSummary(period: DashboardPeriod = "1M"): Dashb
       unpaidInvoiceTotal: String(statCards[1]?.amount ?? 4385),
       approvedExpenses: String(statCards[3]?.amount ?? 40000),
       profitApprox: String(statCards[2]?.amount ?? 8360),
+      stockCogs: "12500.00",
     },
     charts: {
       salesPurchaseByMonth: salesPurchase.map((r) => ({

@@ -86,13 +86,13 @@ export function Units() {
     try {
       const rows = await fetchUnits();
       setUnits(
-        rows.map((r) => ({
+        (rows ?? []).map((r) => ({
           id: r.id,
-          name: r.name,
-          shortName: r.shortName,
-          noOfProducts: r.noOfProducts,
+          name: r.name ?? "",
+          shortName: r.shortName ?? "",
+          noOfProducts: r.noOfProducts ?? 0,
           createdDate: formatInventoryDate(r.createdDate || r.createdAt),
-          status: r.status,
+          status: r.status === "inactive" ? "inactive" : "active",
         })),
       );
     } catch (err) {
@@ -113,9 +113,10 @@ export function Units() {
 
   // Filter items
   const filteredItems = units.filter((item) => {
+    const q = debouncedSearch.toLowerCase();
     const matchesSearch =
-      item.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      item.shortName.toLowerCase().includes(debouncedSearch.toLowerCase());
+      (item.name ?? "").toLowerCase().includes(q) ||
+      (item.shortName ?? "").toLowerCase().includes(q);
     const matchesStatus = selectedStatus === "all" || item.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
@@ -343,18 +344,7 @@ export function Units() {
 
   const handleAddFormSubmit = async () => {
     const errors: Record<string, string> = {};
-    const name = formData.name.trim();
     const shortName = formData.shortName.trim();
-    if (!name) {
-      errors.name = tr("Ad tələb olunur", "Name is required");
-    } else {
-      const duplicateName = units.some(
-        (u) => u.name.trim().toLowerCase() === name.toLowerCase() && u.id !== editingId,
-      );
-      if (duplicateName) {
-        errors.name = tr("Bu adda vahid artıq mövcuddur", "A unit with this name already exists");
-      }
-    }
     if (!shortName) {
       errors.shortName = tr("Qısa ad tələb olunur", "Short name is required");
     } else {
@@ -380,9 +370,9 @@ export function Units() {
     setSaving(true);
     try {
       if (isEdit) {
+        // Do not overwrite existing full name — preserve data for older units
         const updated = await updateUnit(editingId, {
-          name: formData.name.trim(),
-          shortName: formData.shortName.trim(),
+          shortName,
           status: formData.status,
         });
         setUnits((prev) =>
@@ -400,8 +390,8 @@ export function Units() {
         notifySuccess(tr("Vahid uğurla yeniləndi!", "Unit updated successfully!"));
       } else {
         const created = await createUnit({
-          name: formData.name.trim(),
-          shortName: formData.shortName.trim(),
+          name: shortName,
+          shortName,
           status: formData.status,
         });
         setUnits((prev) => [
@@ -607,62 +597,78 @@ export function Units() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedData.map((unit, index) => (
-                  <tr
-                    key={unit.id}
-                    className={`border-b border-gray-200 dark:border-gray-800 ${
-                      index % 2 === 0
-                        ? "bg-white dark:bg-gray-900"
-                        : "bg-gray-50 dark:bg-gray-800/30"
-                    }`}
-                  >
-                    <td className="px-3 py-2 text-xs text-gray-900 dark:text-white whitespace-nowrap">
-                      {unit.name}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {unit.shortName}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {unit.noOfProducts}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {unit.createdDate}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span
-                        className={cn(
-                          "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border",
-                          unit.status === "active"
-                            ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700"
-                            : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"
-                        )}
-                      >
-                        {unit.status === "active" ? tr("Aktiv", "Active") : tr("Qeyri-aktiv", "Inactive")}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {canEdit && (
-                        <button
-                          onClick={() => handleEdit(unit.id)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        )}
-
-                        {canDelete && (
-                        <button
-                          onClick={() => handleDelete(unit.id)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                        )}
-                      </div>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                      {tr("Yüklənir...", "Loading...")}
                     </td>
                   </tr>
-                ))}
+                ) : paginatedData.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                      {units.length === 0
+                        ? tr("Hələ vahid yoxdur. Əlavə etmək üçün \"Vahid Əlavə Et\" düyməsinə klikləyin.", "No units yet. Click \"Add Unit\" to create one.")
+                        : tr("Vahid tapılmadı", "No units found")}
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedData.map((unit, index) => (
+                    <tr
+                      key={unit.id}
+                      className={`border-b border-gray-200 dark:border-gray-800 ${
+                        index % 2 === 0
+                          ? "bg-white dark:bg-gray-900"
+                          : "bg-gray-50 dark:bg-gray-800/30"
+                      }`}
+                    >
+                      <td className="px-3 py-2 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                        {unit.name}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        {unit.shortName}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        {unit.noOfProducts}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        {unit.createdDate}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border",
+                            unit.status === "active"
+                              ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700"
+                              : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"
+                          )}
+                        >
+                          {unit.status === "active" ? tr("Aktiv", "Active") : tr("Qeyri-aktiv", "Inactive")}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {canEdit && (
+                          <button
+                            onClick={() => handleEdit(unit.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          )}
+
+                          {canDelete && (
+                          <button
+                            onClick={() => handleDelete(unit.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -790,24 +796,6 @@ export function Units() {
               <div className="p-4 space-y-3">
                 <div>
                   <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                    {tr("Vahid Adı *", "Unit Name *")}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={tr("Vahid adını daxil edin", "Enter unit name")}
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${
-                      formErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"
-                    } rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
-                  />
-                  {formErrors.name && (
-                    <p className="text-[10px] text-red-500 mt-1">{formErrors.name}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                     {tr("Qısa Ad *", "Short Name *")}
                   </label>
                   <input
@@ -815,6 +803,7 @@ export function Units() {
                     placeholder={tr("məs., kg", "e.g., kg")}
                     value={formData.shortName}
                     onChange={(e) => setFormData({ ...formData, shortName: e.target.value })}
+                    autoFocus
                     className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${
                       formErrors.shortName ? "border-red-500" : "border-gray-300 dark:border-gray-700"
                     } rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}

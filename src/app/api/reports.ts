@@ -255,6 +255,8 @@ export interface ReportsOverview {
   purchases: string;
   purchasesPaid: string;
   purchasesDebt: string;
+  /** On-hand inventory value at unit COGS (qty × cost). */
+  stockCogs: string;
   avgMonthlyRevenue: string | null;
   yoyGrowthPercent: number | null;
 }
@@ -277,6 +279,7 @@ const EMPTY_OVERVIEW: ReportsOverview = {
   purchases: "0.00",
   purchasesPaid: "0.00",
   purchasesDebt: "0.00",
+  stockCogs: "0.00",
   avgMonthlyRevenue: null,
   yoyGrowthPercent: null,
 };

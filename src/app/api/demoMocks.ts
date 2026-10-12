@@ -572,14 +572,14 @@ const DEMO_ROLES = [
     name: "Administrator",
     status: "ACTIVE",
     createdAt: NOW,
-    permissions: [{ module: "Dashboard", view: true, create: true, edit: true, delete: true }],
+    permissions: [{ module: "Dashboard", view: true, create: true, edit: true, delete: true, manage: false }],
   },
   {
     id: "role-2",
     name: "Staff",
     status: "ACTIVE",
     createdAt: NOW,
-    permissions: [{ module: "Sales", view: true, create: true, edit: false, delete: false }],
+    permissions: [{ module: "Sales", view: true, create: true, edit: false, delete: false, manage: true }],
   },
 ];
 
@@ -721,6 +721,7 @@ function reportsOverviewResult() {
     purchases: "1200.00",
     purchasesPaid: "800.00",
     purchasesDebt: "400.00",
+    stockCogs: "12500.00",
     avgMonthlyRevenue: "90.57",
     yoyGrowthPercent: null,
   };

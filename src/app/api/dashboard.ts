@@ -22,6 +22,8 @@ export interface DashboardSummaryTotals {
   unpaidInvoiceTotal: string;
   approvedExpenses: string;
   profitApprox: string;
+  /** On-hand inventory value at unit COGS (qty × cost). */
+  stockCogs: string;
 }
 
 export interface DashboardMonthPoint {
@@ -99,6 +101,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
     unpaidInvoiceTotal: "0.00",
     approvedExpenses: "0.00",
     profitApprox: "0.00",
+    stockCogs: "0.00",
   },
   charts: {
     salesPurchaseByMonth: [],

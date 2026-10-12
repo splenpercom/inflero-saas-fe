@@ -397,15 +397,15 @@ export function CreateProduct() {
 
   const handleAddUnit = async () => {
     const errors = { name: "", shortName: "" };
-    if (!unitFormData.name.trim()) errors.name = pickLang(language, "Ad tələb olunur", "Name is required");
-    if (!unitFormData.shortName.trim()) errors.shortName = pickLang(language, "Qısa ad tələb olunur", "Short name is required");
+    const shortName = unitFormData.shortName.trim();
+    if (!shortName) errors.shortName = pickLang(language, "Qısa ad tələb olunur", "Short name is required");
     setUnitFormErrors(errors);
-    if (errors.name || errors.shortName) return;
+    if (errors.shortName) return;
     if (isDemo || !isAuthenticated || !canCreate) return;
     try {
       const created = await createUnit({
-        name: unitFormData.name.trim(),
-        shortName: unitFormData.shortName.trim(),
+        name: shortName,
+        shortName,
         status: unitFormData.status as "active" | "inactive",
       });
       const newUnit = { value: created.id, label: created.name };
@@ -1256,20 +1256,6 @@ export function CreateProduct() {
             <div className="p-4 space-y-3">
               <div>
                 <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                  {pickLang(language, "Vahid Adı *", "Unit Name *")}
-                </label>
-                <input
-                  type="text"
-                  placeholder={pickLang(language, "Vahid adını daxil edin", "Enter unit name")}
-                  value={unitFormData.name}
-                  onChange={(e) => setUnitFormData({ ...unitFormData, name: e.target.value })}
-                  autoFocus
-                  className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${unitFormErrors.name ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
-                />
-                {unitFormErrors.name && <p className="text-[10px] text-red-500 mt-1">{unitFormErrors.name}</p>}
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                   {pickLang(language, "Qısa Ad *", "Short Name *")}
                 </label>
                 <input
@@ -1277,6 +1263,7 @@ export function CreateProduct() {
                   placeholder={pickLang(language, "məs., kg", "e.g., kg")}
                   value={unitFormData.shortName}
                   onChange={(e) => setUnitFormData({ ...unitFormData, shortName: e.target.value })}
+                  autoFocus
                   className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border ${unitFormErrors.shortName ? "border-red-500" : "border-gray-300 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]`}
                 />
                 {unitFormErrors.shortName && <p className="text-[10px] text-red-500 mt-1">{unitFormErrors.shortName}</p>}

@@ -212,6 +212,18 @@ export function NewDashboard() {
       icon: TrendingUp,
       color: "from-[#14b8a6] to-[#0d9488]",
     },
+    ...(stockEnabled
+      ? [
+          {
+            label: tr("COGS", "Maya dəyəri"),
+            value: formatMoney(totals?.stockCogs),
+            sub: tr("Total stock value at cost", "Ümumi stok dəyəri (maya)"),
+            trend: "up" as const,
+            icon: Package,
+            color: "from-violet-500 to-violet-600",
+          },
+        ]
+      : []),
     {
       label: tr("Invoice Due", "Ödəniləcək Faktura"),
       value: formatMoney(totals?.unpaidInvoiceTotal),
@@ -724,7 +736,11 @@ export function NewDashboard() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div
+        className={`grid grid-cols-2 gap-3 ${
+          financeStats.length > 4 ? "lg:grid-cols-3 xl:grid-cols-5" : "lg:grid-cols-4"
+        }`}
+      >
         {financeStats.map((f) => (
           <div key={f.label} className={`bg-gradient-to-br ${f.color} rounded-xl p-4 text-white shadow-lg`}>
             <div className="flex items-center justify-between mb-3">

@@ -33,6 +33,7 @@ import { useSubscriptionBadge } from "../../hooks/useSubscriptionRemaining";
 import type { TenantRbacModule } from "../../lib/rbacModules";
 import type { PermissionAction } from "../../lib/permissions";
 import { DaySalesBillModal } from "./DaySalesBillModal";
+import { clearPosEditOrderSession } from "../../lib/posEditSession";
 
 interface CorporateHeaderProps {
   onToggleSidebar: () => void;
@@ -276,7 +277,8 @@ export const CorporateHeader = memo(function CorporateHeader({
         {canViewPos && (
           <div className="flex items-stretch rounded-lg overflow-hidden border border-[#14b8a6]/25 dark:border-[#14b8a6]/35 bg-[#14b8a6]/10 dark:bg-[#14b8a6]/20">
             <Link
-              to="/dashboard/sales/pos"
+              to="/dashboard/sales/pos?fresh=1"
+              onClick={() => clearPosEditOrderSession()}
               className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-[#14b8a6]/15 dark:hover:bg-[#14b8a6]/25 smooth-transition"
               title={pt("Open POS", "POS-u aç")}
             >
