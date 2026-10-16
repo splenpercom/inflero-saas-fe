@@ -17,7 +17,7 @@ export const ALL_BRANCHES_NAV_ENTRIES: AllBranchesNavEntry[] = [
   { labelKey: "dashboard", path: "/dashboard", permissionModule: "Dashboard" },
   { labelKey: "employees", path: "/dashboard/user-management", permissionModule: "User Management" },
   { labelKey: "userRoles", path: "/dashboard/user-management/roles", permissionModule: "User Management" },
-  { labelKey: "warehouses", path: "/dashboard/people/warehouses", permissionModule: "People" },
+  { labelKey: "warehouses", path: "/dashboard/people/warehouses", permissionModule: "Stock" },
   { labelKey: "deletionLogs", path: "/dashboard/settings/logs", permissionModule: "Settings" },
   { labelKey: "settings", path: "/dashboard/settings", permissionModule: "Settings" },
 ];

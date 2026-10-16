@@ -579,7 +579,11 @@ const DEMO_ROLES = [
     name: "Staff",
     status: "ACTIVE",
     createdAt: NOW,
-    permissions: [{ module: "Sales", view: true, create: true, edit: false, delete: false, manage: true }],
+    permissions: [
+      { module: "Orders", view: true, create: true, edit: false, delete: false, manage: true },
+      { module: "Sales Returns", view: true, create: true, edit: false, delete: false, manage: false },
+      { module: "POS", view: true, create: true, edit: false, delete: false, manage: false },
+    ],
   },
 ];
 

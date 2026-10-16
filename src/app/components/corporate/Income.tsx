@@ -51,7 +51,7 @@ import { pickLang } from "../../i18n/pickLang";
 export function Income() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Finances");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Income");
   const { branches, isGlobalMode, branchId } = useBranch();
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();

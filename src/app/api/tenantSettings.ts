@@ -44,6 +44,8 @@ export interface TenantSettingsRecord {
   inventoryServicesEnabled?: boolean;
   tableHourlyBillingEnabled?: boolean;
   posStaffPasscodeEnabled?: boolean;
+  /** Default POS payment status pre-selection (NONE = cashier must choose). */
+  posDefaultPaymentStatus?: "PENDING" | "PAID" | "NONE";
 }
 
 export type TenantSettingsUpdate = Partial<{
@@ -69,6 +71,7 @@ export type TenantSettingsUpdate = Partial<{
   inventoryServicesEnabled: boolean;
   tableHourlyBillingEnabled: boolean;
   posStaffPasscodeEnabled: boolean;
+  posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";
 }>;
 
 export async function fetchTenantSettings() {

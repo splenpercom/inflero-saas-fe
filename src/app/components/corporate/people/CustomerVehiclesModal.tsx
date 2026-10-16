@@ -24,7 +24,7 @@ export function CustomerVehiclesModal({
   onChanged?: () => void;
 }) {
   const { isDemo, isAuthenticated } = useAuth();
-  const { canCreate, canEdit, canDelete } = useModulePermissions("People");
+  const { canCreate, canEdit, canDelete } = useModulePermissions("Customers");
   const askConfirm = useConfirm();
   const [vehicles, setVehicles] = useState<CustomerVehicle[]>([]);
   const [editing, setEditing] = useState<CustomerVehicle | null>(null);

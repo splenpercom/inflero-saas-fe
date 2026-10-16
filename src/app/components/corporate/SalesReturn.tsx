@@ -32,7 +32,7 @@ import { pickLang } from "../../i18n/pickLang";
 export function SalesReturn() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Sales");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Sales Returns");
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
 

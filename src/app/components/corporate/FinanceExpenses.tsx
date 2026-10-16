@@ -49,7 +49,7 @@ import { pickLang } from "../../i18n/pickLang";
 export function FinanceExpenses() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Finances");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Expenses");
   const askConfirm = useConfirm();
   const { categories, reload: reloadCategories } = useExpenseCategories();
   const { accounts: bankAccounts } = useFinanceBankAccounts(true);

@@ -28,7 +28,7 @@ export function Invoices() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canCreate, canDelete } = useModulePermissions("Sales");
+  const { canView, canCreate, canDelete } = useModulePermissions("Orders");
   const askConfirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");

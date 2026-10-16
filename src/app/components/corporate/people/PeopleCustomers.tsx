@@ -42,7 +42,7 @@ export function PeopleCustomers() {
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const autoEnabled = hasModule("AUTO");
   const loyaltyEnabled = hasModule("LOYALTY");
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Customers");
   const { canView: canViewLoyalty } = useModulePermissions("Loyalty");
   const branchRevision = useBranchRevision();
   const { isGlobalMode, branchManagementEnabled } = useBranch();

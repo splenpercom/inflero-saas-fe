@@ -36,7 +36,7 @@ export function Warehouses() {
   const { isDemo, isAuthenticated, hasModule, user } = useAuth();
   const branchManagementEnabled = hasModule("BRANCH_MANAGEMENT");
   const { refreshBranches, isGlobalMode } = useBranch();
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Stock");
   const askConfirm = useConfirm();
   const [stores, setStores] = useState<StoreRecord[]>([]);
   const [quota, setQuota] = useState<BranchQuota | null>(null);

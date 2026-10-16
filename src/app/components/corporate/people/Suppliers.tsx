@@ -32,7 +32,7 @@ import { pickLang } from "../../../i18n/pickLang";
 export function Suppliers() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("People");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Purchases");
   const branchRevision = useBranchRevision();
   const { isGlobalMode, branchManagementEnabled } = useBranch();
   const canEditBranchPeople = !branchManagementEnabled || !isGlobalMode;

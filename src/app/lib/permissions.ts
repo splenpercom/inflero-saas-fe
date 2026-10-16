@@ -1,4 +1,10 @@
-import { type TenantRbacModule } from "./rbacModules";
+import {
+  type TenantRbacModule,
+  RBAC_DINING_CHILDREN,
+  RBAC_FINANCE_CHILDREN,
+  RBAC_INVENTORY_CHILDREN,
+  RBAC_SALES_CHILDREN,
+} from "./rbacModules";
 
 export type { TenantRbacModule } from "./rbacModules";
 export type PermissionAction = "view" | "create" | "edit" | "delete";
@@ -8,43 +14,90 @@ export interface RoutePermission {
   action: PermissionAction;
 }
 
-/** Explicit route rules — longest / most specific matches are listed first. */
-const ROUTE_RULES: { test: (path: string) => boolean; module: TenantRbacModule; action: PermissionAction }[] = [
-  { test: (p) => p === "/dashboard/inventory/products/create", module: "Inventory", action: "create" },
-  { test: (p) => /\/dashboard\/inventory\/products\/[^/]+\/edit$/.test(p), module: "Inventory", action: "edit" },
-  { test: (p) => p.startsWith("/dashboard/user-management"), module: "User Management", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/inventory"), module: "Inventory", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/stock"), module: "Stock", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/sales"), module: "Sales", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/purchases"), module: "Purchases", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/finances"), module: "Finances", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/people"), module: "People", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/reports"), module: "Reports", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/reservations"), module: "Reservations", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/restaurant"), module: "Dining", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/loyalty"), module: "Loyalty", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/my-website"), module: "My Website", action: "view" },
-  { test: (p) => p.startsWith("/dashboard/settings"), module: "Settings", action: "view" },
-  { test: (p) => p === "/dashboard/orders", module: "Sales", action: "view" },
-  {
-    test: (p) =>
-      p === "/dashboard" ||
-      p === "/dashboard/home" ||
-      p === "/dashboard/new-dashboard",
-    module: "Dashboard",
-    action: "view",
-  },
-];
+type PrefixRule = {
+  /** Path prefix; matches exact path or prefix + "/" (never bare string prefix). */
+  prefix: string;
+  module: TenantRbacModule;
+  action: PermissionAction;
+};
+
+/**
+ * Boundary-safe match: `/dashboard/sales/pos` matches itself and `/dashboard/sales/pos/...`
+ * but NOT `/dashboard/sales/pos-orders`.
+ */
+export function matchesPathPrefix(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/**
+ * Prefix rules are sorted longest-first at module load so order in this list
+ * cannot cause shadowing bugs (e.g. `pos` vs `pos-orders`).
+ */
+const PREFIX_RULES: PrefixRule[] = (
+  [
+    { prefix: "/dashboard/inventory/products", module: "Products", action: "view" },
+    { prefix: "/dashboard/inventory/services", module: "Products", action: "view" },
+    { prefix: "/dashboard/inventory/category", module: "Categories", action: "view" },
+    { prefix: "/dashboard/inventory/sub-category", module: "Sub Categories", action: "view" },
+    { prefix: "/dashboard/inventory/brands", module: "Brands", action: "view" },
+    { prefix: "/dashboard/inventory/units", module: "Units", action: "view" },
+    { prefix: "/dashboard/inventory/variant-attributes", module: "Products", action: "view" },
+    { prefix: "/dashboard/inventory/warranties", module: "Products", action: "view" },
+    { prefix: "/dashboard/inventory", module: "Products", action: "view" },
+    { prefix: "/dashboard/stock", module: "Stock", action: "view" },
+    { prefix: "/dashboard/sales/pos-orders", module: "Orders", action: "view" },
+    { prefix: "/dashboard/sales/pos", module: "POS", action: "view" },
+    { prefix: "/dashboard/sales/return", module: "Sales Returns", action: "view" },
+    { prefix: "/dashboard/sales/invoices", module: "Orders", action: "view" },
+    { prefix: "/dashboard/sales", module: "Orders", action: "view" },
+    { prefix: "/dashboard/orders", module: "Orders", action: "view" },
+    { prefix: "/dashboard/purchases", module: "Purchases", action: "view" },
+    { prefix: "/dashboard/finances/expenses", module: "Expenses", action: "view" },
+    { prefix: "/dashboard/finances/income", module: "Income", action: "view" },
+    { prefix: "/dashboard/finances/payments", module: "Payments", action: "view" },
+    { prefix: "/dashboard/finances", module: "Expenses", action: "view" },
+    { prefix: "/dashboard/people/customers", module: "Customers", action: "view" },
+    { prefix: "/dashboard/people/suppliers", module: "Purchases", action: "view" },
+    { prefix: "/dashboard/people/warehouses", module: "Stock", action: "view" },
+    { prefix: "/dashboard/people", module: "Customers", action: "view" },
+    { prefix: "/dashboard/user-management", module: "User Management", action: "view" },
+    { prefix: "/dashboard/reports", module: "Reports", action: "view" },
+    { prefix: "/dashboard/reservations", module: "Reservations", action: "view" },
+    { prefix: "/dashboard/restaurant/menu", module: "Menu", action: "view" },
+    { prefix: "/dashboard/restaurant/tables", module: "Tables", action: "view" },
+    { prefix: "/dashboard/restaurant/bookings", module: "Bookings", action: "view" },
+    { prefix: "/dashboard/restaurant/kot", module: "Menu", action: "view" },
+    { prefix: "/dashboard/restaurant", module: "Menu", action: "view" },
+    { prefix: "/dashboard/loyalty", module: "Loyalty", action: "view" },
+    { prefix: "/dashboard/my-website", module: "My Website", action: "view" },
+    { prefix: "/dashboard/settings", module: "Settings", action: "view" },
+  ] satisfies PrefixRule[]
+).slice().sort((a, b) => b.prefix.length - a.prefix.length);
 
 const ALWAYS_ALLOWED_PREFIXES = ["/dashboard/profile"];
 
+const DASHBOARD_HOME = new Set(["/dashboard", "/dashboard/home", "/dashboard/new-dashboard"]);
+
 export function resolveRoutePermission(pathname: string): RoutePermission | null {
   const path = pathname.replace(/\/+$/, "") || "/dashboard";
-  if (ALWAYS_ALLOWED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+  if (ALWAYS_ALLOWED_PREFIXES.some((prefix) => matchesPathPrefix(path, prefix))) {
     return null;
   }
-  for (const rule of ROUTE_RULES) {
-    if (rule.test(path)) {
+
+  // Action-specific product routes (more specific than Products view).
+  if (path === "/dashboard/inventory/products/create") {
+    return { module: "Products", action: "create" };
+  }
+  if (/^\/dashboard\/inventory\/products\/[^/]+\/edit$/.test(path)) {
+    return { module: "Products", action: "edit" };
+  }
+
+  if (DASHBOARD_HOME.has(path)) {
+    return { module: "Dashboard", action: "view" };
+  }
+
+  for (const rule of PREFIX_RULES) {
+    if (matchesPathPrefix(path, rule.prefix)) {
       return { module: rule.module, action: rule.action };
     }
   }
@@ -57,17 +110,26 @@ export function getNavPermission(
   overrides?: { permissionModule?: TenantRbacModule; permissionAction?: PermissionAction },
 ): RoutePermission | null {
   if (!path) return { module: parentModule, action: "view" };
+  // Strip query for path-based checks (sidebar POS uses ?fresh=1).
+  const bare = path.split("?")[0] ?? path;
   if (overrides?.permissionModule || overrides?.permissionAction) {
     return {
       module: overrides.permissionModule ?? parentModule,
       action: overrides.permissionAction ?? "view",
     };
   }
-  if (path === "/dashboard/inventory/products/create") {
-    return { module: "Inventory", action: "create" };
+  if (bare === "/dashboard/inventory/products/create") {
+    return { module: "Products", action: "create" };
   }
-  if (path.startsWith("/dashboard/user-management")) {
+  if (matchesPathPrefix(bare, "/dashboard/user-management")) {
     return { module: "User Management", action: "view" };
   }
   return { module: parentModule, action: "view" };
 }
+
+export {
+  RBAC_DINING_CHILDREN,
+  RBAC_FINANCE_CHILDREN,
+  RBAC_INVENTORY_CHILDREN,
+  RBAC_SALES_CHILDREN,
+};

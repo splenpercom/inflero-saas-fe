@@ -32,7 +32,7 @@ export function usePendingKotCount(pollMs = 15_000) {
     (isAuthenticated || isDemo) &&
     !isDemo &&
     hasModule("DINING") &&
-    hasPermission("Dining", "view");
+    hasPermission("Menu", "view");
   const [pendingCount, setPendingCount] = useState(sharedCount);
   const [seenCount, setSeenCount] = useState(() => {
     const raw = getStorageItem(sessionStorage, SEEN_KEY);

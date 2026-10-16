@@ -60,19 +60,19 @@ function samplePayload(language: "az" | "en" | "ru"): ThermalReceiptPayload {
 
 export function PosPrinterSettings({
   embedded = false,
-  /** Cashiers on POS use Sales; Settings page uses Settings RBAC. */
+  /** Cashiers on POS use POS RBAC; Settings page uses Settings RBAC. */
   accessModule = "Settings",
 }: {
   embedded?: boolean;
-  accessModule?: "Settings" | "Sales";
+  accessModule?: "Settings" | "POS";
 }) {
   const { language } = useLanguage();
   const { hasModule } = useAuth();
   /** Dual printers (receipt + KOT) only when Dining plugin is enabled. */
   const diningEnabled = hasModule("DINING");
   const { canView, canEdit } = useModulePermissions(accessModule);
-  /** Terminal printer map is local — Sales users with view can configure this PC. */
-  const canMutate = accessModule === "Sales" ? canView : canEdit;
+  /** Terminal printer map is local — POS users with view can configure this PC. */
+  const canMutate = accessModule === "POS" ? canView : canEdit;
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [settings, setSettings] = useState<PosPrinterSettings>(() => loadPosPrinterSettings());

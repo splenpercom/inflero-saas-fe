@@ -74,10 +74,10 @@ export function NewDashboard() {
   const { user, hasModule, hasPermission } = useAuth();
   const reservationsEnabled =
     hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
-  // Low-stocks page is STOCK-gated; accept Stock or Inventory view so existing roles keep access.
+  // Low-stocks page is STOCK-gated; accept Stock or Products view so existing roles keep access.
   const stockEnabled =
-    hasModule("STOCK") && (hasPermission("Stock", "view") || hasPermission("Inventory", "view"));
-  const posEnabled = hasModule("POS") && hasPermission("Sales", "view");
+    hasModule("STOCK") && (hasPermission("Stock", "view") || hasPermission("Products", "view"));
+  const posEnabled = hasModule("POS") && hasPermission("POS", "view");
   const [summaryPeriod, setSummaryPeriod] = useState<DashboardPeriod>("1D");
   const [selectedPeriod, setSelectedPeriod] = useState<ChartRange>("1M");
   const [finPeriod, setFinPeriod] = useState<ChartRange>("1M");

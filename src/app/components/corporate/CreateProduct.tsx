@@ -16,6 +16,7 @@ import {
   createUnit,
   createProduct,
   uploadProductImage,
+  type ProductDetail,
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
 import { resolveProductsListReturn } from "../../lib/productsNavigation";
@@ -57,18 +58,32 @@ function productImageUrls(images: unknown): string[] {
   return images.map((img) => (typeof img === "string" ? img : (img as { url: string }).url));
 }
 
-export function CreateProduct() {
+export type CreateProductProps = {
+  /** Render form only (no page chrome / page scroll) for use inside a modal. */
+  embedded?: boolean;
+  /** Called after a successful create when not using Save & New. */
+  onCreated?: (product: ProductDetail) => void;
+  /** Called when Cancel is clicked in embedded mode. */
+  onCancel?: () => void;
+};
+
+export function CreateProduct({
+  embedded = false,
+  onCreated,
+  onCancel,
+}: CreateProductProps = {}) {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const duplicateId = searchParams.get("duplicate")?.trim() || "";
+  const duplicateId = embedded ? "" : searchParams.get("duplicate")?.trim() || "";
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
-  const { canCreate } = useModulePermissions("Inventory");
+  const { canCreate } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const nestedModalZ = embedded ? "z-[90]" : "z-50";
   const returnTo = resolveProductsListReturn(
     (location.state as { returnTo?: string } | null)?.returnTo,
   );
@@ -524,7 +539,7 @@ export function CreateProduct() {
       const initialStocks =
         stockEnabled && qty > 0 && branchId ? [{ storeId: branchId, quantity: qty }] : undefined;
 
-      await createProduct({
+      const created = await createProduct({
         name: productName.trim(),
         description: description.trim() || null,
         productType: "SINGLE",
@@ -550,6 +565,8 @@ export function CreateProduct() {
 
       if (opts?.andNew) {
         resetProductForm();
+      } else if (onCreated) {
+        onCreated(created);
       } else {
         navigate(returnTo);
       }
@@ -561,13 +578,22 @@ export function CreateProduct() {
   };
 
   const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+      return;
+    }
     navigate(returnTo);
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
-      <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
-        {/* Header */}
+    <div
+      className={
+        embedded ? "" : "flex-1 overflow-auto bg-gray-50 dark:bg-gray-950"
+      }
+    >
+      <div className={embedded ? "" : "p-4 sm:p-4 xl:p-6 2xl:px-8 py-4"}>
+        {/* Header — page mode only */}
+        {!embedded && (
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -585,6 +611,7 @@ export function CreateProduct() {
             <span>{pt("backToProduct")}</span>
           </button>
         </div>
+        )}
 
         {duplicateLoading ? (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-8 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -646,6 +673,8 @@ export function CreateProduct() {
                           onChange={(e) => setCategory(e)}
                           placeholder={pt("select")}
                           options={categories}
+                          searchable
+                          searchPlaceholder={tr("Kateqoriya axtar...", "Search category...")}
                         />
                       </div>
                       {canCreate && (
@@ -701,6 +730,8 @@ export function CreateProduct() {
                           onChange={(e) => setBrand(e)}
                           placeholder={pt("select")}
                           options={brands}
+                          searchable
+                          searchPlaceholder={tr("Brend axtar...", "Search brand...")}
                         />
                       </div>
                       {canCreate && (
@@ -1038,8 +1069,8 @@ export function CreateProduct() {
 
       {/* Add Category Modal — exact match of Category.tsx modal */}
       {isAddCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
+        <div className={`fixed inset-0 ${nestedModalZ} flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`}>
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {pickLang(language, "Kateqoriya Əlavə Et", "Add Category")}
@@ -1100,8 +1131,8 @@ export function CreateProduct() {
 
       {/* Add Sub Category Modal — exact match of SubCategory.tsx modal */}
       {isAddSubCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
+        <div className={`fixed inset-0 ${nestedModalZ} flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`}>
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {pickLang(language, "Alt Kateqoriya Əlavə Et", "Add Sub Category")}
@@ -1178,8 +1209,8 @@ export function CreateProduct() {
 
       {/* Add Brand Modal — exact match of Brands.tsx modal */}
       {isAddBrandModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
+        <div className={`fixed inset-0 ${nestedModalZ} flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`}>
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {pickLang(language, "Brend Əlavə Et", "Add Brand")}
@@ -1240,8 +1271,8 @@ export function CreateProduct() {
 
       {/* Add Unit Modal — exact match of Units.tsx modal */}
       {isAddUnitModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
+        <div className={`fixed inset-0 ${nestedModalZ} flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`}>
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {pickLang(language, "Vahid Əlavə Et", "Add Unit")}

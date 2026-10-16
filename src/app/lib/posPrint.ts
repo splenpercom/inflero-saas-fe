@@ -1,7 +1,7 @@
 import JsBarcode from "jsbarcode";
 import type { Language } from "../i18n/translations";
 import { pickLang } from "../i18n/pickLang";
-import type { PosOrderDetail } from "../api/sales";
+import type { PosOrderDetail, SalesReturnDetail } from "../api/sales";
 import { formatDateTime } from "./dateFormat";
 import { loadPosPrinterSettings } from "./posPrinterSettings";
 import {
@@ -749,6 +749,126 @@ export function posOrderToThermalPayload(
       ? { kitchenBannerOverride: opts.kitchenBannerOverride }
       : {}),
   };
+}
+
+/** Map sales return → thermal customer bill (billing / receipt printer). */
+export function salesReturnToThermalPayload(
+  detail: SalesReturnDetail,
+  opts: {
+    language: Language;
+    companyName: string;
+    logoSrc?: string | null;
+  },
+): ThermalReceiptPayload {
+  const language = opts.language;
+  const t = (az: string, en: string) => pickLang(language, az, en);
+  const labels = (() => {
+    const L = {
+      salesReturnBanner: t("*** SATIŞ QAYTARMASI ***", "*** SALES RETURN ***"),
+      returnedItems: t("Qaytarılan məhsullar", "Returned items"),
+      refunded: t("Qaytarılıb", "Refunded"),
+      refundDue: t("Qaytarılacaq", "Refund due"),
+      partiallyRefunded: t("Qismən qaytarılıb", "Partially Refunded"),
+    };
+    return L;
+  })();
+
+  const returnDate = new Date(detail.date);
+  const dateStr = Number.isNaN(returnDate.getTime())
+    ? detail.date
+    : formatDateTime(returnDate, language);
+
+  const items = detail.items.map((item) => {
+    const unit = parseMoney(item.unitPrice);
+    const lineDiscount = parseMoney(item.discount);
+    const qty = item.quantity;
+    // Net unit so qty × price matches refunded line total after line discount.
+    const netUnit =
+      qty > 0 && lineDiscount > 0
+        ? Math.max(0, Math.round(((unit * qty - lineDiscount) / qty) * 100) / 100)
+        : unit;
+    return {
+      name: item.productName,
+      qty,
+      price: netUnit,
+    };
+  });
+
+  const subtotal = items.reduce((sum, it) => sum + it.qty * it.price, 0);
+  const headerDiscount = parseMoney(detail.discount);
+  const shipping = parseMoney(detail.shipping);
+  const total = parseMoney(detail.total);
+  const paid = parseMoney(detail.paid);
+  const amountDue = parseMoney(detail.due) || Math.max(0, total - paid);
+
+  const statusKey = String(detail.orderPaymentStatus || detail.paymentStatus || "")
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const paymentStatusLabel =
+    statusKey === "refunded" || (total > 0 && paid >= total && amountDue < 0.01)
+      ? labels.refunded
+      : statusKey.includes("partial")
+        ? labels.partiallyRefunded
+        : detail.orderPaymentStatus || detail.paymentStatus || labels.refunded;
+
+  const lastPayment = (detail.payments ?? [])[0];
+  const methodRaw = (lastPayment?.method ?? "").toUpperCase();
+  const paymentMethod =
+    methodRaw === "CARD" || methodRaw === "CREDIT_CARD"
+      ? t("Kart", "Card")
+      : methodRaw === "CASH" || methodRaw === "CASH_ON_HAND"
+        ? t("Nağd", "Cash")
+        : methodRaw === "BANK" || methodRaw === "BANK_TRANSFER"
+          ? t("Bank", "Bank")
+          : lastPayment?.method?.trim() || t("Göstərilməyib", "Not specified");
+
+  return {
+    orderNo: detail.reference?.trim() || detail.documentNo?.trim() || detail.id.slice(0, 8),
+    date: dateStr,
+    customer: detail.customerName?.trim() || t("Anonim", "Anonymous"),
+    customerPhone: "—",
+    employee: "—",
+    items,
+    subtotal,
+    shipping,
+    serviceFee: 0,
+    discount: headerDiscount,
+    discountLabel: t("Endirim", "Discount"),
+    total,
+    paid,
+    amountDue,
+    paymentMethod,
+    paymentStatusLabel,
+    companyName: opts.companyName,
+    logoSrc: opts.logoSrc,
+    siteFooter: "https://www.inflero.com/",
+    receiptBanner: labels.salesReturnBanner,
+    ...(detail.posOrderReference?.trim()
+      ? { relatedOrderNo: detail.posOrderReference.trim() }
+      : {}),
+    productsSectionTitle: labels.returnedItems,
+    paidLabelOverride: labels.refunded,
+    amountDueLabelOverride: labels.refundDue,
+  };
+}
+
+/** Print sales return bill on the billing (receipt) printer. */
+export async function printSalesReturnTicket(opts: {
+  detail: SalesReturnDetail;
+  language: Language;
+  companyName: string;
+  logoSrc?: string | null;
+}): Promise<PosPrintResult> {
+  const payload = salesReturnToThermalPayload(opts.detail, {
+    language: opts.language,
+    companyName: opts.companyName,
+    logoSrc: opts.logoSrc,
+  });
+  return printPosTicket({
+    role: "receipt",
+    language: opts.language,
+    payload,
+  });
 }
 
 /** Convenience: map order detail → thermal print (receipt or KOT). */

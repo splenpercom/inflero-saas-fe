@@ -31,6 +31,7 @@ import { usePendingReservationCount } from "../../hooks/usePendingReservationCou
 import { useHeaderStats } from "../../hooks/useHeaderStats";
 import { useSubscriptionBadge } from "../../hooks/useSubscriptionRemaining";
 import type { TenantRbacModule } from "../../lib/rbacModules";
+import { hasAnyRbacPermission, RBAC_INVENTORY_CHILDREN } from "../../lib/rbacModules";
 import type { PermissionAction } from "../../lib/permissions";
 import { DaySalesBillModal } from "./DaySalesBillModal";
 import { clearPosEditOrderSession } from "../../lib/posEditSession";
@@ -92,7 +93,7 @@ export const CorporateHeader = memo(function CorporateHeader({
   const { productCount, todayOrdersCount } = useHeaderStats();
   const subscriptionBadge = useSubscriptionBadge(pt);
 
-  const canViewInventory = hasPermission("Inventory", "view");
+  const canViewInventory = hasAnyRbacPermission(hasPermission, RBAC_INVENTORY_CHILDREN, "view");
 
   const handleLogout = async () => {
     exitDemo();
@@ -112,7 +113,7 @@ export const CorporateHeader = memo(function CorporateHeader({
         label: pt("Create", "Yarat"),
         path: "/dashboard/inventory/products/create",
         icon: Package,
-        module: "Inventory",
+        module: "Products",
         action: "create",
       },
       {
@@ -126,28 +127,28 @@ export const CorporateHeader = memo(function CorporateHeader({
         label: pt("Add Expense", "Xərc Əlavə Et"),
         path: "/dashboard/finances/expenses",
         icon: DollarSign,
-        module: "Finances",
+        module: "Expenses",
         action: "create",
       },
       {
         label: pt("Add Supplier", "Təchizatçı Əlavə Et"),
         path: "/dashboard/people/suppliers",
         icon: Users,
-        module: "People",
+        module: "Purchases",
         action: "create",
       },
       {
         label: pt("Add Customer", "Müştəri Əlavə Et"),
         path: "/dashboard/people/customers",
         icon: UserPlus,
-        module: "People",
+        module: "Customers",
         action: "create",
       },
     ];
     return actions.filter((action) => hasPermission(action.module, action.action));
   }, [hasPermission, language]);
 
-  const canViewPos = hasModule("POS") && hasPermission("Sales", "view");
+  const canViewPos = hasModule("POS") && hasPermission("POS", "view");
   const canViewReservations = hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
 
   // Check fullscreen status

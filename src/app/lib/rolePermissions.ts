@@ -7,15 +7,25 @@ export interface RolePermission {
   create: boolean;
   edit: boolean;
   delete: boolean;
-  /** Extra action — e.g. Sales: manage payments on POS Orders. */
+  /** Extra action — e.g. Orders: manage payments on POS Orders. */
   manage: boolean;
+}
+
+/** Modules that use the Manage flag (order payment actions). Others ignore it. */
+export const RBAC_MANAGE_MODULES = ["Orders"] as const;
+
+export function moduleSupportsManage(module: string): boolean {
+  return (RBAC_MANAGE_MODULES as readonly string[]).includes(module);
 }
 
 /** RBAC rows annotated as unavailable when the matching tenant module is off. */
 const RBAC_MODULE_TENANT_GATE: Partial<Record<(typeof TENANT_RBAC_MODULES)[number], TenantModuleKey>> = {
   Stock: "STOCK",
   Reservations: "RESERVATIONS",
-  Dining: "DINING",
+  Menu: "DINING",
+  Tables: "DINING",
+  Bookings: "DINING",
+  POS: "POS",
   Loyalty: "LOYALTY",
   "My Website": "WEB_EDITOR",
 };
@@ -72,7 +82,7 @@ export function toApiPermissions(formRows: RolePermission[]): RolePermission[] {
       create: p.create,
       edit: p.edit,
       delete: p.delete,
-      manage: p.manage ?? false,
+      manage: moduleSupportsManage(p.module) ? (p.manage ?? false) : false,
     }));
 }
 

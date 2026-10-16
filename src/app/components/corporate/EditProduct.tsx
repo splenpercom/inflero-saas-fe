@@ -80,7 +80,7 @@ export function EditProduct() {
   const { id } = useParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
-  const { canCreate, canEdit } = useModulePermissions("Inventory");
+  const { canCreate, canEdit } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);

@@ -44,7 +44,7 @@ export function Category() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Inventory");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Categories");
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Ban, X } from "lucide-react";
+import { Ban, Loader2, Printer, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
@@ -15,9 +15,12 @@ import {
   mapPaymentMethodToApi,
   type PosUiPaymentMethod,
 } from "../../lib/salesMappers";
-import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { cn } from "../ui/utils";
 import { ModernSelect } from "../ui/ModernSelect";
+import { APP_LOGO_LIGHT } from "../../lib/branding";
+import { getCompanyLogoUrl } from "../../lib/userDisplay";
+import { printSalesReturnTicket } from "../../lib/posPrint";
 
 import { pickLang } from "../../i18n/pickLang";
 
@@ -35,10 +38,10 @@ export function SalesReturnDetailModal({
   onChanged,
 }: SalesReturnDetailModalProps) {
   const { language } = useLanguage();
-  const { isDemo, isAuthenticated, hasModule } = useAuth();
+  const { isDemo, isAuthenticated, hasModule, user } = useAuth();
   const stockEnabled = hasModule("STOCK");
   const askConfirm = useConfirm();
-  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
+  const { canDelete: canVoidFinance } = useModulePermissions("Payments");
   const [detail, setDetail] = useState<SalesReturnDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -47,6 +50,7 @@ export function SalesReturnDetailModal({
   const [paymentReference, setPaymentReference] = useState("");
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -147,6 +151,36 @@ export function SalesReturnDetailModal({
     }
   };
 
+  const handlePrintBill = async () => {
+    if (!detail || isDemo) return;
+    if (detail.items.length === 0) {
+      notifyWarning(tr("Qaytarmada məhsul yoxdur", "This return has no items"));
+      return;
+    }
+    setPrinting(true);
+    try {
+      const logoSrc =
+        getCompanyLogoUrl(user?.tenant, false) ??
+        getCompanyLogoUrl(user?.tenant, true) ??
+        APP_LOGO_LIGHT;
+      const result = await printSalesReturnTicket({
+        detail,
+        language,
+        companyName: user?.tenant?.name?.trim() || "Inflero",
+        logoSrc,
+      });
+      notifySuccess(
+        result.channel === "qz"
+          ? tr(`Qəbz çap edildi → ${result.printer}`, `Bill printed → ${result.printer}`)
+          : tr("Brauzer çap dialoqu açıldı", "Browser print dialog opened"),
+      );
+    } catch (err) {
+      notifyFromError(err, tr("Qəbz çapı alınmadı", "Failed to print bill"));
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   const orderStatus = detail?.orderPaymentStatus || detail?.statusLabel || "—";
 
   return (
@@ -164,9 +198,27 @@ export function SalesReturnDetailModal({
               <p className="text-xs text-gray-500 dark:text-gray-400">{detail.reference}</p>
             )}
           </div>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {detail && !loading ? (
+              <button
+                type="button"
+                disabled={printing || isDemo || detail.items.length === 0}
+                onClick={() => void handlePrintBill()}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white transition-colors disabled:opacity-50"
+                title={tr("Qəbzi çap et (billing printer)", "Print bill (billing printer)")}
+              >
+                {printing ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Printer className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden sm:inline">{tr("Qəbz çapı", "Print Bill")}</span>
+              </button>
+            ) : null}
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-y-auto flex-1 p-4 space-y-4">

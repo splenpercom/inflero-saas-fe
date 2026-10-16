@@ -43,8 +43,8 @@ export function ShowPaymentsModal({
   const { language } = useLanguage();
   const { isDemo } = useAuth();
   const askConfirm = useConfirm();
-  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
-  const { canManage: canManageOrderPayments } = useModulePermissions("Sales");
+  const { canDelete: canVoidFinance } = useModulePermissions("Payments");
+  const { canManage: canManageOrderPayments } = useModulePermissions("Orders");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);

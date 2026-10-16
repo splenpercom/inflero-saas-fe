@@ -29,7 +29,7 @@ export function TransferDetailModal({ transfer, onClose, onChanged }: TransferDe
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, hasPermission } = useAuth();
   const { canEdit, canDelete } = useModulePermissions("Stock");
-  const canSellFinance = hasPermission("Finances", "create");
+  const canSellFinance = hasPermission("Payments", "create");
   const askConfirm = useConfirm();
 
   const [detail, setDetail] = useState<StockTransferDetail | null>(null);

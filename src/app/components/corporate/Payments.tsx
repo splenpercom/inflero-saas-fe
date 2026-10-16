@@ -41,7 +41,7 @@ import { pickLang } from "../../i18n/pickLang";
 export function Payments() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canEdit, canDelete } = useModulePermissions("Finances");
+  const { canView, canEdit, canDelete } = useModulePermissions("Payments");
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);

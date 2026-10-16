@@ -58,9 +58,8 @@ export function UserManagement() {
   const branchRevision = useBranchRevision();
   const { isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
-  const diningEnabled = hasModule("DINING");
   const posEnabled = hasModule("POS");
-  const showPosPasscodeUi = diningEnabled && posEnabled;
+  const showPosPasscodeUi = posEnabled;
 
   const activeTab: "users" | "roles" = /\/user-management\/roles\/?$/.test(
     location.pathname.replace(/\/+$/, "") || location.pathname,

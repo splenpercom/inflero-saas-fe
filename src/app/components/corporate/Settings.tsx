@@ -1,7 +1,7 @@
 import { pickLang } from "../../i18n/pickLang";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router";
-import { ChevronDown, ChevronUp, Upload, X, MapPin, Loader2, Printer } from "lucide-react";
+import { Upload, X, MapPin, Loader2, Printer } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
@@ -13,6 +13,7 @@ import {
   uploadTenantSettingsAsset,
   deleteTenantSettingsAsset,
   type TenantSettingsRecord,
+  type TenantSettingsUpdate,
 } from "../../api/tenantSettings";
 import { fetchSalesBillers, updateSalesBiller, type SalesBillerRow } from "../../api/sales";
 import { notifyFromError, notifyInfo, notifySuccess, notifyWarning } from "../../lib/toast";
@@ -22,7 +23,6 @@ import { PosPrinterSettings } from "./PosPrinterSettings";
 
 type SettingsSection =
   | "companyInfo"
-  | "companyImages"
   | "address"
   | "socials"
   | "addons"
@@ -80,7 +80,6 @@ export function Settings() {
   const canEditBranchAddons = canEditBranchSettings;
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
-  // Nav: sidebar section selection (Company group is collapsible)
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
     searchParams.get("section") === "printers" && posEnabled && diningEnabled
@@ -102,8 +101,6 @@ export function Settings() {
       setSearchParams({}, { replace: true });
     }
   };
-  const [companyNavOpen, setCompanyNavOpen] = useState(true);
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoRemoving, setLogoRemoving] = useState(false);
@@ -144,6 +141,9 @@ export function Settings() {
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
+  const [posDefaultPaymentStatus, setPosDefaultPaymentStatus] = useState<
+    "PENDING" | "PAID" | "NONE"
+  >("PENDING");
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [billers, setBillers] = useState<SalesBillerRow[]>([]);
   const [commissionDrafts, setCommissionDrafts] = useState<Record<string, CommissionDraft>>({});
@@ -160,6 +160,7 @@ export function Settings() {
     posQrOrderAlarmEnabled: boolean;
     tableHourlyBillingEnabled: boolean;
     posStaffPasscodeEnabled: boolean;
+    posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";
     inventoryServicesEnabled: boolean;
     billers: SalesBillerRow[];
   } | null>(null);
@@ -216,7 +217,14 @@ export function Settings() {
     setPosEditableProductPricesEnabled(data.posEditableProductPricesEnabled === true);
     setPosQrOrderAlarmEnabled(diningEnabled && data.posQrOrderAlarmEnabled !== false);
     setTableHourlyBillingEnabled(diningEnabled && data.tableHourlyBillingEnabled === true);
-    setPosStaffPasscodeEnabled(diningEnabled && data.posStaffPasscodeEnabled === true);
+    setPosStaffPasscodeEnabled(data.posStaffPasscodeEnabled === true);
+    setPosDefaultPaymentStatus(
+      data.posDefaultPaymentStatus === "PAID"
+        ? "PAID"
+        : data.posDefaultPaymentStatus === "NONE"
+          ? "NONE"
+          : "PENDING",
+    );
     setInventoryServicesEnabled(data.inventoryServicesEnabled === true);
     setSavedLogoUrl(data.companyLogo);
     setLogoFile(null);
@@ -268,6 +276,12 @@ export function Settings() {
           posQrOrderAlarmEnabled: data.posQrOrderAlarmEnabled !== false,
           tableHourlyBillingEnabled: data.tableHourlyBillingEnabled === true,
           posStaffPasscodeEnabled: data.posStaffPasscodeEnabled === true,
+          posDefaultPaymentStatus:
+            data.posDefaultPaymentStatus === "PAID"
+              ? "PAID"
+              : data.posDefaultPaymentStatus === "NONE"
+                ? "NONE"
+                : "PENDING",
           inventoryServicesEnabled: data.inventoryServicesEnabled === true,
           billers: billerRows,
         };
@@ -392,127 +406,150 @@ export function Settings() {
       return;
     }
 
-    if (!companyName.trim() || !companyEmail.trim() || !phoneNumber.trim()) {
-      notifyFromError(null, pt("Company name, email, and phone are required.", "Şirkət adı, e-poçt və telefon mütləqdir."));
-      return;
+    // Company / address completeness only applies when saving those sections.
+    // Add-ons (and socials) save independently so incomplete company details never block them.
+    if (activeSection === "companyInfo") {
+      if (!companyName.trim() || !companyEmail.trim() || !phoneNumber.trim()) {
+        notifyFromError(
+          null,
+          pt("Company name, email, and phone are required.", "Şirkət adı, e-poçt və telefon mütləqdir."),
+        );
+        return;
+      }
     }
-    if (!address.trim() || !city.trim() || !postalCode.trim()) {
-      notifyFromError(null, pt("Address, city, and postal code are required.", "Ünvan, şəhər və poçt kodu mütləqdir."));
-      return;
+    if (activeSection === "address") {
+      if (!address.trim() || !city.trim() || !postalCode.trim()) {
+        notifyFromError(
+          null,
+          pt("Address, city, and postal code are required.", "Ünvan, şəhər və poçt kodu mütləqdir."),
+        );
+        return;
+      }
     }
 
     setSaving(true);
     try {
-      for (const b of posEnabled ? billers : []) {
-        const draft = commissionDrafts[b.id];
-        if (!draft) continue;
-        const nextType = draft.commissionType === "" ? null : draft.commissionType;
-        const rawVal = draft.commissionValue.trim();
-        if (nextType != null) {
-          const nextValue = rawVal === "" ? NaN : Number(rawVal);
-          if (Number.isNaN(nextValue) || nextValue < 0) {
-            notifyFromError(
-              null,
-              pt(
-                `Invalid commission for ${b.name}.`,
-                `${b.name} üçün komissiya düzgün deyil.`,
-              ),
-            );
-            return;
-          }
-          if (nextType === "PERCENT" && nextValue > 100) {
-            notifyFromError(
-              null,
-              pt(
-                `Percent commission for ${b.name} cannot exceed 100.`,
-                `${b.name} üçün faiz komissiyası 100-dən çox ola bilməz.`,
-              ),
-            );
-            return;
+      if (activeSection === "addons" && posEnabled) {
+        for (const b of billers) {
+          const draft = commissionDrafts[b.id];
+          if (!draft) continue;
+          const nextType = draft.commissionType === "" ? null : draft.commissionType;
+          const rawVal = draft.commissionValue.trim();
+          if (nextType != null) {
+            const nextValue = rawVal === "" ? NaN : Number(rawVal);
+            if (Number.isNaN(nextValue) || nextValue < 0) {
+              notifyFromError(
+                null,
+                pt(
+                  `Invalid commission for ${b.name}.`,
+                  `${b.name} üçün komissiya düzgün deyil.`,
+                ),
+              );
+              return;
+            }
+            if (nextType === "PERCENT" && nextValue > 100) {
+              notifyFromError(
+                null,
+                pt(
+                  `Percent commission for ${b.name} cannot exceed 100.`,
+                  `${b.name} üçün faiz komissiyası 100-dən çox ola bilməz.`,
+                ),
+              );
+              return;
+            }
           }
         }
       }
 
       let companyLogo: string | null | undefined;
-      if (logoFile) {
-        companyLogo = await uploadTenantSettingsAsset("companyLogo", logoFile);
-      } else if (savedLogoUrl && !logoPreview) {
-        companyLogo = null;
+      if (activeSection === "companyInfo") {
+        if (logoFile) {
+          companyLogo = await uploadTenantSettingsAsset("companyLogo", logoFile);
+        } else if (savedLogoUrl && !logoPreview) {
+          companyLogo = null;
+        }
       }
 
-      await updateTenantSettings({
-        companyName: companyName.trim(),
-        companyEmail: companyEmail.trim(),
-        phone: phoneNumber.trim(),
-        address: address.trim(),
-        city: city.trim(),
-        postalCode: postalCode.trim(),
-        website: emptyToNull(website),
-        latitude,
-        longitude,
-        ...(canEditBranchAddons && posEnabled
-          ? {
-              employeeCommissionEnabled,
-              posServiceFeeEnabled,
-              posSendToProductionEnabled,
-              posPrintProductBrandEnabled,
-              posEditableProductPricesEnabled,
-              ...(diningEnabled
-                ? {
-                    posSendToBarEnabled,
-                    posBarBillShowPricesEnabled,
-                    posQrOrderAlarmEnabled,
-                    tableHourlyBillingEnabled,
-                    posStaffPasscodeEnabled,
-                  }
-                : {}),
-            }
-          : {}),
-        ...(canEditBranchAddons && addonsEnabled ? { inventoryServicesEnabled } : {}),
-        socialLinks: {
+      const payload: TenantSettingsUpdate = {};
+
+      if (activeSection === "companyInfo") {
+        payload.companyName = companyName.trim();
+        payload.companyEmail = companyEmail.trim();
+        payload.phone = phoneNumber.trim();
+        if (companyLogo !== undefined) payload.companyLogo = companyLogo;
+      } else if (activeSection === "address") {
+        payload.address = address.trim();
+        payload.city = city.trim();
+        payload.postalCode = postalCode.trim();
+        payload.latitude = latitude;
+        payload.longitude = longitude;
+      } else if (activeSection === "socials") {
+        payload.website = emptyToNull(website);
+        payload.socialLinks = {
           instagram: emptyToNull(instagram),
           facebook: emptyToNull(facebook),
           telegram: emptyToNull(telegram),
           whatsapp: emptyToNull(whatsapp),
           tiktok: emptyToNull(tiktok),
-        },
-        ...(companyLogo !== undefined ? { companyLogo } : {}),
-      });
-
-      for (const b of billers) {
-        const draft = commissionDrafts[b.id];
-        if (!draft) continue;
-        const nextType = draft.commissionType === "" ? null : draft.commissionType;
-        const rawVal = draft.commissionValue.trim();
-        const nextValue =
-          nextType == null || rawVal === "" ? null : Number(rawVal);
-        const prevType = b.commissionType ?? null;
-        const prevValue = b.commissionValue != null ? Number(b.commissionValue) : null;
-        if (prevType === nextType && prevValue === nextValue) continue;
-        await updateSalesBiller(b.id, {
-          commissionType: nextType,
-          commissionValue: nextValue,
-        });
+        };
+      } else if (activeSection === "addons") {
+        if (canEditBranchAddons && posEnabled) {
+          payload.employeeCommissionEnabled = employeeCommissionEnabled;
+          payload.posServiceFeeEnabled = posServiceFeeEnabled;
+          payload.posSendToProductionEnabled = posSendToProductionEnabled;
+          payload.posPrintProductBrandEnabled = posPrintProductBrandEnabled;
+          payload.posEditableProductPricesEnabled = posEditableProductPricesEnabled;
+          payload.posStaffPasscodeEnabled = posStaffPasscodeEnabled;
+          payload.posDefaultPaymentStatus = posDefaultPaymentStatus;
+          if (diningEnabled) {
+            payload.posSendToBarEnabled = posSendToBarEnabled;
+            payload.posBarBillShowPricesEnabled = posBarBillShowPricesEnabled;
+            payload.posQrOrderAlarmEnabled = posQrOrderAlarmEnabled;
+            payload.tableHourlyBillingEnabled = tableHourlyBillingEnabled;
+          }
+        }
+        if (canEditBranchAddons && addonsEnabled) {
+          payload.inventoryServicesEnabled = inventoryServicesEnabled;
+        }
       }
 
-      const refreshedBillers = posEnabled
-        ? await fetchSalesBillers().catch(() => billers)
-        : [];
-      applyBillerDrafts(refreshedBillers);
-      addonSnapshotRef.current = {
-        employeeCommissionEnabled,
-        posServiceFeeEnabled,
-        posSendToProductionEnabled,
-        posSendToBarEnabled,
-        posBarBillShowPricesEnabled,
-        posPrintProductBrandEnabled,
-        posEditableProductPricesEnabled,
-        posQrOrderAlarmEnabled,
-        tableHourlyBillingEnabled,
-        posStaffPasscodeEnabled,
-        inventoryServicesEnabled,
-        billers: refreshedBillers,
-      };
+      await updateTenantSettings(payload);
+
+      if (activeSection === "addons" && posEnabled) {
+        for (const b of billers) {
+          const draft = commissionDrafts[b.id];
+          if (!draft) continue;
+          const nextType = draft.commissionType === "" ? null : draft.commissionType;
+          const rawVal = draft.commissionValue.trim();
+          const nextValue =
+            nextType == null || rawVal === "" ? null : Number(rawVal);
+          const prevType = b.commissionType ?? null;
+          const prevValue = b.commissionValue != null ? Number(b.commissionValue) : null;
+          if (prevType === nextType && prevValue === nextValue) continue;
+          await updateSalesBiller(b.id, {
+            commissionType: nextType,
+            commissionValue: nextValue,
+          });
+        }
+
+        const refreshedBillers = await fetchSalesBillers().catch(() => billers);
+        applyBillerDrafts(refreshedBillers);
+        addonSnapshotRef.current = {
+          employeeCommissionEnabled,
+          posServiceFeeEnabled,
+          posSendToProductionEnabled,
+          posSendToBarEnabled,
+          posBarBillShowPricesEnabled,
+          posPrintProductBrandEnabled,
+          posEditableProductPricesEnabled,
+          posQrOrderAlarmEnabled,
+          tableHourlyBillingEnabled,
+          posStaffPasscodeEnabled,
+          posDefaultPaymentStatus,
+          inventoryServicesEnabled,
+          billers: refreshedBillers,
+        };
+      }
 
       if (companyLogo !== undefined) {
         setSavedLogoUrl(companyLogo);
@@ -525,12 +562,12 @@ export function Settings() {
       }
 
       snapshotRef.current = {
-        companyName: companyName.trim(),
-        companyEmail: companyEmail.trim(),
-        phoneNumber: phoneNumber.trim(),
-        address: address.trim(),
-        city: city.trim(),
-        postalCode: postalCode.trim(),
+        companyName: activeSection === "companyInfo" ? companyName.trim() : companyName,
+        companyEmail: activeSection === "companyInfo" ? companyEmail.trim() : companyEmail,
+        phoneNumber: activeSection === "companyInfo" ? phoneNumber.trim() : phoneNumber,
+        address: activeSection === "address" ? address.trim() : address,
+        city: activeSection === "address" ? city.trim() : city,
+        postalCode: activeSection === "address" ? postalCode.trim() : postalCode,
         instagram,
         facebook,
         telegram,
@@ -566,6 +603,7 @@ export function Settings() {
         setPosQrOrderAlarmEnabled(addonSnapshotRef.current.posQrOrderAlarmEnabled);
         setTableHourlyBillingEnabled(addonSnapshotRef.current.tableHourlyBillingEnabled);
         setPosStaffPasscodeEnabled(addonSnapshotRef.current.posStaffPasscodeEnabled);
+        setPosDefaultPaymentStatus(addonSnapshotRef.current.posDefaultPaymentStatus);
         setInventoryServicesEnabled(addonSnapshotRef.current.inventoryServicesEnabled);
         applyBillerDrafts(addonSnapshotRef.current.billers);
       }
@@ -597,16 +635,12 @@ export function Settings() {
     if (!diningEnabled && tableHourlyBillingEnabled) {
       setTableHourlyBillingEnabled(false);
     }
-    if (!diningEnabled && posStaffPasscodeEnabled) {
-      setPosStaffPasscodeEnabled(false);
-    }
   }, [
     diningEnabled,
     posSendToBarEnabled,
     posBarBillShowPricesEnabled,
     posQrOrderAlarmEnabled,
     tableHourlyBillingEnabled,
-    posStaffPasscodeEnabled,
   ]);
 
   const navItemClass = (section: SettingsSection) =>
@@ -639,70 +673,42 @@ export function Settings() {
 
         <div className="flex flex-col md:flex-row gap-3">
           {/* Left sidebar */}
-          <nav className="w-full md:w-56 shrink-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-2 h-fit">
-            <div>
-              <button
-                type="button"
-                onClick={() => setCompanyNavOpen(!companyNavOpen)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-              >
-                <span>{pt("Company Settings", "Şirkət Parametrləri")}</span>
-                {companyNavOpen ? (
-                  <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                )}
-              </button>
-              {companyNavOpen && (
-                <div className="mt-0.5 space-y-0.5 pl-1">
-                  <button
-                    type="button"
-                    onClick={() => selectSection("companyInfo")}
-                    className={navItemClass("companyInfo")}
-                  >
-                    {pt("Company Information", "Şirkət Məlumatı")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectSection("companyImages")}
-                    className={navItemClass("companyImages")}
-                  >
-                    {pt("Company Images", "Şirkət Şəkilləri")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectSection("address")}
-                    className={navItemClass("address")}
-                  >
-                    {pt("Address Information", "Ünvan Məlumatı")}
-                  </button>
-                </div>
-              )}
-            </div>
-
+          <nav className="w-full md:w-56 shrink-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-2 h-fit space-y-0.5">
+            <button
+              type="button"
+              onClick={() => selectSection("companyInfo")}
+              className={navItemClass("companyInfo")}
+            >
+              {pt("Company Information", "Şirkət Məlumatı")}
+            </button>
+            <button
+              type="button"
+              onClick={() => selectSection("address")}
+              className={navItemClass("address")}
+            >
+              {pt("Address Information", "Ünvan Məlumatı")}
+            </button>
             <button
               type="button"
               onClick={() => selectSection("socials")}
-              className={`mt-0.5 ${navItemClass("socials")}`}
+              className={navItemClass("socials")}
             >
               {pt("Social Media & Links", "Sosial Media & Linklər")}
             </button>
-
             {addonsEnabled && (
               <button
                 type="button"
                 onClick={() => selectSection("addons")}
-                className={`mt-0.5 ${navItemClass("addons")}`}
+                className={navItemClass("addons")}
               >
                 {pt("Add-ons", "Əlavələr")}
               </button>
             )}
-
             {posEnabled && diningEnabled && (
               <button
                 type="button"
                 onClick={() => selectSection("printers")}
-                className={`mt-0.5 ${navItemClass("printers")} flex items-center gap-1.5`}
+                className={`${navItemClass("printers")} flex items-center gap-1.5`}
               >
                 <Printer className="w-3.5 h-3.5" />
                 {pt("POS Printers", "POS Printerlər")}
@@ -757,21 +763,10 @@ export function Settings() {
                       />
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
 
-            {activeSection === "companyImages" && (
-              <div>
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {pt("Company Images", "Şirkət Şəkilləri")}
-                  </h2>
-                </div>
-                <div className="px-4 pb-4">
-                  <div className="space-y-4 mt-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
+                  <div className="mt-5 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
                         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {pt("Company Logo", "Şirkət Loqosu")}
                         </label>
@@ -779,23 +774,27 @@ export function Settings() {
                           {pt("Upload Logo of your Company", "Şirkətinizin loqosunu yükləyin")}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         {logoPreview ? (
                           <div className="relative">
-                            <img src={logoPreview} alt="Company Logo" className="w-12 h-12 rounded-lg object-cover border border-gray-300 dark:border-gray-700" />
+                            <img
+                              src={logoPreview}
+                              alt="Company Logo"
+                              className="w-12 h-12 rounded-lg object-cover border border-gray-300 dark:border-gray-700"
+                            />
                             {canEdit && (
-                            <button
-                              type="button"
-                              onClick={handleRemoveImage}
-                              disabled={logoRemoving || saving}
-                              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50"
-                            >
-                              {logoRemoving ? (
-                                <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
-                              ) : (
-                                <X className="w-2.5 h-2.5 text-white" />
-                              )}
-                            </button>
+                              <button
+                                type="button"
+                                onClick={handleRemoveImage}
+                                disabled={logoRemoving || saving}
+                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50"
+                              >
+                                {logoRemoving ? (
+                                  <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                                ) : (
+                                  <X className="w-2.5 h-2.5 text-white" />
+                                )}
+                              </button>
                             )}
                           </div>
                         ) : canEdit ? (
@@ -813,7 +812,10 @@ export function Settings() {
                       </div>
                     </div>
                     <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                      {pt("Recommended size is 450x+ x 450px. Max size 5mb.", "Tövsiyə olunan ölçü 450x+ x 450px. Maks ölçü 5mb.")}
+                      {pt(
+                        "Recommended size is 450x+ x 450px. Max size 5mb.",
+                        "Tövsiyə olunan ölçü 450x+ x 450px. Maks ölçü 5mb.",
+                      )}
                     </p>
                   </div>
                 </div>
@@ -1277,6 +1279,87 @@ export function Settings() {
                     </button>
                   </div>
 
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Staff passcode for POS orders", "POS sifarişləri üçün işçi kodu")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, POS filters staff who can place orders and requires each employee’s 4-digit passcode (when set) before placing or sending orders.",
+                          "Aktiv olduqda POS sifariş verə bilən işçiləri filtr edir və (təyin olunubsa) sifariş vermədən və ya göndərməzdən əvvəl hər işçinin 4 rəqəmli kodunu tələb edir.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit || !canEditBranchAddons}
+                      onClick={() => setPosStaffPasscodeEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        posStaffPasscodeEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={posStaffPasscodeEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          posStaffPasscodeEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Default POS payment status", "POS-da ilkin ödəniş statusu")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "Pre-selects Pending, Paid, or none on new POS orders. None requires the cashier to choose. Cashiers can still change it per order.",
+                          "Yeni POS sifarişlərində Gözləyir, Ödənilib və ya heç biri. Heç biri seçildikdə kassir seçməlidir. Kassir yenə də sifariş üzrə dəyişə bilər.",
+                        )}
+                      </p>
+                    </div>
+                    <div className="inline-flex shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                      <button
+                        type="button"
+                        disabled={!canEdit || !canEditBranchAddons}
+                        onClick={() => setPosDefaultPaymentStatus("PENDING")}
+                        className={`px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${
+                          posDefaultPaymentStatus === "PENDING"
+                            ? "bg-[#14b8a6] text-white"
+                            : "bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }`}
+                      >
+                        {pt("Pending", "Gözləyir")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!canEdit || !canEditBranchAddons}
+                        onClick={() => setPosDefaultPaymentStatus("PAID")}
+                        className={`px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-l border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-50 ${
+                          posDefaultPaymentStatus === "PAID"
+                            ? "bg-[#14b8a6] text-white"
+                            : "bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }`}
+                      >
+                        {pt("Paid", "Ödənilib")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!canEdit || !canEditBranchAddons}
+                        onClick={() => setPosDefaultPaymentStatus("NONE")}
+                        className={`px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-l border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-50 ${
+                          posDefaultPaymentStatus === "NONE"
+                            ? "bg-[#14b8a6] text-white"
+                            : "bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }`}
+                      >
+                        {pt("None", "Heç biri")}
+                      </button>
+                    </div>
+                  </div>
+
                   {posEnabled && diningEnabled ? (
                   <>
                   <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -1396,35 +1479,6 @@ export function Settings() {
                       <span
                         className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
                           tableHourlyBillingEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
-                    <div>
-                      <p className="text-xs font-medium text-gray-900 dark:text-white">
-                        {pt("Staff passcode for POS orders", "POS sifarişləri üçün işçi kodu")}
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">
-                        {pt(
-                          "When on, POS filters staff who can place orders and requires each employee’s 4-digit passcode (when set) before placing or sending orders.",
-                          "Aktiv olduqda POS sifariş verə bilən işçiləri filtr edir və (təyin olunubsa) sifariş vermədən və ya göndərməzdən əvvəl hər işçinin 4 rəqəmli kodunu tələb edir.",
-                        )}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!canEdit || !canEditBranchAddons}
-                      onClick={() => setPosStaffPasscodeEnabled((v) => !v)}
-                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
-                        posStaffPasscodeEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
-                      } disabled:opacity-50`}
-                      aria-pressed={posStaffPasscodeEnabled}
-                    >
-                      <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
-                          posStaffPasscodeEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
                         }`}
                       />
                     </button>

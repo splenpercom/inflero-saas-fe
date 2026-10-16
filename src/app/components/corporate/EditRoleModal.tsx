@@ -10,6 +10,7 @@ import {
   defaultPermissionMatrix,
   isRbacModuleVisible,
   mergeApiPermissions,
+  moduleSupportsManage,
   toApiPermissionsPreservingHidden,
   type RolePermission,
 } from "../../lib/rolePermissions";
@@ -56,10 +57,13 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
     permissionType: keyof Omit<RolePermission, "module">,
   ) => {
     setPermissions((prev) => {
+      const row = prev[moduleIndex];
+      if (!row) return prev;
+      if (permissionType === "manage" && !moduleSupportsManage(row.module)) return prev;
       const updated = [...prev];
       updated[moduleIndex] = {
-        ...updated[moduleIndex],
-        [permissionType]: !updated[moduleIndex][permissionType],
+        ...row,
+        [permissionType]: !row[permissionType],
       };
       return updated;
     });
@@ -69,14 +73,22 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
     setPermissions((prev) => {
       const updated = [...prev];
       const row = updated[moduleIndex];
-      const allEnabled = row.view && row.create && row.edit && row.delete && row.manage;
+      if (!row) return prev;
+      const supportsManage = moduleSupportsManage(row.module);
+      const allEnabled =
+        row.view &&
+        row.create &&
+        row.edit &&
+        row.delete &&
+        (!supportsManage || row.manage);
+      const next = !allEnabled;
       updated[moduleIndex] = {
         ...row,
-        view: !allEnabled,
-        create: !allEnabled,
-        edit: !allEnabled,
-        delete: !allEnabled,
-        manage: !allEnabled,
+        view: next,
+        create: next,
+        edit: next,
+        delete: next,
+        manage: supportsManage ? next : false,
       };
       return updated;
     });
@@ -142,31 +154,40 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
               </label>
               <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
+                  <table className="w-full table-fixed text-xs">
+                    <colgroup>
+                      <col />
+                      <col className="w-14" />
+                      <col className="w-14" />
+                      <col className="w-14" />
+                      <col className="w-14" />
+                      <col className="w-16" />
+                      <col className="w-14" />
+                    </colgroup>
                     <thead>
                       <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
-                        <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                        <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2">
                           {t("module")}
                         </th>
-                        <th className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                        <th className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center">
                           {t("view")}
                         </th>
-                        <th className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                        <th className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center">
                           {t("create")}
                         </th>
-                        <th className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                        <th className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center">
                           {t("edit")}
                         </th>
-                        <th className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                        <th className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center">
                           {t("delete")}
                         </th>
                         <th
-                          className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap"
+                          className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center"
                           title={t("managePaymentsHint")}
                         >
-                          {t("manage")}
+                          {t("managePayments")}
                         </th>
-                        <th className="text-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                        <th className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center">
                           {t("all")}
                         </th>
                       </tr>
@@ -174,109 +195,128 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
                     <tbody>
                       {permissions.map((permission, index) => {
                         const moduleAvailable = isRbacModuleVisible(permission.module, hasModule);
+                        const supportsManage = moduleSupportsManage(permission.module);
                         return (
                         <tr
                           key={permission.module}
                           className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
                         >
-                          <td className="px-3 py-2 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-                            {translateModuleName(permission.module, language)}
-                            {!moduleAvailable && (
-                              <span className="ml-2 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                                {t("unavailableModule")}
-                              </span>
-                            )}
+                          <td className="px-3 py-2 text-xs font-semibold text-gray-900 dark:text-white">
+                            <span className="block truncate">
+                              {translateModuleName(permission.module, language)}
+                              {!moduleAvailable && (
+                                <span className="ml-2 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                  {t("unavailableModule")}
+                                </span>
+                              )}
+                            </span>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <button
-                              type="button"
-                              disabled={!moduleAvailable}
-                              onClick={() => togglePermission(index, "view")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
-                                permission.view
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200 dark:bg-gray-700 text-gray-400"
-                              }`}
-                            >
-                              {permission.view ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                            </button>
+                          <td className="px-1 py-2">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                disabled={!moduleAvailable}
+                                onClick={() => togglePermission(index, "view")}
+                                className={`inline-flex w-5 h-5 shrink-0 rounded items-center justify-center transition-colors disabled:opacity-50 ${
+                                  permission.view
+                                    ? "bg-green-500 text-white"
+                                    : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                                }`}
+                              >
+                                {permission.view ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                              </button>
+                            </div>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <button
-                              type="button"
-                              disabled={!moduleAvailable}
-                              onClick={() => togglePermission(index, "create")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
-                                permission.create
-                                  ? "bg-blue-500 text-white"
-                                  : "bg-gray-200 dark:bg-gray-700 text-gray-400"
-                              }`}
-                            >
-                              {permission.create ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                            </button>
+                          <td className="px-1 py-2">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                disabled={!moduleAvailable}
+                                onClick={() => togglePermission(index, "create")}
+                                className={`inline-flex w-5 h-5 shrink-0 rounded items-center justify-center transition-colors disabled:opacity-50 ${
+                                  permission.create
+                                    ? "bg-blue-500 text-white"
+                                    : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                                }`}
+                              >
+                                {permission.create ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                              </button>
+                            </div>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <button
-                              type="button"
-                              disabled={!moduleAvailable}
-                              onClick={() => togglePermission(index, "edit")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
-                                permission.edit
-                                  ? "bg-[#14b8a6] text-white"
-                                  : "bg-gray-200 dark:bg-gray-700 text-gray-400"
-                              }`}
-                            >
-                              {permission.edit ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                            </button>
+                          <td className="px-1 py-2">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                disabled={!moduleAvailable}
+                                onClick={() => togglePermission(index, "edit")}
+                                className={`inline-flex w-5 h-5 shrink-0 rounded items-center justify-center transition-colors disabled:opacity-50 ${
+                                  permission.edit
+                                    ? "bg-[#14b8a6] text-white"
+                                    : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                                }`}
+                              >
+                                {permission.edit ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                              </button>
+                            </div>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <button
-                              type="button"
-                              disabled={!moduleAvailable}
-                              onClick={() => togglePermission(index, "delete")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
-                                permission.delete
-                                  ? "bg-red-500 text-white"
-                                  : "bg-gray-200 dark:bg-gray-700 text-gray-400"
-                              }`}
-                            >
-                              {permission.delete ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                            </button>
+                          <td className="px-1 py-2">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                disabled={!moduleAvailable}
+                                onClick={() => togglePermission(index, "delete")}
+                                className={`inline-flex w-5 h-5 shrink-0 rounded items-center justify-center transition-colors disabled:opacity-50 ${
+                                  permission.delete
+                                    ? "bg-red-500 text-white"
+                                    : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                                }`}
+                              >
+                                {permission.delete ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                              </button>
+                            </div>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <button
-                              type="button"
-                              disabled={!moduleAvailable}
-                              title={
-                                permission.module === "Sales" ? t("managePaymentsHint") : undefined
-                              }
-                              onClick={() => togglePermission(index, "manage")}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
-                                permission.manage
-                                  ? "bg-amber-500 text-white"
-                                  : "bg-gray-200 dark:bg-gray-700 text-gray-400"
-                              }`}
-                            >
-                              {permission.manage ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                            </button>
+                          <td className="px-1 py-2">
+                            <div className="flex justify-center">
+                              {supportsManage ? (
+                                <button
+                                  type="button"
+                                  disabled={!moduleAvailable}
+                                  title={t("managePaymentsHint")}
+                                  onClick={() => togglePermission(index, "manage")}
+                                  className={`inline-flex w-5 h-5 shrink-0 rounded items-center justify-center transition-colors disabled:opacity-50 ${
+                                    permission.manage
+                                      ? "bg-amber-500 text-white"
+                                      : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                                  }`}
+                                >
+                                  {permission.manage ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                </button>
+                              ) : (
+                                <span className="inline-flex w-5 h-5 shrink-0 items-center justify-center text-gray-300 dark:text-gray-600" aria-hidden>
+                                  <Minus className="w-3 h-3" />
+                                </span>
+                              )}
+                            </div>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <button
-                              type="button"
-                              disabled={!moduleAvailable}
-                              onClick={() => toggleAll(index)}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50 ${
-                                permission.view &&
-                                permission.create &&
-                                permission.edit &&
-                                permission.delete &&
-                                permission.manage
-                                  ? "bg-purple-500 text-white"
-                                  : "bg-gray-200 dark:bg-gray-700 text-gray-400"
-                              }`}
-                            >
-                              <Check className="w-3 h-3" />
-                            </button>
+                          <td className="px-1 py-2">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                disabled={!moduleAvailable}
+                                onClick={() => toggleAll(index)}
+                                className={`inline-flex w-5 h-5 shrink-0 rounded items-center justify-center transition-colors disabled:opacity-50 ${
+                                  permission.view &&
+                                  permission.create &&
+                                  permission.edit &&
+                                  permission.delete &&
+                                  (!supportsManage || permission.manage)
+                                    ? "bg-purple-500 text-white"
+                                    : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                                }`}
+                              >
+                                <Check className="w-3 h-3" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                         );

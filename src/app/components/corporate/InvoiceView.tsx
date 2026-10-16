@@ -43,8 +43,8 @@ export function InvoiceView() {
   const { id } = useParams();
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user } = useAuth();
-  const { canEdit, canDelete } = useModulePermissions("Sales");
-  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
+  const { canEdit, canDelete } = useModulePermissions("Orders");
+  const { canDelete: canVoidFinance } = useModulePermissions("Payments");
   const askConfirm = useConfirm();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [sourceOrder, setSourceOrder] = useState<PosOrderDetail | null>(null);

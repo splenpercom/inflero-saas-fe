@@ -33,7 +33,7 @@ export function usePendingQrOrderCount(pollMs = 20_000) {
     !isDemo &&
     hasModule("POS") &&
     hasModule("DINING") &&
-    hasPermission("Sales", "view");
+    hasPermission("Orders", "view");
   const [pendingCount, setPendingCount] = useState(sharedCount);
   const [seenCount, setSeenCount] = useState(() => {
     const raw = getStorageItem(sessionStorage, SEEN_KEY);

@@ -21,6 +21,7 @@ import { PurchaseBranchField, resolvePurchaseStoreIdForApi } from "./PurchaseBra
 import { SupplierRecentPurchasesPanel } from "./SupplierRecentPurchasesPanel";
 import { PurchaseDetailModal } from "./PurchaseDetailModal";
 import { AddSupplierModal, type SupplierFormData } from "./people/AddSupplierModal";
+import { CreateProductModal } from "./CreateProductModal";
 import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
@@ -144,7 +145,8 @@ export function AddPurchaseModal({
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
-  const { canCreate: canCreateSupplier } = useModulePermissions("People");
+  const { canCreate: canCreateSupplier } = useModulePermissions("Purchases");
+  const { canCreate: canCreateProduct } = useModulePermissions("Products");
   const { branchId, isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
   const isEdit = !!purchaseId;
@@ -153,6 +155,7 @@ export function AddPurchaseModal({
   const [supplierSearch, setSupplierSearch] = useState("");
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const [savingSupplier, setSavingSupplier] = useState(false);
+  const [addProductOpen, setAddProductOpen] = useState(false);
   const [date, setDate] = useState("");
   const [reference, setReference] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -187,6 +190,7 @@ export function AddPurchaseModal({
     if (!isOpen) {
       setAddSupplierOpen(false);
       setSavingSupplier(false);
+      setAddProductOpen(false);
       resetFormState({
         setSupplierId,
         setSupplierSearch,
@@ -639,20 +643,35 @@ export function AddPurchaseModal({
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
                 {tr("Məhsul", "Product")} <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  value={productSearch}
-                  disabled={linesLocked}
-                  onChange={(e) => {
-                    setProductSearch(e.target.value);
-                    setShowProductList(true);
-                  }}
-                  onFocus={() => setShowProductList(true)}
-                  placeholder={tr("Məhsul axtar", "Search product")}
-                  className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 disabled:opacity-50"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    disabled={linesLocked}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value);
+                      setShowProductList(true);
+                    }}
+                    onFocus={() => setShowProductList(true)}
+                    placeholder={tr("Məhsul axtar", "Search product")}
+                    className="w-full pl-8 pr-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 disabled:opacity-50"
+                  />
+                </div>
+                {canCreateProduct && !linesLocked && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProductList(false);
+                      setAddProductOpen(true);
+                    }}
+                    title={tr("Yeni məhsul əlavə et", "Add new product")}
+                    className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                )}
               </div>
               {!linesLocked && showProductList && productSearch && (
                 <div className="absolute z-20 w-full mt-1 max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
@@ -1000,6 +1019,26 @@ export function AddPurchaseModal({
         }}
         onSave={handleSaveNewSupplier}
         saving={savingSupplier}
+      />
+
+      <CreateProductModal
+        isOpen={addProductOpen}
+        onClose={() => setAddProductOpen(false)}
+        onCreated={(product) => {
+          const unitCostRaw =
+            product.purchasePrice != null && String(product.purchasePrice).trim() !== ""
+              ? String(product.purchasePrice).trim()
+              : String(product.price ?? "").trim();
+          const unitCost = sanitizeNumericTyping(unitCostRaw, { allowDecimal: true });
+          handleAddProduct(
+            product.id,
+            product.name,
+            product.sku ?? "",
+            product.category ?? "",
+            product.subCategory ?? "",
+            unitCost,
+          );
+        }}
       />
     </div>
   );

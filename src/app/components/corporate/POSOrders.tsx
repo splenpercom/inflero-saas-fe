@@ -137,6 +137,7 @@ function addLocalDays(ymd: string, days: number): string {
 /** Snap From/To calendar dates for a preset (times stay separate). */
 function datesForSortPreset(sortBy: string): { fromDate: string; toDate: string } {
   const toDate = localYmd();
+  if (sortBy === "today") return { fromDate: toDate, toDate };
   if (sortBy === "last30days") return { fromDate: addLocalDays(toDate, -30), toDate };
   if (sortBy === "last90days") return { fromDate: addLocalDays(toDate, -90), toDate };
   if (sortBy === "thisyear") {
@@ -149,6 +150,7 @@ function datesForSortPreset(sortBy: string): { fromDate: string; toDate: string 
 }
 
 const PERIOD_PRESETS = [
+  { value: "today", az: "Bu gün", en: "Today" },
   { value: "last7days", az: "Son 7 gün", en: "Last 7 days" },
   { value: "last30days", az: "Son 30 gün", en: "Last 30 days" },
   { value: "last90days", az: "Son 90 gün", en: "Last 90 days" },
@@ -283,7 +285,7 @@ export function POSOrders() {
     confirmPasscode,
   } = usePosStaffPasscodeGate();
   const { billers } = useSalesBillers(isAuthenticated || isDemo);
-  const { canView, canCreate, canEdit, canDelete, canManage } = useModulePermissions("Sales");
+  const { canView, canCreate, canEdit, canDelete, canManage } = useModulePermissions("Orders");
   const branchRevision = useBranchRevision();
   const prefersTouchKeyboard = usePrefersTouchKeyboard();
   const lastPointerType = useLastPointerType();
@@ -452,7 +454,7 @@ export function POSOrders() {
       .then((s) => {
         if (!cancelled) {
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
-          setPosStaffPasscodeEnabled(diningEnabled && s.posStaffPasscodeEnabled === true);
+          setPosStaffPasscodeEnabled(s.posStaffPasscodeEnabled === true);
         }
       })
       .catch(() => {
@@ -464,7 +466,7 @@ export function POSOrders() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, isDemo, branchRevision, diningEnabled]);
+  }, [isAuthenticated, isDemo, branchRevision]);
 
   const showProductionColumn = posSendToProductionEnabled && visibleColumns.production;
 
@@ -1896,7 +1898,7 @@ export function POSOrders() {
                                           (order.biller ?? "").trim().toLowerCase(),
                                       );
                                       await ensureWithPasscode({
-                                        featureOn: diningEnabled && posStaffPasscodeEnabled,
+                                        featureOn: posStaffPasscodeEnabled,
                                         hasPosPasscode: matched?.hasPosPasscode === true,
                                         staffName: matched?.name || order.biller || tr("İşçi", "Staff"),
                                         invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),

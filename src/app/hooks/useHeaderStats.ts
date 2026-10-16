@@ -7,8 +7,8 @@ const POLL_MS = 60000;
 
 export function useHeaderStats() {
   const { isAuthenticated, isDemo, hasModule, hasPermission } = useAuth();
-  const inventoryEnabled = hasPermission("Inventory", "view");
-  const posEnabled = hasModule("POS") && hasPermission("Sales", "view");
+  const inventoryEnabled = hasPermission("Products", "view");
+  const posEnabled = hasModule("POS") && hasPermission("POS", "view");
   const branchRevision = useBranchRevision();
   const [productCount, setProductCount] = useState(0);
   const [todayOrdersCount, setTodayOrdersCount] = useState(0);

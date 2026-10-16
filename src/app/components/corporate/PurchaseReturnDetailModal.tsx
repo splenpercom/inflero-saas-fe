@@ -42,7 +42,7 @@ export function PurchaseReturnDetailModal({
   const stockEnabled = hasModule("STOCK");
   const { branchId, isGlobalMode } = useBranch();
   const askConfirm = useConfirm();
-  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
+  const { canDelete: canVoidFinance } = useModulePermissions("Payments");
   const [detail, setDetail] = useState<PurchaseReturnDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [statusUi, setStatusUi] = useState("");

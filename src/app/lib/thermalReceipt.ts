@@ -192,6 +192,11 @@ export function thermalReceiptLabels(language: Language) {
     dailySales: t("GÜNÜN SATIŞLARI", "TODAY'S SALES"),
     productsSold: t("Satılan məhsullar", "Products sold"),
     noSales: t("Bu gün satış yoxdur", "No sales today"),
+    salesReturnBanner: t("*** SATIŞ QAYTARMASI ***", "*** SALES RETURN ***"),
+    returnedItems: t("Qaytarılan məhsullar", "Returned items"),
+    originalOrder: t("Əsas sifariş", "Original order"),
+    refunded: t("Qaytarılıb", "Refunded"),
+    refundDue: t("Qaytarılacaq", "Refund due"),
   };
 }
 
@@ -238,6 +243,16 @@ export type ThermalReceiptPayload = {
   siteFooter?: string;
   /** When set, replaces the default kitchen/bar banner (e.g. additional-items KOT). */
   kitchenBannerOverride?: string;
+  /** Customer-copy banner (e.g. sales return). */
+  receiptBanner?: string;
+  /** Linked original POS order reference (sales return). */
+  relatedOrderNo?: string;
+  /** Override products section title (e.g. Returned items). */
+  productsSectionTitle?: string;
+  /** Override paid row label (e.g. Refunded). */
+  paidLabelOverride?: string;
+  /** Override amount-due row label (e.g. Refund due). */
+  amountDueLabelOverride?: string;
 };
 
 export type BuildThermalReceiptOpts = {
@@ -291,6 +306,7 @@ export function buildThermalReceiptHtml(
       : undefined,
     tableHourlyCharge: data.tableHourlyCharge ?? 0,
     discount: data.discount,
+    cashbackEarned: data.cashbackEarned ?? 0,
     total: data.total,
     paid: data.paid ?? 0,
     amountDue: data.amountDue ?? Math.max(0, data.total - (data.paid ?? 0)),
@@ -339,6 +355,21 @@ export function buildThermalReceiptHtml(
       ? `<div class="center bold big" style="margin:6px 0;">${ticketBanner}</div>
        <div class="center bold" style="margin-bottom:4px;">${d.tableLabel ? `${L.table}: ${d.tableLabel}` : ""}</div>`
       : "";
+  const receiptBanner =
+    showPrices && data.receiptBanner
+      ? `<div class="center bold" style="margin:4px 0 2px;">${p(data.receiptBanner)}</div>`
+      : "";
+  const relatedOrderNo = data.relatedOrderNo ? p(data.relatedOrderNo) : "";
+  const relatedOrderLabel = p(labels.originalOrder);
+  const productsTitle = isTicket
+    ? L.orderItems
+    : data.productsSectionTitle
+      ? p(data.productsSectionTitle)
+      : L.products;
+  const paidLabel = data.paidLabelOverride ? p(data.paidLabelOverride) : L.paid;
+  const amountDueLabel = data.amountDueLabelOverride
+    ? p(data.amountDueLabelOverride)
+    : L.amountDue;
   const footer = receiptPrintText(language, data.siteFooter ?? "https://www.inflero.com/");
   const logo =
     showPrices && data.logoSrc ? brandLogoThermalHtml(data.logoSrc, company) : "";
@@ -357,10 +388,12 @@ export function buildThermalReceiptHtml(
 <body>
   ${logo}
   ${companyHeader}
+  ${receiptBanner}
   ${headerBanner}
   <div class="divider-solid"></div>
   <div class="row"><span class="label">${L.order}:</span><span>${d.orderNo}</span></div>
   <div class="row"><span class="label">${L.date}:</span><span>${d.date}</span></div>
+  ${relatedOrderNo && showPrices ? `<div class="row"><span class="label">${relatedOrderLabel}:</span><span>${relatedOrderNo}</span></div>` : ""}
   ${d.tableLabel && showPrices && !isBar ? `<div class="row"><span class="label">${L.table}:</span><span>${d.tableLabel}</span></div>` : ""}
   <div class="divider"></div>
   <div class="row"><span class="label">${L.customer}:</span><span>${d.customer}</span></div>
@@ -369,7 +402,7 @@ export function buildThermalReceiptHtml(
   ${d.mileage != null && showPrices ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
   ${isTicket ? `<div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>` : ""}
   <div class="divider-solid"></div>
-  <div class="section-title">${isTicket ? L.orderItems : L.products}</div>
+  <div class="section-title">${productsTitle}</div>
   ${d.items
     .map(
       (it) => `
@@ -400,9 +433,11 @@ export function buildThermalReceiptHtml(
   <div class="total-row"><span>${L.total}:</span><span>${d.total.toFixed(2)} AZN</span></div>
   ${
     d.amountDue > 0.009
-      ? `<div class="row" style="margin-top:2px;"><span class="label">${L.paid}:</span><span>${d.paid.toFixed(2)} AZN</span></div>
-  <div class="row"><span class="label" style="font-weight:700;">${L.amountDue}:</span><span style="font-weight:700;">${d.amountDue.toFixed(2)} AZN</span></div>`
-      : ""
+      ? `<div class="row" style="margin-top:2px;"><span class="label">${paidLabel}:</span><span>${d.paid.toFixed(2)} AZN</span></div>
+  <div class="row"><span class="label" style="font-weight:700;">${amountDueLabel}:</span><span style="font-weight:700;">${d.amountDue.toFixed(2)} AZN</span></div>`
+      : d.paid > 0.009
+        ? `<div class="row" style="margin-top:2px;"><span class="label">${paidLabel}:</span><span>${d.paid.toFixed(2)} AZN</span></div>`
+        : ""
   }
   <div class="row" style="margin-top:4px;"><span class="label">${L.payment}:</span><span>${d.paymentMethod}</span></div>
   <div class="row"><span class="label">${L.status}:</span><span>${d.paymentStatusLabel}</span></div>

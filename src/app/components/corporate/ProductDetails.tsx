@@ -148,7 +148,7 @@ export function ProductDetails() {
   const { id } = useParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
-  const { canView, canEdit } = useModulePermissions("Inventory");
+  const { canView, canEdit } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);

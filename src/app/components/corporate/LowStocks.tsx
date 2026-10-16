@@ -61,7 +61,7 @@ export function LowStocks() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const { isDemo, isAuthenticated } = useAuth();
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Inventory");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");

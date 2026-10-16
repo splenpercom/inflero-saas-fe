@@ -115,7 +115,7 @@ export function Products() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
-  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Inventory");
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch(); 
   // Translation helper - temporary until translations.ts is updated

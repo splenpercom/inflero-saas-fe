@@ -322,11 +322,12 @@ function reorderWithinVisible(
 }
 
 function getPosProductColumnCount(): number {
-  if (typeof window === "undefined") return 3;
+  if (typeof window === "undefined") return 2;
   if (window.matchMedia("(min-width: 1280px)").matches) return 6;
   if (window.matchMedia("(min-width: 1024px)").matches) return 5;
-  if (window.matchMedia("(min-width: 640px)").matches) return 4;
-  return 3;
+  if (window.matchMedia("(min-width: 768px)").matches) return 4;
+  if (window.matchMedia("(min-width: 640px)").matches) return 3;
+  return 2;
 }
 
 function ProductThumb({ image, className }: { image: string; className?: string }) {
@@ -345,6 +346,8 @@ function SelectDropdown({
   icon: Icon,
   disabled = false,
   variant = "row",
+  searchable = false,
+  searchPlaceholder = "Search...",
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -353,14 +356,39 @@ function SelectDropdown({
   icon?: React.ElementType;
   disabled?: boolean;
   variant?: "row" | "box";
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const selected = options.find((o) => o.id === value);
   const isBox = variant === "box";
+
+  const filteredOptions = useMemo(() => {
+    if (!searchable || !search.trim()) return options;
+    const q = search.trim().toLocaleLowerCase("az");
+    return options.filter((opt) => {
+      const label = opt.label.toLocaleLowerCase("az");
+      const sub = (opt.sub ?? "").toLocaleLowerCase("az");
+      return label.includes(q) || sub.includes(q);
+    });
+  }, [options, search, searchable]);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      return;
+    }
+    if (searchable) {
+      const id = window.setTimeout(() => searchRef.current?.focus(), 0);
+      return () => window.clearTimeout(id);
+    }
+  }, [open, searchable]);
 
   useEffect(() => {
     if (!open) return;
@@ -397,36 +425,65 @@ function SelectDropdown({
   const menu = open && menuPos ? (
     <div
       ref={menuRef}
-      className="fixed z-[200] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto"
+      className="fixed z-[200] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden"
       style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
     >
-      <button
-        type="button"
-        onClick={() => {
-          onChange("");
-          setOpen(false);
-        }}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-      >
-        {placeholder}
-      </button>
-      {options.map((opt) => (
+      {searchable && (
+        <div className="sticky top-0 z-10 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1.5">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setOpen(false);
+                }
+              }}
+              placeholder={searchPlaceholder}
+              className="w-full pl-7 pr-2 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#14b8a6]"
+            />
+          </div>
+        </div>
+      )}
+      <div className="max-h-52 overflow-y-auto">
         <button
-          key={opt.id}
           type="button"
           onClick={() => {
-            onChange(opt.id);
+            onChange("");
             setOpen(false);
           }}
-          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
-          <span className="flex-1 text-left">
-            <span className="block font-medium text-gray-900 dark:text-white">{opt.label}</span>
-            {opt.sub && <span className="block text-gray-400 text-[10px]">{opt.sub}</span>}
-          </span>
-          {value === opt.id && <Check className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6]" />}
+          {placeholder}
         </button>
-      ))}
+        {filteredOptions.length === 0 ? (
+          <div className="px-3 py-2.5 text-xs text-gray-400 text-center">
+            {search.trim() ? "No results" : "No options"}
+          </div>
+        ) : (
+          filteredOptions.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => {
+                onChange(opt.id);
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              <span className="flex-1 text-left min-w-0">
+                <span className="block font-medium text-gray-900 dark:text-white truncate">{opt.label}</span>
+                {opt.sub && <span className="block text-gray-400 text-[10px] truncate">{opt.sub}</span>}
+              </span>
+              {value === opt.id && <Check className="w-3 h-3 text-[#14b8a6] dark:text-[#14b8a6] flex-shrink-0" />}
+            </button>
+          ))
+        )}
+      </div>
     </div>
   ) : null;
 
@@ -440,7 +497,7 @@ function SelectDropdown({
         disabled={disabled}
         className={
           isBox
-            ? "w-full h-full min-h-[4.25rem] flex flex-col items-stretch justify-center gap-1 px-2 py-2 text-left bg-white dark:bg-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#14b8a6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+            ? "w-full h-full min-h-[2.75rem] flex flex-col items-stretch justify-center gap-0.5 px-2 py-1.5 text-left bg-white dark:bg-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#14b8a6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
             : `w-full flex items-center gap-2 ${Icon ? "pl-9" : "pl-3"} pr-3 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-white dark:disabled:hover:bg-gray-900`
         }
       >
@@ -1047,8 +1104,8 @@ export function CorporatePOS() {
   const opticsEnabled = hasModule("OPTICS");
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
-  const { canCreate, canEdit } = useModulePermissions("Sales");
-  const { canCreate: canCreateCustomer } = useModulePermissions("People");
+  const { canCreate, canEdit } = useModulePermissions("POS");
+  const { canCreate: canCreateCustomer } = useModulePermissions("Customers");
   const prefersTouchKeyboard = usePrefersTouchKeyboard();
   const lastPointerType = useLastPointerType();
 
@@ -1093,6 +1150,8 @@ export function CorporatePOS() {
   const [selectedBillerId, setSelectedBillerId] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
+  /** Below lg: order panel is a bottom sheet; desktop keeps the side panel. */
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [diningTables, setDiningTables] = useState<DiningTable[]>([]);
   const [occupiedDialogTable, setOccupiedDialogTable] = useState<DiningTable | null>(null);
   const [occupiedDialogBusy, setOccupiedDialogBusy] = useState(false);
@@ -1122,6 +1181,15 @@ export function CorporatePOS() {
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
+  const [posDefaultPaymentStatus, setPosDefaultPaymentStatus] = useState<
+    "PENDING" | "PAID" | "NONE"
+  >("PENDING");
+  const defaultPaymentStatusChoice: PaymentStatusChoiceState =
+    posDefaultPaymentStatus === "PAID"
+      ? "paid"
+      : posDefaultPaymentStatus === "NONE"
+        ? null
+        : "pending";
   const [hourlyRateInput, setHourlyRateInput] = useState("");
   const [hourlyStartedAt, setHourlyStartedAt] = useState<string | null>(null);
   const [hourlyEndedAt, setHourlyEndedAt] = useState<string | null>(null);
@@ -1334,6 +1402,7 @@ export function CorporatePOS() {
       setPosQrOrderAlarmEnabled(true);
       setTableHourlyBillingEnabled(false);
       setPosStaffPasscodeEnabled(false);
+      setPosDefaultPaymentStatus("PENDING");
       setInventoryServicesEnabled(false);
       return;
     }
@@ -1351,7 +1420,20 @@ export function CorporatePOS() {
           setPosEditableProductPricesEnabled(s.posEditableProductPricesEnabled === true);
           setPosQrOrderAlarmEnabled(diningEnabled && s.posQrOrderAlarmEnabled !== false);
           setTableHourlyBillingEnabled(diningEnabled && s.tableHourlyBillingEnabled === true);
-          setPosStaffPasscodeEnabled(diningEnabled && s.posStaffPasscodeEnabled === true);
+          setPosStaffPasscodeEnabled(s.posStaffPasscodeEnabled === true);
+          const defaultPay =
+            s.posDefaultPaymentStatus === "PAID"
+              ? "PAID"
+              : s.posDefaultPaymentStatus === "NONE"
+                ? "NONE"
+                : "PENDING";
+          setPosDefaultPaymentStatus(defaultPay);
+          // Apply to a fresh register only (don't override an open/edit order).
+          if (!editingOrderIdRef.current && !pendingQrOrderIdRef.current) {
+            setPaymentStatusChoice(
+              defaultPay === "PAID" ? "paid" : defaultPay === "NONE" ? null : "pending",
+            );
+          }
           setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
       })
@@ -1366,6 +1448,7 @@ export function CorporatePOS() {
           setPosQrOrderAlarmEnabled(true);
           setTableHourlyBillingEnabled(false);
           setPosStaffPasscodeEnabled(false);
+          setPosDefaultPaymentStatus("PENDING");
           setInventoryServicesEnabled(false);
         }
       });
@@ -1752,12 +1835,12 @@ export function CorporatePOS() {
     try {
       const biller = billers.find((b) => b.id === selectedBillerId);
       const ok = await ensureWithPasscode({
-        featureOn: diningEnabled && posStaffPasscodeEnabled,
+        featureOn: posStaffPasscodeEnabled,
         hasPosPasscode: biller?.hasPosPasscode === true,
         staffName: biller?.name ?? tr("İşçi", "Staff"),
         invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
         run: async (staffPasscode) => {
-          if (diningEnabled && posStaffPasscodeEnabled && !selectedBillerId) {
+          if (posStaffPasscodeEnabled && !selectedBillerId) {
             throw new ApiError(
               400,
               tr("Kassir seçin", "Please select an employee / biller"),
@@ -1794,7 +1877,7 @@ export function CorporatePOS() {
         setMileageInput("");
         setSelectedBillerId(defaultBillerId || "");
         setSelectedPaymentMethod(null);
-        setPaymentStatusChoice("pending");
+        setPaymentStatusChoice(defaultPaymentStatusChoice);
         setAppliedDiscount(null);
       }
       setSelectedTableId(tableId);
@@ -1812,6 +1895,7 @@ export function CorporatePOS() {
     occupiedDialogTable,
     reloadDiningTables,
     defaultBillerId,
+    defaultPaymentStatusChoice,
     tr,
     billers,
     selectedBillerId,
@@ -2803,6 +2887,7 @@ export function CorporatePOS() {
     setKotPrintedQtyByProduct({});
     setSuppressEditOrderUi(false);
     setCart([]);
+    setMobileCartOpen(false);
     setShippingInput("");
     setServiceFeeInput("");
     setHourlyRateInput("");
@@ -2817,7 +2902,7 @@ export function CorporatePOS() {
     setSelectedBillerId(defaultBillerId || "");
     setSelectedTableId("");
     setSelectedPaymentMethod(null);
-    setPaymentStatusChoice("pending");
+    setPaymentStatusChoice(defaultPaymentStatusChoice);
     setAppliedDiscount(null);
     void loadProducts();
     void refreshPendingQr("count");
@@ -3192,7 +3277,7 @@ export function CorporatePOS() {
   ): Promise<boolean> => {
     const biller = billers.find((b) => b.id === selectedBillerId);
     return ensureWithPasscode({
-      featureOn: diningEnabled && posStaffPasscodeEnabled,
+      featureOn: posStaffPasscodeEnabled,
       hasPosPasscode: biller?.hasPosPasscode === true,
       staffName: biller?.name ?? tr("İşçi", "Staff"),
       invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
@@ -3938,14 +4023,14 @@ export function CorporatePOS() {
         <ArrowLeft className="w-3.5 h-3.5" />
       </button>
 
-      <div className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8">
+      <div className="flex-1 min-h-0 p-2 sm:p-4 lg:p-8">
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0 overflow-y-auto lg:overflow-hidden">
-          {/* ── Left: Products ── */}
-          <div className="lg:col-span-7 xl:col-span-8 flex flex-col min-h-[40vh] lg:min-h-0 overflow-hidden">
-            <div className="shrink-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
+        <div className="flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:gap-4 h-full min-h-0 overflow-hidden">
+          {/* ── Left: Products (full height on mobile; cart is a sheet) ── */}
+          <div className="flex-1 min-h-0 lg:col-span-7 xl:col-span-8 flex flex-col overflow-hidden">
+            <div className="shrink-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-3 lg:mb-4">
               <div className="flex gap-2">
-                <div className="relative flex-1">
+                <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   <input
                     type="text"
@@ -3967,6 +4052,46 @@ export function CorporatePOS() {
                     <Keyboard className="w-3.5 h-3.5" />
                   </button>
                 </div>
+                {/* Mobile: open order sheet */}
+                <button
+                  type="button"
+                  onClick={() => setMobileCartOpen(true)}
+                  className="lg:hidden relative shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white transition-colors"
+                  title={tr("Səbət / Sifariş", "Cart / Order")}
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span className="text-[11px] font-semibold tabular-nums">
+                    {cart.reduce((n, i) => n + i.quantity, 0)}
+                  </span>
+                </button>
+              </div>
+              {/* Mobile quick actions (Orders / QR live in the order sheet on desktop) */}
+              <div className="lg:hidden flex flex-wrap items-center gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/dashboard/sales/pos-orders")}
+                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-[10px] font-medium"
+                >
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  {tr("Sifarişlər", "Orders")}
+                </button>
+                {diningEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingQrPortalOpen(true);
+                      void refreshPendingQr("list");
+                    }}
+                    className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-md border text-[10px] font-medium ${
+                      pendingQrCount > 0
+                        ? "bg-orange-500 border-orange-600 text-white"
+                        : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200"
+                    }`}
+                  >
+                    <Bell className="w-3.5 h-3.5" />
+                    QR{pendingQrCount > 0 ? ` (${pendingQrCount})` : ""}
+                  </button>
+                )}
               </div>
               <div className="mt-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -4116,7 +4241,7 @@ export function CorporatePOS() {
                 </div>
               ) : (
               <div
-                className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 pb-4"
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 pb-20 lg:pb-4"
                 style={dragProductId ? { touchAction: "none" } : undefined}
               >
                 {filteredProducts.map((product, index) => {
@@ -4308,24 +4433,45 @@ export function CorporatePOS() {
             </div>
           </div>
 
-          {/* ── Right: Order panel ── */}
-          <div className="lg:col-span-5 xl:col-span-4 flex flex-col min-h-[50vh] lg:min-h-0 overflow-hidden">
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 flex flex-col h-full min-h-0">
+          {/* Mobile cart sheet backdrop */}
+          {mobileCartOpen ? (
+            <button
+              type="button"
+              aria-label={tr("Bağla", "Close")}
+              className="lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
+              onClick={() => setMobileCartOpen(false)}
+            />
+          ) : null}
 
-              {/* Order Header */}
-              <div className="shrink-0 flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
-                <div className="min-w-0 flex-shrink">
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                    {editingOrderId && !suppressEditOrderUi
-                      ? tr("Sifarişi redaktə et", "Edit Order")
-                      : tr("Sifariş", "Order")}
-                  </h2>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-                    {editingOrderRef && !suppressEditOrderUi
-                      ? editingOrderRef
-                      : `${cart.length} ${tr("məhsul", "items")}`}
+          {/* ── Right: Order panel (side column on lg+; bottom sheet below lg) ── */}
+          <div
+            className={`lg:col-span-5 xl:col-span-4 flex flex-col overflow-hidden ${
+              mobileCartOpen
+                ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-50 max-lg:h-[min(92dvh,100%)] max-lg:max-h-[92dvh]"
+                : "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-50 max-lg:h-[min(92dvh,100%)] max-lg:max-h-[92dvh] max-lg:translate-y-full max-lg:pointer-events-none max-lg:invisible"
+            } lg:relative lg:z-auto lg:h-full lg:min-h-0 lg:translate-y-0 lg:visible lg:pointer-events-auto transition-transform duration-200 ease-out`}
+          >
+            <div className="relative bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-t-2xl lg:rounded-lg p-3 sm:p-4 flex flex-col h-full min-h-0 shadow-2xl lg:shadow-none pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {/* Mobile sheet grab + close */}
+              <div className="lg:hidden shrink-0 flex items-center justify-end gap-2 mb-1 pt-0.5">
+                <div className="absolute left-1/2 -translate-x-1/2 top-2 w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={() => setMobileCartOpen(false)}
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  title={tr("Bağla", "Close")}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Order Header — actions only (no Order / items title row) */}
+              <div className="shrink-0 flex flex-wrap items-center gap-1.5 mb-2 pb-2 border-b border-gray-200 dark:border-gray-800">
+                {editingOrderId && !suppressEditOrderUi ? (
+                  <p className="min-w-0 flex-1 text-[10px] text-gray-500 dark:text-gray-400 truncate mr-1">
+                    {editingOrderRef ?? tr("Sifarişi redaktə et", "Edit Order")}
                   </p>
-                </div>
+                ) : null}
                 <div className="ml-auto flex flex-wrap items-center justify-end gap-1 min-w-0">
                   <button
                     type="button"
@@ -4444,11 +4590,11 @@ export function CorporatePOS() {
                 <div className="mb-3 space-y-1.5">
                   <div
                     className={`grid gap-1.5 ${
-                      diningEnabled ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"
+                      diningEnabled ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"
                     }`}
                   >
                     {/* Customer + add */}
-                    <div className="flex min-h-[4.25rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
+                    <div className="flex min-h-[2.75rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
                       <div className="flex-1 min-w-0 rounded-l-lg">
                         <SelectDropdown
                           variant="box"
@@ -4456,6 +4602,8 @@ export function CorporatePOS() {
                           onChange={handleCustomerChange}
                           options={customerOptions}
                           placeholder={tr("Müştəri seçin", "Select customer")}
+                          searchable
+                          searchPlaceholder={tr("Müştəri axtar...", "Search customer...")}
                         />
                       </div>
                       {canCreateCustomer && (
@@ -4463,15 +4611,15 @@ export function CorporatePOS() {
                           type="button"
                           onClick={() => setAddCustomerModalOpen(true)}
                           title={tr("Yeni müştəri əlavə et", "Add new Customer")}
-                          className="w-9 flex-shrink-0 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-r-lg border-l border-[#0d9488]/40 transition-colors"
+                          className="w-8 flex-shrink-0 flex items-center justify-center bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-r-lg border-l border-[#0d9488]/40 transition-colors"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
 
                     {/* Employee */}
-                    <div className="min-h-[4.25rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
+                    <div className="min-h-[2.75rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
                       <SelectDropdown
                         variant="box"
                         value={selectedBillerId}
@@ -4483,6 +4631,8 @@ export function CorporatePOS() {
                         }
                         placeholder={tr("İşçi seçin", "Select employee")}
                         disabled={isEmployee}
+                        searchable
+                        searchPlaceholder={tr("İşçi axtar...", "Search employee...")}
                       />
                     </div>
 
@@ -4491,15 +4641,15 @@ export function CorporatePOS() {
                       <button
                         type="button"
                         onClick={() => setTablePickerOpen(true)}
-                        className="min-h-[4.25rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col items-center justify-center gap-1.5 px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                        className="min-h-[2.75rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center justify-center gap-1.5 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       >
                         <Armchair
-                          className={`w-5 h-5 flex-shrink-0 ${
+                          className={`w-4 h-4 flex-shrink-0 ${
                             selectedTableLabel ? "text-[#14b8a6]" : "text-gray-400"
                           }`}
                         />
                         <span
-                          className={`text-[10px] font-semibold leading-tight text-center line-clamp-2 ${
+                          className={`text-[10px] font-semibold leading-tight text-center line-clamp-1 ${
                             selectedTableLabel
                               ? "text-gray-900 dark:text-white"
                               : "text-gray-500 dark:text-gray-400"
@@ -4510,12 +4660,12 @@ export function CorporatePOS() {
                       </button>
                     )}
 
-                    {/* Payment status: Pending / Paid */}
-                    <div className="min-h-[4.25rem] rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden flex flex-col bg-white dark:bg-gray-900">
+                    {/* Payment status: Pending | Paid (side-by-side, compact) */}
+                    <div className="min-h-[2.75rem] rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden flex bg-white dark:bg-gray-900">
                       <button
                         type="button"
                         onClick={() => setPaymentStatusChoice("pending")}
-                        className={`flex-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                        className={`flex-1 px-1.5 py-1.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide transition-colors ${
                           paymentStatusChoice === "pending"
                             ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/25 text-[#0f766e] dark:text-[#5eead4]"
                             : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -4535,7 +4685,7 @@ export function CorporatePOS() {
                             : undefined
                         }
                         onClick={() => setPaymentStatusChoice("paid")}
-                        className={`flex-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-t border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                        className={`flex-1 px-1.5 py-1.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide border-l border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                           paymentStatusChoice === "paid"
                             ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/25 text-[#0f766e] dark:text-[#5eead4]"
                             : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -5388,7 +5538,7 @@ export function CorporatePOS() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <PosPrinterSettings embedded accessModule="Sales" />
+            <PosPrinterSettings embedded accessModule="POS" />
           </div>
         </div>
       )}

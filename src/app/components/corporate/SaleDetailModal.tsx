@@ -70,7 +70,7 @@ export function SaleDetailModal({
   const { user, hasModule } = useAuth();
   const diningEnabled = hasModule("DINING");
   const opticsEnabled = hasModule("OPTICS");
-  const { canView: canViewSales } = useModulePermissions("Sales");
+  const { canView: canViewSales } = useModulePermissions("Orders");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const {
     ensureWithPasscode,
@@ -114,7 +114,7 @@ export function SaleDetailModal({
   }, [isOpen, orderId, language]);
 
   useEffect(() => {
-    if (!isOpen || !diningEnabled) {
+    if (!isOpen) {
       setTableHourlyBillingEnabled(false);
       setPosStaffPasscodeEnabled(false);
       return;
@@ -123,7 +123,9 @@ export function SaleDetailModal({
     fetchTenantSettings()
       .then((s) => {
         if (!cancelled) {
-          setTableHourlyBillingEnabled(s.tableHourlyBillingEnabled === true);
+          setTableHourlyBillingEnabled(
+            diningEnabled && s.tableHourlyBillingEnabled === true,
+          );
           setPosStaffPasscodeEnabled(s.posStaffPasscodeEnabled === true);
         }
       })
@@ -357,9 +359,9 @@ export function SaleDetailModal({
         const matched = billers.find((b) => b.id === order.billerId);
         const needsPin =
           matched?.hasPosPasscode === true ||
-          (diningEnabled && posStaffPasscodeEnabled && !matched && Boolean(order.billerId));
+          (posStaffPasscodeEnabled && !matched && Boolean(order.billerId));
         const ok = await ensureWithPasscode({
-          featureOn: diningEnabled && posStaffPasscodeEnabled,
+          featureOn: posStaffPasscodeEnabled,
           hasPosPasscode: needsPin,
           staffName: matched?.name || order.billerName || tr("İşçi", "Staff"),
           invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
@@ -377,10 +379,10 @@ export function SaleDetailModal({
         const matched = billers.find((b) => b.id === order.billerId);
         const needsPin =
           matched?.hasPosPasscode === true ||
-          (diningEnabled && posStaffPasscodeEnabled && !matched && Boolean(order.billerId));
+          (posStaffPasscodeEnabled && !matched && Boolean(order.billerId));
         let completed: PosOrderDetail | null = null;
         const ok = await ensureWithPasscode({
-          featureOn: diningEnabled && posStaffPasscodeEnabled,
+          featureOn: posStaffPasscodeEnabled,
           hasPosPasscode: needsPin,
           staffName: matched?.name || order.billerName || tr("İşçi", "Staff"),
           invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),

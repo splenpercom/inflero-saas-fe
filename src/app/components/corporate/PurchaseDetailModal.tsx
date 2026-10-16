@@ -73,7 +73,7 @@ export function PurchaseDetailModal({
   const { language } = useLanguage();
   const { isDemo } = useAuth();
   const askConfirm = useConfirm();
-  const { canDelete: canVoidFinance } = useModulePermissions("Finances");
+  const { canDelete: canVoidFinance } = useModulePermissions("Payments");
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [purchase, setPurchase] = useState<PurchaseDetail | null>(null);
   const [loading, setLoading] = useState(false);

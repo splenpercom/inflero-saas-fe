@@ -59,7 +59,7 @@ export function CustomerProfile() {
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const autoEnabled = hasModule("AUTO");
   const loyaltyEnabled = hasModule("LOYALTY");
-  const { canView, canEdit } = useModulePermissions("People");
+  const { canView, canEdit } = useModulePermissions("Customers");
   const branchRevision = useBranchRevision();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
