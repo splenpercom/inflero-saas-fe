@@ -12,15 +12,18 @@ const SHELL = {
 
 export type BrandLogoSize = keyof typeof SHELL;
 
-/** Left-aligned shells keep the wordmark flush; centered shells stay balanced. */
-const OBJECT_POSITION: Record<BrandLogoSize, string> = {
-  header: "object-left",
-  auth: "object-left",
-  nav: "object-left",
-  sidebar: "object-center",
-  sidebarIcon: "object-center",
-  footer: "object-center",
-  receipt: "object-center",
+/**
+ * Square brand assets have large letterboxing. Sidebar/header use cover so the
+ * wordmark fills the shell. Auth/nav use contain so login never crops the top.
+ */
+const OBJECT_FIT: Record<BrandLogoSize, string> = {
+  header: "object-cover object-center",
+  sidebar: "object-cover object-center",
+  sidebarIcon: "object-cover object-center",
+  footer: "object-cover object-center",
+  receipt: "object-cover object-center",
+  auth: "object-contain object-left",
+  nav: "object-contain object-left",
 };
 
 type BrandLogoProps = {
@@ -43,11 +46,7 @@ export function BrandLogo({
       <img
         src={src}
         alt={alt}
-        className={cn(
-          "h-full w-full object-contain",
-          OBJECT_POSITION[size],
-          imgClassName,
-        )}
+        className={cn("h-full w-full", OBJECT_FIT[size], imgClassName)}
       />
     </div>
   );
@@ -55,6 +54,6 @@ export function BrandLogo({
 
 export function brandLogoReceiptHtml(src: string, alt: string): string {
   return `<div style="height:64px;width:232px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">
-  <img src="${src}" alt="${alt}" style="height:100%;width:100%;object-fit:contain;object-position:center;" />
+  <img src="${src}" alt="${alt}" style="height:100%;width:100%;object-fit:cover;object-position:center;" />
 </div>`;
 }
