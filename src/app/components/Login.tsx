@@ -209,7 +209,7 @@ export function Login() {
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-[#14b8a6]/6 blur-3xl pointer-events-none" />
 
-        <div className="absolute top-6 left-0 right-0 px-6 flex items-center justify-between lg:justify-end">
+        <div className="absolute top-0 left-0 right-0 px-6 pt-[max(1.5rem,env(safe-area-inset-top))] flex items-center justify-between lg:justify-end">
           <AppBrandLogo onDarkBackground size="nav" className="lg:hidden" />
           <LanguageSwitcherDropdown variant="dark" />
         </div>
