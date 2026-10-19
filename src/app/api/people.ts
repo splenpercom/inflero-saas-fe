@@ -68,6 +68,13 @@ export async function fetchCustomers(query: PeopleListQuery | string = {}) {
   return res.data;
 }
 
+export async function fetchCustomer(id: string) {
+  const res = await apiGet<{ success: boolean; data: PeopleCustomer }>(
+    `/tenant/people/customers/${id}`,
+  );
+  return res.data;
+}
+
 export async function createCustomer(body: {
   name: string;
   code?: string;

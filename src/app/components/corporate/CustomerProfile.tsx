@@ -17,7 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
 import {
-  fetchCustomers,
+  fetchCustomer,
   fetchCustomerVehicles,
   updateCustomer,
   type CustomerVehicle,
@@ -125,8 +125,7 @@ export function CustomerProfile() {
     }
     setLoading(true);
     try {
-      const rows = await fetchCustomers();
-      setCustomer(rows.find((c) => c.id === id) ?? null);
+      setCustomer(await fetchCustomer(id));
     } catch (err) {
       notifyFromError(err);
       setCustomer(null);
