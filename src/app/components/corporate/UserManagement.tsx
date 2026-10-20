@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { cn } from "../ui/utils";
 import {
   Search,
@@ -23,7 +23,6 @@ import { NoAccessPanel } from "../permissions/NoAccessPanel";
 import { PermissionGate } from "../permissions/PermissionGate";
 import { translateModuleName } from "../../i18n/userManagementTranslations";
 import { isRbacModuleVisible } from "../../lib/rolePermissions";
-import { ViewUserModal } from "./ViewUserModal";
 import { AddUserModal, type AddUserFormData } from "./AddUserModal";
 import { AddRoleModal } from "./AddRoleModal";
 import { EditRoleModal } from "./EditRoleModal";
@@ -53,6 +52,7 @@ import { pickLang, mapLang } from "../../i18n/pickLang";
 export function UserManagement() {
   const { language } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   const { isDemo, isAuthenticated, user: authUser, hasModule } = useAuth();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("User Management");
   const branchRevision = useBranchRevision();
@@ -76,7 +76,6 @@ export function UserManagement() {
   const [roles, setRoles] = useState<TenantRoleRow[]>([]);
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
 
-  const [viewUserModalOpen, setViewUserModalOpen] = useState(false);
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
   const [addRoleModalOpen, setAddRoleModalOpen] = useState(false);
   const [editRoleModalOpen, setEditRoleModalOpen] = useState(false);
@@ -785,10 +784,7 @@ export function UserManagement() {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setViewUserModalOpen(true);
-                              }}
+                              onClick={() => navigate(`/dashboard/user-management/users/${user.id}`)}
                               className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                             >
                               <Eye className="w-3 h-3" />
@@ -978,16 +974,6 @@ export function UserManagement() {
         )}
       </div>
 
-      <ViewUserModal
-        isOpen={viewUserModalOpen}
-        onClose={() => setViewUserModalOpen(false)}
-        onEdit={(user) => {
-          setSelectedUser(user);
-          setViewUserModalOpen(false);
-          setEditUserModalOpen(true);
-        }}
-        user={selectedUser}
-      />
       <AddUserModal
         key={addUserModalOpen ? "add-user-open" : "add-user-closed"}
         isOpen={addUserModalOpen}

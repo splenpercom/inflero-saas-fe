@@ -102,6 +102,7 @@ export const userManagementTranslations = {
     loyalty: "Loyalty",
     myWebsite: "My Website",
     settings: "Settings",
+    tasksModule: "Tasks",
 
     // Inventory sub-items
     products: "Products",
@@ -311,6 +312,7 @@ export const userManagementTranslations = {
     loyalty: "Loyalty",
     myWebsite: "Vebsaytım",
     settings: "Parametrlər",
+    tasksModule: "Tapşırıqlar",
 
     // Inventory sub-items
     products: "Məhsullar",
@@ -497,6 +499,7 @@ export const userManagementTranslations = {
     loyalty: "Лояльность",
     myWebsite: "Мой сайт",
     settings: "Настройки",
+    tasksModule: "Задачи",
     products: "Товары",
     createproduct: "Создать товар",
     expiredproducts: "Просроченные товары",
@@ -630,6 +633,7 @@ export const translateModuleName = (moduleName: string, language: "en" | "az" | 
     Loyalty: "loyalty",
     "My Website": "myWebsite",
     Settings: "settings",
+    Tasks: "tasksModule",
   };
 
   const key = moduleMap[moduleName];

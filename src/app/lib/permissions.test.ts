@@ -41,6 +41,7 @@ describe("resolveRoutePermission", () => {
     ["/dashboard/stock/manage", "Stock", "view"],
     ["/dashboard/purchases/return", "Purchases", "view"],
     ["/dashboard", "Dashboard", "view"],
+    ["/dashboard/tasks", "Tasks", "view"],
     ["/dashboard/profile", "", ""], // always allowed → null
   ];
 

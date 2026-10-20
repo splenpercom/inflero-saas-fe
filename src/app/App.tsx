@@ -7,7 +7,6 @@ import { ThemeProvider } from "./i18n/ThemeContext";
 import { CorporateSidebar } from "./components/corporate/CorporateSidebar";
 import { CorporateHeader } from "./components/corporate/CorporateHeader";
 import { CorporateDashboard } from "./components/corporate/CorporateDashboard";
-import { NewDashboard } from "./components/corporate/NewDashboard";
 import { CorporateOrders } from "./components/corporate/CorporateOrders";
 import { Settings as CorporateSettings } from "./components/corporate/Settings";
 import { DeletionLogs } from "./components/corporate/DeletionLogs";
@@ -56,6 +55,13 @@ import {
   diningPublicRouteElements,
 } from "../modules/dining";
 import { loyaltyDashboardRouteElements } from "../modules/loyalty";
+import {
+  travelDashboardRouteElements,
+  travelPublicRouteElements,
+  DashboardHome,
+  TravelErpBlock,
+  TasksPage,
+} from "../modules/travel";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DemoBanner } from "./components/DemoBanner";
 import { PaymentStatusGate, BillingResultPage } from "./components/billing/PaymentStatusGate";
@@ -252,6 +258,7 @@ function AppShell() {
             <Route path="/customer-landing/:slug" element={<LegacyCustomerLandingRedirect />} />
             <Route path="/customer-landing/:slug/:branchSlug" element={<LegacyCustomerLandingRedirect />} />
             {diningPublicRouteElements}
+            {travelPublicRouteElements}
 
             {/* POS Route - Full screen without sidebar/header */}
             <Route
@@ -286,11 +293,12 @@ function AppShell() {
                   darkMode={darkMode}
                   toggleDarkMode={toggleDarkMode}
                 >
+                  <TravelErpBlock>
                   <Routes>
               {/* Corporate ERP Routes */}
-              <Route path="/" element={<NewDashboard />} />
-              <Route path="/home" element={<NewDashboard />} />
-              <Route path="new-dashboard" element={<NewDashboard />} />
+              <Route path="/" element={<DashboardHome />} />
+              <Route path="/home" element={<DashboardHome />} />
+              <Route path="new-dashboard" element={<DashboardHome />} />
               <Route path="profile" element={<Profile />} />
               <Route path="orders" element={<CorporateOrders />} />
 
@@ -359,6 +367,8 @@ function AppShell() {
               <Route path="reports/finance" element={<Navigate to="/dashboard/reports" replace />} />
               <Route path="reports/product" element={<Navigate to="/dashboard/reports" replace />} />
               <Route path="reports/annual" element={<Navigate to="/dashboard/reports" replace />} />
+              {/* Tasks — core surface, not gated by any feature plugin */}
+              <Route path="tasks" element={<TasksPage />} />
               <Route path="user-management/users/:id" element={<UserDetail />} />
               <Route path="user-management/roles" element={<UserManagement />} />
               <Route path="user-management" element={<UserManagement />} />
@@ -400,10 +410,12 @@ function AppShell() {
 
               {diningDashboardRouteElements}
               {loyaltyDashboardRouteElements}
+              {travelDashboardRouteElements}
 
               {/* Catch all - redirect to dashboard home */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
+                  </TravelErpBlock>
                 </LayoutWrapper>
                 </ProtectedRoute>
               }
