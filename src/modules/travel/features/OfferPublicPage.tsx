@@ -1,20 +1,42 @@
-import { useState, useRef } from "react";
-import { useParams } from "react-router";
+import { useState, useRef, useEffect } from "react";
+import { useParams, useSearchParams } from "react-router";
 import {
   Plane, MapPin, Hotel, Calendar, Users, Shield,
   Utensils, Car, CreditCard, DollarSign, User,
   CheckCircle, Clock, ArrowRight, Globe, X,
   ThumbsUp, ThumbsDown, MessageSquare, Upload, FileText,
   ChevronRight, ChevronLeft, Lock, Banknote, AlertCircle,
-  Star, Send, Trash2, Eye, Moon,
+  Star, Send, Trash2, Moon, RefreshCw,
 } from "lucide-react";
+import {
+  deletePublicOfferDocument,
+  fetchPublicOffer,
+  publicAcceptOffer,
+  publicDeclineOffer,
+  publicInitiateBankPayment,
+  publicInitiateEpointPayment,
+  publicReconcilePayment,
+  publicRequestOfferChanges,
+  publicSubmitOfferDocuments,
+  offerDocSideLabel,
+  uploadPublicOfferDocument,
+  type OfferBankDetails,
+  type OfferDocSide,
+  type OfferDocumentRow,
+  type OfferPaymentRow,
+  type OfferStatusUi,
+  type TravelOfferRow,
+} from "../../../app/api/offers";
+import { ApiError } from "../../../app/api/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FinancialRow { amount: string; currency: string; rate: string; date: string; }
 interface Passenger { id: string; fullName: string; dob: string; passportNo: string; passportExpiry: string; }
 interface TravelOffer {
-  id: string; saleType: string; saleDate: string; from: string; to: string;
+  id: string;
+  displayCode: string;
+  saleType: string; saleDate: string; from: string; to: string;
   country: string; city: string; hotelName: string;
   numAdults: number; numChildren: number;
   flight: string; transfer: string; insurance: string; meal: string;
@@ -23,14 +45,89 @@ interface TravelOffer {
   expectedIncome: number; debt: number; actualIncome: number;
   clientName: string; paymentDeadline: string; supplier: string; agent: string;
   passengers: Passenger[];
-  status: "active" | "inactive" | "sent" | "expired";
+  status: OfferStatusUi;
   createdAt: string;
+  clientResponseNote?: string | null;
+  clientResponseRating?: number | null;
+  documentsSubmittedAt?: string | null;
+}
+
+type UploadedDoc = {
+  id?: string;
+  name: string;
+  size: number;
+  type: string;
+  side?: OfferDocSide | null;
+  contentType?: string;
+  /** Image data-URL / CDN, or any viewable URL for inline preview. */
+  previewUrl?: string;
+  url?: string;
+};
+
+function docViewSrc(doc: UploadedDoc): string | undefined {
+  return doc.url || doc.previewUrl;
+}
+
+function isImageDoc(doc: UploadedDoc): boolean {
+  const ct = (doc.contentType ?? "").toLowerCase();
+  if (ct.startsWith("image/")) return true;
+  const src = docViewSrc(doc) ?? "";
+  if (src.startsWith("data:image/")) return true;
+  return /\.(jpe?g|png|webp|gif)$/i.test(doc.name);
+}
+
+function isPdfDoc(doc: UploadedDoc): boolean {
+  const ct = (doc.contentType ?? "").toLowerCase();
+  if (ct.includes("pdf")) return true;
+  const src = docViewSrc(doc) ?? "";
+  if (src.startsWith("data:application/pdf")) return true;
+  return /\.pdf$/i.test(doc.name);
+}
+
+function sideOptionsForType(type: string): { value: OfferDocSide; label: string; optional?: boolean }[] {
+  if (type === "Passport") {
+    return [
+      { value: "bio", label: "Bio page" },
+      { value: "extra", label: "Extra page", optional: true },
+    ];
+  }
+  if (type === "ID Card") {
+    return [
+      { value: "front", label: "Front" },
+      { value: "back", label: "Back" },
+    ];
+  }
+  return [];
+}
+
+function docsForSide(docs: UploadedDoc[], side: OfferDocSide | null): UploadedDoc[] {
+  if (!side) return docs.filter((d) => !d.side);
+  return docs.filter((d) => d.side === side);
+}
+
+function docsOfType(docs: UploadedDoc[], type: string): UploadedDoc[] {
+  return docs.filter((d) => d.type === type);
+}
+
+/** Required slots filled → tick on tab (optional sides ignored). */
+function isDocTypeComplete(docs: UploadedDoc[], type: string): boolean {
+  const ofType = docsOfType(docs, type);
+  if (type === "Passport") return ofType.some((d) => d.side === "bio" || !d.side);
+  if (type === "ID Card") {
+    return ofType.some((d) => d.side === "front") && ofType.some((d) => d.side === "back");
+  }
+  return ofType.length > 0;
+}
+
+function isDocTypeStarted(docs: UploadedDoc[], type: string): boolean {
+  return docsOfType(docs, type).length > 0;
 }
 
 // ─── Dummy data ───────────────────────────────────────────────────────────────
 
 const PREVIEW_OFFER: TravelOffer = {
-  id: "TRV-2026-0041",
+  id: "preview-offer",
+  displayCode: "TRV-2026-0041",
   saleType: "Holiday Package",
   saleDate: "2026-10-18",
   from: "Baku",
@@ -88,18 +185,66 @@ function fmtFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function loadOffer(id: string | undefined): TravelOffer {
-  if (!id || id === "preview") return PREVIEW_OFFER;
-  const keys = [`inflero_offer_${id}`, `inflero_offer_${id.replace(/^#/, "")}`];
-  for (const key of keys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const p = JSON.parse(raw) as TravelOffer;
-      if (p?.id && p?.salePrice) return p;
-    } catch { /* ignore */ }
-  }
-  return PREVIEW_OFFER;
+function mapPublicRow(row: TravelOfferRow): TravelOffer {
+  return {
+    id: row.id,
+    displayCode: row.displayCode || row.id,
+    saleType: row.saleType,
+    saleDate: row.saleDate,
+    from: row.from,
+    to: row.to,
+    country: row.country,
+    city: row.city,
+    hotelName: row.hotelName,
+    numAdults: row.numAdults,
+    numChildren: row.numChildren,
+    flight: row.flight,
+    transfer: row.transfer,
+    insurance: row.insurance,
+    meal: row.meal,
+    costPrice: row.costPrice,
+    salePrice: row.salePrice,
+    paidByCash: row.paidByCash,
+    paidByTransfer: row.paidByTransfer,
+    expectedIncome: row.expectedIncome,
+    debt: row.debt,
+    actualIncome: row.actualIncome,
+    clientName: row.clientName,
+    paymentDeadline: row.paymentDeadline,
+    supplier: row.supplier,
+    agent: row.agent,
+    passengers: row.passengers,
+    status: row.status,
+    createdAt: row.createdAt,
+    clientResponseNote: row.clientResponseNote,
+    clientResponseRating: row.clientResponseRating,
+    documentsSubmittedAt: row.documentsSubmittedAt ?? null,
+  };
+}
+
+function mapDocs(docs: OfferDocumentRow[] | undefined): UploadedDoc[] {
+  return (docs ?? []).map((d) => ({
+    id: d.id,
+    name: d.fileName,
+    size: d.sizeBytes,
+    type: d.type,
+    side: d.side,
+    contentType: d.contentType,
+    url: d.url,
+    previewUrl: d.contentType.startsWith("image/") ? d.url : d.url,
+  }));
+}
+
+function hydrateActionFromStatus(status: OfferStatusUi): {
+  actionDone: "accepted" | "rejected" | null;
+  feedbackSent: boolean;
+  note?: string | null;
+  rating?: number | null;
+} {
+  if (status === "accepted") return { actionDone: "accepted", feedbackSent: false };
+  if (status === "rejected") return { actionDone: "rejected", feedbackSent: false };
+  if (status === "changing") return { actionDone: null, feedbackSent: true };
+  return { actionDone: null, feedbackSent: false };
 }
 
 // ─── Small shared pieces ──────────────────────────────────────────────────────
@@ -136,34 +281,88 @@ function Card({ title, icon: Icon, children, className = "" }: {
   );
 }
 
-// ─── Checkout Modal ───────────────────────────────────────────────────────────
+// ─── Checkout Modal (full outstanding only; Epoint redirect / bank notify) ────
 
-function CheckoutModal({ remaining, clientName, offerId, onClose }: {
-  remaining: number; clientName: string; offerId: string; onClose: () => void;
+const PREVIEW_BANK: OfferBankDetails = {
+  bank: "ABB Bank",
+  accountName: "Inflero Travel MMC",
+  iban: "AZ21NABZ00000000137010001944",
+  reference: "TRV-2026-0041",
+};
+
+function CheckoutModal({
+  remaining,
+  clientName,
+  offerCode,
+  publicToken,
+  isPreview,
+  onClose,
+  onBankNotified,
+}: {
+  remaining: number;
+  clientName: string;
+  offerCode: string;
+  publicToken: string | null;
+  isPreview: boolean;
+  onClose: () => void;
+  onBankNotified?: () => void;
 }) {
-  const [step, setStep]       = useState<"amount" | "details" | "confirm" | "success">("amount");
-  const [amount, setAmount]   = useState(remaining.toFixed(2));
-  const [cardNo, setCardNo]   = useState("");
-  const [expiry, setExpiry]   = useState("");
-  const [cvv, setCvv]         = useState("");
-  const [holder, setHolder]   = useState(clientName);
-  const [method, setMethod]   = useState<"card" | "bank">("card");
-  const payAmt = parseFloat(amount) || 0;
+  const [step, setStep] = useState<"method" | "bank" | "success">("method");
+  const [method, setMethod] = useState<"card" | "bank">("card");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [bank, setBank] = useState<OfferBankDetails | null>(null);
+  const [orderRef, setOrderRef] = useState<string | null>(null);
 
-  function fmtCard(v: string)   { return v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim(); }
-  function fmtExpiry(v: string) { const d = v.replace(/\D/g, "").slice(0, 4); return d.length >= 3 ? `${d.slice(0,2)}/${d.slice(2)}` : d; }
+  async function payWithCard() {
+    setError(null);
+    if (isPreview || !publicToken) {
+      setError("Preview mode — card checkout is disabled.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await publicInitiateEpointPayment(publicToken, "en");
+      window.location.assign(data.redirectUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Card payment unavailable");
+      setBusy(false);
+    }
+  }
 
-  const inp = "w-full px-3 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#001058] transition-colors";
+  async function showBankDetails() {
+    setError(null);
+    if (isPreview || !publicToken) {
+      setBank({ ...PREVIEW_BANK, reference: offerCode });
+      setStep("bank");
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await publicInitiateBankPayment(publicToken);
+      setBank(data.bank);
+      setOrderRef(data.payment.orderId);
+      setStep("bank");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create bank payment");
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  const steps = ["amount", "details", "confirm"] as const;
-  const stepIdx = steps.indexOf(step as typeof steps[number]);
+  function notifyBankDone() {
+    setStep("success");
+    onBankNotified?.();
+  }
+
+  async function continueFromMethod() {
+    if (method === "card") await payWithCard();
+    else await showBankDetails();
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-      {/* Sheet on mobile, centred card on desktop */}
       <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col">
-
-        {/* Header */}
         <div className="bg-[#001058] px-5 py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,0.15)" }}>
@@ -174,130 +373,81 @@ function CheckoutModal({ remaining, clientName, offerId, onClose }: {
               <p className="text-sm font-bold text-white leading-tight">Inflero Travel</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/20 transition-colors">
+          <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-white/20 transition-colors">
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
 
-        {/* Step pills */}
-        {step !== "success" && (
-          <div className="flex items-center px-5 py-3 bg-gray-50 border-b border-gray-100 flex-shrink-0">
-            {steps.map((s, i) => {
-              const done   = i < stepIdx;
-              const active = s === step;
-              const labels = ["Amount", "Details", "Review"];
-              return (
-                <div key={s} className="flex items-center flex-1 last:flex-none">
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${done ? "bg-green-500" : active ? "bg-[#001058]" : "bg-gray-200"}`}>
-                      {done
-                        ? <CheckCircle className="w-3 h-3 text-white" />
-                        : <span className={`text-[10px] font-bold ${active ? "text-white" : "text-gray-400"}`}>{i + 1}</span>}
-                    </div>
-                    <span className={`text-[10px] font-medium hidden sm:inline ${active ? "text-[#001058]" : "text-gray-400"}`}>{labels[i]}</span>
-                  </div>
-                  {i < 2 && <div className="flex-1 h-px bg-gray-200 mx-2" />}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
-
-          {step === "amount" && (
+          {step === "method" && (
             <>
               <div className="bg-[#001058]/5 rounded-xl p-4 border border-[#001058]/10">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Invoice</p>
-                <p className="text-sm font-semibold text-gray-800">{offerId} — {clientName}</p>
-                <p className="text-xs text-gray-500 mt-1">Outstanding: <span className="font-bold text-orange-500">{fmtAZN(remaining)}</span></p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">Payment Amount (AZN)</label>
-                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} min="1" max={remaining}
-                  className={inp} />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {([["25%", remaining * 0.25], ["50%", remaining * 0.5], ["Full", remaining]] as [string, number][]).map(([lbl, val]) => (
-                  <button key={lbl} onClick={() => setAmount(val.toFixed(2))}
-                    className="py-2 text-xs border border-gray-300 rounded-lg hover:border-[#001058] hover:text-[#001058] font-medium transition-colors">
-                    {lbl}
-                  </button>
-                ))}
+                <p className="text-sm font-semibold text-gray-800">{offerCode} — {clientName}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Amount due: <span className="font-bold text-orange-500">{fmtAZNDec(remaining)}</span>
+                </p>
+                <p className="text-[11px] text-gray-400 mt-1">Full outstanding balance only</p>
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-700 mb-2">Method</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {([["card", "Card / POS", CreditCard], ["bank", "Bank Transfer", Banknote]] as [typeof method, string, React.ElementType][]).map(([k, lbl, Icon]) => (
-                    <button key={k} onClick={() => setMethod(k)}
-                      className={`flex items-center gap-2 px-3 py-3 border rounded-lg text-xs font-medium transition-colors ${method === k ? "border-[#001058] bg-[#001058]/5 text-[#001058]" : "border-gray-200 text-gray-600"}`}>
-                      <Icon className="w-4 h-4 flex-shrink-0" />{lbl}
+                  {([
+                    ["card", "Card", CreditCard],
+                    ["bank", "Bank Transfer", Banknote],
+                  ] as const).map(([k, lbl, Icon]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setMethod(k)}
+                      className={`flex items-center gap-2 px-3 py-3 border rounded-lg text-xs font-medium transition-colors ${
+                        method === k
+                          ? "border-[#001058] bg-[#001058]/5 text-[#001058]"
+                          : "border-gray-200 text-gray-600"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {lbl}
                     </button>
                   ))}
                 </div>
               </div>
+              {method === "card" && (
+                <p className="text-xs text-gray-500">
+                  You will be redirected to Epoint to pay securely. Card details are never entered here.
+                </p>
+              )}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">
+                  {error}
+                </div>
+              )}
             </>
           )}
 
-          {step === "details" && method === "card" && (
-            <>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">Cardholder Name</label>
-                <input value={holder} onChange={e => setHolder(e.target.value)} className={inp} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">Card Number</label>
-                <input value={cardNo} onChange={e => setCardNo(fmtCard(e.target.value))} placeholder="1234 5678 9012 3456" maxLength={19}
-                  className={`${inp} font-mono tracking-widest`} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">Expiry</label>
-                  <input value={expiry} onChange={e => setExpiry(fmtExpiry(e.target.value))} placeholder="MM/YY" maxLength={5} className={inp} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">CVV</label>
-                  <input value={cvv} onChange={e => setCvv(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="•••" type="password" maxLength={4} className={inp} />
-                </div>
-              </div>
-            </>
-          )}
-
-          {step === "details" && method === "bank" && (
+          {step === "bank" && bank && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2.5">
-              <p className="text-sm font-semibold text-blue-800 mb-3">Bank Transfer Details</p>
-              {([["Bank", "ABB Bank"], ["Account", "Inflero Travel MMC"], ["IBAN", "AZ21NABZ00000000137010001944"], ["Ref", offerId]] as [string,string][]).map(([k, v]) => (
+              <p className="text-sm font-semibold text-blue-800 mb-1">Bank Transfer Details</p>
+              <p className="text-xs text-blue-700 mb-2">
+                Transfer <span className="font-bold">{fmtAZNDec(remaining)}</span> then notify us.
+              </p>
+              {(
+                [
+                  ["Bank", bank.bank],
+                  ["Account", bank.accountName],
+                  ["IBAN", bank.iban],
+                  ["Ref", bank.reference],
+                ] as [string, string][]
+              ).map(([k, v]) => (
                 <div key={k} className="flex flex-col gap-0.5">
                   <span className="text-[10px] text-blue-500 uppercase tracking-wider">{k}</span>
                   <span className="text-sm font-semibold text-blue-900 font-mono break-all">{v}</span>
                 </div>
               ))}
-              <p className="text-xs text-blue-500 pt-2 border-t border-blue-200">After transferring, click Continue to notify us.</p>
+              <p className="text-xs text-blue-500 pt-2 border-t border-blue-200">
+                After transferring, click Notify — our team will confirm the payment.
+              </p>
             </div>
-          )}
-
-          {step === "confirm" && (
-            <>
-              <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
-                {[
-                  ["Offer", offerId],
-                  ["Client", clientName],
-                  ["Amount", fmtAZNDec(payAmt)],
-                  ["Method", method === "card" ? "Card / POS" : "Bank Transfer"],
-                  ...(method === "card" && cardNo ? [["Card", `•••• ${cardNo.replace(/\s/g,"").slice(-4)}`]] : []),
-                ].map(([k, v]) => (
-                  <div key={k} className="flex items-center justify-between px-4 py-3 text-sm">
-                    <span className="text-gray-500 text-xs">{k}</span>
-                    <span className="font-semibold text-gray-800">{v}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700">Review all details before confirming. Payment is processed securely.</p>
-              </div>
-            </>
           )}
 
           {step === "success" && (
@@ -306,53 +456,72 @@ function CheckoutModal({ remaining, clientName, offerId, onClose }: {
                 <CheckCircle className="w-10 h-10 text-green-500" />
               </div>
               <div>
-                <p className="text-lg font-bold text-gray-900">Payment Submitted!</p>
+                <p className="text-lg font-bold text-gray-900">Transfer notified</p>
                 <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-                  Your payment of <span className="font-bold text-green-600">{fmtAZNDec(payAmt)}</span> has been received. Our team will confirm within 24 hours.
+                  We recorded your bank transfer of{" "}
+                  <span className="font-bold text-green-600">{fmtAZNDec(remaining)}</span>. Staff will
+                  confirm once funds arrive.
                 </p>
               </div>
-              <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 space-y-1 text-left">
-                <div className="flex justify-between"><span>Reference</span><span className="font-mono font-semibold">{offerId}-{Date.now().toString().slice(-6)}</span></div>
-                <div className="flex justify-between"><span>Date</span><span>{formatDate(new Date().toISOString().split("T")[0])}</span></div>
-              </div>
+              {orderRef && (
+                <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 text-left">
+                  <div className="flex justify-between">
+                    <span>Reference</span>
+                    <span className="font-mono font-semibold">{orderRef}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Footer buttons */}
         <div className="p-4 border-t border-gray-100 bg-white flex-shrink-0">
-          {step === "amount" && (
-            <button onClick={() => { if (payAmt > 0) setStep("details"); }} disabled={payAmt <= 0}
-              className="w-full py-3 bg-[#001058] hover:bg-[#000844] disabled:opacity-40 text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2">
-              Continue <ChevronRight className="w-4 h-4" />
+          {step === "method" && (
+            <button
+              type="button"
+              onClick={() => void continueFromMethod()}
+              disabled={busy || remaining <= 0}
+              className="w-full py-3 bg-[#001058] hover:bg-[#000844] disabled:opacity-40 text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+            >
+              {busy
+                ? "Please wait…"
+                : method === "card"
+                  ? (
+                    <>
+                      Pay {fmtAZNDec(remaining)} <ChevronRight className="w-4 h-4" />
+                    </>
+                  )
+                  : (
+                    <>
+                      Continue <ChevronRight className="w-4 h-4" />
+                    </>
+                  )}
             </button>
           )}
-          {step === "details" && (
+          {step === "bank" && (
             <div className="flex gap-2">
-              <button onClick={() => setStep("amount")}
-                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium flex items-center justify-center gap-1 hover:bg-gray-50 transition-colors">
+              <button
+                type="button"
+                onClick={() => setStep("method")}
+                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium flex items-center justify-center gap-1 hover:bg-gray-50 transition-colors"
+              >
                 <ChevronLeft className="w-4 h-4" /> Back
               </button>
-              <button onClick={() => setStep("confirm")}
-                className="flex-1 py-3 bg-[#001058] hover:bg-[#000844] text-white rounded-lg text-sm font-bold flex items-center justify-center gap-1 transition-colors">
-                Review <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-          {step === "confirm" && (
-            <div className="flex gap-2">
-              <button onClick={() => setStep("details")}
-                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium flex items-center justify-center gap-1 hover:bg-gray-50 transition-colors">
-                <ChevronLeft className="w-4 h-4" /> Back
-              </button>
-              <button onClick={() => setStep("success")}
-                className="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg text-sm font-bold transition-colors">
-                Confirm Payment
+              <button
+                type="button"
+                onClick={notifyBankDone}
+                className="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg text-sm font-bold transition-colors"
+              >
+                Notify transfer
               </button>
             </div>
           )}
           {step === "success" && (
-            <button onClick={onClose} className="w-full py-3 bg-[#001058] hover:bg-[#000844] text-white rounded-lg text-sm font-bold transition-colors">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-3 bg-[#001058] hover:bg-[#000844] text-white rounded-lg text-sm font-bold transition-colors"
+            >
               Close
             </button>
           )}
@@ -366,14 +535,15 @@ function CheckoutModal({ remaining, clientName, offerId, onClose }: {
 
 export function OfferPublicPage() {
   const { id } = useParams<{ id: string }>();
-  const [offer] = useState<TravelOffer>(() => loadOffer(id));
-
-  const salePriceAZN = calcAZN(offer.salePrice);
-  const paidCashAZN  = calcAZN(offer.paidByCash);
-  const paidTransAZN = calcAZN(offer.paidByTransfer);
-  const totalPaid    = paidCashAZN + paidTransAZN;
-  const remaining    = Math.max(0, salePriceAZN - totalPaid);
-  const paidPct      = salePriceAZN > 0 ? Math.min(100, (totalPaid / salePriceAZN) * 100) : 0;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isPreview = !id || id === "preview";
+  const [offer, setOffer] = useState<TravelOffer>(PREVIEW_OFFER);
+  const [loading, setLoading] = useState(() => Boolean(id && id !== "preview"));
+  const [notFound, setNotFound] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [payBanner, setPayBanner] = useState<"success" | "error" | "pending" | null>(null);
+  const [payments, setPayments] = useState<OfferPaymentRow[]>([]);
 
   const [clientAction, setClientAction]       = useState<"none" | "accepting" | "rejecting" | "feedback">("none");
   const [actionDone, setActionDone]           = useState<"accepted" | "rejected" | null>(null);
@@ -381,39 +551,453 @@ export function OfferPublicPage() {
   const [feedbackRating, setFeedbackRating]   = useState(0);
   const [feedbackSent, setFeedbackSent]       = useState(false);
   const [showCheckout, setShowCheckout]       = useState(false);
-  const [uploadedDocs, setUploadedDocs]       = useState<{ name: string; size: number; type: string; previewUrl?: string }[]>([]);
+  const [uploadedDocs, setUploadedDocs]       = useState<UploadedDoc[]>([]);
   const [docType, setDocType]                 = useState("Passport");
+  const [docSide, setDocSide]                 = useState<OfferDocSide | null>("bio");
+  const [docsAck, setDocsAck]                 = useState(false);
+  const [docsSubmitting, setDocsSubmitting]   = useState(false);
   const fileInputRef                          = useRef<HTMLInputElement>(null);
+  const replaceDocRef                         = useRef<UploadedDoc | null>(null);
+
+  function selectDocType(t: string) {
+    setDocType(t);
+    const sides = sideOptionsForType(t);
+    if (sides.length) {
+      // Prefer first incomplete required side, else first side
+      const ofType = docsOfType(uploadedDocs, t);
+      const prefer =
+        sides.find((s) => !s.optional && docsForSide(ofType, s.value).length === 0) ??
+        sides[0];
+      setDocSide(prefer.value);
+    } else {
+      setDocSide(null);
+    }
+  }
+
+  const sideOptions = sideOptionsForType(docType);
+  const activeTypeDocs = docsOfType(uploadedDocs, docType);
+  const activeSideDocs = sideOptions.length
+    ? docsForSide(activeTypeDocs, docSide)
+    : activeTypeDocs;
+  const activeSlotFilled = activeSideDocs.length > 0;
+
+  function applyPublicOffer(row: TravelOfferRow) {
+    setOffer(mapPublicRow(row));
+    if (row.documents) setUploadedDocs(mapDocs(row.documents));
+    if (Array.isArray(row.payments)) setPayments(row.payments);
+    const h = hydrateActionFromStatus(row.status);
+    setActionDone(h.actionDone);
+    setFeedbackSent(h.feedbackSent);
+    if (row.clientResponseNote) setFeedback(row.clientResponseNote);
+    if (row.clientResponseRating) setFeedbackRating(row.clientResponseRating);
+    // Unlock actions after staff resolves changes (status leaves "changing").
+    if (h.feedbackSent) setClientAction("feedback");
+    else if (!h.actionDone) setClientAction("none");
+  }
+
+  async function refreshPublicOffer() {
+    if (isPreview || !id) return;
+    try {
+      const row = await fetchPublicOffer(id);
+      applyPublicOffer(row);
+    } catch {
+      /* keep current */
+    }
+  }
+
+  useEffect(() => {
+    if (isPreview) {
+      setOffer(PREVIEW_OFFER);
+      setNotFound(false);
+      setActionDone(null);
+      setFeedbackSent(false);
+      setUploadedDocs([]);
+      setPayments([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+    fetchPublicOffer(id)
+      .then((row) => {
+        if (cancelled) return;
+        applyPublicOffer(row);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.statusCode === 404) {
+          setNotFound(true);
+        } else {
+          setNotFound(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isPreview]);
+
+  // Epoint return: ?pay=success|error&order_id=… — reconcile; never fake PAID.
+  useEffect(() => {
+    if (isPreview || !id) return;
+    const pay = searchParams.get("pay");
+    if (pay !== "success" && pay !== "error") return;
+    const orderId = searchParams.get("order_id");
+    let cancelled = false;
+
+    (async () => {
+      try {
+        if (pay === "error") {
+          if (!cancelled) setPayBanner("error");
+        } else {
+          setPayBanner("pending");
+          if (orderId) {
+            try {
+              const result = await publicReconcilePayment(id, orderId);
+              if (cancelled) return;
+              if (result.status === "paid") {
+                setPayBanner("success");
+                const row = await fetchPublicOffer(id);
+                if (!cancelled) applyPublicOffer(row);
+              } else if (result.status === "failed" || result.status === "cancelled") {
+                setPayBanner("error");
+              } else {
+                setPayBanner("pending");
+              }
+            } catch {
+              if (!cancelled) setPayBanner("pending");
+            }
+          }
+        }
+      } finally {
+        if (cancelled) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete("pay");
+        next.delete("order_id");
+        setSearchParams(next, { replace: true });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isPreview, searchParams, setSearchParams]);
+
+  const salePriceAZN = calcAZN(offer.salePrice);
+  const paidCashAZN  = calcAZN(offer.paidByCash);
+  const paidTransAZN = calcAZN(offer.paidByTransfer);
+  const totalPaid    = paidCashAZN + paidTransAZN;
+  const remaining    = Math.max(0, salePriceAZN - totalPaid);
+  const paidPct      = salePriceAZN > 0 ? Math.min(100, (totalPaid / salePriceAZN) * 100) : 0;
+  /** After change request: view-only until staff revises / re-sends. */
+  // Change-request lock only — accepted deals still allow docs/payments.
+  const actionsLocked = feedbackSent || offer.status === "changing";
+  const decisionDone =
+    offer.status === "accepted" ||
+    offer.status === "rejected" ||
+    actionDone === "accepted" ||
+    actionDone === "rejected";
+  const effectiveActionDone: "accepted" | "rejected" | null =
+    actionDone ??
+    (offer.status === "accepted"
+      ? "accepted"
+      : offer.status === "rejected"
+        ? "rejected"
+        : null);
+  const pendingBank = payments.find((p) => p.method === "bank" && p.status === "pending");
+  const pendingCard = payments.find((p) => p.method === "card" && p.status === "pending");
+  const recentPayments = payments.filter((p) => p.status !== "cancelled").slice(0, 8);
 
   const DOC_TYPES = ["Passport", "ID Card", "Insurance", "Visa", "Medical", "Other"];
 
+  function openCheckout() {
+    if (actionsLocked || remaining <= 0 || pendingBank) return;
+    setShowCheckout(true);
+  }
+
+  function paymentStatusLabel(status: OfferPaymentRow["status"]) {
+    if (status === "paid") return "Paid";
+    if (status === "pending") return "Pending confirmation";
+    if (status === "failed") return "Failed";
+    return "Cancelled";
+  }
+
+  async function confirmAccept() {
+    if (actionsLocked || decisionDone) return;
+    setActionError(null);
+    if (isPreview) {
+      setActionDone("accepted");
+      return;
+    }
+    setBusy(true);
+    try {
+      const row = await publicAcceptOffer(id!);
+      applyPublicOffer(row);
+      setActionDone("accepted");
+      setClientAction("none");
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to accept");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDecline() {
+    if (actionsLocked || decisionDone) return;
+    setActionError(null);
+    if (isPreview) {
+      setActionDone("rejected");
+      return;
+    }
+    setBusy(true);
+    try {
+      const row = await publicDeclineOffer(id!, { note: feedback.trim() || null });
+      applyPublicOffer(row);
+      setActionDone("rejected");
+      setClientAction("none");
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to decline");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmRequestChanges() {
+    if (actionsLocked || decisionDone || !feedback.trim()) return;
+    setActionError(null);
+    if (isPreview) {
+      setFeedbackSent(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const row = await publicRequestOfferChanges(id!, {
+        note: feedback.trim(),
+        rating: feedbackRating || null,
+      });
+      applyPublicOffer(row);
+      setFeedbackSent(true);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to send feedback");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openFilePicker(opts?: { replace?: UploadedDoc | null; side?: OfferDocSide | null }) {
+    if (actionsLocked) return;
+    replaceDocRef.current = opts?.replace ?? null;
+    if (opts?.side !== undefined) setDocSide(opts.side);
+    fileInputRef.current?.click();
+  }
+
   function handleFiles(files: FileList | null) {
-    if (!files) return;
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setUploadedDocs(prev => [...prev, {
-          name: file.name, size: file.size, type: docType,
-          previewUrl: file.type.startsWith("image/") ? reader.result as string : undefined,
-        }]);
-      };
-      reader.readAsDataURL(file);
+    if (!files || actionsLocked) return;
+    const side = sideOptions.length ? docSide : null;
+    const toReplace = replaceDocRef.current;
+    replaceDocRef.current = null;
+    const fileList = Array.from(files);
+    if (!fileList.length) return;
+
+    // Replace mode: single file, remove previous after success
+    const filesToUpload = toReplace ? fileList.slice(0, 1) : fileList;
+
+    filesToUpload.forEach((file) => {
+      if (isPreview) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          setUploadedDocs((prev) => {
+            let next = prev;
+            if (toReplace) {
+              next = next.filter((d) => d !== toReplace && d.id !== toReplace.id);
+            }
+            return [
+              ...next,
+              {
+                name: file.name,
+                size: file.size,
+                type: docType,
+                side: toReplace?.side ?? side,
+                contentType: file.type || undefined,
+                previewUrl: dataUrl,
+                url: dataUrl,
+              },
+            ];
+          });
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+      void (async () => {
+        setBusy(true);
+        setActionError(null);
+        try {
+          const doc = await uploadPublicOfferDocument(
+            id!,
+            file,
+            docType,
+            toReplace?.side ?? side,
+          );
+          if (toReplace?.id) {
+            try {
+              await deletePublicOfferDocument(id!, toReplace.id);
+            } catch {
+              /* new file already uploaded */
+            }
+          }
+          setUploadedDocs((prev) => {
+            let next = prev;
+            if (toReplace) {
+              next = next.filter((d) => d.id !== toReplace.id && d !== toReplace);
+            }
+            return [
+              ...next,
+              {
+                id: doc.id,
+                name: doc.fileName,
+                size: doc.sizeBytes,
+                type: doc.type,
+                side: doc.side,
+                contentType: doc.contentType,
+                url: doc.url,
+                previewUrl: doc.url,
+              },
+            ];
+          });
+        } catch (err) {
+          setActionError(err instanceof Error ? err.message : "Upload failed");
+        } finally {
+          setBusy(false);
+        }
+      })();
     });
   }
 
-  const paymentSchedule = [
-    { label: "Deposit (30%)",       amount: salePriceAZN * 0.3, due: offer.createdAt,        done: totalPaid >= salePriceAZN * 0.3 },
-    { label: "Second Payment (40%)", amount: salePriceAZN * 0.4, due: offer.paymentDeadline, done: totalPaid >= salePriceAZN * 0.7 },
-    { label: "Final Payment (30%)",  amount: salePriceAZN * 0.3, due: offer.paymentDeadline, done: totalPaid >= salePriceAZN },
-  ];
+  async function removeDoc(doc: UploadedDoc) {
+    if (actionsLocked) return;
+    if (isPreview || !doc.id) {
+      setUploadedDocs((p) => p.filter((d) => d !== doc));
+      return;
+    }
+    setBusy(true);
+    setActionError(null);
+    try {
+      await deletePublicOfferDocument(id!, doc.id);
+      setUploadedDocs((p) => p.filter((d) => d.id !== doc.id));
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitDocumentsAck() {
+    if (actionsLocked || !docsAck || uploadedDocs.length < 1) return;
+    if (isPreview) {
+      setOffer((o) => ({ ...o, documentsSubmittedAt: new Date().toISOString() }));
+      return;
+    }
+    setDocsSubmitting(true);
+    setActionError(null);
+    try {
+      const row = await publicSubmitOfferDocuments(id!);
+      applyPublicOffer(row);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to submit documents");
+    } finally {
+      setDocsSubmitting(false);
+    }
+  }
+
+  function renderDocCard(doc: UploadedDoc, opts?: { compact?: boolean }) {
+    const src = docViewSrc(doc);
+    const image = isImageDoc(doc);
+    const pdf = isPdfDoc(doc);
+    const compact = opts?.compact;
+    return (
+      <div key={doc.id ?? `${doc.name}-${doc.size}`} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 p-3">
+          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {image && src ? (
+              <img src={src} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <FileText className="w-5 h-5 text-gray-400" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-gray-800 truncate">{doc.name}</p>
+            <p className="text-[10px] text-gray-400">{fmtFileSize(doc.size)}</p>
+          </div>
+          {!actionsLocked && (
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => openFilePicker({ replace: doc, side: doc.side ?? null })}
+                disabled={busy}
+                className="p-2 text-gray-400 hover:text-[#001058] disabled:opacity-50"
+                title="Replace"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void removeDoc(doc)}
+                disabled={busy}
+                className="p-2 text-gray-400 hover:text-red-500 disabled:opacity-50"
+                title="Remove"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+        {src && (image || pdf) && !compact && (
+          <div className="border-t border-gray-100">
+            {image ? (
+              <img src={src} alt={doc.name} className="w-full max-h-[280px] object-contain bg-gray-50" />
+            ) : (
+              <iframe title={doc.name} src={src} className="w-full h-[280px] border-0 bg-gray-50" />
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
     active:   { label: "Active Deal",   bg: "bg-green-100", text: "text-green-700", border: "border-green-300" },
     sent:     { label: "Pending Offer", bg: "bg-blue-100",  text: "text-blue-700",  border: "border-blue-300"  },
     inactive: { label: "Inactive",      bg: "bg-gray-100",  text: "text-gray-600",  border: "border-gray-300"  },
     expired:  { label: "Expired",       bg: "bg-red-100",   text: "text-red-600",   border: "border-red-300"   },
+    accepted: { label: "Accepted",      bg: "bg-green-100", text: "text-green-700", border: "border-green-300" },
+    rejected: { label: "Declined",      bg: "bg-red-100",   text: "text-red-600",   border: "border-red-300"   },
+    changing: { label: "Changes requested", bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-300" },
   };
   const sc = STATUS_CONFIG[offer.status] ?? STATUS_CONFIG.sent;
+
+  if (loading) {
+    return (
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center text-sm text-gray-500">
+        Loading offer…
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <AlertCircle className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-gray-800">Offer not found</p>
+          <p className="text-xs text-gray-500 mt-1">This link may be invalid or the offer is no longer available.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-gray-50 flex flex-col">
@@ -431,87 +1015,186 @@ export function OfferPublicPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {actionDone === "accepted" && <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-green-100 text-green-700 border border-green-300">✓ Accepted</span>}
-            {actionDone === "rejected" && <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-100 text-red-600 border border-red-300">Declined</span>}
-            {!actionDone && <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${sc.bg} ${sc.text} border ${sc.border}`}>{sc.label}</span>}
-            {remaining > 0 && !actionDone && (
-              <button onClick={() => setShowCheckout(true)}
+            {effectiveActionDone === "accepted" && <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-green-100 text-green-700 border border-green-300">✓ Accepted</span>}
+            {effectiveActionDone === "rejected" && <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-100 text-red-600 border border-red-300">Declined</span>}
+            {feedbackSent && !actionDone && <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700 border border-amber-300">Changes requested</span>}
+            {!actionDone && !feedbackSent && <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${sc.bg} ${sc.text} border ${sc.border}`}>{sc.label}</span>}
+            {remaining > 0 && !actionDone && !actionsLocked && !pendingBank && (
+              <button type="button" onClick={openCheckout}
                 className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap transition-colors">
                 Pay Now
               </button>
+            )}
+            {remaining > 0 && !actionsLocked && pendingBank && (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-300 whitespace-nowrap">
+                Bank pending
+              </span>
             )}
           </div>
         </div>
       </div>
 
+      {actionsLocked && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
+          This offer is locked while your change request is reviewed. Accept, decline, payments, and document uploads are disabled until we send an updated offer.
+        </div>
+      )}
+
+      {!actionsLocked && pendingBank && (
+        <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-900">
+          Bank transfer of <strong>{fmtAZNDec(pendingBank.amount)}</strong> submitted — awaiting staff confirmation.
+          Balance updates after approval.
+        </div>
+      )}
+
+      {!actionsLocked && !pendingBank && pendingCard && !payBanner && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
+          Card payment of <strong>{fmtAZNDec(pendingCard.amount)}</strong> is processing. Refresh if the balance does not update shortly.
+        </div>
+      )}
+
+      {payBanner && (
+        <div
+          className={`border-b px-4 py-3 text-center text-sm ${
+            payBanner === "success"
+              ? "bg-green-50 border-green-200 text-green-800"
+              : payBanner === "error"
+                ? "bg-red-50 border-red-200 text-red-700"
+                : "bg-amber-50 border-amber-200 text-amber-800"
+          }`}
+        >
+          {payBanner === "success" && "Payment confirmed. Thank you!"}
+          {payBanner === "error" && "Payment was not completed. You can try again."}
+          {payBanner === "pending" && "Payment is processing — refresh shortly if the balance has not updated."}
+        </div>
+      )}
+
       {/* ── Hero ───────────────────────────────────────────────────────── */}
       <div style={{ background: "linear-gradient(135deg, #001058 0%, #001c8c 70%, #0031b8 100%)" }}>
-        <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
+        <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8 lg:py-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 md:items-center">
 
-          {/* Route + type */}
-          <p className="text-xs text-white/50 uppercase tracking-widest mb-3 font-medium">{offer.saleType}</p>
-          <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <span className="text-3xl sm:text-4xl font-bold text-white">{offer.from || "—"}</span>
-            <ArrowRight className="w-6 h-6 text-white/40 flex-shrink-0" />
-            <span className="text-3xl sm:text-4xl font-bold text-white">{offer.to || "—"}</span>
-          </div>
-          {offer.hotelName && (
-            <div className="flex items-center gap-1.5 text-white/70 text-sm mb-4">
-              <Hotel className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>{offer.hotelName}</span>
-            </div>
-          )}
-
-          {/* Pill tags */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {[
-              { icon: Calendar, text: formatDate(offer.saleDate) },
-              { icon: Users,    text: `${offer.numAdults} adults${(offer.numChildren ?? 0) > 0 ? `, ${offer.numChildren} child${offer.numChildren > 1 ? "ren":""}` : ""}` },
-              { icon: Globe,    text: [offer.city, offer.country].filter(Boolean).join(", ") },
-              { icon: Clock,    text: `Deadline: ${formatDate(offer.paymentDeadline)}` },
-            ].filter(x => x.text && x.text !== "—").map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white"
-                style={{ background: "rgba(255,255,255,0.13)" }}>
-                <Icon className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
-                <span>{text}</span>
+            {/* Left: trip summary */}
+            <div className="min-w-0">
+              <p className="text-xs text-white/50 uppercase tracking-widest mb-2 font-medium">
+                {offer.saleType || "Offer"}
+              </p>
+              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 flex-wrap">
+                <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight">
+                  {offer.from?.trim() || "—"}
+                </span>
+                <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-white/40 flex-shrink-0" />
+                <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight">
+                  {offer.to?.trim() || "—"}
+                </span>
               </div>
-            ))}
-          </div>
-
-          {/* Price + progress block */}
-          <div className="rounded-2xl p-4 sm:p-5 border border-white/20 max-w-sm"
-            style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}>
-            <div className="flex items-end justify-between mb-3">
-              <div>
-                <p className="text-[10px] text-white/60 uppercase tracking-wider mb-0.5">Total Price</p>
-                <p className="text-3xl font-bold text-white">{fmtAZN(salePriceAZN)}</p>
-              </div>
-              {remaining <= 0 && (
-                <div className="flex items-center gap-1.5 text-green-300">
-                  <CheckCircle className="w-4 h-4" />
-                  <span className="text-sm font-semibold">Fully Paid</span>
+              {offer.hotelName && (
+                <div className="flex items-center gap-1.5 text-white/70 text-sm mb-3">
+                  <Hotel className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{offer.hotelName}</span>
                 </div>
               )}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { icon: Calendar, text: formatDate(offer.saleDate) },
+                  {
+                    icon: Users,
+                    text: `${offer.numAdults} adult${offer.numAdults !== 1 ? "s" : ""}${
+                      (offer.numChildren ?? 0) > 0
+                        ? `, ${offer.numChildren} child${offer.numChildren !== 1 ? "ren" : ""}`
+                        : ""
+                    }`,
+                  },
+                  { icon: Globe, text: [offer.city, offer.country].filter(Boolean).join(", ") },
+                  {
+                    icon: Clock,
+                    text: offer.paymentDeadline
+                      ? `Deadline: ${formatDate(offer.paymentDeadline)}`
+                      : "",
+                  },
+                ]
+                  .filter((x) => x.text && x.text !== "—")
+                  .map(({ icon: Icon, text }) => (
+                    <div
+                      key={text}
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white"
+                      style={{ background: "rgba(255,255,255,0.13)" }}
+                    >
+                      <Icon className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
+                      <span>{text}</span>
+                    </div>
+                  ))}
+              </div>
             </div>
-            <div className="w-full h-2 rounded-full mb-2" style={{ background: "rgba(255,255,255,0.2)" }}>
-              <div className="h-full rounded-full bg-green-400 transition-all duration-500" style={{ width: `${paidPct}%` }} />
-            </div>
-            <div className="flex justify-between text-xs text-white/60 mb-3">
-              <span>Paid {fmtAZN(totalPaid)}</span>
-              <span>{Math.round(paidPct)}%</span>
-            </div>
-            {remaining > 0 && (
-              <div className="flex items-center justify-between">
+
+            {/* Right: price + progress (fills empty space on md+) */}
+            <div
+              className="rounded-2xl p-4 sm:p-5 border border-white/20 w-full"
+              style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}
+            >
+              <div className="flex items-end justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-[10px] text-white/60 uppercase tracking-wider mb-0.5">Total Price</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white">{fmtAZN(salePriceAZN)}</p>
+                </div>
+                {remaining <= 0 && (
+                  <div className="flex items-center gap-1.5 text-green-300 flex-shrink-0">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm font-semibold">Fully Paid</span>
+                  </div>
+                )}
+              </div>
+              <div className="w-full h-2 rounded-full mb-2" style={{ background: "rgba(255,255,255,0.2)" }}>
+                <div
+                  className="h-full rounded-full bg-green-400 transition-all duration-500"
+                  style={{ width: `${paidPct}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-white/60 mb-4">
+                <span>Paid {fmtAZN(totalPaid)}</span>
+                <span>{Math.round(paidPct)}%</span>
+              </div>
+              {remaining > 0 && !actionsLocked && !pendingBank && (
+                <div className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] text-white/50 uppercase tracking-wider mb-0.5">Remaining</p>
+                    <p className="text-xl font-bold text-orange-300">{fmtAZN(remaining)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openCheckout}
+                    className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-sm font-bold transition-colors whitespace-nowrap"
+                  >
+                    Pay →
+                  </button>
+                </div>
+              )}
+              {remaining > 0 && !actionsLocked && pendingBank && (
+                <div className="rounded-xl px-3 py-3 border border-blue-300/40 bg-blue-500/20">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-white/50 uppercase tracking-wider mb-0.5">Remaining</p>
+                      <p className="text-xl font-bold text-orange-300">{fmtAZN(remaining)}</p>
+                      <p className="text-[11px] text-blue-100 mt-1.5 leading-snug">
+                        Bank transfer submitted — awaiting confirmation ({fmtAZNDec(pendingBank.amount)})
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-blue-500/40 text-blue-50 border border-blue-300/40 whitespace-nowrap flex-shrink-0">
+                      Waiting…
+                    </span>
+                  </div>
+                </div>
+              )}
+              {remaining > 0 && actionsLocked && (
                 <div>
                   <p className="text-[10px] text-white/50 uppercase tracking-wider mb-0.5">Remaining</p>
                   <p className="text-xl font-bold text-orange-300">{fmtAZN(remaining)}</p>
+                  <p className="text-[11px] text-white/60 mt-1">
+                    Payment paused until your change request is resolved.
+                  </p>
                 </div>
-                <button onClick={() => setShowCheckout(true)}
-                  className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-sm font-bold transition-colors">
-                  Pay →
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -520,25 +1203,51 @@ export function OfferPublicPage() {
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4 flex-1 w-full">
 
         {/* 1. Client Response ─────────────────────────────────────────── */}
-        {!actionDone ? (
+        {!effectiveActionDone ? (
           <Card title="Your Response" icon={MessageSquare}>
             <div className="p-4 sm:p-5">
+              {actionsLocked ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">Change request received</p>
+                    <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                      Dear <strong>{offer.clientName}</strong>, this offer is locked while agent{" "}
+                      <strong>{offer.agent || "our team"}</strong> reviews your feedback
+                      {offer.clientResponseNote ? (
+                        <>
+                          :{" "}
+                          <span className="italic">“{offer.clientResponseNote}”</span>
+                        </>
+                      ) : (
+                        "."
+                      )}{" "}
+                      You will be able to accept, pay, and upload documents again after we send an update.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+              <>
               <p className="text-sm text-gray-600 mb-4">
                 Dear <strong>{offer.clientName}</strong>, please review the offer details below and let us know your decision.
               </p>
 
+              {actionError && (
+                <p className="text-xs text-red-600 mb-3">{actionError}</p>
+              )}
+
               {clientAction === "none" && (
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <button onClick={() => setClientAction("accepting")}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition-colors">
+                  <button onClick={() => setClientAction("accepting")} disabled={busy}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50">
                     <ThumbsUp className="w-4 h-4" /> Accept Offer
                   </button>
-                  <button onClick={() => setClientAction("rejecting")}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-colors">
+                  <button onClick={() => setClientAction("rejecting")} disabled={busy}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50">
                     <ThumbsDown className="w-4 h-4" /> Decline Offer
                   </button>
-                  <button onClick={() => setClientAction("feedback")}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-[#001058] text-[#001058] hover:bg-[#001058]/5 rounded-lg text-sm font-semibold transition-colors">
+                  <button onClick={() => setClientAction("feedback")} disabled={busy}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-[#001058] text-[#001058] hover:bg-[#001058]/5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50">
                     <MessageSquare className="w-4 h-4" /> Request Changes
                   </button>
                 </div>
@@ -554,9 +1263,9 @@ export function OfferPublicPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setActionDone("accepted")}
-                      className="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-bold transition-colors">Confirm Acceptance</button>
-                    <button onClick={() => setClientAction("none")}
+                    <button onClick={() => void confirmAccept()} disabled={busy}
+                      className="flex-1 py-2.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg text-sm font-bold transition-colors">Confirm Acceptance</button>
+                    <button onClick={() => setClientAction("none")} disabled={busy}
                       className="px-4 py-2.5 border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Back</button>
                   </div>
                 </div>
@@ -571,9 +1280,9 @@ export function OfferPublicPage() {
                     placeholder="Your reason (optional)..."
                     className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#001058] resize-none" />
                   <div className="flex gap-2">
-                    <button onClick={() => setActionDone("rejected")}
-                      className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition-colors">Decline</button>
-                    <button onClick={() => setClientAction("none")}
+                    <button onClick={() => void confirmDecline()} disabled={busy}
+                      className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-lg text-sm font-bold transition-colors">Decline</button>
+                    <button onClick={() => setClientAction("none")} disabled={busy}
                       className="px-4 py-2.5 border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Back</button>
                   </div>
                 </div>
@@ -585,7 +1294,7 @@ export function OfferPublicPage() {
                     <p className="text-xs font-medium text-gray-700 mb-2">Rate this offer</p>
                     <div className="flex gap-1">
                       {[1,2,3,4,5].map(n => (
-                        <button key={n} onClick={() => setFeedbackRating(n)}>
+                        <button key={n} onClick={() => setFeedbackRating(n)} type="button">
                           <Star className={`w-6 h-6 transition-colors ${n <= feedbackRating ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} />
                         </button>
                       ))}
@@ -595,11 +1304,11 @@ export function OfferPublicPage() {
                     placeholder="What would you like to change? Dates, hotel, price, inclusions..."
                     className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#001058] resize-none" />
                   <div className="flex gap-2">
-                    <button onClick={() => { if (feedback.trim()) setFeedbackSent(true); }} disabled={!feedback.trim()}
+                    <button onClick={() => void confirmRequestChanges()} disabled={!feedback.trim() || busy}
                       className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-[#001058] hover:bg-[#000844] disabled:opacity-40 text-white rounded-lg text-sm font-bold transition-colors">
                       <Send className="w-3.5 h-3.5" /> Send Feedback
                     </button>
-                    <button onClick={() => setClientAction("none")}
+                    <button onClick={() => setClientAction("none")} disabled={busy}
                       className="px-4 py-2.5 border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
                   </div>
                 </div>
@@ -614,27 +1323,37 @@ export function OfferPublicPage() {
                   </div>
                 </div>
               )}
+              </>
+              )}
             </div>
           </Card>
         ) : (
-          <div className={`rounded-2xl p-4 sm:p-5 flex items-start gap-4 border ${actionDone === "accepted" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${actionDone === "accepted" ? "bg-green-100" : "bg-red-100"}`}>
-              {actionDone === "accepted" ? <ThumbsUp className="w-5 h-5 text-green-600" /> : <ThumbsDown className="w-5 h-5 text-red-500" />}
+          <div className={`rounded-2xl p-4 sm:p-5 flex items-start gap-4 border ${effectiveActionDone === "accepted" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${effectiveActionDone === "accepted" ? "bg-green-100" : "bg-red-100"}`}>
+              {effectiveActionDone === "accepted" ? <ThumbsUp className="w-5 h-5 text-green-600" /> : <ThumbsDown className="w-5 h-5 text-red-500" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-bold mb-1 ${actionDone === "accepted" ? "text-green-800" : "text-red-700"}`}>
-                {actionDone === "accepted" ? "Offer Accepted — Welcome Aboard!" : "Offer Declined"}
+              <p className={`text-sm font-bold mb-1 ${effectiveActionDone === "accepted" ? "text-green-800" : "text-red-700"}`}>
+                {effectiveActionDone === "accepted" ? "Offer Accepted — Welcome Aboard!" : "Offer Declined"}
               </p>
-              <p className={`text-xs ${actionDone === "accepted" ? "text-green-600" : "text-red-500"}`}>
-                {actionDone === "accepted"
-                  ? "Please upload your travel documents below and complete your first payment to confirm the booking."
+              <p className={`text-xs ${effectiveActionDone === "accepted" ? "text-green-600" : "text-red-500"}`}>
+                {effectiveActionDone === "accepted"
+                  ? pendingBank
+                    ? "Your bank transfer was submitted. We will confirm it shortly — please upload your travel documents below."
+                    : "Please upload your travel documents below and complete your first payment to confirm the booking."
                   : `Our agent ${offer.agent} will follow up with an updated offer.`}
               </p>
-              {actionDone === "accepted" && remaining > 0 && (
-                <button onClick={() => setShowCheckout(true)}
+              {effectiveActionDone === "accepted" && remaining > 0 && !actionsLocked && !pendingBank && (
+                <button type="button" onClick={openCheckout}
                   className="mt-3 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-bold transition-colors inline-block">
                   Make First Payment →
                 </button>
+              )}
+              {effectiveActionDone === "accepted" && remaining > 0 && !actionsLocked && pendingBank && (
+                <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-800">
+                  <Banknote className="w-3.5 h-3.5" />
+                  Waiting for bank confirmation ({fmtAZNDec(pendingBank.amount)})
+                </div>
               )}
             </div>
           </div>
@@ -759,59 +1478,243 @@ export function OfferPublicPage() {
           </Card>
         )}
 
-        {/* 4. Upload Documents ────────────────────────────────────────── */}
-        <Card title="Upload Documents" icon={Upload}>
+        {/* 4. Documents — tabbed slots; filled slots show content + replace/remove */}
+        <Card title="Documents" icon={Upload}>
           <div className="p-4 sm:p-5">
-            <p className="text-xs text-gray-500 mb-4">Upload passport, ID or visa copies. JPG, PNG, PDF — max 10 MB each.</p>
+            {actionsLocked ? (
+              <p className="text-xs text-amber-700 mb-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                Document upload is disabled while your change request is under review. Existing files remain visible.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mb-4">
+                Select a type below. Completed tabs show a checkmark. JPG, PNG, PDF — max 10 MB.
+              </p>
+            )}
 
-            {/* Doc type chips */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.pdf"
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+
+            {/* Type tabs with completion ticks */}
             <div className="flex flex-wrap gap-1.5 mb-4">
-              {DOC_TYPES.map(t => (
-                <button key={t} onClick={() => setDocType(t)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                    docType === t ? "bg-[#001058] text-white border-[#001058]" : "bg-white text-gray-600 border-gray-300 hover:border-[#001058]"
-                  }`}>{t}</button>
-              ))}
+              {DOC_TYPES.map((t) => {
+                const complete = isDocTypeComplete(uploadedDocs, t);
+                const started = isDocTypeStarted(uploadedDocs, t);
+                const active = docType === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => selectDocType(t)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      active
+                        ? "bg-[#001058] text-white border-[#001058]"
+                        : complete
+                          ? "bg-green-50 text-green-800 border-green-300"
+                          : started
+                            ? "bg-amber-50 text-amber-800 border-amber-300"
+                            : "bg-white text-gray-600 border-gray-300 hover:border-[#001058]"
+                    }`}
+                  >
+                    {complete && (
+                      <CheckCircle
+                        className={`w-3.5 h-3.5 ${active ? "text-green-300" : "text-green-600"}`}
+                      />
+                    )}
+                    {t}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Drop zone */}
-            <div onClick={() => fileInputRef.current?.click()}
-              onDragOver={e => e.preventDefault()}
-              onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
-              className="border-2 border-dashed border-gray-300 rounded-xl py-10 px-4 text-center cursor-pointer hover:border-[#001058] transition-colors active:bg-[#001058]/5">
-              <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                <Upload className="w-6 h-6 text-gray-400" />
-              </div>
-              <p className="text-sm font-medium text-gray-700">Tap to upload <span className="text-[#001058]">{docType}</span></p>
-              <p className="text-xs text-gray-400 mt-1">or drag & drop here</p>
-              <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.pdf"
-                className="hidden" onChange={e => handleFiles(e.target.files)} />
-            </div>
-
-            {uploadedDocs.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <p className="text-xs font-semibold text-gray-700">{uploadedDocs.length} file{uploadedDocs.length > 1 ? "s" : ""} uploaded</p>
-                {uploadedDocs.map((doc, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {doc.previewUrl ? <img src={doc.previewUrl} alt="" className="w-full h-full object-cover" /> : <FileText className="w-5 h-5 text-gray-400" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-800 truncate">{doc.name}</p>
-                      <p className="text-[10px] text-gray-400">{doc.type} · {fmtFileSize(doc.size)}</p>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {doc.previewUrl && (
-                        <a href={doc.previewUrl} target="_blank" rel="noreferrer" className="p-2 text-gray-400 hover:text-[#001058]">
-                          <Eye className="w-4 h-4" />
-                        </a>
-                      )}
-                      <button onClick={() => setUploadedDocs(p => p.filter((_, idx) => idx !== i))} className="p-2 text-gray-400 hover:text-red-500">
-                        <Trash2 className="w-4 h-4" />
+            {/* Side / page chips when relevant */}
+            {sideOptions.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1.5">
+                  {docType === "Passport" ? "Page" : "Side"}
+                  {docType === "ID Card" ? " (front + back required)" : ""}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {sideOptions.map((opt) => {
+                    const filled = docsForSide(activeTypeDocs, opt.value).length > 0;
+                    const active = docSide === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setDocSide(opt.value)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                          active
+                            ? "bg-[#001058]/10 text-[#001058] border-[#001058]"
+                            : filled
+                              ? "bg-green-50 text-green-700 border-green-200"
+                              : "bg-white text-gray-600 border-gray-300 hover:border-[#001058]"
+                        }`}
+                      >
+                        {filled && <CheckCircle className="w-3 h-3 text-green-600" />}
+                        {opt.label}
+                        {opt.optional && !filled ? (
+                          <span className="text-[9px] opacity-70">optional</span>
+                        ) : null}
                       </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {actionError && (
+              <p className="text-xs text-red-600 mb-3">{actionError}</p>
+            )}
+
+            {/* Active slot: content OR upload — never both for the same slot */}
+            {activeSlotFilled ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-gray-700">
+                    {docType}
+                    {docSide ? ` · ${offerDocSideLabel(docType, docSide)}` : ""}
+                  </p>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700">
+                    <CheckCircle className="w-3 h-3" /> Uploaded
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {activeSideDocs.map((doc) => renderDocCard(doc))}
+                </div>
+                {!actionsLocked && sideOptions.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => openFilePicker()}
+                    disabled={busy}
+                    className="w-full py-2 text-xs font-medium text-[#001058] border border-dashed border-[#001058]/30 rounded-lg hover:bg-[#001058]/5 disabled:opacity-50"
+                  >
+                    + Add another file
+                  </button>
+                )}
+              </div>
+            ) : actionsLocked ? (
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+                <p className="text-xs text-gray-500">
+                  No {docType}
+                  {docSide ? ` (${offerDocSideLabel(docType, docSide)})` : ""} uploaded yet.
+                </p>
+              </div>
+            ) : (
+              <div
+                onClick={() => openFilePicker({ side: docSide })}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleFiles(e.dataTransfer.files);
+                }}
+                className="border-2 border-dashed border-gray-300 rounded-xl py-8 px-4 text-center cursor-pointer hover:border-[#001058] transition-colors active:bg-[#001058]/5"
+              >
+                <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                  <Upload className="w-5 h-5 text-gray-400" />
+                </div>
+                <p className="text-sm font-medium text-gray-700">
+                  Upload{" "}
+                  <span className="text-[#001058]">
+                    {docType}
+                    {docSide ? ` · ${offerDocSideLabel(docType, docSide)}` : ""}
+                  </span>
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Tap or drag & drop</p>
+              </div>
+            )}
+
+            {/* Quick overview of other completed types */}
+            {uploadedDocs.length > 0 && (
+              <div className="mt-5 pt-4 border-t border-gray-100">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Overview
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {DOC_TYPES.filter((t) => isDocTypeStarted(uploadedDocs, t)).map((t) => {
+                    const n = docsOfType(uploadedDocs, t).length;
+                    const complete = isDocTypeComplete(uploadedDocs, t);
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => selectDocType(t)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border ${
+                          complete
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}
+                      >
+                        {complete ? (
+                          <CheckCircle className="w-3 h-3" />
+                        ) : (
+                          <AlertCircle className="w-3 h-3" />
+                        )}
+                        {t} · {n}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Acknowledgement + submit for staff review */}
+            {!actionsLocked && (
+              <div className="mt-5 pt-4 border-t border-gray-100 space-y-3">
+                {offer.documentsSubmittedAt ? (
+                  <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 flex items-start gap-3">
+                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-green-800">Documents submitted</p>
+                      <p className="text-xs text-green-700 mt-0.5">
+                        Thanks — our team has been notified. You can still replace files if needed.
+                        {" "}
+                        Submitted {new Date(offer.documentsSubmittedAt).toLocaleString()}.
+                      </p>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={docsAck}
+                        onChange={(e) => setDocsAck(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#001058] focus:ring-[#001058]"
+                      />
+                      <span className="text-xs text-gray-700 leading-relaxed">
+                        I confirm the documents I uploaded are correct, complete, and ready for Inflero
+                        Travel to review.
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void submitDocumentsAck()}
+                      disabled={
+                        !docsAck ||
+                        uploadedDocs.length < 1 ||
+                        docsSubmitting ||
+                        busy
+                      }
+                      className="w-full py-3 bg-[#001058] hover:bg-[#000844] disabled:opacity-40 text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      {docsSubmitting ? "Submitting…" : "Submit documents for review"}
+                    </button>
+                    {uploadedDocs.length < 1 && (
+                      <p className="text-[11px] text-gray-400 text-center">
+                        Upload at least one document before submitting.
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -843,33 +1746,95 @@ export function OfferPublicPage() {
           </div>
         </Card>
 
-        {/* 6. Payment Schedule ────────────────────────────────────────── */}
-        <Card title="Payment Schedule" icon={CreditCard}>
-          <div className="p-4 sm:p-5">
-            <div className="space-y-3 mb-4">
-              {paymentSchedule.map((item, i) => (
-                <div key={i} className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border ${item.done ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${item.done ? "bg-green-500" : "bg-gray-300"}`}>
-                    {item.done
-                      ? <CheckCircle className="w-4 h-4 text-white" />
-                      : <span className="text-white text-xs font-bold">{i + 1}</span>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-semibold ${item.done ? "text-green-700" : "text-gray-700"}`}>{item.label}</p>
-                    <p className="text-[10px] text-gray-400">Due: {formatDate(item.due)}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className={`text-sm font-bold ${item.done ? "text-green-600" : "text-gray-600"}`}>{fmtAZN(item.amount)}</p>
-                    <p className={`text-[10px] font-medium ${item.done ? "text-green-500" : "text-orange-400"}`}>{item.done ? "Paid" : "Pending"}</p>
-                  </div>
-                </div>
-              ))}
+        {/* 6. Outstanding balance + payment activity ──────────────────── */}
+        <Card title="Payment" icon={CreditCard}>
+          <div className="p-4 sm:p-5 space-y-4">
+            <div className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border ${remaining <= 0 ? "bg-green-50 border-green-200" : "bg-orange-50 border-orange-200"}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${remaining <= 0 ? "bg-green-500" : "bg-orange-500"}`}>
+                {remaining <= 0
+                  ? <CheckCircle className="w-4 h-4 text-white" />
+                  : <DollarSign className="w-4 h-4 text-white" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-semibold ${remaining <= 0 ? "text-green-700" : "text-orange-800"}`}>
+                  {remaining <= 0 ? "Fully paid" : "Outstanding balance"}
+                </p>
+                {offer.paymentDeadline && (
+                  <p className="text-[10px] text-gray-400">Deadline: {formatDate(offer.paymentDeadline)}</p>
+                )}
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className={`text-sm font-bold ${remaining <= 0 ? "text-green-600" : "text-orange-600"}`}>
+                  {fmtAZNDec(remaining)}
+                </p>
+              </div>
             </div>
+
+            {recentPayments.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                  Payment activity
+                </p>
+                <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                  {recentPayments.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white">
+                      <div className="min-w-0 flex items-center gap-2">
+                        {p.method === "bank" ? (
+                          <Banknote className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                        ) : (
+                          <CreditCard className="w-3.5 h-3.5 text-[#001058] flex-shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-800">
+                            {p.method === "bank" ? "Bank transfer" : "Card"} · {fmtAZNDec(p.amount)}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {new Date(p.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-semibold flex-shrink-0 ${
+                          p.status === "paid"
+                            ? "text-green-600"
+                            : p.status === "pending"
+                              ? "text-amber-600"
+                              : p.status === "failed"
+                                ? "text-red-600"
+                                : "text-gray-400"
+                        }`}
+                      >
+                        {paymentStatusLabel(p.status)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {remaining > 0
-              ? <button onClick={() => setShowCheckout(true)}
-                  className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors">
-                  <CreditCard className="w-4 h-4" /> Make a Payment ({fmtAZN(remaining)} remaining)
-                </button>
+              ? actionsLocked
+                ? (
+                  <div className="flex items-center justify-center gap-2 py-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <span className="text-sm font-semibold text-amber-800">Payment disabled until offer is updated</span>
+                  </div>
+                )
+                : pendingBank
+                  ? (
+                    <div className="flex items-center justify-center gap-2 py-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <Banknote className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-semibold text-blue-800">
+                        Waiting for bank confirmation ({fmtAZNDec(pendingBank.amount)})
+                      </span>
+                    </div>
+                  )
+                  : (
+                  <button type="button" onClick={openCheckout}
+                    className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+                    <CreditCard className="w-4 h-4" /> Pay {fmtAZNDec(remaining)}
+                  </button>
+                )
               : <div className="flex items-center justify-center gap-2 py-3 bg-green-50 rounded-lg border border-green-200">
                   <CheckCircle className="w-4 h-4 text-green-500" />
                   <span className="text-sm font-semibold text-green-700">All payments complete!</span>
@@ -895,8 +1860,16 @@ export function OfferPublicPage() {
       </div>
 
       {/* Checkout modal */}
-      {showCheckout && (
-        <CheckoutModal remaining={remaining} clientName={offer.clientName} offerId={offer.id} onClose={() => setShowCheckout(false)} />
+      {showCheckout && !actionsLocked && (
+        <CheckoutModal
+          remaining={remaining}
+          clientName={offer.clientName}
+          offerCode={offer.displayCode || offer.id}
+          publicToken={isPreview ? null : id!}
+          isPreview={isPreview}
+          onClose={() => setShowCheckout(false)}
+          onBankNotified={() => void refreshPublicOffer()}
+        />
       )}
     </div>
   );

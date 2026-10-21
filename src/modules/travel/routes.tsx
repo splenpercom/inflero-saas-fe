@@ -19,7 +19,6 @@ import {
   OffersPage,
   OfferPublicPageWrapper,
   CommissionsPage,
-  LogsPage,
   TravelInvoicesPage,
   TravelCalendarPage,
 } from "./pages";
@@ -53,7 +52,6 @@ export const travelDashboardRouteElements = (
     <Route path="travel-reports" element={<TravelStaffGuard><TravelReportsPage /></TravelStaffGuard>} />
     <Route path="offers" element={<TravelStaffGuard><OffersPage /></TravelStaffGuard>} />
     <Route path="commissions" element={<TravelStaffGuard><CommissionsPage /></TravelStaffGuard>} />
-    <Route path="logs" element={<TravelStaffGuard><LogsPage /></TravelStaffGuard>} />
     <Route path="invoices-travel" element={<TravelStaffGuard><TravelInvoicesPage /></TravelStaffGuard>} />
     <Route path="travel-calendar" element={<TravelStaffGuard><TravelCalendarPage /></TravelStaffGuard>} />
   </>

@@ -25,6 +25,7 @@ export const TENANT_RBAC_MODULES = [
   "Settings",
   "My Website",
   "Tasks",
+  "Offers",
 ] as const;
 
 export type TenantRbacModule = (typeof TENANT_RBAC_MODULES)[number];

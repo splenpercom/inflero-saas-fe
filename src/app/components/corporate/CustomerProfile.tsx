@@ -553,6 +553,7 @@ export function CustomerProfile() {
           (activeTab === "invoices" || activeTab === "offers" || activeTab === "documents") && (
             <CustomerTravelPanels
               tab={activeTab}
+              customerId={customer.id}
               customerName={customer.name}
               customerPhone={customer.phone}
             />

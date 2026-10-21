@@ -28,6 +28,7 @@ const RBAC_MODULE_TENANT_GATE: Partial<Record<(typeof TENANT_RBAC_MODULES)[numbe
   POS: "POS",
   Loyalty: "LOYALTY",
   "My Website": "WEB_EDITOR",
+  Offers: "TRAVEL",
 };
 
 export function isRbacModuleVisible(

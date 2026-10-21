@@ -103,6 +103,7 @@ export const userManagementTranslations = {
     myWebsite: "My Website",
     settings: "Settings",
     tasksModule: "Tasks",
+    offersModule: "Offers",
 
     // Inventory sub-items
     products: "Products",
@@ -313,6 +314,7 @@ export const userManagementTranslations = {
     myWebsite: "Vebsaytım",
     settings: "Parametrlər",
     tasksModule: "Tapşırıqlar",
+    offersModule: "Təkliflər",
 
     // Inventory sub-items
     products: "Məhsullar",
@@ -500,6 +502,7 @@ export const userManagementTranslations = {
     myWebsite: "Мой сайт",
     settings: "Настройки",
     tasksModule: "Задачи",
+    offersModule: "Предложения",
     products: "Товары",
     createproduct: "Создать товар",
     expiredproducts: "Просроченные товары",
@@ -634,6 +637,7 @@ export const translateModuleName = (moduleName: string, language: "en" | "az" | 
     "My Website": "myWebsite",
     Settings: "settings",
     Tasks: "tasksModule",
+    Offers: "offersModule",
   };
 
   const key = moduleMap[moduleName];

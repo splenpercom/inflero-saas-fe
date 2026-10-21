@@ -1,27 +1,30 @@
 /**
  * Travel Offers / Invoices / Documents panels for People → Customer profile.
- * UI-only (localStorage + mock). Shown only when TRAVEL module is enabled.
+ * Offers + docs by customerId from API; invoices stay localStorage mock.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  BadgeCheck,
   ChevronLeft,
   ChevronRight,
-  CreditCard,
-  Download,
   Edit2,
   Eye,
-  FileImage,
-  Hotel,
+  FileText,
   Search,
   Send,
-  ShieldCheck,
-  Ticket,
   Trash2,
-  Upload,
   WalletCards,
 } from "lucide-react";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
+import { useAuth } from "../../../app/context/AuthContext";
+import {
+  deleteOfferDocument,
+  fetchOfferDocuments,
+  fetchOffers,
+  offerDocSideLabel,
+  type OfferDocumentRow,
+  type OfferStatusUi,
+} from "../../../app/api/offers";
+import { notifyFromError, notifySuccess } from "../../../app/lib/toast";
 import { FilterSelect } from "../ui/filter-select";
 
 export type CustomerTravelTab = "invoices" | "offers" | "documents";
@@ -58,6 +61,8 @@ interface Invoice {
 
 interface TravelOffer {
   id: string;
+  displayCode: string;
+  publicToken: string;
   saleType: string;
   saleDate: string;
   from: string;
@@ -69,23 +74,9 @@ interface TravelOffer {
   numChildren: number;
   salePrice: FinancialRow;
   clientName: string;
-  status: "active" | "inactive" | "sent" | "expired";
+  status: OfferStatusUi;
+  documentsSubmittedAt: string | null;
   createdAt: string;
-}
-
-type DocStatus = "valid" | "expiring" | "expired" | "missing";
-
-interface ClientDoc {
-  id: string;
-  type: string;
-  typeKey: string;
-  fileName: string | null;
-  uploadedAt: string | null;
-  expiryDate: string | null;
-  status: DocStatus;
-  notes: string;
-  icon: typeof CreditCard;
-  iconColor: string;
 }
 
 const SEED_INVOICES: Invoice[] = [
@@ -133,84 +124,20 @@ const SEED_INVOICES: Invoice[] = [
   },
 ];
 
-const SEED_OFFERS: TravelOffer[] = [
-  {
-    id: "TRV-001",
-    saleType: "Business",
-    saleDate: "2026-10-01",
-    from: "Baku",
-    to: "Istanbul",
-    country: "Turkey",
-    city: "Istanbul",
-    hotelName: "Grand Hyatt Istanbul",
-    numAdults: 1,
-    numChildren: 0,
-    salePrice: { amount: "4500", currency: "USD", rate: "1.70", date: "" },
-    clientName: "",
-    status: "active",
-    createdAt: "2026-08-15",
-  },
-  {
-    id: "TRV-002",
-    saleType: "Luxury",
-    saleDate: "2026-09-25",
-    from: "Baku",
-    to: "Dubai",
-    country: "UAE",
-    city: "Dubai",
-    hotelName: "Burj Al Arab",
-    numAdults: 2,
-    numChildren: 0,
-    salePrice: { amount: "6200", currency: "USD", rate: "1.70", date: "" },
-    clientName: "",
-    status: "sent",
-    createdAt: "2026-08-28",
-  },
-  {
-    id: "TRV-003",
-    saleType: "Holiday",
-    saleDate: "2026-08-20",
-    from: "Baku",
-    to: "Antalya",
-    country: "Turkey",
-    city: "Antalya",
-    hotelName: "Rixos Premium Antalya",
-    numAdults: 2,
-    numChildren: 1,
-    salePrice: { amount: "3100", currency: "USD", rate: "1.70", date: "" },
-    clientName: "",
-    status: "inactive",
-    createdAt: "2026-07-01",
-  },
-];
-
-const DEFAULT_DOCS: ClientDoc[] = [
-  { id: "d1", type: "Passport Copy", typeKey: "passport", fileName: "passport_scan.pdf", uploadedAt: "2026-08-10", expiryDate: "2028-03-14", status: "valid", notes: "Biometric pages", icon: CreditCard, iconColor: "text-blue-500" },
-  { id: "d2", type: "Visa", typeKey: "visa", fileName: "visa_scan.jpg", uploadedAt: "2026-08-12", expiryDate: "2026-12-01", status: "valid", notes: "Multiple entry", icon: ShieldCheck, iconColor: "text-green-500" },
-  { id: "d3", type: "Flight Ticket", typeKey: "ticket", fileName: "flight_ticket.pdf", uploadedAt: "2026-08-28", expiryDate: null, status: "valid", notes: "", icon: Ticket, iconColor: "text-purple-500" },
-  { id: "d4", type: "Hotel Voucher", typeKey: "hotel", fileName: null, uploadedAt: null, expiryDate: null, status: "missing", notes: "Pending", icon: Hotel, iconColor: "text-gray-400" },
-  { id: "d5", type: "Travel Insurance", typeKey: "insurance", fileName: "insurance.pdf", uploadedAt: "2026-08-15", expiryDate: "2026-10-31", status: "expiring", notes: "", icon: BadgeCheck, iconColor: "text-amber-500" },
-  { id: "d6", type: "Other", typeKey: "other", fileName: null, uploadedAt: null, expiryDate: null, status: "missing", notes: "", icon: FileImage, iconColor: "text-gray-400" },
-];
-
 const INV_STATUS_BADGE: Record<Invoice["status"], string> = {
   paid: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
   partial: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
   unpaid: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700",
 };
 
-const OFFER_STATUS_BADGE: Record<TravelOffer["status"], string> = {
+const OFFER_STATUS_BADGE: Record<OfferStatusUi, string> = {
   active: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
   sent: "bg-blue-100 dark:bg-[#14b8a6]/20 text-blue-700 dark:text-[#14b8a6] border border-blue-300 dark:border-[#14b8a6]/50",
   inactive: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600",
   expired: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700",
-};
-
-const DOC_STATUS_STYLE: Record<DocStatus, string> = {
-  valid: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
-  expiring: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
-  expired: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
-  missing: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
+  accepted: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700",
+  rejected: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700",
+  changing: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
 };
 
 function fmt(n: number) {
@@ -246,14 +173,17 @@ const tdCls = "px-3 py-2 text-xs text-gray-600 dark:text-gray-400";
 
 export function CustomerTravelPanels({
   tab,
+  customerId,
   customerName,
   customerPhone = "",
 }: {
   tab: CustomerTravelTab;
+  customerId: string;
   customerName: string;
   customerPhone?: string;
 }) {
   const { language } = useLanguage();
+  const { isAuthenticated, isDemo } = useAuth();
   const tr = (az: string, en: string) => (language === "az" ? az : en);
 
   const [currentMonth, setCurrentMonth] = useState(() => toMonthStr(new Date()));
@@ -263,11 +193,9 @@ export function CustomerTravelPanels({
   const [offerSearch, setOfferSearch] = useState("");
   const [offerStatus, setOfferStatus] = useState("all");
   const [allOffers, setAllOffers] = useState<TravelOffer[]>([]);
-  const [clientDocs, setClientDocs] = useState<ClientDoc[]>(DEFAULT_DOCS);
-  const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
-  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadTargetRef = useRef<string | null>(null);
+  const [offerDocs, setOfferDocs] = useState<OfferDocumentRow[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -309,28 +237,64 @@ export function CustomerTravelPanels({
   }, [customerName, customerPhone]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("inflero_offers");
-      if (stored) {
-        const list: TravelOffer[] = JSON.parse(stored);
-        const forClient = list.filter((o) => o.clientName === customerName);
-        setAllOffers(
-          forClient.length > 0
-            ? forClient
-            : SEED_OFFERS.map((o) => ({ ...o, clientName: customerName })),
-        );
-      } else {
-        setAllOffers(SEED_OFFERS.map((o) => ({ ...o, clientName: customerName })));
-      }
-    } catch {
-      setAllOffers(SEED_OFFERS.map((o) => ({ ...o, clientName: customerName })));
+    let cancelled = false;
+    if (!(isAuthenticated || isDemo) || !customerId) {
+      setAllOffers([]);
+      return;
     }
-  }, [customerName]);
+    fetchOffers({ customerId, page: 1, pageSize: 100 })
+      .then((res) => {
+        if (cancelled) return;
+        setAllOffers(
+          (res.items || []).map((row) => ({
+            id: row.id,
+            displayCode: row.displayCode,
+            publicToken: row.publicToken,
+            saleType: row.saleType,
+            saleDate: row.saleDate,
+            from: row.from,
+            to: row.to,
+            country: row.country,
+            city: row.city,
+            hotelName: row.hotelName,
+            numAdults: row.numAdults,
+            numChildren: row.numChildren,
+            salePrice: row.salePrice,
+            clientName: row.clientName,
+            status: row.status,
+            documentsSubmittedAt: row.documentsSubmittedAt ?? null,
+            createdAt: row.createdAt,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setAllOffers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, isAuthenticated, isDemo]);
 
   useEffect(() => {
-    setClientDocs(DEFAULT_DOCS);
-    setUploadedDocs({});
-  }, [customerName]);
+    let cancelled = false;
+    if (!(isAuthenticated || isDemo) || !customerId || tab !== "documents") {
+      return;
+    }
+    setDocsLoading(true);
+    fetchOfferDocuments({ customerId })
+      .then((docs) => {
+        if (!cancelled) setOfferDocs(docs);
+      })
+      .catch(() => {
+        if (!cancelled) setOfferDocs([]);
+      })
+      .finally(() => {
+        if (!cancelled) setDocsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, isAuthenticated, isDemo, tab]);
 
   const filteredInvoices = useMemo(() => {
     return allInvoices.filter((inv) => {
@@ -355,6 +319,7 @@ export function CustomerTravelPanels({
       const q = offerSearch.trim().toLowerCase();
       const matchSearch =
         !q ||
+        o.displayCode.toLowerCase().includes(q) ||
         o.hotelName.toLowerCase().includes(q) ||
         o.city.toLowerCase().includes(q) ||
         o.saleType.toLowerCase().includes(q) ||
@@ -365,25 +330,15 @@ export function CustomerTravelPanels({
     });
   }, [allOffers, offerSearch, offerStatus]);
 
-  function handleUploadClick(docId: string) {
-    uploadTargetRef.current = docId;
-    fileInputRef.current?.click();
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    const docId = uploadTargetRef.current;
-    if (!file || !docId) return;
-    setUploadingDocId(docId);
-    window.setTimeout(() => {
-      setUploadedDocs((prev) => ({ ...prev, [docId]: file.name }));
-      setClientDocs((prev) =>
-        prev.map((d) => (d.id === docId ? { ...d, status: "valid" as const, fileName: file.name, uploadedAt: new Date().toISOString().slice(0, 10) } : d)),
-      );
-      setUploadingDocId(null);
-      uploadTargetRef.current = null;
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }, 400);
+  async function handleDeleteDoc(docId: string) {
+    try {
+      await deleteOfferDocument(docId);
+      setOfferDocs((prev) => prev.filter((d) => d.id !== docId));
+      setPreviewDocId((id) => (id === docId ? null : id));
+      notifySuccess(tr("Sənəd silindi", "Document deleted"));
+    } catch (err) {
+      notifyFromError(err);
+    }
   }
 
   if (tab === "invoices") {
@@ -577,6 +532,9 @@ export function CustomerTravelPanels({
                 { value: "sent", label: tr("Göndərildi", "Sent") },
                 { value: "inactive", label: tr("Aktiv deyil", "Inactive") },
                 { value: "expired", label: tr("Müddəti bitib", "Expired") },
+                { value: "accepted", label: tr("Qəbul edildi", "Accepted") },
+                { value: "rejected", label: tr("Rədd edildi", "Rejected") },
+                { value: "changing", label: tr("Dəyişiklik", "Changing") },
               ]}
             />
           </div>
@@ -588,12 +546,14 @@ export function CustomerTravelPanels({
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/50">
                   {[
+                    tr("KOD", "CODE"),
                     tr("TƏYİNAT", "DESTINATION"),
                     tr("OTEL", "HOTEL"),
                     tr("NÖV", "TYPE"),
                     tr("TARİX", "DATE"),
                     tr("SATIŞ QİYMƏTİ", "SALE PRICE"),
                     tr("STATUS", "STATUS"),
+                    tr("SƏNƏDLƏR", "DOCS"),
                     tr("ƏMƏLİYYATLAR", "ACTIONS"),
                   ].map((h) => (
                     <th key={h} className={thCls}>
@@ -605,7 +565,7 @@ export function CustomerTravelPanels({
               <tbody>
                 {filteredOffers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-10 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <td colSpan={9} className="px-3 py-10 text-center text-xs text-gray-500 dark:text-gray-400">
                       {tr("Təklif tapılmadı.", "No offers found.")}
                     </td>
                   </tr>
@@ -617,6 +577,9 @@ export function CustomerTravelPanels({
                         i % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"
                       }`}
                     >
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <span className="text-xs font-semibold text-[#14b8a6]">{o.displayCode || "—"}</span>
+                      </td>
                       <td className="whitespace-nowrap px-3 py-2">
                         <span className="text-xs font-medium text-gray-900 dark:text-white">
                           {o.from && o.to ? `${o.from} → ${o.to}` : o.from || o.to || "—"}
@@ -638,20 +601,27 @@ export function CustomerTravelPanels({
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-2">
+                        {o.documentsSubmittedAt ? (
+                          <span className="inline-flex items-center rounded border border-green-200 bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400">
+                            {tr("Təqdim edilib", "Submitted")}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2">
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => window.open(`/offer-view/${o.id}`, "_blank")}
+                            onClick={() => {
+                              const token = o.publicToken;
+                              if (token) window.open(`/offer-view/${token}`, "_blank");
+                            }}
                             className="rounded-lg border border-gray-300 p-1.5 text-gray-600 dark:border-gray-700 dark:text-gray-400"
                             title={tr("Bax", "View")}
+                            disabled={!o.publicToken}
                           >
                             <Eye className="h-3 w-3" />
-                          </button>
-                          <button type="button" className="rounded-lg border border-gray-300 p-1.5 text-gray-600 dark:border-gray-700 dark:text-gray-400" title={tr("Redaktə Et", "Edit")}>
-                            <Edit2 className="h-3 w-3" />
-                          </button>
-                          <button type="button" className="rounded-lg border border-gray-300 p-1.5 text-red-600 dark:border-gray-700 dark:text-red-400" title={tr("Sil", "Delete")}>
-                            <Trash2 className="h-3 w-3" />
                           </button>
                         </div>
                       </td>
@@ -666,125 +636,266 @@ export function CustomerTravelPanels({
     );
   }
 
-  // documents
+  // documents — from TravelOfferDocument API (customerId)
   return (
     <div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept=".pdf,.jpg,.jpeg,.png,.webp"
-        onChange={handleFileChange}
-      />
-
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: tr("Ümumi", "Total"), value: clientDocs.length, color: "text-gray-900 dark:text-white" },
-          { label: tr("Etibarlı", "Valid"), value: clientDocs.filter((d) => d.status === "valid").length, color: "text-green-600 dark:text-green-400" },
-          { label: tr("Vaxtı bitir", "Expiring"), value: clientDocs.filter((d) => d.status === "expiring").length, color: "text-amber-600 dark:text-amber-400" },
-          { label: tr("Yüklənməyib", "Missing"), value: clientDocs.filter((d) => d.status === "missing").length, color: "text-red-500 dark:text-red-400" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 dark:border-gray-800 dark:bg-gray-900">
-            <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{s.label}</p>
-            <p className={`mt-0.5 text-xl font-bold ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
+      <div className="mb-4 rounded-lg border border-gray-200 bg-white px-3 py-2.5 dark:border-gray-800 dark:bg-gray-900">
+        <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          {tr("Təklif sənədləri", "Offer documents")}
+        </p>
+        <p className="mt-0.5 text-xl font-bold text-gray-900 dark:text-white">{offerDocs.length}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {clientDocs.map((doc) => {
-          const Icon = doc.icon;
-          const uploadedName = uploadedDocs[doc.id];
-          const effectiveFile = uploadedName ?? doc.fileName;
-          const effectiveStatus: DocStatus = uploadedName ? "valid" : doc.status;
-          const isUploading = uploadingDocId === doc.id;
+      {docsLoading ? (
+        <p className="py-8 text-center text-xs text-gray-500">{tr("Yüklənir…", "Loading…")}</p>
+      ) : offerDocs.length === 0 ? (
+        <p className="py-8 text-center text-xs text-gray-500">
+          {tr("Bu müştəri üçün sənəd yoxdur.", "No documents for this customer.")}
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {(() => {
+            const order = ["Passport", "ID Card", "Insurance", "Visa", "Medical", "Other"];
+            const groups = order
+              .map((type) => ({
+                type,
+                docs: offerDocs.filter((d) => d.type === type),
+              }))
+              .filter((g) => g.docs.length > 0);
+            const orphan = offerDocs.filter((d) => !order.includes(d.type));
+            if (orphan.length) {
+              const other = groups.find((g) => g.type === "Other");
+              if (other) other.docs.push(...orphan);
+              else groups.push({ type: "Other", docs: orphan });
+            }
 
-          return (
-            <div
-              key={doc.id}
-              className={`flex flex-col gap-3 rounded-xl border p-4 transition-all ${
-                effectiveStatus === "missing"
-                  ? "border-dashed border-gray-300 dark:border-gray-700"
-                  : "border-gray-200 shadow-sm dark:border-gray-800"
-              } bg-white dark:bg-gray-900`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <Icon className={`h-4 w-4 ${effectiveStatus === "missing" ? "text-gray-400" : doc.iconColor}`} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold leading-tight text-gray-900 dark:text-white">{doc.type}</p>
-                    {effectiveFile && (
-                      <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-gray-400">{effectiveFile}</p>
+            return groups.map((group) => {
+              const sides =
+                group.type === "Passport"
+                  ? (["bio", "extra"] as const)
+                  : group.type === "ID Card"
+                    ? (["front", "back"] as const)
+                    : null;
+
+              return (
+                <section
+                  key={group.type}
+                  className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+                >
+                  <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-3 py-2.5 dark:border-gray-800">
+                    <span className="text-xs font-bold text-[#14b8a6]">{group.type}</span>
+                    <span className="text-[10px] text-gray-400">
+                      {group.docs.length}{" "}
+                      {tr("fayl", group.docs.length === 1 ? "file" : "files")}
+                    </span>
+                    {sides && (
+                      <div className="ml-auto flex flex-wrap gap-1">
+                        {sides.map((side) => {
+                          const n = group.docs.filter((d) => d.side === side).length;
+                          return (
+                            <span
+                              key={side}
+                              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium ${
+                                n > 0
+                                  ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400"
+                                  : "border-gray-200 bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-800"
+                              }`}
+                            >
+                              {offerDocSideLabel(group.type, side)}
+                              {n > 0 ? ` · ${n}` : ""}
+                            </span>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-                </div>
-                <span className={`inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${DOC_STATUS_STYLE[effectiveStatus]}`}>
-                  {effectiveStatus}
-                </span>
-              </div>
 
-              {(doc.uploadedAt || doc.expiryDate || doc.notes) && effectiveStatus !== "missing" && (
-                <div className="space-y-1 border-t border-gray-100 pt-2 text-[11px] text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                  {doc.uploadedAt && (
-                    <div className="flex items-center justify-between">
-                      <span>{tr("Yüklənib", "Uploaded")}</span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">{doc.uploadedAt}</span>
-                    </div>
-                  )}
-                  {doc.expiryDate && (
-                    <div className="flex items-center justify-between">
-                      <span>{tr("Bitmə tarixi", "Expiry")}</span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">{doc.expiryDate}</span>
-                    </div>
-                  )}
-                  {doc.notes && <p className="text-[10px] italic text-gray-400">{doc.notes}</p>}
-                </div>
-              )}
-
-              <div className="mt-auto flex gap-1.5">
-                {effectiveFile ? (
-                  <>
-                    <button
-                      type="button"
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                    >
-                      <Eye className="h-3 w-3" />
-                      {tr("Bax", "View")}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                    >
-                      <Download className="h-3 w-3" />
-                      {tr("Yüklə", "Download")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUploadClick(doc.id)}
-                      className="rounded-lg border border-gray-200 bg-gray-50 p-1.5 text-gray-500 dark:border-gray-700 dark:bg-gray-800"
-                      title={tr("Yenilə", "Replace")}
-                    >
-                      <Upload className="h-3 w-3" />
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleUploadClick(doc.id)}
-                    disabled={isUploading}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#14b8a6]/40 bg-[#14b8a6]/5 py-2 text-[11px] font-semibold text-[#14b8a6]"
-                  >
-                    <Upload className="h-3 w-3" />
-                    {isUploading ? tr("Yüklənir...", "Uploading...") : tr("Yüklə", "Upload")}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                  <div className="space-y-3 p-3">
+                    {(sides
+                      ? sides.flatMap((side) => {
+                          const sideDocs = group.docs.filter((d) => d.side === side);
+                          if (!sideDocs.length) return [];
+                          return [
+                            <div key={side} className="space-y-2">
+                              <span className="inline-flex items-center rounded-md border border-[#14b8a6]/30 bg-[#14b8a6]/10 px-2 py-0.5 text-[10px] font-semibold text-[#14b8a6]">
+                                {offerDocSideLabel(group.type, side)}
+                              </span>
+                              {sideDocs.map((doc) => {
+                                const isImage = doc.contentType.startsWith("image/");
+                                const isPdf =
+                                  doc.contentType.includes("pdf") || /\.pdf$/i.test(doc.fileName);
+                                const open = previewDocId === doc.id;
+                                return (
+                                  <div
+                                    key={doc.id}
+                                    className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+                                  >
+                                    <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
+                                      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-800">
+                                          {isImage ? (
+                                            <img src={doc.url} alt="" className="h-full w-full object-cover" />
+                                          ) : (
+                                            <FileText className="h-4 w-4 text-[#14b8a6]" />
+                                          )}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="truncate text-xs font-medium text-gray-900 dark:text-white">
+                                            {doc.fileName}
+                                          </p>
+                                          <p className="text-[10px] text-gray-400">
+                                            {doc.offerDisplayCode ? (
+                                              <button
+                                                type="button"
+                                                className="mr-1.5 font-medium text-[#14b8a6] hover:underline"
+                                                onClick={() => {
+                                                  if (doc.offerPublicToken) {
+                                                    window.open(`/offer-view/${doc.offerPublicToken}`, "_blank");
+                                                  }
+                                                }}
+                                              >
+                                                {doc.offerDisplayCode}
+                                              </button>
+                                            ) : null}
+                                            {tr("Yüklənib", "Uploaded")}{" "}
+                                            {formatDate(doc.createdAt.slice(0, 10))}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-1.5">
+                                        {(isImage || isPdf) && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setPreviewDocId(open ? null : doc.id)}
+                                            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                                          >
+                                            <Eye className="h-3 w-3" />
+                                            {open ? tr("Gizlət", "Hide") : tr("Bax", "View")}
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleDeleteDoc(doc.id)}
+                                          className="rounded-lg border border-gray-200 bg-gray-50 p-1.5 text-red-500 dark:border-gray-700 dark:bg-gray-800"
+                                          title={tr("Sil", "Delete")}
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                    {open && (isImage || isPdf) && (
+                                      <div className="border-t border-gray-100 dark:border-gray-800">
+                                        {isImage ? (
+                                          <img
+                                            src={doc.url}
+                                            alt={doc.fileName}
+                                            className="max-h-[480px] w-full object-contain bg-gray-50 dark:bg-gray-950"
+                                          />
+                                        ) : (
+                                          <iframe
+                                            title={doc.fileName}
+                                            src={doc.url}
+                                            className="h-[480px] w-full border-0 bg-gray-50 dark:bg-gray-950"
+                                          />
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>,
+                          ];
+                        })
+                      : group.docs.map((doc) => {
+                          const isImage = doc.contentType.startsWith("image/");
+                          const isPdf =
+                            doc.contentType.includes("pdf") || /\.pdf$/i.test(doc.fileName);
+                          const open = previewDocId === doc.id;
+                          return (
+                            <div
+                              key={doc.id}
+                              className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+                            >
+                              <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
+                                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-800">
+                                    {isImage ? (
+                                      <img src={doc.url} alt="" className="h-full w-full object-cover" />
+                                    ) : (
+                                      <FileText className="h-4 w-4 text-[#14b8a6]" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-xs font-medium text-gray-900 dark:text-white">
+                                      {doc.fileName}
+                                    </p>
+                                    <p className="text-[10px] text-gray-400">
+                                      {doc.offerDisplayCode ? (
+                                        <button
+                                          type="button"
+                                          className="mr-1.5 font-medium text-[#14b8a6] hover:underline"
+                                          onClick={() => {
+                                            if (doc.offerPublicToken) {
+                                              window.open(`/offer-view/${doc.offerPublicToken}`, "_blank");
+                                            }
+                                          }}
+                                        >
+                                          {doc.offerDisplayCode}
+                                        </button>
+                                      ) : null}
+                                      {tr("Yüklənib", "Uploaded")}{" "}
+                                      {formatDate(doc.createdAt.slice(0, 10))}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex gap-1.5">
+                                  {(isImage || isPdf) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewDocId(open ? null : doc.id)}
+                                      className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                                    >
+                                      <Eye className="h-3 w-3" />
+                                      {open ? tr("Gizlət", "Hide") : tr("Bax", "View")}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleDeleteDoc(doc.id)}
+                                    className="rounded-lg border border-gray-200 bg-gray-50 p-1.5 text-red-500 dark:border-gray-700 dark:bg-gray-800"
+                                    title={tr("Sil", "Delete")}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                              {open && (isImage || isPdf) && (
+                                <div className="border-t border-gray-100 dark:border-gray-800">
+                                  {isImage ? (
+                                    <img
+                                      src={doc.url}
+                                      alt={doc.fileName}
+                                      className="max-h-[480px] w-full object-contain bg-gray-50 dark:bg-gray-950"
+                                    />
+                                  ) : (
+                                    <iframe
+                                      title={doc.fileName}
+                                      src={doc.url}
+                                      className="h-[480px] w-full border-0 bg-gray-50 dark:bg-gray-950"
+                                    />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }))}
+                  </div>
+                </section>
+              );
+            });
+          })()}
+        </div>
+      )}
     </div>
   );
 }

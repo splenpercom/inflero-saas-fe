@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Briefcase, Calendar, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Briefcase, Calendar, Loader2, Mail, Phone } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { getUserManagementTranslation } from "../../i18n/userManagementTranslations";
 import { useAuth } from "../../context/AuthContext";
@@ -19,16 +19,19 @@ import { fetchStores } from "../../api/stores";
 import { EditUserModal, type EditUserFormData } from "./EditUserModal";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { pickLang } from "../../i18n/pickLang";
+import {
+  fetchOffers,
+  type OfferStatusUi,
+  type TravelOfferRow,
+} from "../../api/offers";
+import { fetchExpenses, type ExpenseListRow } from "../../api/finance";
+import {
+  formatFinanceDate,
+  mapExpenseStatusLabel,
+  type ExpenseStatusApi,
+} from "../../lib/financeMappers";
 
 type ProfileTab = "expenses" | "commissions" | "offers";
-
-const MOCK_EXPENSES = [
-  { id: "EXP-001", date: "2026-09-01", category: "Meals", description: "Client dinner", amount: 120, status: "Approved" },
-  { id: "EXP-002", date: "2026-08-28", category: "Transport", description: "Taxi to airport", amount: 45, status: "Approved" },
-  { id: "EXP-003", date: "2026-08-20", category: "Accommodation", description: "Business trip", amount: 380, status: "Pending" },
-  { id: "EXP-004", date: "2026-08-10", category: "Meals", description: "Team lunch", amount: 210, status: "Approved" },
-  { id: "EXP-005", date: "2026-07-25", category: "Other", description: "Office supplies", amount: 65, status: "Rejected" },
-];
 
 const MOCK_COMMISSIONS = [
   { id: "COM-001", offer: "Istanbul Business Package", amount: 450, rate: 10, date: "2026-08-25", status: "Paid" },
@@ -36,24 +39,38 @@ const MOCK_COMMISSIONS = [
   { id: "COM-003", offer: "Dubai Luxury Package", amount: 680, rate: 10, date: "2026-08-28", status: "Pending" },
 ];
 
-const MOCK_OFFERS = [
-  { id: "OF-001", title: "Istanbul Business Package", client: "Nigar Babayeva", value: 4500, status: "Completed", date: "2026-08-15" },
-  { id: "OF-002", title: "Baku City Tour", client: "Anar Həsənov", value: 1200, status: "Completed", date: "2026-08-10" },
-  { id: "OF-003", title: "Georgia Adventure Trip", client: "Sevinc Əhmədova", value: 2100, status: "Active", date: "2026-09-01" },
-  { id: "OF-004", title: "Dubai Luxury Package", client: "Leyla Əliyeva", value: 6800, status: "Pending", date: "2026-08-28" },
-];
-
-const EXPENSE_STATUS: Record<string, string> = {
-  Approved: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
-  Pending: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
-  Rejected: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700",
+const EXPENSE_STATUS_BADGE: Record<ExpenseStatusApi, string> = {
+  APPROVED: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
+  PENDING: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
+  REJECTED: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700",
 };
 
-const OFFER_STATUS: Record<string, string> = {
-  Completed: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
-  Active: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-700",
-  Pending: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
+const OFFER_STATUS_BADGE: Record<OfferStatusUi, string> = {
+  active: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
+  inactive: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600",
+  sent: "bg-blue-100 dark:bg-[#14b8a6]/20 text-blue-700 dark:text-[#14b8a6] border border-blue-300 dark:border-[#14b8a6]/50",
+  expired: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700",
+  accepted: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700",
+  rejected: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700",
+  changing: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
 };
+
+const OFFER_STATUS_LABEL: Record<OfferStatusUi, { en: string; az: string }> = {
+  active: { en: "Active", az: "Aktiv" },
+  inactive: { en: "Inactive", az: "Qeyri-aktiv" },
+  sent: { en: "Sent", az: "Göndərildi" },
+  expired: { en: "Expired", az: "Vaxtı bitmiş" },
+  accepted: { en: "Accepted", az: "Qəbul edildi" },
+  rejected: { en: "Rejected", az: "Rədd edildi" },
+  changing: { en: "Changing", az: "Dəyişiklik" },
+};
+
+function offerTitle(o: TravelOfferRow): string {
+  const route = [o.from, o.to].filter(Boolean).join(" → ");
+  if (route) return `${o.saleType}${route ? ` · ${route}` : ""}`;
+  if (o.hotelName) return `${o.saleType} · ${o.hotelName}`;
+  return o.saleType || o.displayCode;
+}
 
 function formatMoney(value: string | number | null | undefined) {
   const n = typeof value === "number" ? value : parseFloat(String(value ?? "0"));
@@ -83,8 +100,12 @@ export function UserDetail() {
   const [user, setUser] = useState<TenantUserRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ProfileTab>("expenses");
-  const [expenseFilter, setExpenseFilter] = useState("all");
-  const [offerFilter, setOfferFilter] = useState("all");
+  const [expenseFilter, setExpenseFilter] = useState<"all" | ExpenseStatusApi>("all");
+  const [expenses, setExpenses] = useState<ExpenseListRow[]>([]);
+  const [expensesLoading, setExpensesLoading] = useState(false);
+  const [offerFilter, setOfferFilter] = useState<"all" | OfferStatusUi>("all");
+  const [offers, setOffers] = useState<TravelOfferRow[]>([]);
+  const [offersLoading, setOffersLoading] = useState(false);
   const [commission, setCommission] = useState<UserCommissionDetail | null>(null);
   const [commissionLoading, setCommissionLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -141,6 +162,50 @@ export function UserDetail() {
   }, [user, isAuthenticated, isDemo]);
 
   useEffect(() => {
+    if (!user || !(isAuthenticated || isDemo) || activeTab !== "offers") return;
+    let cancelled = false;
+    setOffersLoading(true);
+    fetchOffers({ createdByUserId: user.id, pageSize: 100 })
+      .then((res) => {
+        if (!cancelled) setOffers(Array.isArray(res.items) ? res.items : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setOffers([]);
+          notifyFromError(err);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOffersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isAuthenticated, isDemo, activeTab]);
+
+  useEffect(() => {
+    if (!user || !(isAuthenticated || isDemo) || activeTab !== "expenses") return;
+    let cancelled = false;
+    setExpensesLoading(true);
+    fetchExpenses({ userId: user.id, pageSize: 100 })
+      .then((res) => {
+        if (!cancelled) setExpenses(Array.isArray(res.items) ? res.items : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setExpenses([]);
+          notifyFromError(err);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setExpensesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isAuthenticated, isDemo, activeTab]);
+
+  useEffect(() => {
     if (!(isAuthenticated || isDemo) || !canEdit) return;
     let cancelled = false;
     Promise.all([fetchTenantRoles(), fetchStores()])
@@ -189,9 +254,9 @@ export function UserDetail() {
 
   const showCommission = Boolean(commission?.hasCommission);
   const filteredExpenses =
-    expenseFilter === "all" ? MOCK_EXPENSES : MOCK_EXPENSES.filter((e) => e.status === expenseFilter);
+    expenseFilter === "all" ? expenses : expenses.filter((e) => e.status === expenseFilter);
   const filteredOffers =
-    offerFilter === "all" ? MOCK_OFFERS : MOCK_OFFERS.filter((o) => o.status === offerFilter);
+    offerFilter === "all" ? offers : offers.filter((o) => o.status === offerFilter);
 
   const tabs: { key: ProfileTab; label: string }[] = [
     { key: "expenses", label: tr("Xərclər", "Expenses") },
@@ -352,23 +417,34 @@ export function UserDetail() {
 
         {activeTab === "expenses" && (
           <div>
-            <div className="mb-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <select
                 value={expenseFilter}
-                onChange={(e) => setExpenseFilter(e.target.value)}
+                onChange={(e) => setExpenseFilter(e.target.value as "all" | ExpenseStatusApi)}
                 className={selectClass}
               >
                 <option value="all">{tr("Bütün Statuslar", "All Statuses")}</option>
-                <option value="Approved">{tr("Təsdiqlənib", "Approved")}</option>
-                <option value="Pending">{tr("Gözləyir", "Pending")}</option>
-                <option value="Rejected">{tr("Rədd edilib", "Rejected")}</option>
+                <option value="APPROVED">{tr("Təsdiqlənib", "Approved")}</option>
+                <option value="PENDING">{tr("Gözləyir", "Pending")}</option>
+                <option value="REJECTED">{tr("Rədd edilib", "Rejected")}</option>
               </select>
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                {tr("Bu işçiyə təyin olunmuş xərclər", "Expenses assigned to this employee")}
+                {!expensesLoading ? ` · ${filteredExpenses.length}` : ""}
+              </span>
             </div>
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
                   <tr>
-                    {["ID", "Date", "Category", "Description", "Amount", "Status"].map((h) => (
+                    {[
+                      tr("İstinad", "Reference"),
+                      tr("Tarix", "Date"),
+                      tr("Kateqoriya", "Category"),
+                      tr("Təsvir", "Description"),
+                      tr("Məbləğ", "Amount"),
+                      tr("Status", "Status"),
+                    ].map((h) => (
                       <th key={h} className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2">
                         {h}
                       </th>
@@ -376,20 +452,49 @@ export function UserDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredExpenses.map((exp, i) => (
-                    <tr key={exp.id} className={i % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"}>
-                      <td className="px-3 py-2 text-xs font-mono text-gray-500">{exp.id}</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{exp.date}</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{exp.category}</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{exp.description}</td>
-                      <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white">${exp.amount}</td>
-                      <td className="px-3 py-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${EXPENSE_STATUS[exp.status] ?? ""}`}>
-                          {exp.status}
+                  {expensesLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#14b8a6]" />
+                          {tr("Yüklənir…", "Loading…")}
                         </span>
                       </td>
                     </tr>
-                  ))}
+                  ) : filteredExpenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                        {tr("Bu işçiyə təyin olunmuş xərc yoxdur.", "No expenses assigned to this employee.")}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredExpenses.map((exp, i) => (
+                      <tr
+                        key={exp.id}
+                        className={`cursor-pointer ${i % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"} hover:bg-gray-50 dark:hover:bg-gray-800/60`}
+                        onClick={() => navigate("/dashboard/finances/expenses")}
+                      >
+                        <td className="px-3 py-2 text-xs font-mono text-gray-500">
+                          {exp.reference || exp.expenseName}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                          {formatFinanceDate(exp.date)}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{exp.category}</td>
+                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-[200px] truncate">
+                          {exp.description || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white">
+                          {formatMoney(exp.amount)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${EXPENSE_STATUS_BADGE[exp.status] ?? ""}`}>
+                            {mapExpenseStatusLabel(exp.status, tr)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -489,23 +594,36 @@ export function UserDetail() {
 
         {activeTab === "offers" && (
           <div>
-            <div className="mb-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <select
                 value={offerFilter}
-                onChange={(e) => setOfferFilter(e.target.value)}
+                onChange={(e) => setOfferFilter(e.target.value as "all" | OfferStatusUi)}
                 className={selectClass}
               >
                 <option value="all">{tr("Bütün Statuslar", "All Statuses")}</option>
-                <option value="Active">{tr("Aktiv", "Active")}</option>
-                <option value="Completed">{tr("Tamamlandı", "Completed")}</option>
-                <option value="Pending">{tr("Gözləyir", "Pending")}</option>
+                {(Object.keys(OFFER_STATUS_LABEL) as OfferStatusUi[]).map((s) => (
+                  <option key={s} value={s}>
+                    {language === "az" ? OFFER_STATUS_LABEL[s].az : OFFER_STATUS_LABEL[s].en}
+                  </option>
+                ))}
               </select>
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                {tr("Yaradılan təkliflər", "Offers created by this employee")}
+                {!offersLoading ? ` · ${filteredOffers.length}` : ""}
+              </span>
             </div>
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
                   <tr>
-                    {["ID", "Offer", "Client", "Value", "Date", "Status"].map((h) => (
+                    {[
+                      "ID",
+                      tr("Təklif", "Offer"),
+                      tr("Müştəri", "Client"),
+                      tr("Məbləğ", "Value"),
+                      tr("Tarix", "Date"),
+                      tr("Status", "Status"),
+                    ].map((h) => (
                       <th key={h} className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2">
                         {h}
                       </th>
@@ -513,20 +631,54 @@ export function UserDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredOffers.map((offer, i) => (
-                    <tr key={offer.id} className={i % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"}>
-                      <td className="px-3 py-2 text-xs font-mono text-gray-500">{offer.id}</td>
-                      <td className="px-3 py-2 text-xs font-medium text-gray-800 dark:text-gray-200">{offer.title}</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{offer.client}</td>
-                      <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white">${offer.value.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{offer.date}</td>
-                      <td className="px-3 py-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${OFFER_STATUS[offer.status] ?? ""}`}>
-                          {offer.status}
+                  {offersLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#14b8a6]" />
+                          {tr("Yüklənir…", "Loading…")}
                         </span>
                       </td>
                     </tr>
-                  ))}
+                  ) : filteredOffers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                        {tr("Bu işçinin yaratdığı təklif yoxdur.", "No offers created by this employee.")}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOffers.map((offer, i) => (
+                      <tr
+                        key={offer.id}
+                        className={`cursor-pointer ${i % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"} hover:bg-gray-50 dark:hover:bg-gray-800/60`}
+                        onClick={() => navigate("/dashboard/offers")}
+                      >
+                        <td className="px-3 py-2 text-xs font-mono text-gray-500">{offer.displayCode}</td>
+                        <td className="px-3 py-2 text-xs font-medium text-gray-800 dark:text-gray-200">
+                          {offerTitle(offer)}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                          {offer.clientName || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white">
+                          {Number(offer.salePrice?.amount || 0).toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}{" "}
+                          {offer.salePrice?.currency || "AZN"}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                          {offer.saleDate || offer.createdAt || "—"}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${OFFER_STATUS_BADGE[offer.status] ?? ""}`}>
+                            {language === "az"
+                              ? OFFER_STATUS_LABEL[offer.status]?.az ?? offer.status
+                              : OFFER_STATUS_LABEL[offer.status]?.en ?? offer.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

@@ -16,11 +16,14 @@ export interface ExpenseFormData {
   description: string;
   categoryId: string;
   accountId: string;
+  userId: string;
   date: string;
   amount: string;
   reference?: string;
   status: ExpenseStatusApi;
 }
+
+export type ExpenseEmployeeOption = { id: string; name: string };
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -28,6 +31,7 @@ interface AddExpenseModalProps {
   onSave: (expenseData: ExpenseFormData) => Promise<void>;
   categories: FinanceCategory[];
   bankAccounts: BankAccountRow[];
+  employees?: ExpenseEmployeeOption[];
   editExpense?: ExpenseListRow | null;
   onManageCategories?: () => void;
 }
@@ -38,6 +42,7 @@ export function AddExpenseModal({
   onSave,
   categories,
   bankAccounts,
+  employees = [],
   editExpense,
   onManageCategories,
 }: AddExpenseModalProps) {
@@ -46,6 +51,7 @@ export function AddExpenseModal({
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
+  const [userId, setUserId] = useState("");
   const [date, setDate] = useState("");
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
@@ -61,6 +67,7 @@ export function AddExpenseModal({
       setDescription("");
       setCategoryId("");
       setAccountId("");
+      setUserId("");
       setDate("");
       setAmount("");
       setReference("");
@@ -73,6 +80,7 @@ export function AddExpenseModal({
       setDescription(editExpense.description);
       setCategoryId(editExpense.categoryId ?? "");
       setAccountId(editExpense.accountId ?? "");
+      setUserId(editExpense.userId ?? "");
       setDate(editExpense.date.slice(0, 10));
       setAmount(editExpense.amount);
       setReference(editExpense.reference ?? "");
@@ -96,6 +104,7 @@ export function AddExpenseModal({
         description: description.trim(),
         categoryId,
         accountId,
+        userId,
         date,
         amount,
         reference: reference.trim() || undefined,
@@ -229,6 +238,23 @@ export function AddExpenseModal({
                 )}
               </p>
             )}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+              {tr("İşçi", "Employee")}{" "}
+              <span className="text-gray-400 font-normal">({tr("opsional", "optional")})</span>
+            </label>
+            <ModernSelect
+              value={userId}
+              onChange={setUserId}
+              className="w-full"
+              placeholder={tr("Seçin (opsional)", "Select (optional)")}
+              options={[
+                { value: "", label: tr("Seçin (opsional)", "Select (optional)") },
+                ...employees.map((e) => ({ value: e.id, label: e.name })),
+              ]}
+            />
           </div>
         </div>
 

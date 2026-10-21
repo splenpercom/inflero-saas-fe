@@ -63,6 +63,7 @@ const PREFIX_RULES: PrefixRule[] = (
     { prefix: "/dashboard/user-management", module: "User Management", action: "view" },
     { prefix: "/dashboard/reports", module: "Reports", action: "view" },
     { prefix: "/dashboard/tasks", module: "Tasks", action: "view" },
+    { prefix: "/dashboard/offers", module: "Offers", action: "view" },
     { prefix: "/dashboard/reservations", module: "Reservations", action: "view" },
     { prefix: "/dashboard/restaurant/menu", module: "Menu", action: "view" },
     { prefix: "/dashboard/restaurant/tables", module: "Tables", action: "view" },

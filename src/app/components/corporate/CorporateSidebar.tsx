@@ -161,7 +161,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       // Travel plugin (labels without "Travel" — plugin owns the shell when enabled)
       travelOffers: { en: "Offers", az: "Təkliflər" },
       travelCommissions: { en: "Commissions", az: "Komissiyalar" },
-      travelLogs: { en: "Logs", az: "Jurnallar" },
       invoiceTravel: { en: "Invoices", az: "Fakturalar" },
       travelCalendar: { en: "Calendar", az: "Təqvim" },
       travelReports: { en: "Reports", az: "Hesabatlar" },
@@ -488,9 +487,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const travelNavItems: NavItem[] = useMemo(
     () => [
       { icon: BarChart3, labelKey: "travelReports", label: st("travelReports"), path: "/dashboard/travel-reports" },
-      { icon: Tag, labelKey: "travelOffers", label: st("travelOffers"), path: "/dashboard/offers" },
+      { icon: Tag, labelKey: "travelOffers", label: st("travelOffers"), path: "/dashboard/offers", permissionModule: "Offers" },
       { icon: Percent, labelKey: "travelCommissions", label: st("travelCommissions"), path: "/dashboard/commissions" },
-      { icon: ScrollText, labelKey: "travelLogs", label: st("travelLogs"), path: "/dashboard/logs" },
       { icon: Receipt, labelKey: "invoiceTravel", label: st("invoiceTravel"), path: "/dashboard/invoices-travel" },
       { icon: CalendarDays, labelKey: "travelCalendar", label: st("travelCalendar"), path: "/dashboard/travel-calendar" },
     ],
@@ -574,7 +572,11 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
     const BOTTOM_KEYS = new Set(["settings", "deletionLogs"]);
     const bottom = filtered.filter((i) => BOTTOM_KEYS.has(i.labelKey));
     const middle = filtered.filter((i) => !BOTTOM_KEYS.has(i.labelKey));
-    const [travelReports, ...travelRest] = travelNavItems;
+    const travelVisible = travelNavItems.filter((item) => {
+      if (!item.permissionModule) return true;
+      return canAccess(item.permissionModule, "view");
+    });
+    const [travelReports, ...travelRest] = travelVisible;
     return [
       ...(travelReports ? [travelReports] : []),
       ...middle,

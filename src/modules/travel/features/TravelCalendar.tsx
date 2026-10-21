@@ -1,78 +1,24 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  ChevronLeft, ChevronRight, Plane, FileText, CreditCard,
-  ShieldCheck, Hotel, BadgeCheck, Calendar, Clock, User,
-  Phone, Mail, MapPin, AlertTriangle, CheckCircle, X,
-  Star, TrendingUp,
+  ChevronRight, Plane, FileText, CreditCard,
+  ShieldCheck, Hotel, BadgeCheck, Calendar, Clock,
+  Phone, MapPin, AlertTriangle, CheckCircle, X,
+  Star, TrendingUp, ExternalLink, Loader2,
 } from "lucide-react";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
+import { useAuth } from "../../../app/context/AuthContext";
+import {
+  fetchOfferCalendar,
+  type OfferCalendarEvent,
+  type OfferCalendarEventType,
+} from "../../../app/api/offers";
+import { notifyFromError } from "../../../app/lib/toast";
+import { MonthYearNav, dateToMonthStr, monthStrToDate } from "../ui/MonthYearNav";
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
-type EventType =
-  | "departure"
-  | "return"
-  | "hotel_checkin"
-  | "hotel_checkout"
-  | "invoice_due"
-  | "passport_expiry"
-  | "visa_expiry"
-  | "insurance_expiry"
-  | "booking";
-
-interface CalEvent {
-  id: string;
-  type: EventType;
-  date: string; // YYYY-MM-DD
-  clientId: string;
-  clientName: string;
-  clientPhone: string;
-  clientStatus: "vip" | "active" | "inactive";
-  title: string;
-  detail: string;
-  amount?: number;
-  destination?: string;
-  urgent?: boolean;
-}
-
-// ─── Seed data ────────────────────────────────────────────────────────────────
-
-const EVENTS: CalEvent[] = [
-  // October 2026
-  { id: "e1",  type: "departure",       date: "2026-10-01", clientId: "TC001", clientName: "Nigar Babayeva",  clientPhone: "+994514445566", clientStatus: "vip",      title: "Istanbul Departure",         detail: "TK 381 — IST, 09:15. Grand Hyatt Istanbul",   destination: "Istanbul, TR",  urgent: false },
-  { id: "e2",  type: "hotel_checkin",   date: "2026-10-01", clientId: "TC002", clientName: "Rauf Quliyev",    clientPhone: "+994703334455", clientStatus: "active",   title: "Cappadocia Check-In",        detail: "Museum Hotel Cappadocia, Cave Suite",          destination: "Nevşehir, TR",  urgent: false },
-  { id: "e3",  type: "invoice_due",     date: "2026-10-05", clientId: "TC003", clientName: "Rauf Quliyev",    clientPhone: "+994703334455", clientStatus: "active",   title: "Invoice Due — INV-011",      detail: "Cappadocia Adventure — 3,800 AZN outstanding", amount: 3800, urgent: true },
-  { id: "e4",  type: "invoice_due",     date: "2026-10-08", clientId: "TC004", clientName: "Sevinc Əhmədova", clientPhone: "+994506667788", clientStatus: "active",   title: "Invoice Due — INV-012",      detail: "Georgia Mountain Tour — PAID",                 amount: 2600, urgent: false },
-  { id: "e5",  type: "hotel_checkout",  date: "2026-10-06", clientId: "TC002", clientName: "Rauf Quliyev",    clientPhone: "+994703334455", clientStatus: "active",   title: "Cappadocia Check-Out",       detail: "Museum Hotel — 5 nights completed",            destination: "Nevşehir, TR",  urgent: false },
-  { id: "e6",  type: "return",          date: "2026-10-06", clientId: "TC002", clientName: "Rauf Quliyev",    clientPhone: "+994703334455", clientStatus: "active",   title: "Return Flight — GYD",        detail: "TK 382 — GYD arrival, 17:40",                  destination: "Baku, AZ",      urgent: false },
-  { id: "e7",  type: "departure",       date: "2026-10-09", clientId: "TC001", clientName: "Anar Həsənov",    clientPhone: "+994501112233", clientStatus: "vip",      title: "Dubai Departure",            detail: "AZAL 102 — DXB, 22:00. Burj Al Arab",          destination: "Dubai, UAE",    urgent: false },
-  { id: "e8",  type: "invoice_due",     date: "2026-10-10", clientId: "TC006", clientName: "Farid Gasimov",   clientPhone: "+994774445566", clientStatus: "active",   title: "Invoice Due — INV-014",      detail: "Antalya All-Inclusive — PAID",                  amount: 9400, urgent: false },
-  { id: "e9",  type: "hotel_checkin",   date: "2026-10-09", clientId: "TC001", clientName: "Anar Həsənov",    clientPhone: "+994501112233", clientStatus: "vip",      title: "Burj Al Arab Check-In",      detail: "Diplomatic Suite, 5 nights — Dubai",           destination: "Dubai, UAE",    urgent: false },
-  { id: "e10", type: "invoice_due",     date: "2026-10-15", clientId: "TC001", clientName: "Anar Həsənov",    clientPhone: "+994501112233", clientStatus: "vip",      title: "Invoice Due — INV-010",      detail: "Dubai Luxury — 5,540 AZN remaining",           amount: 5540, urgent: true },
-  { id: "e11", type: "visa_expiry",     date: "2026-10-20", clientId: "TC005", clientName: "Elçin Nəsirov",   clientPhone: "+994775556677", clientStatus: "inactive", title: "Schengen Visa Expires",      detail: "Passport: AA4567890 — renewal recommended",    urgent: true },
-  { id: "e12", type: "return",          date: "2026-10-14", clientId: "TC001", clientName: "Anar Həsənov",    clientPhone: "+994501112233", clientStatus: "vip",      title: "Return from Dubai",          detail: "Emirates EK 086 — GYD, 06:30",                 destination: "Baku, AZ",      urgent: false },
-  { id: "e13", type: "invoice_due",     date: "2026-10-20", clientId: "TC003", clientName: "Elçin Nəsirov",   clientPhone: "+994775556677", clientStatus: "inactive", title: "Invoice Due — INV-013",      detail: "Baku City Tour — 700 AZN remaining",           amount: 700,  urgent: false },
-  { id: "e14", type: "insurance_expiry",date: "2026-10-31", clientId: "TC001", clientName: "Anar Həsənov",    clientPhone: "+994501112233", clientStatus: "vip",      title: "Insurance Expiring",         detail: "AXA policy #TI-8821 — renew before departure", urgent: true },
-  { id: "e15", type: "invoice_due",     date: "2026-10-28", clientId: "TC007", clientName: "Aysel Cafarova",  clientPhone: "+994501112233", clientStatus: "active",   title: "Invoice Due — INV-015",      detail: "Rome & Venice — 3,200 AZN remaining",          amount: 3200, urgent: true },
-  { id: "e16", type: "departure",       date: "2026-10-25", clientId: "TC007", clientName: "Aysel Cafarova",  clientPhone: "+994501112233", clientStatus: "active",   title: "Rome Departure",             detail: "ITA AZ 872 — FCO, 08:45",                      destination: "Rome, IT",      urgent: false },
-  { id: "e17", type: "hotel_checkin",   date: "2026-10-25", clientId: "TC007", clientName: "Aysel Cafarova",  clientPhone: "+994501112233", clientStatus: "active",   title: "Hotel Eden Rome Check-In",   detail: "Superior Room, 4 nights",                      destination: "Rome, IT",      urgent: false },
-  { id: "e18", type: "booking",         date: "2026-10-03", clientId: "TC004", clientName: "Nigar Babayeva",  clientPhone: "+994514445566", clientStatus: "vip",      title: "New Booking Confirmed",      detail: "Maldives Honeymoon Dec 2026 — deposit paid",   destination: "Malé, MV",      urgent: false },
-  // November 2026
-  { id: "e19", type: "departure",       date: "2026-11-05", clientId: "TC002", clientName: "Leyla Əliyeva",   clientPhone: "+994552223344", clientStatus: "active",   title: "London Departure",           detail: "British Airways BA 182 — LHR",                 destination: "London, UK",    urgent: false },
-  { id: "e20", type: "hotel_checkin",   date: "2026-11-05", clientId: "TC002", clientName: "Leyla Əliyeva",   clientPhone: "+994552223344", clientStatus: "active",   title: "The Savoy Check-In",         detail: "Deluxe Room, 6 nights — London",               destination: "London, UK",    urgent: false },
-  { id: "e21", type: "invoice_due",     date: "2026-11-10", clientId: "TC002", clientName: "Leyla Əliyeva",   clientPhone: "+994552223344", clientStatus: "active",   title: "Invoice Due — INV-020",      detail: "London Explorer — 4,700 AZN remaining",        amount: 4700, urgent: true },
-  { id: "e22", type: "passport_expiry", date: "2026-11-20", clientId: "TC006", clientName: "Sevinc Əhmədova", clientPhone: "+994506667788", clientStatus: "active",   title: "Passport Expiry Warning",    detail: "GE5678901 expires in 35 days — renew now",    urgent: true },
-  { id: "e23", type: "return",          date: "2026-11-11", clientId: "TC002", clientName: "Leyla Əliyeva",   clientPhone: "+994552223344", clientStatus: "active",   title: "Return from London",         detail: "BA 183 — GYD arrival, 22:15",                  destination: "Baku, AZ",      urgent: false },
-  // September 2026
-  { id: "e24", type: "departure",       date: "2026-09-10", clientId: "TC004", clientName: "Nigar Babayeva",  clientPhone: "+994514445566", clientStatus: "vip",      title: "Istanbul Departure",         detail: "TK 381 — IST, Grand Hyatt Istanbul",           destination: "Istanbul, TR",  urgent: false },
-  { id: "e25", type: "invoice_due",     date: "2026-09-10", clientId: "TC004", clientName: "Nigar Babayeva",  clientPhone: "+994514445566", clientStatus: "vip",      title: "Invoice Due — INV-006",      detail: "Istanbul Business — 2,000 AZN remaining",      amount: 2000, urgent: true },
-  { id: "e26", type: "invoice_due",     date: "2026-09-15", clientId: "TC001", clientName: "Anar Həsənov",    clientPhone: "+994501112233", clientStatus: "vip",      title: "Invoice Due — INV-007",      detail: "Dubai Luxury — FULL 10,540 AZN outstanding",   amount: 10540, urgent: true },
-  { id: "e27", type: "return",          date: "2026-09-15", clientId: "TC004", clientName: "Nigar Babayeva",  clientPhone: "+994514445566", clientStatus: "vip",      title: "Return from Istanbul",       detail: "TK 382 — GYD arrival",                         destination: "Baku, AZ",      urgent: false },
-  // December 2026
-  { id: "e28", type: "departure",       date: "2026-12-10", clientId: "TC004", clientName: "Nigar Babayeva",  clientPhone: "+994514445566", clientStatus: "vip",      title: "Maldives Departure",         detail: "Emirates EK 127 — MLE via Dubai",              destination: "Malé, MV",      urgent: false },
-  { id: "e29", type: "hotel_checkin",   date: "2026-12-10", clientId: "TC004", clientName: "Nigar Babayeva",  clientPhone: "+994514445566", clientStatus: "vip",      title: "Soneva Jani Check-In",       detail: "Overwater Villa, 7 nights — North Malé Atoll", destination: "Malé, MV",      urgent: false },
-  { id: "e30", type: "insurance_expiry",date: "2026-12-31", clientId: "TC002", clientName: "Leyla Əliyeva",   clientPhone: "+994552223344", clientStatus: "active",   title: "Insurance Expiring",         detail: "Allianz policy — renew for 2027 travel",       urgent: false },
-];
+type EventType = OfferCalendarEventType;
+type CalEvent = OfferCalendarEvent;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -101,6 +47,16 @@ function toDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function monthRange(view: Date): { from: string; to: string } {
+  const y = view.getFullYear();
+  const m = view.getMonth();
+  const last = new Date(y, m + 1, 0).getDate();
+  return {
+    from: `${y}-${String(m + 1).padStart(2, "0")}-01`,
+    to: `${y}-${String(m + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`,
+  };
+}
+
 function formatDisplayDate(d: string) {
   if (!d) return "—";
   try {
@@ -114,19 +70,48 @@ function fmtAZN(n: number) { return n.toLocaleString("en-US", { maximumFractionD
 
 export function TravelCalendar() {
   const { language } = useLanguage();
+  const { isAuthenticated, isDemo } = useAuth();
   const tr = (az: string, en: string) => language === "az" ? az : en;
 
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<string | null>(toDateStr(today));
   const [filterType, setFilterType] = useState<EventType | "all">("all");
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null);
+  const [events, setEvents] = useState<CalEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // ── Build calendar grid ───────────────────────────────────────────────────
   const year  = viewDate.getFullYear();
   const month = viewDate.getMonth();
-  const monthLabel = viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!(isAuthenticated || isDemo)) {
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
+    const { from, to } = monthRange(viewDate);
+    setLoading(true);
+    fetchOfferCalendar({ from, to })
+      .then((rows) => {
+        if (!cancelled) setEvents(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setEvents([]);
+          notifyFromError(err);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewDate, isAuthenticated, isDemo]);
+
+  // ── Build calendar grid ───────────────────────────────────────────────────
   const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startOffset = (firstDay + 6) % 7; // Mon-first
@@ -140,12 +125,12 @@ export function TravelCalendar() {
   // ── Events indexed by date ────────────────────────────────────────────────
   const eventsByDate = useMemo(() => {
     const map: Record<string, CalEvent[]> = {};
-    for (const ev of EVENTS) {
+    for (const ev of events) {
       if (!map[ev.date]) map[ev.date] = [];
       map[ev.date].push(ev);
     }
     return map;
-  }, []);
+  }, [events]);
 
   // ── Events for selected date ──────────────────────────────────────────────
   const selectedEvents = useMemo(() => {
@@ -155,20 +140,12 @@ export function TravelCalendar() {
   }, [selectedDate, filterType, eventsByDate]);
 
   // ── Month overview stats ──────────────────────────────────────────────────
-  const monthEvents = useMemo(() => {
-    return EVENTS.filter(e => {
-      const [y, m] = e.date.split("-").map(Number);
-      return y === year && m === month + 1;
-    });
-  }, [year, month]);
-
+  const monthEvents = events;
   const urgentThisMonth = monthEvents.filter(e => e.urgent).length;
   const departures = monthEvents.filter(e => e.type === "departure").length;
   const invoicesDue = monthEvents.filter(e => e.type === "invoice_due").length;
   const totalRevenue = monthEvents.filter(e => e.type === "invoice_due" && e.amount).reduce((s, e) => s + (e.amount ?? 0), 0);
 
-  const prevMonth = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
-  const nextMonth = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
 
   const EVENT_TYPES_FILTER: { id: EventType | "all"; label: string; labelAz: string; dot?: string }[] = [
     { id: "all",           label: "All",          labelAz: "Hamısı",       dot: "bg-gray-400" },
@@ -178,6 +155,7 @@ export function TravelCalendar() {
     { id: "invoice_due",   label: "Invoices",     labelAz: "Fakturalar",   dot: "bg-orange-500" },
     { id: "passport_expiry",label:"Passports",    labelAz: "Pasportlar",   dot: "bg-red-500"    },
     { id: "visa_expiry",   label: "Visas",        labelAz: "Vizalar",      dot: "bg-red-400"    },
+    { id: "booking",       label: "Bookings",     labelAz: "Rezervasiya",  dot: "bg-purple-500" },
   ];
 
   const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -201,10 +179,10 @@ export function TravelCalendar() {
           {/* Month stats strip */}
           <div className="hidden sm:flex items-center gap-3">
             {[
-              { icon: Plane,        val: departures,       label: tr("Uçuş",      "Departures"), color: "text-blue-600 dark:text-[#14b8a6]" },
-              { icon: FileText,     val: invoicesDue,      label: tr("Faktura",   "Invoices"),   color: "text-orange-600 dark:text-orange-400" },
-              { icon: AlertTriangle,val: urgentThisMonth,  label: tr("Kritik",    "Urgent"),     color: "text-red-600 dark:text-red-400" },
-              { icon: TrendingUp,   val: fmtAZN(totalRevenue), label: tr("Dövriyyə","Revenue"), color: "text-emerald-600 dark:text-emerald-400" },
+              { icon: Plane,        val: loading ? "…" : departures,       label: tr("Uçuş",      "Departures"), color: "text-blue-600 dark:text-[#14b8a6]" },
+              { icon: FileText,     val: loading ? "…" : invoicesDue,      label: tr("Faktura",   "Invoices"),   color: "text-orange-600 dark:text-orange-400" },
+              { icon: AlertTriangle,val: loading ? "…" : urgentThisMonth,  label: tr("Kritik",    "Urgent"),     color: "text-red-600 dark:text-red-400" },
+              { icon: TrendingUp,   val: loading ? "…" : fmtAZN(totalRevenue), label: tr("Dövriyyə","Revenue"), color: "text-emerald-600 dark:text-emerald-400" },
             ].map(s => {
               const Icon = s.icon;
               return (
@@ -226,20 +204,25 @@ export function TravelCalendar() {
           {/* ── LEFT: Calendar ──────────────────────────────────────────── */}
           <div className="w-80 xl:w-96 flex flex-col bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden flex-shrink-0">
 
-            {/* Month nav */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-              <button onClick={prevMonth} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <div className="text-center">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{monthLabel}</p>
-                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                  {monthEvents.length} {tr("hadisə", "events")} · {urgentThisMonth} {tr("kritik", "urgent")}
-                </p>
-              </div>
-              <button onClick={nextMonth} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                <ChevronRight className="w-4 h-4" />
-              </button>
+            {/* Month / year nav */}
+            <div className="flex flex-col items-center gap-1.5 px-3 py-3 border-b border-gray-200 dark:border-gray-800">
+              <MonthYearNav
+                value={dateToMonthStr(viewDate)}
+                onChange={(ym) => setViewDate(monthStrToDate(ym))}
+                language={language}
+              />
+              <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                {loading ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    {tr("Yüklənir…", "Loading…")}
+                  </span>
+                ) : (
+                  <>
+                    {monthEvents.length} {tr("hadisə", "events")} · {urgentThisMonth} {tr("kritik", "urgent")}
+                  </>
+                )}
+              </p>
             </div>
 
             {/* Day-of-week headers */}
@@ -269,6 +252,7 @@ export function TravelCalendar() {
 
                 return (
                   <button
+                    type="button"
                     key={dateStr}
                     onClick={() => setSelectedDate(dateStr)}
                     className={`relative h-14 flex flex-col items-center pt-1.5 pb-1 border-b border-r border-gray-100 dark:border-gray-800 transition-colors group ${
@@ -362,15 +346,18 @@ export function TravelCalendar() {
                 )}
                 {selectedDate && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {selectedEvents.length === 0
-                      ? tr("Bu gün hadisə yoxdur", "No events on this day")
-                      : `${selectedEvents.length} ${tr("hadisə", selectedEvents.length === 1 ? "event" : "events")}`}
+                    {loading
+                      ? tr("Yüklənir…", "Loading…")
+                      : selectedEvents.length === 0
+                        ? tr("Bu gün hadisə yoxdur", "No events on this day")
+                        : `${selectedEvents.length} ${tr("hadisə", selectedEvents.length === 1 ? "event" : "events")}`}
                   </p>
                 )}
               </div>
               <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
                 {EVENT_TYPES_FILTER.map(f => (
                   <button
+                    type="button"
                     key={f.id}
                     onClick={() => setFilterType(f.id)}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
@@ -388,14 +375,21 @@ export function TravelCalendar() {
 
             {/* Events list */}
             <div className="flex-1 overflow-y-auto space-y-2.5">
-              {!selectedDate && (
+              {loading && (
+                <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#14b8a6]" />
+                  <p className="text-sm">{tr("Hadisələr yüklənir…", "Loading events…")}</p>
+                </div>
+              )}
+
+              {!loading && !selectedDate && (
                 <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-300 dark:text-gray-700">
                   <Calendar className="w-12 h-12" />
                   <p className="text-sm text-gray-400 dark:text-gray-600">{tr("Sol tərəfdən tarix seçin", "Select a date from the left calendar")}</p>
                 </div>
               )}
 
-              {selectedDate && selectedEvents.length === 0 && (
+              {!loading && selectedDate && selectedEvents.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-300 dark:text-gray-700">
                   <CheckCircle className="w-10 h-10" />
                   <p className="text-sm text-gray-400 dark:text-gray-600">
@@ -406,7 +400,7 @@ export function TravelCalendar() {
                 </div>
               )}
 
-              {selectedEvents.map(event => {
+              {!loading && selectedEvents.map(event => {
                 const cfg = EVENT_CONFIG[event.type];
                 const EventIcon = cfg.icon;
                 const isUrgent = event.urgent;
@@ -456,11 +450,16 @@ export function TravelCalendar() {
                               </span>
                             </div>
                             <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{event.clientName}</span>
+                            {event.displayCode && (
+                              <span className="text-[10px] text-[#14b8a6] font-medium">{event.displayCode}</span>
+                            )}
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
-                            <Phone className="w-3 h-3" />
-                            <span>{event.clientPhone}</span>
-                          </div>
+                          {event.clientPhone && (
+                            <div className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
+                              <Phone className="w-3 h-3" />
+                              <span>{event.clientPhone}</span>
+                            </div>
+                          )}
                           {event.destination && (
                             <div className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
                               <MapPin className="w-3 h-3" />
@@ -506,7 +505,7 @@ export function TravelCalendar() {
                     <p className="text-[10px] text-gray-400 dark:text-gray-500">{language === "az" ? EVENT_CONFIG[selectedEvent.type].labelAz : EVENT_CONFIG[selectedEvent.type].label}</p>
                   </div>
                 </div>
-                <button onClick={() => setSelectedEvent(null)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                <button type="button" onClick={() => setSelectedEvent(null)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -518,6 +517,14 @@ export function TravelCalendar() {
                   <span className="text-gray-500 dark:text-gray-400 w-20">{tr("Tarix", "Date")}</span>
                   <span className="font-semibold text-gray-900 dark:text-white">{formatDisplayDate(selectedEvent.date)}</span>
                 </div>
+
+                {selectedEvent.displayCode && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span className="text-gray-500 dark:text-gray-400 w-20">{tr("Təklif", "Offer")}</span>
+                    <span className="font-semibold text-[#14b8a6]">{selectedEvent.displayCode}</span>
+                  </div>
+                )}
 
                 {/* Client */}
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-2">
@@ -535,10 +542,12 @@ export function TravelCalendar() {
                           {selectedEvent.clientStatus.toUpperCase()}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Phone className="w-2.5 h-2.5 text-gray-400" />
-                        <span className="text-[11px] text-gray-500 dark:text-gray-400">{selectedEvent.clientPhone}</span>
-                      </div>
+                      {selectedEvent.clientPhone && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Phone className="w-2.5 h-2.5 text-gray-400" />
+                          <span className="text-[11px] text-gray-500 dark:text-gray-400">{selectedEvent.clientPhone}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -577,24 +586,40 @@ export function TravelCalendar() {
 
               <div className="flex gap-2 px-4 pb-4">
                 <button
+                  type="button"
                   onClick={() => setSelectedEvent(null)}
                   className="flex-1 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 transition-colors"
                 >
                   {tr("Bağla", "Close")}
                 </button>
-                <button
-                  onClick={() => {
-                    const phone = selectedEvent.clientPhone.replace(/\D/g, "");
-                    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(`Dear ${selectedEvent.clientName}, reminder about: ${selectedEvent.title}. ${selectedEvent.detail}. Please contact us if you have any questions. Inflero Travel.`)}`, "_blank");
-                  }}
-                  className="flex-1 py-2 text-xs font-medium text-white bg-[#25D366] hover:bg-[#1db954] rounded-xl transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.555 4.12 1.527 5.851L.057 23.882l6.198-1.459A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.01-1.373l-.36-.214-3.678.865.93-3.584-.234-.368A9.818 9.818 0 1 1 12 21.818z" />
-                  </svg>
-                  WhatsApp
-                </button>
+                {selectedEvent.publicToken && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(`/offer-view/${selectedEvent.publicToken}`, "_blank");
+                    }}
+                    className="flex-1 py-2 text-xs font-medium text-white bg-[#14b8a6] hover:bg-[#0f766e] rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    {tr("Təklifə bax", "View offer")}
+                  </button>
+                )}
+                {selectedEvent.clientPhone && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const phone = selectedEvent.clientPhone.replace(/\D/g, "");
+                      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(`Dear ${selectedEvent.clientName}, reminder about: ${selectedEvent.title}. ${selectedEvent.detail}. Please contact us if you have any questions. Inflero Travel.`)}`, "_blank");
+                    }}
+                    className="flex-1 py-2 text-xs font-medium text-white bg-[#25D366] hover:bg-[#1db954] rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.555 4.12 1.527 5.851L.057 23.882l6.198-1.459A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.01-1.373l-.36-.214-3.678.865.93-3.584-.234-.368A9.818 9.818 0 1 1 12 21.818z" />
+                    </svg>
+                    WhatsApp
+                  </button>
+                )}
               </div>
             </div>
           </div>

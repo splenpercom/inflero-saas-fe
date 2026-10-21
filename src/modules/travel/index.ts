@@ -11,7 +11,6 @@ export {
   OffersPage,
   OfferPublicPageWrapper,
   CommissionsPage,
-  LogsPage,
   TasksPage,
   TravelInvoicesPage,
   TravelCalendarPage,
@@ -22,7 +21,6 @@ export { CustomerTravelPanels, type CustomerTravelTab } from "./features/Custome
 export { Offers } from "./features/Offers";
 export { OfferPublicPage } from "./features/OfferPublicPage";
 export { Commissions } from "./features/Commissions";
-export { Logs } from "./features/Logs";
 export { Tasks } from "./features/Tasks";
 export { TravelInvoices } from "./features/TravelInvoices";
 export { TravelCalendar } from "./features/TravelCalendar";
