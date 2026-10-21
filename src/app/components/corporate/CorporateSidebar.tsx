@@ -486,11 +486,11 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
 
   const travelNavItems: NavItem[] = useMemo(
     () => [
-      { icon: BarChart3, labelKey: "travelReports", label: st("travelReports"), path: "/dashboard/travel-reports" },
+      { icon: BarChart3, labelKey: "travelReports", label: st("travelReports"), path: "/dashboard/travel-reports", permissionModule: "Travel Reports" },
       { icon: Tag, labelKey: "travelOffers", label: st("travelOffers"), path: "/dashboard/offers", permissionModule: "Offers" },
-      { icon: Percent, labelKey: "travelCommissions", label: st("travelCommissions"), path: "/dashboard/commissions" },
-      { icon: Receipt, labelKey: "invoiceTravel", label: st("invoiceTravel"), path: "/dashboard/invoices-travel" },
-      { icon: CalendarDays, labelKey: "travelCalendar", label: st("travelCalendar"), path: "/dashboard/travel-calendar" },
+      { icon: Percent, labelKey: "travelCommissions", label: st("travelCommissions"), path: "/dashboard/commissions", permissionModule: "Commissions" },
+      { icon: Receipt, labelKey: "invoiceTravel", label: st("invoiceTravel"), path: "/dashboard/invoices-travel", permissionModule: "Travel Invoices" },
+      { icon: CalendarDays, labelKey: "travelCalendar", label: st("travelCalendar"), path: "/dashboard/travel-calendar", permissionModule: "Travel Calendar" },
     ],
     // st() depends on language via closure
     // eslint-disable-next-line react-hooks/exhaustive-deps

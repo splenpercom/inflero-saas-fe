@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, EyeOff, Eye, User } from "lucide-react";
 import { CustomSelect } from "../ui/CustomSelect";
 import { DateInput } from "../ui/DateInput";
@@ -87,8 +88,8 @@ export function AddUserModal({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex items-center gap-2">
@@ -159,13 +160,12 @@ export function AddUserModal({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-700 dark:text-gray-300 mb-1.5 block">
-                  {t("phone")} <span className="text-red-500">*</span>
+                  {t("phone")}
                 </label>
                 <input
                   type="tel"
                   className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                   placeholder={t("enterPhone")}
-                  required
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
@@ -321,6 +321,7 @@ export function AddUserModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

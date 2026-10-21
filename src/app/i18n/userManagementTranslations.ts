@@ -104,6 +104,10 @@ export const userManagementTranslations = {
     settings: "Settings",
     tasksModule: "Tasks",
     offersModule: "Offers",
+    travelReportsModule: "Travel Reports",
+    commissionsModule: "Commissions",
+    travelInvoicesModule: "Travel Invoices",
+    travelCalendarModule: "Travel Calendar",
 
     // Inventory sub-items
     products: "Products",
@@ -315,6 +319,10 @@ export const userManagementTranslations = {
     settings: "Parametrlər",
     tasksModule: "Tapşırıqlar",
     offersModule: "Təkliflər",
+    travelReportsModule: "Səyahət Hesabatları",
+    commissionsModule: "Komissiyalar",
+    travelInvoicesModule: "Səyahət Fakturaları",
+    travelCalendarModule: "Səyahət Təqvimi",
 
     // Inventory sub-items
     products: "Məhsullar",
@@ -503,6 +511,10 @@ export const userManagementTranslations = {
     settings: "Настройки",
     tasksModule: "Задачи",
     offersModule: "Предложения",
+    travelReportsModule: "Туристические отчёты",
+    commissionsModule: "Комиссии",
+    travelInvoicesModule: "Туристические счета",
+    travelCalendarModule: "Туристический календарь",
     products: "Товары",
     createproduct: "Создать товар",
     expiredproducts: "Просроченные товары",
@@ -638,6 +650,10 @@ export const translateModuleName = (moduleName: string, language: "en" | "az" | 
     Settings: "settings",
     Tasks: "tasksModule",
     Offers: "offersModule",
+    "Travel Reports": "travelReportsModule",
+    Commissions: "commissionsModule",
+    "Travel Invoices": "travelInvoicesModule",
+    "Travel Calendar": "travelCalendarModule",
   };
 
   const key = moduleMap[moduleName];

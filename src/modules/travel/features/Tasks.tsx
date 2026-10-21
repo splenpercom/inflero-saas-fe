@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
+import { pickLang } from "../../../app/i18n/pickLang";
 import { useAuth } from "../../../app/context/AuthContext";
 import { useBranch } from "../../../app/context/BranchContext";
 import { useConfirm } from "../../../app/context/ConfirmContext";
@@ -100,7 +101,7 @@ function StatusDropdown({
   onChange: (s: Status) => void;
   disabled?: boolean;
 }) {
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -210,7 +211,7 @@ function TaskRow({
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: Status) => void;
 }) {
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const priorityLabel: Record<Priority, string> = {
     High: tr("Yüksək", "High"),
     Medium: tr("Orta", "Medium"),
@@ -324,7 +325,7 @@ export function Tasks() {
   const askConfirm = useConfirm();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Tasks");
   const isOwner = !!user?.isTenantOwner;
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const priorityLabel: Record<Priority, string> = {
     High: tr("Yüksək", "High"),

@@ -10,6 +10,16 @@ const MONTHS_AZ = [
   "Yanvar", "Fevral", "Mart", "Aprel", "May", "İyun",
   "İyul", "Avqust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr",
 ];
+const MONTHS_RU = [
+  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+];
+
+function monthsForLang(language: string) {
+  if (language === "az") return MONTHS_AZ;
+  if (language === "ru") return MONTHS_RU;
+  return MONTHS_EN;
+}
 
 /** Wide fixed range so staff can jump far back / ahead. */
 const YEAR_MIN = 2000;
@@ -112,7 +122,7 @@ export function MonthYearNav({
   const parts = value.split("-");
   const year = Number(parts[0]) || new Date().getFullYear();
   const month = Number(parts[1]) || new Date().getMonth() + 1;
-  const months = language === "az" ? MONTHS_AZ : MONTHS_EN;
+  const months = monthsForLang(language);
   const years = useMemo(() => buildYears(year), [year]);
 
   const [menu, setMenu] = useState<MenuKind>(null);

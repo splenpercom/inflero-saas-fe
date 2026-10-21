@@ -6,7 +6,9 @@ import {
   Star, TrendingUp, ExternalLink, Loader2,
 } from "lucide-react";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
+import { pickLang } from "../../../app/i18n/pickLang";
 import { useAuth } from "../../../app/context/AuthContext";
+import { useModulePermissions } from "../../../app/hooks/useModulePermissions";
 import {
   fetchOfferCalendar,
   type OfferCalendarEvent,
@@ -71,7 +73,8 @@ function fmtAZN(n: number) { return n.toLocaleString("en-US", { maximumFractionD
 export function TravelCalendar() {
   const { language } = useLanguage();
   const { isAuthenticated, isDemo } = useAuth();
-  const tr = (az: string, en: string) => language === "az" ? az : en;
+  const { canView } = useModulePermissions("Travel Calendar");
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const today = useMemo(() => new Date(), []);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -86,7 +89,7 @@ export function TravelCalendar() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!(isAuthenticated || isDemo)) {
+    if (!(isAuthenticated || isDemo) || !canView) {
       setEvents([]);
       setLoading(false);
       return;
@@ -109,7 +112,7 @@ export function TravelCalendar() {
     return () => {
       cancelled = true;
     };
-  }, [viewDate, isAuthenticated, isDemo]);
+  }, [viewDate, isAuthenticated, isDemo, canView]);
 
   // ── Build calendar grid ───────────────────────────────────────────────────
   const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
@@ -160,6 +163,15 @@ export function TravelCalendar() {
 
   const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const DOW_AZ = ["Baz", "Çər", "Çrş", "Cüm", "Cmt", "Şnb", "Baz"];
+  const DOW_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+  if (!canView) {
+    return (
+      <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950 p-6">
+        <p className="text-sm text-gray-500">{tr("İcazə yoxdur", "No permission")}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
@@ -227,7 +239,7 @@ export function TravelCalendar() {
 
             {/* Day-of-week headers */}
             <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-800">
-              {(language === "az" ? DOW_AZ : DOW).map(d => (
+              {(language === "az" ? DOW_AZ : language === "ru" ? DOW_RU : DOW).map(d => (
                 <div key={d} className="py-2 text-center text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase">
                   {d}
                 </div>
@@ -319,7 +331,7 @@ export function TravelCalendar() {
                   <div key={key} className="flex items-center gap-1.5">
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dotColor}`} />
                     <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                      {language === "az" ? cfg.labelAz : cfg.label}
+                      {pickLang(language, cfg.labelAz, cfg.label)}
                     </span>
                   </div>
                 ))}
@@ -367,7 +379,7 @@ export function TravelCalendar() {
                     }`}
                   >
                     {f.dot && <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${f.dot}`} />}
-                    {language === "az" ? f.labelAz : f.label}
+                    {pickLang(language, f.labelAz, f.label)}
                   </button>
                 ))}
               </div>
@@ -502,7 +514,7 @@ export function TravelCalendar() {
                   })()}
                   <div>
                     <p className="text-sm font-semibold text-gray-900 dark:text-white">{selectedEvent.title}</p>
-                    <p className="text-[10px] text-gray-400 dark:text-gray-500">{language === "az" ? EVENT_CONFIG[selectedEvent.type].labelAz : EVENT_CONFIG[selectedEvent.type].label}</p>
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500">{pickLang(language, EVENT_CONFIG[selectedEvent.type].labelAz, EVENT_CONFIG[selectedEvent.type].label)}</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => setSelectedEvent(null)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">

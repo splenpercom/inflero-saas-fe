@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Briefcase, Calendar, Loader2, Mail, Phone } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { getUserManagementTranslation } from "../../i18n/userManagementTranslations";
 import { useAuth } from "../../context/AuthContext";
+import { useBranch } from "../../context/BranchContext";
+import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { NoAccessPanel } from "../permissions/NoAccessPanel";
 import { formatDate } from "../../lib/dateFormat";
@@ -24,6 +26,11 @@ import {
   type OfferStatusUi,
   type TravelOfferRow,
 } from "../../api/offers";
+import {
+  fetchTravelCommissions,
+  type TravelCommissionEntryRow,
+  type TravelCommissionStatusUi,
+} from "../../api/travelCommissions";
 import { fetchExpenses, type ExpenseListRow } from "../../api/finance";
 import {
   formatFinanceDate,
@@ -33,11 +40,12 @@ import {
 
 type ProfileTab = "expenses" | "commissions" | "offers";
 
-const MOCK_COMMISSIONS = [
-  { id: "COM-001", offer: "Istanbul Business Package", amount: 450, rate: 10, date: "2026-08-25", status: "Paid" },
-  { id: "COM-002", offer: "Baku City Tour", amount: 120, rate: 10, date: "2026-08-10", status: "Paid" },
-  { id: "COM-003", offer: "Dubai Luxury Package", amount: 680, rate: 10, date: "2026-08-28", status: "Pending" },
-];
+const TRAVEL_COMMISSION_STATUS_BADGE: Record<TravelCommissionStatusUi, string> = {
+  paid: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
+  pending: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
+  processing: "bg-blue-100 dark:bg-[#14b8a6]/20 text-blue-700 dark:text-[#14b8a6] border border-blue-300 dark:border-[#14b8a6]/50",
+  voided: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700",
+};
 
 const EXPENSE_STATUS_BADGE: Record<ExpenseStatusApi, string> = {
   APPROVED: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
@@ -93,9 +101,13 @@ export function UserDetail() {
   const { id } = useParams<{ id: string }>();
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user: authUser, hasModule } = useAuth();
+  const { isGlobalMode, branchId } = useBranch();
+  const branchRevision = useBranchRevision();
+  const needsBranch = isGlobalMode && !branchId;
+  const travelEnabled = hasModule("TRAVEL");
   const { canView, canEdit } = useModulePermissions("User Management");
   const t = (key: string) => getUserManagementTranslation(key as any, language);
-  const tr = (az: string, en: string) => pickLang(language, az, en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [user, setUser] = useState<TenantUserRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,6 +120,8 @@ export function UserDetail() {
   const [offersLoading, setOffersLoading] = useState(false);
   const [commission, setCommission] = useState<UserCommissionDetail | null>(null);
   const [commissionLoading, setCommissionLoading] = useState(false);
+  const [travelCommissions, setTravelCommissions] = useState<TravelCommissionEntryRow[]>([]);
+  const [travelCommissionsLoading, setTravelCommissionsLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [roles, setRoles] = useState<{ id: string; name: string }[]>([]);
@@ -160,6 +174,36 @@ export function UserDetail() {
       cancelled = true;
     };
   }, [user, isAuthenticated, isDemo]);
+
+  useEffect(() => {
+    if (!user || !(isAuthenticated || isDemo) || activeTab !== "commissions" || !travelEnabled) {
+      if (!travelEnabled) setTravelCommissions([]);
+      return;
+    }
+    if (needsBranch) {
+      setTravelCommissions([]);
+      setTravelCommissionsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setTravelCommissionsLoading(true);
+    fetchTravelCommissions({ userId: user.id })
+      .then((rows) => {
+        if (!cancelled) setTravelCommissions(Array.isArray(rows) ? rows : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setTravelCommissions([]);
+          notifyFromError(err);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTravelCommissionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isAuthenticated, isDemo, activeTab, travelEnabled, needsBranch, branchRevision]);
 
   useEffect(() => {
     if (!user || !(isAuthenticated || isDemo) || activeTab !== "offers") return;
@@ -222,6 +266,17 @@ export function UserDetail() {
     };
   }, [isAuthenticated, isDemo, canEdit]);
 
+  const travelCommissionTotals = useMemo(() => {
+    const active = travelCommissions.filter((c) => c.status !== "voided");
+    return {
+      count: active.length,
+      sales: active.reduce((s, c) => s + (c.salesAmount || 0), 0),
+      commission: active.reduce((s, c) => s + (c.commissionAmount || 0), 0),
+      bonus: active.reduce((s, c) => s + (c.bonusAmount || 0), 0),
+      payout: active.reduce((s, c) => s + (c.totalPayout || 0), 0),
+    };
+  }, [travelCommissions]);
+
   if (!canView && isAuthenticated) {
     return <NoAccessPanel />;
   }
@@ -257,6 +312,22 @@ export function UserDetail() {
     expenseFilter === "all" ? expenses : expenses.filter((e) => e.status === expenseFilter);
   const filteredOffers =
     offerFilter === "all" ? offers : offers.filter((o) => o.status === offerFilter);
+
+  function travelStatusLabel(status: TravelCommissionStatusUi) {
+    if (status === "paid") return tr("Ödənilib", "Paid");
+    if (status === "pending") return tr("Gözləyir", "Pending");
+    if (status === "processing") return tr("Emal olunur", "Processing");
+    return tr("Ləğv edilib", "Voided");
+  }
+
+  function travelOfferLabel(c: TravelCommissionEntryRow) {
+    if (c.offerDisplayCode && c.offerTitle) return `${c.offerDisplayCode} — ${c.offerTitle}`;
+    if (c.offerDisplayCode) return c.offerDisplayCode;
+    if (c.offerTitle) return c.offerTitle;
+    return c.source === "AUTO"
+      ? tr("Avto komissiya", "Auto commission")
+      : tr("Manual qeyd", "Manual entry");
+  }
 
   const tabs: { key: ProfileTab; label: string }[] = [
     { key: "expenses", label: tr("Xərclər", "Expenses") },
@@ -555,40 +626,162 @@ export function UserDetail() {
               </div>
             )}
 
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
-                  <tr>
-                    {["Offer", "Amount", "Rate", "Date", "Status"].map((h) => (
-                      <th key={h} className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {MOCK_COMMISSIONS.map((c, i) => (
-                    <tr key={c.id} className={i % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"}>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{c.offer}</td>
-                      <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white">${c.amount}</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{c.rate}%</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{c.date}</td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
-                            c.status === "Paid"
-                              ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700"
-                              : "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700"
-                          }`}
-                        >
-                          {c.status}
+            {travelEnabled && (
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {tr("Təklif komissiyaları", "Offer commissions")}
+                    </h3>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                      {tr(
+                        "Qəbul edilmiş və ödənilmiş təkliflərdən qazanılan real komissiyalar",
+                        "Real commissions earned from accepted and paid offers",
+                      )}
+                    </p>
+                  </div>
+                  {!needsBranch && !travelCommissionsLoading && travelCommissionTotals.count > 0 && (
+                    <div className="flex flex-wrap gap-3 text-[11px]">
+                      <span className="text-gray-500">
+                        {tr("Satış", "Sales")}:{" "}
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {formatMoney(travelCommissionTotals.sales)}
                         </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </span>
+                      <span className="text-gray-500">
+                        {tr("Komissiya", "Commission")}:{" "}
+                        <span className="font-semibold text-[#14b8a6]">
+                          {formatMoney(travelCommissionTotals.commission)}
+                        </span>
+                      </span>
+                      {travelCommissionTotals.bonus > 0 && (
+                        <span className="text-gray-500">
+                          {tr("Bonus", "Bonus")}:{" "}
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {formatMoney(travelCommissionTotals.bonus)}
+                          </span>
+                        </span>
+                      )}
+                      <span className="text-gray-500">
+                        {tr("Cəmi", "Total")}:{" "}
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {formatMoney(travelCommissionTotals.payout)}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {needsBranch ? (
+                  <div className="px-4 py-10 text-center text-xs text-gray-500 dark:text-gray-400">
+                    {tr(
+                      "Komissiyaları görmək üçün filial seçin",
+                      "Select a branch to view commissions",
+                    )}
+                  </div>
+                ) : travelCommissionsLoading ? (
+                  <div className="px-4 py-10 flex justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-[#14b8a6]" />
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px]">
+                      <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                          {[
+                            tr("Təklif", "Offer"),
+                            tr("Mənbə", "Source"),
+                            tr("Satış", "Sales"),
+                            tr("Dərəcə", "Rate"),
+                            tr("Komissiya", "Commission"),
+                            tr("Bonus", "Bonus"),
+                            tr("Cəmi", "Payout"),
+                            tr("Tarix", "Date"),
+                            tr("Status", "Status"),
+                          ].map((h) => (
+                            <th
+                              key={h}
+                              className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2"
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {travelCommissions.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={9}
+                              className="px-3 py-10 text-center text-xs text-gray-500 dark:text-gray-400"
+                            >
+                              {tr(
+                                "Bu işçi üçün hələ komissiya yoxdur.",
+                                "No commissions earned for this employee yet.",
+                              )}
+                            </td>
+                          </tr>
+                        ) : (
+                          travelCommissions.map((c, i) => (
+                            <tr
+                              key={c.id}
+                              className={
+                                i % 2 === 0
+                                  ? "bg-white dark:bg-gray-900"
+                                  : "bg-gray-50 dark:bg-gray-800/30"
+                              }
+                            >
+                              <td className="px-3 py-2 text-xs text-gray-800 dark:text-gray-200 max-w-[220px]">
+                                <div className="truncate font-medium">{travelOfferLabel(c)}</div>
+                                {c.period ? (
+                                  <div className="text-[10px] text-gray-400 mt-0.5">{c.period}</div>
+                                ) : null}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                                {c.source === "AUTO" ? tr("Avto", "Auto") : tr("Manual", "Manual")}
+                              </td>
+                              <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                                {formatMoney(c.salesAmount)}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                {c.commissionRate}%
+                              </td>
+                              <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                                {formatMoney(c.commissionAmount)}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                {c.bonusAmount > 0 ? `+${formatMoney(c.bonusAmount)}` : "—"}
+                              </td>
+                              <td className="px-3 py-2 text-xs font-semibold text-[#14b8a6] whitespace-nowrap">
+                                {formatMoney(c.totalPayout)}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                {c.entryDate || "—"}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
+                                    TRAVEL_COMMISSION_STATUS_BADGE[c.status] ?? TRAVEL_COMMISSION_STATUS_BADGE.pending
+                                  }`}
+                                >
+                                  {travelStatusLabel(c.status)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!travelEnabled && !showCommission && !commissionLoading && (
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-10 text-center text-xs text-gray-500 dark:text-gray-400">
+                {t("noCommissionSalesYet")}
+              </div>
+            )}
           </div>
         )}
 

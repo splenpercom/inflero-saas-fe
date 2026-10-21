@@ -15,6 +15,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
+import { pickLang } from "../../../app/i18n/pickLang";
 import { useAuth } from "../../../app/context/AuthContext";
 import {
   deleteOfferDocument,
@@ -184,7 +185,7 @@ export function CustomerTravelPanels({
 }) {
   const { language } = useLanguage();
   const { isAuthenticated, isDemo } = useAuth();
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [currentMonth, setCurrentMonth] = useState(() => toMonthStr(new Date()));
   const [invSearch, setInvSearch] = useState("");
@@ -597,7 +598,21 @@ export function CustomerTravelPanels({
                       </td>
                       <td className="whitespace-nowrap px-3 py-2">
                         <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${OFFER_STATUS_BADGE[o.status]}`}>
-                          {o.status}
+                          {o.status === "active"
+                            ? tr("Aktiv", "Active")
+                            : o.status === "sent"
+                              ? tr("Göndərildi", "Sent")
+                              : o.status === "inactive"
+                                ? tr("Aktiv deyil", "Inactive")
+                                : o.status === "expired"
+                                  ? tr("Müddəti bitib", "Expired")
+                                  : o.status === "accepted"
+                                    ? tr("Qəbul edildi", "Accepted")
+                                    : o.status === "rejected"
+                                      ? tr("Rədd edildi", "Rejected")
+                                      : o.status === "changing"
+                                        ? tr("Dəyişiklik", "Changing")
+                                        : o.status}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-2">

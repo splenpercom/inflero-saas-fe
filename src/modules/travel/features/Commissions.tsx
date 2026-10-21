@@ -1,92 +1,40 @@
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Search, Plus, FileText, FileSpreadsheet, RefreshCw,
   ChevronDown, Eye, Trash2, X, CheckCircle, Clock, TrendingUp,
-  Edit2,
+  Edit2, Save,
 } from "lucide-react";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
+import { pickLang } from "../../../app/i18n/pickLang";
+import { useBranch } from "../../../app/context/BranchContext";
+import { useBranchRevision } from "../../../app/hooks/useBranchRevision";
+import { useModulePermissions } from "../../../app/hooks/useModulePermissions";
 import { useReportDateRange } from "../../../app/hooks/useReportDateRange";
 import { ReportDateRangeFilter } from "../../../app/components/corporate/reports/ReportDateRangeFilter";
 import { DateInput } from "../../../app/components/ui/DateInput";
+import { fetchTenantUsers, type TenantUserRow } from "../../../app/api/userManagement";
+import {
+  createTravelCommission,
+  deleteTravelCommission,
+  fetchTravelCommissionRules,
+  fetchTravelCommissions,
+  patchTravelCommission,
+  upsertTravelCommissionRule,
+  type TravelCommissionEntryRow,
+  type TravelCommissionRuleRow,
+} from "../../../app/api/travelCommissions";
+import { fetchOffers } from "../../../app/api/offers";
 import { exportToExcel } from "../lib/exportExcel";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Commission {
-  id: string;
-  employee: string;
-  role: string;
-  offerId: string;
-  offerTitle: string;
-  period: string;
-  /** YYYY-MM-DD — used for today / week / month / custom filters */
-  entryDate: string;
-  salesAmount: number;
-  commissionRate: number;
-  commissionAmount: number;
-  bonusAmount: number;
-  totalPayout: number;
-  status: "paid" | "pending" | "processing";
-  paidDate?: string;
-}
-
-interface StoredEmployee {
-  id: string;
-  fullName: string;
-  jobTitle: string;
-  department: string;
-  status: string;
-}
-
-// ─── Offers reference ─────────────────────────────────────────────────────────
-
-interface OfferRef {
-  id: string;
-  title: string;
-  type: "percentage" | "fixed" | "bundle";
-  value: number;
-  status: "active" | "inactive" | "expired";
-}
-
-const OFFERS_REF: OfferRef[] = [
-  { id: "OFF001", title: "Summer Sale",        type: "percentage", value: 20, status: "active"   },
-  { id: "OFF002", title: "New Client Welcome", type: "percentage", value: 15, status: "active"   },
-  { id: "OFF003", title: "Oil Change Bundle",  type: "bundle",     value: 0,  status: "expired"  },
-  { id: "OFF004", title: "Loyalty Discount",   type: "fixed",      value: 50, status: "active"   },
-  { id: "OFF005", title: "Holiday Special",    type: "percentage", value: 25, status: "inactive" },
-  { id: "OFF006", title: "Flash Friday",       type: "percentage", value: 10, status: "active"   },
-];
-
-// ─── Mock seed data ───────────────────────────────────────────────────────────
+type Tab = "entries" | "rules";
 
 function todayYmd() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function periodToEntryDate(period: string, fallbackDay = 15): string {
-  // e.g. "Aug 2026" → "2026-08-15"
-  const m = period.trim().match(/^([A-Za-z]{3})\s+(\d{4})$/);
-  if (!m) return todayYmd();
-  const months: Record<string, number> = {
-    Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
-    Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
-  };
-  const mo = months[m[1]!];
-  const year = Number(m[2]);
-  if (!mo || !year) return todayYmd();
-  return `${year}-${String(mo).padStart(2, "0")}-${String(fallbackDay).padStart(2, "0")}`;
-}
-
-function ymdOffset(days: number): string {
-  const d = new Date();
-  d.setHours(12, 0, 0, 0);
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function periodLabelFromYmd(ymd: string): string {
+function periodFromYmd(ymd: string): string {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const [y, m] = ymd.split("-");
   const mi = Number(m) - 1;
@@ -94,163 +42,120 @@ function periodLabelFromYmd(ymd: string): string {
   return `${months[mi]} ${y}`;
 }
 
-const SEED: Commission[] = (() => {
-  const d0 = ymdOffset(0);
-  const d2 = ymdOffset(-2);
-  const d5 = ymdOffset(-5);
-  const d12 = ymdOffset(-12);
-  const d20 = ymdOffset(-20);
-  const d40 = ymdOffset(-40);
-  return [
-    { id: "COM001", employee: "Anar Həsənov",    role: "Senior Sales",  offerId: "OFF001", offerTitle: "Summer Sale",        period: periodLabelFromYmd(d0),  entryDate: d0,  salesAmount: 28400, commissionRate: 5,   commissionAmount: 1420, bonusAmount: 200, totalPayout: 1620, status: "paid" as const,       paidDate: d0 },
-    { id: "COM002", employee: "Leyla Əliyeva",   role: "Sales Agent",   offerId: "OFF002", offerTitle: "New Client Welcome", period: periodLabelFromYmd(d2),  entryDate: d2,  salesAmount: 19800, commissionRate: 4,   commissionAmount: 792,  bonusAmount: 0,   totalPayout: 792,  status: "pending" as const },
-    { id: "COM003", employee: "Rauf Quliyev",    role: "Sales Manager", offerId: "OFF004", offerTitle: "Loyalty Discount",   period: periodLabelFromYmd(d5),  entryDate: d5,  salesAmount: 45200, commissionRate: 6.5, commissionAmount: 2938, bonusAmount: 500, totalPayout: 3438, status: "processing" as const },
-    { id: "COM004", employee: "Nigar Babayeva",  role: "Sales Agent",   offerId: "OFF006", offerTitle: "Flash Friday",       period: periodLabelFromYmd(d12), entryDate: d12, salesAmount: 12600, commissionRate: 4,   commissionAmount: 504,  bonusAmount: 0,   totalPayout: 504,  status: "paid" as const,       paidDate: d12 },
-    { id: "COM005", employee: "Elçin Nəsirov",   role: "Senior Sales",  offerId: "OFF001", offerTitle: "Summer Sale",        period: periodLabelFromYmd(d20), entryDate: d20, salesAmount: 33100, commissionRate: 5,   commissionAmount: 1655, bonusAmount: 150, totalPayout: 1805, status: "paid" as const,       paidDate: d20 },
-    { id: "COM006", employee: "Sevinc Əhmədova", role: "Sales Agent",   offerId: "OFF002", offerTitle: "New Client Welcome", period: periodLabelFromYmd(d40), entryDate: d40, salesAmount: 8900,  commissionRate: 4,   commissionAmount: 356,  bonusAmount: 0,   totalPayout: 356,  status: "paid" as const,       paidDate: d40 },
-  ];
-})();
-
-const STORAGE_KEY = "inflero_commissions_v2";
-
 function emptyForm() {
   return {
-    employee: "",
-    role: "",
-    offerId: "",
-    period: periodLabelFromYmd(todayYmd()),
+    userId: "",
+    period: periodFromYmd(todayYmd()),
     entryDate: todayYmd(),
     salesAmount: "",
     commissionRate: "5",
     bonus: "0",
+    offerId: "",
+    offerTitle: "",
+    offerDisplayCode: "",
   };
-}
-
-function normalizeCommission(raw: Partial<Commission> & { id: string }): Commission {
-  const period = raw.period || "—";
-  const entryDate =
-    (raw.entryDate && /^\d{4}-\d{2}-\d{2}$/.test(raw.entryDate) && raw.entryDate)
-    || (raw.paidDate && /^\d{4}-\d{2}-\d{2}$/.test(raw.paidDate) && raw.paidDate)
-    || periodToEntryDate(period);
-  return {
-    id: raw.id,
-    employee: raw.employee || "—",
-    role: raw.role || "Staff",
-    offerId: raw.offerId || "",
-    offerTitle: raw.offerTitle || "",
-    period,
-    entryDate,
-    salesAmount: Number(raw.salesAmount) || 0,
-    commissionRate: Number(raw.commissionRate) || 0,
-    commissionAmount: Number(raw.commissionAmount) || 0,
-    bonusAmount: Number(raw.bonusAmount) || 0,
-    totalPayout: Number(raw.totalPayout) || 0,
-    status: (raw.status as Commission["status"]) || "pending",
-    paidDate: raw.paidDate,
-  };
-}
-
-function loadCommissions(): Commission[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<Commission>[];
-      if (Array.isArray(parsed) && parsed.length) {
-        return parsed.filter((c) => c?.id).map((c) => normalizeCommission(c as Partial<Commission> & { id: string }));
-      }
-    }
-  } catch {}
-  return SEED.map((c) => ({ ...c }));
-}
-
-function ymdInRange(ymd: string, dateFromIso: string, dateToIso: string): boolean {
-  const t = new Date(`${ymd}T12:00:00`).getTime();
-  if (Number.isNaN(t)) return false;
-  const from = new Date(dateFromIso).getTime();
-  const to = new Date(dateToIso).getTime();
-  return t >= from && t <= to;
-}
-
-function uid() {
-  return "COM" + String(Math.floor(Math.random() * 9000) + 1000);
 }
 
 function getInitials(name: string): string {
-  return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?";
+  return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
 }
 
-// ─── Style maps ───────────────────────────────────────────────────────────────
-
-const STATUS_BADGE: Record<Commission["status"], string> = {
-  paid:       "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
-  pending:    "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
+const STATUS_BADGE: Record<string, string> = {
+  paid: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
+  pending: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
   processing: "bg-blue-100 dark:bg-[#14b8a6]/20 text-blue-700 dark:text-[#14b8a6] border border-blue-300 dark:border-[#14b8a6]/50",
+  voided: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700",
 };
 
-const STATUS_ICON: Record<Commission["status"], typeof CheckCircle> = {
-  paid: CheckCircle, pending: Clock, processing: TrendingUp,
+const STATUS_ICON: Record<string, typeof CheckCircle> = {
+  paid: CheckCircle,
+  pending: Clock,
+  processing: TrendingUp,
+  voided: X,
 };
 
-// ─── View Commission Modal ────────────────────────────────────────────────────
-
-function ViewModal({ c, onClose }: { c: Commission; onClose: () => void }) {
+function ViewModal({
+  c,
+  onClose,
+  tr,
+}: {
+  c: TravelCommissionEntryRow;
+  onClose: () => void;
+  tr: (az: string, en: string, ru?: string) => string;
+}) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-full max-w-md shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md border border-gray-200 dark:border-gray-800"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Commission Detail</h2>
-          <button onClick={onClose} className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors">
-            <X className="w-3 h-3" />
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+            {tr("Komissiya Detalı", "Commission Detail")}
+          </h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-4 space-y-0 divide-y divide-gray-100 dark:divide-gray-800">
+        <div className="p-4 space-y-2">
           {[
-            { label: "ID",           value: c.id },
-            { label: "Employee",     value: c.employee },
-            { label: "Offer",        value: `${c.offerTitle} (${c.offerId})` },
-            { label: "Period",       value: c.period },
-            { label: "Date",         value: c.entryDate },
-            { label: "Sales",        value: `${c.salesAmount.toLocaleString()} ₼` },
-            { label: "Rate",         value: `${c.commissionRate}%` },
-            { label: "Commission",   value: `${c.commissionAmount.toLocaleString()} ₼` },
-            { label: "Bonus",        value: c.bonusAmount > 0 ? `+${c.bonusAmount} ₼` : "—" },
-            { label: "Total Payout", value: `${c.totalPayout.toLocaleString()} ₼` },
-            { label: "Status",       value: c.status },
-            { label: "Paid Date",    value: c.paidDate ?? "—" },
+            { label: "ID", value: c.id },
+            { label: tr("İşçi", "Employee"), value: c.employeeName },
+            { label: tr("Mənbə", "Source"), value: c.source === "AUTO" ? tr("Avto", "Auto") : tr("Manual", "Manual") },
+            {
+              label: tr("Təklif", "Offer"),
+              value: c.offerDisplayCode
+                ? `${c.offerTitle ?? "—"} (${c.offerDisplayCode})`
+                : (c.offerTitle ?? "—"),
+            },
+            { label: tr("Dövr", "Period"), value: c.period ?? "—" },
+            { label: tr("Tarix", "Date"), value: c.entryDate },
+            { label: tr("Satış", "Sales"), value: `${c.salesAmount.toLocaleString()} ₼` },
+            { label: tr("Dərəcə", "Rate"), value: `${c.commissionRate}%` },
+            { label: tr("Komissiya", "Commission"), value: `${c.commissionAmount.toLocaleString()} ₼` },
+            { label: tr("Bonus", "Bonus"), value: c.bonusAmount > 0 ? `+${c.bonusAmount} ₼` : "—" },
+            { label: tr("Cəmi", "Total"), value: `${c.totalPayout.toLocaleString()} ₼` },
+            { label: "Status", value: c.status },
+            { label: tr("Ödəniş tarixi", "Paid Date"), value: c.paidDate ?? "—" },
           ].map(({ label, value }) => (
-            <div key={label} className="flex items-start justify-between py-2 gap-4">
-              <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px] flex-shrink-0 pt-0.5">{label}</span>
-              <span className="text-xs text-gray-900 dark:text-white text-right">
-                {label === "Status" ? (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[c.status]}`}>{value}</span>
-                ) : value}
-              </span>
+            <div key={label} className="flex justify-between gap-3 text-xs">
+              <span className="text-gray-500 dark:text-gray-400">{label}</span>
+              <span className="text-gray-900 dark:text-white font-medium text-right">{value}</span>
             </div>
           ))}
-        </div>
-        <div className="px-4 pb-4">
-          <button onClick={onClose} className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition-colors">
-            Close
-          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
 export function Commissions() {
   const { language } = useLanguage();
-  const tr = (az: string, en: string) => language === "az" ? az : en;
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const navigate = useNavigate();
+  const { isGlobalMode, branchId } = useBranch();
+  const branchRevision = useBranchRevision();
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Commissions");
+  const needsBranch = isGlobalMode && !branchId;
 
-  const [commissions, setCommissions] = useState<Commission[]>(loadCommissions);
-  const [search, setSearch]           = useState("");
-  const [showModal, setShowModal]     = useState(false);
-  const [editingEntry, setEditingEntry] = useState<Commission | null>(null);
-  const [viewingEntry, setViewingEntry] = useState<Commission | null>(null);
+  const [tab, setTab] = useState<Tab>("entries");
+  const [entries, setEntries] = useState<TravelCommissionEntryRow[]>([]);
+  const [rules, setRules] = useState<TravelCommissionRuleRow[]>([]);
+  const [users, setUsers] = useState<TenantUserRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<TravelCommissionEntryRow | null>(null);
+  const [viewingEntry, setViewingEntry] = useState<TravelCommissionEntryRow | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [editingRuleUserId, setEditingRuleUserId] = useState<string | null>(null);
+  const [ruleDraft, setRuleDraft] = useState({ baseRatePercent: "5", monthlyTarget: "30000", targetBonus: "300" });
+  const [savingRule, setSavingRule] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [offerOptions, setOfferOptions] = useState<
+    { id: string; displayCode: string; clientName: string }[]
+  >([]);
+
   const {
     preset,
     setPreset,
@@ -262,64 +167,129 @@ export function Commissions() {
     dateTo,
   } = useReportDateRange("month");
 
-  const [form, setForm] = useState(emptyForm);
+  const dateFromYmd = useMemo(() => dateFrom.slice(0, 10), [dateFrom]);
+  const dateToYmd = useMemo(() => dateTo.slice(0, 10), [dateTo]);
 
-  const [storedEmployees, setStoredEmployees] = useState<StoredEmployee[]>([]);
-  useEffect(() => {
+  const loadEntries = useCallback(async () => {
+    if (!canView || needsBranch) {
+      setEntries([]);
+      return;
+    }
+    setLoading(true);
     try {
-      const raw = localStorage.getItem("inflero_employees");
-      if (raw) setStoredEmployees(JSON.parse(raw) as StoredEmployee[]);
-    } catch {}
-  }, [showModal]);
+      const rows = await fetchTravelCommissions({
+        from: dateFromYmd,
+        to: dateToYmd,
+      });
+      setEntries(rows);
+    } catch {
+      setEntries([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [canView, needsBranch, dateFromYmd, dateToYmd]);
+
+  const loadRules = useCallback(async () => {
+    if (!canView || needsBranch) {
+      setRules([]);
+      return;
+    }
+    try {
+      const rows = await fetchTravelCommissionRules();
+      setRules(rows);
+    } catch {
+      setRules([]);
+    }
+  }, [canView, needsBranch]);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const rows = await fetchTenantUsers();
+      setUsers(rows.filter((u) => u.status === "Active"));
+    } catch {
+      setUsers([]);
+    }
+  }, []);
+
+  const loadOfferOptions = useCallback(async () => {
+    if (needsBranch) {
+      setOfferOptions([]);
+      return;
+    }
+    try {
+      const res = await fetchOffers({ page: 1, pageSize: 100 });
+      setOfferOptions(
+        (res.items ?? []).map((o) => ({
+          id: o.id,
+          displayCode: o.displayCode,
+          clientName: o.clientName,
+        })),
+      );
+    } catch {
+      setOfferOptions([]);
+    }
+  }, [needsBranch]);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(commissions)); } catch {}
-  }, [commissions]);
+    void loadUsers();
+    void loadOfferOptions();
+  }, [loadUsers, loadOfferOptions, branchRevision]);
+
+  useEffect(() => {
+    if (tab === "entries") void loadEntries();
+    // Always keep rules warm for Add Entry rate prefill + Rules tab.
+    void loadRules();
+  }, [tab, loadEntries, loadRules, branchRevision]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return commissions.filter((c) => {
-      if (!ymdInRange(c.entryDate, dateFrom, dateTo)) return false;
-      if (!q) return true;
-      return (
-        c.employee.toLowerCase().includes(q) ||
+    if (!q) return entries;
+    return entries.filter(
+      (c) =>
+        c.employeeName.toLowerCase().includes(q) ||
         c.role.toLowerCase().includes(q) ||
-        c.offerTitle.toLowerCase().includes(q)
-      );
-    });
-  }, [commissions, search, dateFrom, dateTo]);
+        (c.offerTitle ?? "").toLowerCase().includes(q) ||
+        (c.offerDisplayCode ?? "").toLowerCase().includes(q),
+    );
+  }, [entries, search]);
 
   const calcCommission = useMemo(() => {
     const sales = parseFloat(form.salesAmount) || 0;
-    const rate  = parseFloat(form.commissionRate) || 0;
-    return Math.round(sales * rate / 100);
+    const rate = parseFloat(form.commissionRate) || 0;
+    return Math.round((sales * rate) / 100);
   }, [form.salesAmount, form.commissionRate]);
 
   const calcTotal = calcCommission + (parseFloat(form.bonus) || 0);
 
-  const employeeNames = useMemo(() => {
-    const fromStorage = storedEmployees.filter(e => e.status !== "Inactive").map(e => e.fullName);
-    const fromData    = [...new Set(commissions.map(c => c.employee))];
-    return [...new Set([...fromStorage, ...fromData])].sort();
-  }, [storedEmployees, commissions]);
-
   function openAdd() {
     setEditingEntry(null);
-    setForm(emptyForm());
+    const base = emptyForm();
+    // Prefill rate from first rule if only one employee selected later; keep default 5.
+    setForm(base);
     setShowModal(true);
   }
 
-  function openEdit(c: Commission) {
+  function onEmployeeChange(userId: string) {
+    const rule = rules.find((r) => r.userId === userId);
+    setForm({
+      ...form,
+      userId,
+      commissionRate: rule ? String(rule.baseRatePercent) : form.commissionRate,
+    });
+  }
+
+  function openEdit(c: TravelCommissionEntryRow) {
     setEditingEntry(c);
     setForm({
-      employee: c.employee,
-      role: c.role,
-      offerId: c.offerId,
-      period: c.period,
-      entryDate: c.entryDate || todayYmd(),
+      userId: c.userId,
+      period: c.period ?? periodFromYmd(c.entryDate),
+      entryDate: c.entryDate,
       salesAmount: String(c.salesAmount),
       commissionRate: String(c.commissionRate),
       bonus: String(c.bonusAmount),
+      offerId: c.offerId ?? "",
+      offerTitle: c.offerTitle ?? "",
+      offerDisplayCode: c.offerDisplayCode ?? "",
     });
     setShowModal(true);
   }
@@ -330,257 +300,563 @@ export function Commissions() {
     setForm(emptyForm());
   }
 
-  function handleDelete(id: string) {
-    if (confirm(tr("Bu qeydi silmək istədiyinizə əminsiniz?", "Delete this commission entry?"))) {
-      setCommissions(prev => prev.filter(c => c.id !== id));
+  async function handleDelete(id: string) {
+    if (!confirm(tr("Bu qeydi silmək istədiyinizə əminsiniz?", "Delete this commission entry?"))) return;
+    try {
+      await deleteTravelCommission(id);
+      await loadEntries();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : tr("Silinmədi", "Delete failed"));
     }
   }
 
-  function handleSave() {
-    if (!form.employee || !form.offerId || !form.salesAmount) return;
-    const offer = OFFERS_REF.find(o => o.id === form.offerId);
-    const emp   = storedEmployees.find(e => e.fullName === form.employee);
-    const entryDate = form.entryDate || todayYmd();
-    const payload = {
-      employee: form.employee,
-      role: emp?.jobTitle || form.role || "Staff",
-      offerId: form.offerId,
-      offerTitle: offer?.title || form.offerId,
-      period: form.period,
-      entryDate,
-      salesAmount: parseFloat(form.salesAmount) || 0,
-      commissionRate: parseFloat(form.commissionRate) || 5,
-      commissionAmount: calcCommission,
-      bonusAmount: parseFloat(form.bonus) || 0,
-      totalPayout: calcTotal,
-    };
-
-    if (editingEntry) {
-      setCommissions(prev =>
-        prev.map(c =>
-          c.id === editingEntry.id
-            ? { ...c, ...payload }
-            : c,
-        ),
-      );
-    } else {
-      setCommissions(prev => [{
-        id: uid(),
-        ...payload,
-        status: "pending",
-      }, ...prev]);
+  async function handleSave() {
+    if (!form.userId || !form.salesAmount) return;
+    try {
+      if (editingEntry) {
+        await patchTravelCommission(editingEntry.id, {
+          ...(editingEntry.source === "MANUAL" ? { userId: form.userId } : {}),
+          period: form.period,
+          entryDate: form.entryDate,
+          salesAmount: form.salesAmount,
+          commissionRate: form.commissionRate,
+          bonusAmount: form.bonus,
+          offerTitle: form.offerTitle || null,
+          offerDisplayCode: form.offerDisplayCode || null,
+        });
+      } else {
+        await createTravelCommission({
+          userId: form.userId,
+          entryDate: form.entryDate,
+          salesAmount: form.salesAmount,
+          commissionRate: form.commissionRate,
+          bonusAmount: form.bonus,
+          period: form.period,
+          offerTitle: form.offerTitle || null,
+          offerDisplayCode: form.offerDisplayCode || null,
+        });
+      }
+      closeModal();
+      await loadEntries();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : tr("Saxlanılmadı", "Save failed"));
     }
-    closeModal();
+  }
+
+  function startEditRule(r: TravelCommissionRuleRow) {
+    setEditingRuleUserId(r.userId);
+    setRuleDraft({
+      baseRatePercent: String(r.baseRatePercent),
+      monthlyTarget: String(r.monthlyTarget),
+      targetBonus: String(r.targetBonus),
+    });
+  }
+
+  async function saveRule(userId: string) {
+    setSavingRule(true);
+    try {
+      await upsertTravelCommissionRule(userId, ruleDraft);
+      setEditingRuleUserId(null);
+      await loadRules();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : tr("Qayda saxlanılmadı", "Rule save failed"));
+    } finally {
+      setSavingRule(false);
+    }
   }
 
   function handleExportCSV() {
     exportToExcel(
-      ["ID", tr("İşçi", "Employee"), tr("Vəzifə", "Role"), tr("Təklif ID", "Offer ID"), tr("Təklif adı", "Offer Title"), tr("Dövr", "Period"), tr("Tarix", "Date"), tr("Satış məbləği", "Sales Amount"), tr("Komissiya dərəcəsi %", "Commission Rate %"), tr("Komissiya məbləği", "Commission Amount"), tr("Bonus", "Bonus"), tr("Cəmi ödəniş", "Total Payout"), "Status", tr("Ödəniş tarixi", "Paid Date")],
-      filtered.map(c => [
-        c.id, c.employee, c.role, c.offerId, c.offerTitle, c.period, c.entryDate,
-        c.salesAmount, c.commissionRate, c.commissionAmount,
-        c.bonusAmount, c.totalPayout, c.status, c.paidDate ?? "",
+      [
+        "ID",
+        tr("İşçi", "Employee"),
+        tr("Vəzifə", "Role"),
+        tr("Mənbə", "Source"),
+        tr("Təklif", "Offer"),
+        tr("Dövr", "Period"),
+        tr("Tarix", "Date"),
+        tr("Satış məbləği", "Sales Amount"),
+        tr("Komissiya dərəcəsi %", "Commission Rate %"),
+        tr("Komissiya məbləği", "Commission Amount"),
+        tr("Bonus", "Bonus"),
+        tr("Cəmi ödəniş", "Total Payout"),
+        "Status",
+        tr("Ödəniş tarixi", "Paid Date"),
+      ],
+      filtered.map((c) => [
+        c.id,
+        c.employeeName,
+        c.role,
+        c.source,
+        c.offerDisplayCode ?? c.offerTitle ?? "",
+        c.period ?? "",
+        c.entryDate,
+        c.salesAmount,
+        c.commissionRate,
+        c.commissionAmount,
+        c.bonusAmount,
+        c.totalPayout,
+        c.status,
+        c.paidDate ?? "",
       ]),
-      "commissions"
+      "commissions",
     );
   }
 
-  const inputClass = "w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors";
+  const inputClass =
+    "w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors";
   const labelClass = "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1";
-  const thCls      = "text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap";
+  const thCls =
+    "text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap";
+
+  const employeeOptions = useMemo(() => {
+    const fromUsers = users.map((u) => ({ id: u.id, name: u.name, role: u.role }));
+    const fromRules = rules.map((r) => ({ id: r.userId, name: r.employeeName, role: r.role }));
+    const map = new Map<string, { id: string; name: string; role: string }>();
+    for (const e of [...fromUsers, ...fromRules]) map.set(e.id, e);
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [users, rules]);
+
+  if (!canView) {
+    return (
+      <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950 p-6">
+        <p className="text-sm text-gray-500">{tr("İcazə yoxdur", "No permission")}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
       <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
-
         <div className="mb-4">
           <h1 className="text-lg sm:text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 dark:text-white">
             {tr("Komissiyalar", "Commissions")}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {tr("İşçi komissiyalarını izləyin", "Track employee commission payouts per offer")}
+            {tr(
+              "İşçi komissiyalarını və qaydalarını idarə edin",
+              "Track employee commissions and per-branch rules",
+            )}
           </p>
         </div>
 
-        <div className="flex justify-end gap-2 mb-4">
-          <button onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            title={tr("Excel İxrac Et", "Export CSV")}>
-            <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
-          </button>
-          <button onClick={() => alert(tr("PDF ixrac funksiyası tezliklə əlavə olunacaq", "Export PDF coming soon"))}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            title={tr("PDF İxrac Et", "Export PDF")}>
-            <FileText className="w-3.5 h-3.5 text-red-500" />
-          </button>
-          <button onClick={() => { setIsRefreshing(true); setTimeout(() => setIsRefreshing(false), 800); }}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-            title={tr("Yenilə", "Refresh")}>
-            <RefreshCw className={`w-3.5 h-3.5${isRefreshing ? " animate-spin" : ""}`} />
-          </button>
-          <button onClick={openAdd}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors">
-            <Plus className="w-3.5 h-3.5" />
-            <span>{tr("Qeyd Əlavə Et", "Add Entry")}</span>
-          </button>
-        </div>
-
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 relative max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input type="text"
-                placeholder={tr("İşçi axtar...", "Search employees or offers...")}
-                value={search} onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2 ml-auto items-center">
-              <ReportDateRangeFilter
-                preset={preset}
-                onPresetChange={setPreset}
-                customFrom={customFrom}
-                customTo={customTo}
-                onCustomFromChange={setCustomFrom}
-                onCustomToChange={setCustomTo}
-                includeYear={false}
-                includeQuarter={false}
-              />
-            </div>
+        {needsBranch && (
+          <div className="mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+            {tr("Komissiyaları idarə etmək üçün filial seçin", "Select a branch to manage commissions")}
           </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div className="flex rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setTab("entries")}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                tab === "entries"
+                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              {tr("Komissiyalar", "Commissions")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("rules")}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                tab === "rules"
+                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              {tr("Qaydalar", "Rules")}
+            </button>
+          </div>
+
+          {tab === "entries" && (
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                title={tr("Excel İxrac Et", "Export CSV")}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
+              </button>
+              <button
+                type="button"
+                onClick={() => alert(tr("PDF ixrac funksiyası tezliklə əlavə olunacaq", "Export PDF coming soon"))}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                title={tr("PDF İxrac Et", "Export PDF")}
+              >
+                <FileText className="w-3.5 h-3.5 text-red-500" />
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  await loadEntries();
+                  setIsRefreshing(false);
+                }}
+                disabled={isRefreshing || needsBranch}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                title={tr("Yenilə", "Refresh")}
+              >
+                <RefreshCw className={`w-3.5 h-3.5${isRefreshing ? " animate-spin" : ""}`} />
+              </button>
+              {canCreate && (
+              <button
+                type="button"
+                onClick={openAdd}
+                disabled={needsBranch}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{tr("Qeyd Əlavə Et", "Add Entry")}</span>
+              </button>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
-                  <th className={thCls}>{tr("İŞÇİ", "EMPLOYEE")}</th>
-                  <th className={thCls}>{tr("TƏKLİF", "OFFER")}</th>
-                  <th className={thCls}>{tr("DÖVR", "PERIOD")}</th>
-                  <th className={thCls}>{tr("SATIŞ", "SALES")}</th>
-                  <th className={thCls}>{tr("DƏRƏCƏSİ", "RATE")}</th>
-                  <th className={thCls}>{tr("KOMİSSİYA", "COMMISSION")}</th>
-                  <th className={thCls}>{tr("BONUS", "BONUS")}</th>
-                  <th className={thCls}>{tr("CƏMİ", "TOTAL")}</th>
-                  <th className={thCls}>{tr("STATUS", "STATUS")}</th>
-                  <th className={thCls}>{tr("ƏMƏLİYYATLAR", "ACTIONS")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c, idx) => {
-                  const Icon = STATUS_ICON[c.status];
-                  return (
-                    <tr key={c.id} className={`border-b border-gray-200 dark:border-gray-800 ${idx % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-800/30"}`}>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => navigate("/dashboard/user-management")}
-                          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                        >
-                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 text-[10px] font-bold flex-shrink-0">
-                            {getInitials(c.employee)}
-                          </div>
-                          <p className="text-xs text-gray-900 dark:text-white whitespace-nowrap">{c.employee}</p>
-                        </button>
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/offer-view/${c.offerId}`)}
-                          className="text-xs text-[#14b8a6] dark:text-[#14b8a6] hover:underline text-left whitespace-nowrap font-medium"
-                        >
-                          {c.offerTitle}
-                        </button>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{c.period}</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{c.salesAmount.toLocaleString()} ₼</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{c.commissionRate}%</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{c.commissionAmount.toLocaleString()} ₼</td>
-                      <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{c.bonusAmount > 0 ? `+${c.bonusAmount} ₼` : "—"}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <span className="text-xs font-medium text-gray-900 dark:text-white">{c.totalPayout.toLocaleString()} ₼</span>
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[c.status]}`}>
-                          <Icon className="w-2.5 h-2.5" />
-                          {c.status === "paid" ? tr("Ödənilib", "Paid") : c.status === "pending" ? tr("Gözləyir", "Pending") : tr("Emal olunur", "Processing")}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => setViewingEntry(c)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                            title={tr("Bax", "View")}>
-                            <Eye className="w-3 h-3" />
-                          </button>
-                          <button type="button" onClick={() => openEdit(c)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                            title={tr("Redaktə Et", "Edit")}>
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                          <button type="button" onClick={() => handleDelete(c.id)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                            title={tr("Sil", "Delete")}>
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </td>
+        {tab === "entries" && (
+          <>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                <div className="flex-1 relative max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder={tr("İşçi axtar...", "Search employees or offers...")}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2 ml-auto items-center">
+                  <ReportDateRangeFilter
+                    preset={preset}
+                    onPresetChange={setPreset}
+                    customFrom={customFrom}
+                    customTo={customTo}
+                    onCustomFromChange={setCustomFrom}
+                    onCustomToChange={setCustomTo}
+                    includeYear={false}
+                    includeQuarter={false}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                      <th className={thCls}>{tr("İŞÇİ", "EMPLOYEE")}</th>
+                      <th className={thCls}>{tr("MƏNBƏ", "SOURCE")}</th>
+                      <th className={thCls}>{tr("TƏKLİF", "OFFER")}</th>
+                      <th className={thCls}>{tr("DÖVR", "PERIOD")}</th>
+                      <th className={thCls}>{tr("SATIŞ", "SALES")}</th>
+                      <th className={thCls}>{tr("DƏRƏCƏSİ", "RATE")}</th>
+                      <th className={thCls}>{tr("KOMİSSİYA", "COMMISSION")}</th>
+                      <th className={thCls}>{tr("BONUS", "BONUS")}</th>
+                      <th className={thCls}>{tr("CƏMİ", "TOTAL")}</th>
+                      <th className={thCls}>STATUS</th>
+                      <th className={thCls}>{tr("ƏMƏLİYYATLAR", "ACTIONS")}</th>
                     </tr>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
-                      {tr("Heç bir nəticə tapılmadı.", "No commission entries found.")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((c) => {
+                      const Icon = STATUS_ICON[c.status] ?? Clock;
+                      return (
+                        <tr
+                          key={c.id}
+                          className="border-b border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/80 dark:hover:bg-gray-800/40"
+                        >
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-[#0f2744] text-white text-[10px] flex items-center justify-center font-semibold shrink-0">
+                                {getInitials(c.employeeName)}
+                              </div>
+                              <div>
+                                <div className="text-xs font-medium text-gray-900 dark:text-white">{c.employeeName}</div>
+                                <div className="text-[10px] text-gray-500">{c.role}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                c.source === "AUTO"
+                                  ? "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300"
+                                  : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                              }`}
+                            >
+                              {c.source === "AUTO" ? tr("Avto", "Auto") : tr("Manual", "Manual")}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
+                            <div>{c.offerTitle ?? "—"}</div>
+                            {c.offerDisplayCode && (
+                              <button
+                                type="button"
+                                className="text-[10px] text-[#14b8a6] hover:underline"
+                                onClick={() => navigate(`/dashboard/offers`)}
+                              >
+                                {c.offerDisplayCode}
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {c.period ?? "—"}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                            {c.salesAmount.toLocaleString()} ₼
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{c.commissionRate}%</td>
+                          <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                            {c.commissionAmount.toLocaleString()} ₼
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {c.bonusAmount > 0 ? `+${c.bonusAmount}` : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                            {c.totalPayout.toLocaleString()} ₼
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${STATUS_BADGE[c.status] ?? STATUS_BADGE.pending}`}
+                            >
+                              <Icon className="w-3 h-3" />
+                              {c.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewingEntry(c)}
+                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                                title={tr("Bax", "View")}
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => openEdit(c)}
+                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                                title={tr("Redaktə", "Edit")}
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              )}
+                              {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => void handleDelete(c.id)}
+                                className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"
+                                title={tr("Sil", "Delete")}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {!loading && filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={11} className="px-3 py-8 text-center text-xs text-gray-500">
+                          {needsBranch
+                            ? tr("Filial seçin", "Select a branch")
+                            : tr("Qeyd tapılmadı", "No commission entries")}
+                        </td>
+                      </tr>
+                    )}
+                    {loading && (
+                      <tr>
+                        <td colSpan={11} className="px-3 py-8 text-center text-xs text-gray-500">
+                          {tr("Yüklənir...", "Loading...")}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {tab === "rules" && (
+          <>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              {tr(
+                "Filial üzrə işçi komissiya qaydaları. Dəyişikliklər yeni avto qeydlərə tətbiq olunur.",
+                "Set commission rules per employee for this branch. Changes apply to new auto entries.",
+              )}
+            </p>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                      <th className={thCls}>{tr("İŞÇİ", "EMPLOYEE")}</th>
+                      <th className={thCls}>{tr("QAYDA TİPİ", "RULE TYPE")}</th>
+                      <th className={thCls}>{tr("ƏSAS DƏRƏCƏ", "BASE RATE")}</th>
+                      <th className={thCls}>{tr("AYLIQ HƏDƏF (₼)", "MONTHLY TARGET (₼)")}</th>
+                      <th className={thCls}>{tr("HƏDƏF BONUSU (₼)", "TARGET BONUS (₼)")}</th>
+                      <th className={thCls}>{tr("ƏMƏLİYYATLAR", "ACTIONS")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rules.map((r) => {
+                      const editing = editingRuleUserId === r.userId;
+                      return (
+                        <tr
+                          key={r.id}
+                          className="border-b border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/80 dark:hover:bg-gray-800/40"
+                        >
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-[#0f2744] text-white text-[10px] flex items-center justify-center font-semibold shrink-0">
+                                {getInitials(r.employeeName)}
+                              </div>
+                              <div>
+                                <div className="text-xs font-medium text-gray-900 dark:text-white">{r.employeeName}</div>
+                                <div className="text-[10px] text-gray-500">{r.role}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                              {tr("Faiz", "Percentage")}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            {editing ? (
+                              <input
+                                value={ruleDraft.baseRatePercent}
+                                onChange={(e) => setRuleDraft({ ...ruleDraft, baseRatePercent: e.target.value })}
+                                className={`${inputClass} w-20`}
+                              />
+                            ) : (
+                              <span className="text-xs text-gray-900 dark:text-white">{r.baseRatePercent}%</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {editing ? (
+                              <input
+                                value={ruleDraft.monthlyTarget}
+                                onChange={(e) => setRuleDraft({ ...ruleDraft, monthlyTarget: e.target.value })}
+                                className={`${inputClass} w-28`}
+                              />
+                            ) : (
+                              <span className="text-xs text-gray-900 dark:text-white">
+                                {r.monthlyTarget.toLocaleString()} ₼
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {editing ? (
+                              <input
+                                value={ruleDraft.targetBonus}
+                                onChange={(e) => setRuleDraft({ ...ruleDraft, targetBonus: e.target.value })}
+                                className={`${inputClass} w-24`}
+                              />
+                            ) : (
+                              <span className="text-xs text-gray-900 dark:text-white">
+                                +{r.targetBonus.toLocaleString()} ₼
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {editing ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  disabled={savingRule || needsBranch}
+                                  onClick={() => void saveRule(r.userId)}
+                                  className="p-1 rounded hover:bg-teal-50 dark:hover:bg-teal-900/20 text-[#14b8a6]"
+                                  title={tr("Saxla", "Save")}
+                                >
+                                  <Save className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingRuleUserId(null)}
+                                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : canEdit ? (
+                              <button
+                                type="button"
+                                disabled={needsBranch}
+                                onClick={() => startEditRule(r)}
+                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 disabled:opacity-50"
+                                title={tr("Redaktə", "Edit")}
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {rules.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-500">
+                          {needsBranch
+                            ? tr("Filial seçin", "Select a branch")
+                            : tr("Qayda yoxdur", "No rules yet")}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {viewingEntry && (
-        <ViewModal c={viewingEntry} onClose={() => setViewingEntry(null)} />
+        <ViewModal c={viewingEntry} onClose={() => setViewingEntry(null)} tr={tr} />
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeModal}>
+          <div
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-lg border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {editingEntry
                   ? tr("Komissiya Qeydini Redaktə Et", "Edit Commission Entry")
                   : tr("Komissiya Qeydi Əlavə Et", "Add Commission Entry")}
               </h2>
-              <button type="button" onClick={closeModal} className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors">
-                <X className="w-3 h-3" />
+              <button type="button" onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-4 space-y-3">
               <div>
                 <label className={labelClass}>{tr("İşçi", "Employee")} *</label>
                 <div className="relative">
-                  <select value={form.employee} onChange={e => setForm({ ...form, employee: e.target.value })}
-                    className={inputClass + " appearance-none pr-8 cursor-pointer"}>
-                    <option value="">{tr("İşçi seçin", "Select employee")}</option>
-                    {employeeNames.map(name => <option key={name} value={name}>{name}</option>)}
-                  </select>
-                  <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-              <div>
-                <label className={labelClass}>{tr("Tamamlanan Təklif", "Completed Offer")} *</label>
-                <div className="relative">
-                  <select value={form.offerId} onChange={e => setForm({ ...form, offerId: e.target.value })}
-                    className={inputClass + " appearance-none pr-8 cursor-pointer"}>
-                    <option value="">{tr("Təklif seçin", "Select offer")}</option>
-                    {OFFERS_REF.map(o => (
-                      <option key={o.id} value={o.id}>
-                        {o.title} ({o.id}) {o.status !== "active" ? `[${o.status}]` : ""}
+                  <select
+                    value={form.userId}
+                    onChange={(e) => onEmployeeChange(e.target.value)}
+                    disabled={editingEntry?.source === "AUTO"}
+                    className={`${inputClass} appearance-none pr-8`}
+                  >
+                    <option value="">{tr("Seçin...", "Select...")}</option>
+                    {employeeOptions.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name}
                       </option>
                     ))}
                   </select>
@@ -590,8 +866,12 @@ export function Commissions() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>{tr("Dövr", "Period")}</label>
-                  <input value={form.period} onChange={e => setForm({ ...form, period: e.target.value })}
-                    placeholder="e.g. Sep 2026" className={inputClass} />
+                  <input
+                    value={form.period}
+                    onChange={(e) => setForm({ ...form, period: e.target.value })}
+                    placeholder="e.g. Oct 2026"
+                    className={inputClass}
+                  />
                 </div>
                 <div>
                   <label className={labelClass}>{tr("Tarix", "Date")} *</label>
@@ -603,52 +883,97 @@ export function Commissions() {
                 </div>
               </div>
               <div>
-                <label className={labelClass}>{tr("Satış Məbləği (₼)", "Sales Amount (₼)")} *</label>
-                <input type="number" min="0" value={form.salesAmount}
-                  onChange={e => setForm({ ...form, salesAmount: e.target.value })}
-                  placeholder="0" className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>{tr("Komissiya Dərəcəsi (%)", "Commission Rate (%)")}</label>
-                <input type="number" min="0" max="100" step="0.5" value={form.commissionRate}
-                  onChange={e => setForm({ ...form, commissionRate: e.target.value })}
-                  placeholder="5" className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>{tr("Bonus (₼)", "Bonus (₼)")}</label>
-                <input type="number" min="0" value={form.bonus}
-                  onChange={e => setForm({ ...form, bonus: e.target.value })}
-                  placeholder="0" className={inputClass} />
-              </div>
-              {(form.salesAmount || form.bonus) && (
-                <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                  <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                    {tr("Hesablama", "Calculation Preview")}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600 dark:text-gray-400">{tr("Komissiya", "Commission")}</span>
-                    <span className="text-xs font-medium text-gray-900 dark:text-white">{calcCommission.toLocaleString()} ₼</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-xs text-gray-600 dark:text-gray-400">{tr("Bonus", "Bonus")}</span>
-                    <span className="text-xs font-medium text-gray-900 dark:text-white">+{(parseFloat(form.bonus) || 0).toLocaleString()} ₼</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <span className="text-xs font-semibold text-gray-900 dark:text-white">{tr("Ümumi", "Total Payout")}</span>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white">{calcTotal.toLocaleString()} ₼</span>
-                  </div>
+                <label className={labelClass}>{tr("Təklif (istəyə bağlı)", "Offer (optional)")}</label>
+                <div className="relative">
+                  <select
+                    value={form.offerId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const o = offerOptions.find((x) => x.id === id);
+                      setForm({
+                        ...form,
+                        offerId: id,
+                        offerDisplayCode: o?.displayCode ?? "",
+                        offerTitle: o?.clientName ?? "",
+                      });
+                    }}
+                    disabled={editingEntry?.source === "AUTO"}
+                    className={`${inputClass} appearance-none pr-8`}
+                  >
+                    <option value="">{tr("Seçin...", "Select...")}</option>
+                    {offerOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.displayCode} — {o.clientName}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
-              )}
+                <p className="mt-1 text-[10px] text-gray-400">
+                  {tr(
+                    "Manual qeyd təklifə bağlanmır; yalnız istinad üçün göstərilir.",
+                    "Manual entries do not link to the offer row; used as display reference only.",
+                  )}
+                </p>
+              </div>
+              <div>
+                <label className={labelClass}>{tr("Satış Məbləği (₼)", "Sales Amount (₼)")} *</label>
+                <input
+                  type="number"
+                  value={form.salesAmount}
+                  onChange={(e) => setForm({ ...form, salesAmount: e.target.value })}
+                  className={inputClass}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>{tr("Komissiya Dərəcəsi (%)", "Commission Rate (%)")}</label>
+                  <input
+                    type="number"
+                    value={form.commissionRate}
+                    onChange={(e) => setForm({ ...form, commissionRate: e.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>{tr("Bonus (₼)", "Bonus (₼)")}</label>
+                  <input
+                    type="number"
+                    value={form.bonus}
+                    onChange={(e) => setForm({ ...form, bonus: e.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-600 dark:text-gray-400">{tr("Komissiya", "Commission")}</span>
+                  <span className="text-xs font-medium text-gray-900 dark:text-white">
+                    {calcCommission.toLocaleString()} ₼
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-600 dark:text-gray-400">{tr("Cəmi ödəniş", "Total payout")}</span>
+                  <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                    {calcTotal.toLocaleString()} ₼
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2 px-4 pb-4">
-              <button type="button" onClick={closeModal}
-                className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition-colors">
-                {tr("Ləğv Et", "Cancel")}
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+              >
+                {tr("Ləğv et", "Cancel")}
               </button>
-              <button type="button" onClick={handleSave}
-                disabled={!form.employee || !form.offerId || !form.salesAmount}
-                className="flex-1 px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors">
-                {editingEntry ? tr("Yadda Saxla", "Save Changes") : tr("Yadda Saxla", "Save Entry")}
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                className="px-3 py-1.5 text-xs rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white font-medium"
+              >
+                {tr("Saxla", "Save")}
               </button>
             </div>
           </div>

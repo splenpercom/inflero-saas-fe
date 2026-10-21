@@ -7,7 +7,10 @@ import {
   Send, DollarSign, Calendar, Loader2, Printer, Trash2,
 } from "lucide-react";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
+import { pickLang } from "../../../app/i18n/pickLang";
+import type { Language } from "../../../app/i18n/translations";
 import { useAuth } from "../../../app/context/AuthContext";
+import { useModulePermissions } from "../../../app/hooks/useModulePermissions";
 import { FilterSelect } from "../ui/filter-select";
 import { MonthYearNav } from "../ui/MonthYearNav";
 import { exportToExcel } from "../lib/exportExcel";
@@ -28,13 +31,7 @@ type Invoice = OfferInvoice;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PAYMENT_METHODS = [
-  { value: "",               label: "Select method..."   },
-  { value: "cash",           label: "Cash"               },
-  { value: "bank",           label: "Bank Transfer"      },
-  { value: "card",           label: "Card / POS"         },
-  { value: "online",         label: "Online Transfer"    },
-];
+const PAYMENT_METHOD_VALUES = ["", "cash", "bank", "card", "online"] as const;
 
 const STATUS_BADGE = {
   paid:    "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
@@ -42,7 +39,8 @@ const STATUS_BADGE = {
   unpaid:  "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700",
 };
 
-const STATUS_LABEL = { paid: "Paid", partial: "Partial", unpaid: "Unpaid" };
+const STATUS_LABEL_EN = { paid: "Paid", partial: "Partial", unpaid: "Unpaid" } as const;
+const STATUS_LABEL_AZ = { paid: "Ödənilib", partial: "Qismən", unpaid: "Ödənilməyib" } as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,24 +70,24 @@ function formatDate(d: string) {
   }
 }
 
-function printInvoice(invoice: Invoice, language: string) {
-  const isAz = language === "az";
+function printInvoice(invoice: Invoice, language: Language) {
+  const t = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const remaining = Math.max(0, invoice.amount - invoice.paid);
   const paidRows = invoice.payments.filter((p) => p.status === "paid");
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${isAz ? "Hesab-faktura" : "Invoice"} ${invoice.id}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${t("Hesab-faktura", "Invoice", "Счёт-фактура")} ${invoice.id}</title>
 <style>body{font-family:Arial,sans-serif;margin:40px;color:#111;font-size:13px}h1{color:#14b8a6;font-size:22px;margin-bottom:2px}.sub{color:#666;font-size:12px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#14b8a6;color:#fff;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em}td{padding:7px 12px;border-bottom:1px solid #eee}.bold{font-weight:700;color:#14b8a6}.right{text-align:right}.footer{margin-top:40px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}</style></head><body>
 <h1>Inflero Travel</h1>
-<div class="sub">${isAz ? "Hesab-faktura" : "Invoice"} ${invoice.id} &mdash; ${new Date().toLocaleDateString()}</div>
-<table><tr><th colspan="2">${isAz ? "Müştəri" : "Client Information"}</th></tr>
-<tr><td>${isAz ? "Ad" : "Client"}</td><td class="bold">${invoice.clientName || "—"}</td></tr>
-<tr><td>${isAz ? "Telefon" : "Phone"}</td><td>${invoice.clientPhone || "—"}</td></tr>
-<tr><td>${isAz ? "Ödəniş son tarixi" : "Payment Deadline"}</td><td>${invoice.dueDate || "—"}</td></tr>
-<tr><td>${isAz ? "Təklif" : "Offer"}</td><td>${invoice.id} — ${invoice.offerTitle}</td></tr></table>
-<table><tr><th>${isAz ? "Maliyyə" : "Financial Summary"}</th><th class="right">AZN</th></tr>
-<tr><td>${isAz ? "Satış qiyməti" : "Sale Price"}</td><td class="right bold">${invoice.amount.toFixed(2)}</td></tr>
-<tr><td>${isAz ? "Ödənilib" : "Paid"}</td><td class="right">${invoice.paid.toFixed(2)}</td></tr>
-<tr><td>${isAz ? "Qalıq" : "Remaining"}</td><td class="right">${remaining.toFixed(2)}</td></tr></table>
-${paidRows.length ? `<table><tr><th>${isAz ? "Tarix" : "Date"}</th><th>${isAz ? "Metod" : "Method"}</th><th class="right">${isAz ? "Məbləğ" : "Amount"}</th><th>${isAz ? "Qeyd" : "Note"}</th></tr>${paidRows.map((p) => `<tr><td>${p.date || "—"}</td><td>${p.method}</td><td class="right">${p.amount.toFixed(2)}</td><td>${p.notes || "—"}</td></tr>`).join("")}</table>` : ""}
+<div class="sub">${t("Hesab-faktura", "Invoice", "Счёт-фактура")} ${invoice.id} &mdash; ${new Date().toLocaleDateString()}</div>
+<table><tr><th colspan="2">${t("Müştəri", "Client Information", "Информация о клиенте")}</th></tr>
+<tr><td>${t("Ad", "Client", "Клиент")}</td><td class="bold">${invoice.clientName || "—"}</td></tr>
+<tr><td>${t("Telefon", "Phone", "Телефон")}</td><td>${invoice.clientPhone || "—"}</td></tr>
+<tr><td>${t("Ödəniş son tarixi", "Payment Deadline")}</td><td>${invoice.dueDate || "—"}</td></tr>
+<tr><td>${t("Təklif", "Offer")}</td><td>${invoice.id} — ${invoice.offerTitle}</td></tr></table>
+<table><tr><th>${t("Maliyyə", "Financial Summary", "Финансовая сводка")}</th><th class="right">AZN</th></tr>
+<tr><td>${t("Satış qiyməti", "Sale Price")}</td><td class="right bold">${invoice.amount.toFixed(2)}</td></tr>
+<tr><td>${t("Ödənilib", "Paid")}</td><td class="right">${invoice.paid.toFixed(2)}</td></tr>
+<tr><td>${t("Qalıq", "Remaining")}</td><td class="right">${remaining.toFixed(2)}</td></tr></table>
+${paidRows.length ? `<table><tr><th>${t("Tarix", "Date")}</th><th>${t("Metod", "Method")}</th><th class="right">${t("Məbləğ", "Amount")}</th><th>${t("Qeyd", "Note")}</th></tr>${paidRows.map((p) => `<tr><td>${p.date || "—"}</td><td>${p.method}</td><td class="right">${p.amount.toFixed(2)}</td><td>${p.notes || "—"}</td></tr>`).join("")}</table>` : ""}
 <div class="footer">Inflero Travel Management System &mdash; ${new Date().getFullYear()}</div>
 <script>window.onload=()=>window.print();</script></body></html>`;
   const win = window.open("", "_blank");
@@ -106,7 +104,7 @@ function WAPopup({
 }: {
   invoice: Invoice;
   onClose: () => void;
-  language: string;
+  language: Language;
   anchorEl: HTMLElement;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -142,10 +140,12 @@ function WAPopup({
     return () => document.removeEventListener("mousedown", h);
   }, [onClose, anchorEl]);
 
-  const isAz = language === "az";
-  const message = isAz
-    ? `Hörmətli ${invoice.clientName},\n\nSizin ödənişiniz barədə xatırlatma:\n\n📋 Faktura: ${invoice.id}\n✈️ Xidmət: ${invoice.offerTitle}\n💰 Ümumi məbləğ: ${fmt(invoice.amount)}\n✅ Ödənildi: ${fmt(invoice.paid)}\n⏳ Qalıq: ${fmt(remaining)}\n📅 Son tarix: ${formatDate(invoice.dueDate)}\n\nXahiş edirik ödənişi tamamlayasınız.\n\nInflero Travel komandası`
-    : `Dear ${invoice.clientName},\n\nThis is a payment reminder:\n\n📋 Invoice: ${invoice.id}\n✈️ Service: ${invoice.offerTitle}\n💰 Total Amount: ${fmt(invoice.amount)}\n✅ Already Paid: ${fmt(invoice.paid)}\n⏳ Remaining Balance: ${fmt(remaining)}\n📅 Due Date: ${formatDate(invoice.dueDate)}\n\nPlease complete your payment at your earliest convenience.\n\nThank you,\nInflero Travel Team`;
+  const message = pickLang(
+    language,
+    `Hörmətli ${invoice.clientName},\n\nSizin ödənişiniz barədə xatırlatma:\n\n📋 Faktura: ${invoice.id}\n✈️ Xidmət: ${invoice.offerTitle}\n💰 Ümumi məbləğ: ${fmt(invoice.amount)}\n✅ Ödənildi: ${fmt(invoice.paid)}\n⏳ Qalıq: ${fmt(remaining)}\n📅 Son tarix: ${formatDate(invoice.dueDate)}\n\nXahiş edirik ödənişi tamamlayasınız.\n\nInflero Travel komandası`,
+    `Dear ${invoice.clientName},\n\nThis is a payment reminder:\n\n📋 Invoice: ${invoice.id}\n✈️ Service: ${invoice.offerTitle}\n💰 Total Amount: ${fmt(invoice.amount)}\n✅ Already Paid: ${fmt(invoice.paid)}\n⏳ Remaining Balance: ${fmt(remaining)}\n📅 Due Date: ${formatDate(invoice.dueDate)}\n\nPlease complete your payment at your earliest convenience.\n\nThank you,\nInflero Travel Team`,
+    `Уважаемый(ая) ${invoice.clientName},\n\nНапоминание об оплате:\n\n📋 Счёт: ${invoice.id}\n✈️ Услуга: ${invoice.offerTitle}\n💰 Общая сумма: ${fmt(invoice.amount)}\n✅ Уже оплачено: ${fmt(invoice.paid)}\n⏳ Остаток: ${fmt(remaining)}\n📅 Срок оплаты: ${formatDate(invoice.dueDate)}\n\nПожалуйста, завершите оплату при первой возможности.\n\nС уважением,\nКоманда Inflero Travel`,
+  );
 
   const cleanPhone = invoice.clientPhone.replace(/\D/g, "");
   const waUrl = cleanPhone
@@ -163,13 +163,13 @@ function WAPopup({
       <div className="absolute -top-1.5 right-4 w-3 h-3 bg-white dark:bg-gray-900 border-l border-t border-gray-200 dark:border-gray-700 rotate-45" />
 
       <p className="text-xs font-semibold text-gray-900 dark:text-white mb-0.5">
-        {isAz ? "Ödəniş xatırlatması" : "Payment Reminder"}
+        {pickLang(language, "Ödəniş xatırlatması", "Payment Reminder", "Напоминание об оплате")}
       </p>
       <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1.5">
         {invoice.clientName} — {invoice.offerTitle}
       </p>
       <div className="flex items-center gap-1.5 mb-3 text-[11px]">
-        <span className="text-gray-500 dark:text-gray-400">{isAz ? "Qalıq:" : "Remaining:"}</span>
+        <span className="text-gray-500 dark:text-gray-400">{pickLang(language, "Qalıq:", "Remaining:", "Остаток:")}</span>
         <span className="font-bold text-orange-500">{fmt(remaining)}</span>
         <span className="text-gray-300 dark:text-gray-600">·</span>
         <span className="text-gray-500 dark:text-gray-400">{formatDate(invoice.dueDate)}</span>
@@ -182,11 +182,11 @@ function WAPopup({
             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
             <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.555 4.12 1.527 5.851L.057 23.882l6.198-1.459A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.01-1.373l-.36-.214-3.678.865.93-3.584-.234-.368A9.818 9.818 0 1 1 12 21.818z" />
           </svg>
-          {isAz ? "WhatsApp ilə göndər" : "Send via WhatsApp"}
+          {pickLang(language, "WhatsApp ilə göndər", "Send via WhatsApp", "Отправить через WhatsApp")}
         </a>
       ) : (
         <p className="text-[11px] text-center text-red-500 py-2">
-          {isAz ? "Telefon nömrəsi yoxdur" : "No phone number on file"}
+          {pickLang(language, "Telefon nömrəsi yoxdur", "No phone number on file", "Номер телефона не указан")}
         </p>
       )}
       <p className="text-[10px] text-center text-gray-400 dark:text-gray-500 mt-1.5">
@@ -212,7 +212,7 @@ function AddPaymentModal({
   }) => Promise<void>;
 }) {
   const { language } = useLanguage();
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const remaining = Math.max(0, invoice.amount - invoice.paid);
 
   const [amount, setAmount] = useState("");
@@ -325,7 +325,24 @@ function AddPaymentModal({
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               {tr("Ödəniş Metodu", "Payment Method")} <span className="text-red-500">*</span>
             </label>
-            <FilterSelect value={method} onChange={setMethod} options={PAYMENT_METHODS} className="w-full" />
+            <FilterSelect
+              value={method}
+              onChange={setMethod}
+              options={PAYMENT_METHOD_VALUES.map((value) => ({
+                value,
+                label:
+                  value === ""
+                    ? tr("Metod seçin...", "Select method...")
+                    : value === "cash"
+                      ? tr("Nağd", "Cash")
+                      : value === "bank"
+                        ? tr("Bank Transferi", "Bank Transfer")
+                        : value === "card"
+                          ? tr("Kart / POS", "Card / POS")
+                          : tr("Online Transfer", "Online Transfer"),
+              }))}
+              className="w-full"
+            />
           </div>
 
           <div>
@@ -374,7 +391,7 @@ function ViewInvoiceModal({
   onPrint: () => void;
 }) {
   const { language } = useLanguage();
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const remaining = Math.max(0, invoice.amount - invoice.paid);
   const history = invoice.payments.filter((p) => p.status !== "cancelled");
 
@@ -385,7 +402,7 @@ function ViewInvoiceModal({
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{invoice.id}</h2>
             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[invoice.status]}`}>
-              {STATUS_LABEL[invoice.status]}
+              {pickLang(language, STATUS_LABEL_AZ[invoice.status], STATUS_LABEL_EN[invoice.status])}
             </span>
           </div>
           <button type="button" onClick={onClose} className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors">
@@ -470,7 +487,8 @@ export function TravelInvoices() {
   const { isAuthenticated, isDemo } = useAuth();
   const navigate = useNavigate();
   const askConfirm = useConfirm();
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Travel Invoices");
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -482,7 +500,7 @@ export function TravelInvoices() {
   const [waPopup, setWaPopup] = useState<{ offerId: string; el: HTMLElement } | null>(null);
 
   const load = useCallback(async () => {
-    if (!(isAuthenticated || isDemo)) {
+    if (!(isAuthenticated || isDemo) || !canView) {
       setInvoices([]);
       setLoading(false);
       return;
@@ -498,7 +516,7 @@ export function TravelInvoices() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, isDemo]);
+  }, [isAuthenticated, isDemo, canView]);
 
   useEffect(() => {
     void load();
@@ -557,6 +575,14 @@ export function TravelInvoices() {
   const totalPaid      = filtered.reduce((s, i) => s + i.paid,   0);
   const totalRemaining = totalAmount - totalPaid;
 
+  if (!canView) {
+    return (
+      <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950 p-6">
+        <p className="text-sm text-gray-500">{tr("İcazə yoxdur", "No permission")}</p>
+      </div>
+    );
+  }
+
   function printAllFiltered() {
     if (filtered.length === 0) {
       notifyError(tr("Çap üçün faktura yoxdur", "No invoices to print"));
@@ -567,15 +593,14 @@ export function TravelInvoices() {
       return;
     }
     // Print a summary sheet for the month, then each invoice can be printed individually.
-    const isAz = language === "az";
     const rows = filtered.map((inv) =>
       `<tr><td>${inv.id}</td><td>${inv.clientName}</td><td>${inv.offerTitle}</td><td class="right">${inv.amount.toFixed(0)}</td><td class="right">${inv.paid.toFixed(0)}</td><td class="right">${(inv.amount - inv.paid).toFixed(0)}</td><td>${inv.status}</td><td>${inv.dueDate || "—"}</td></tr>`,
     ).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${isAz ? "Fakturalar" : "Invoices"} ${currentMonth}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${tr("Fakturalar", "Invoices")} ${currentMonth}</title>
 <style>body{font-family:Arial,sans-serif;margin:32px;font-size:12px}h1{color:#14b8a6}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#14b8a6;color:#fff;padding:8px;text-align:left}td{padding:6px 8px;border-bottom:1px solid #eee}.right{text-align:right}</style></head><body>
 <h1>Inflero Travel — ${formatMonthLabel(currentMonth)}</h1>
-<p>${filtered.length} ${isAz ? "faktura" : "invoices"} · ${isAz ? "Ümumi" : "Total"} ${totalAmount.toFixed(0)} AZN · ${isAz ? "Ödənilib" : "Paid"} ${totalPaid.toFixed(0)} AZN</p>
-<table><tr><th>ID</th><th>${isAz ? "Müştəri" : "Client"}</th><th>${isAz ? "Təklif" : "Offer"}</th><th class="right">${isAz ? "Məbləğ" : "Amount"}</th><th class="right">${isAz ? "Ödənilib" : "Paid"}</th><th class="right">${isAz ? "Qalıq" : "Due"}</th><th>Status</th><th>${isAz ? "Son tarix" : "Due"}</th></tr>${rows}</table>
+<p>${filtered.length} ${tr("faktura", "invoices", "счетов")} · ${tr("Ümumi", "Total")} ${totalAmount.toFixed(0)} AZN · ${tr("Ödənilib", "Paid")} ${totalPaid.toFixed(0)} AZN</p>
+<table><tr><th>ID</th><th>${tr("Müştəri", "Client")}</th><th>${tr("Təklif", "Offer")}</th><th class="right">${tr("Məbləğ", "Amount")}</th><th class="right">${tr("Ödənilib", "Paid")}</th><th class="right">${tr("Qalıq", "Due")}</th><th>Status</th><th>${tr("Son tarix", "Due")}</th></tr>${rows}</table>
 <script>window.onload=()=>window.print();</script></body></html>`;
     const win = window.open("", "_blank");
     if (win) {
@@ -590,7 +615,7 @@ export function TravelInvoices() {
 
         <div className="mb-4">
           <h1 className="text-lg sm:text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 dark:text-white">
-            {tr("Fakturalar (Səyahət)", "Invoices (Travel)")}
+            {tr("Fakturalar", "Invoices")}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {tr(
@@ -625,11 +650,13 @@ export function TravelInvoices() {
               className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition-colors">
               <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
             </button>
+            {canCreate && (
             <button type="button" onClick={() => navigate("/dashboard/offers")}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors">
               <Plus className="w-3.5 h-3.5" />
               <span>{tr("Təklif yarat", "+ Create offer")}</span>
             </button>
+            )}
           </div>
         </div>
 
@@ -767,7 +794,7 @@ export function TravelInvoices() {
 
                       <td className="px-3 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[inv.status]}`}>
-                          {STATUS_LABEL[inv.status]}
+                          {pickLang(language, STATUS_LABEL_AZ[inv.status], STATUS_LABEL_EN[inv.status])}
                         </span>
                       </td>
 
@@ -795,7 +822,7 @@ export function TravelInvoices() {
                             <Edit2 className="w-3 h-3" />
                           </button>
 
-                          {inv.status !== "paid" && (
+                          {canEdit && inv.status !== "paid" && (
                             <button type="button" onClick={() => setPaymentModal(inv)}
                               className="flex items-center gap-1 px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition-colors"
                               title={tr("Ödəniş Əlavə Et", "Add Payment")}>
@@ -829,11 +856,13 @@ export function TravelInvoices() {
                             <Send className="w-3 h-3" />
                           </button>
 
+                          {canDelete && (
                           <button type="button" onClick={() => void handleDelete(inv)}
                             className="flex items-center gap-1 px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-red-200 dark:border-red-800 rounded-lg font-medium text-red-600 hover:bg-red-50 transition-colors"
                             title={tr("Sil", "Delete")}>
                             <Trash2 className="w-3 h-3" />
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>

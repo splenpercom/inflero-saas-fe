@@ -29,6 +29,10 @@ const RBAC_MODULE_TENANT_GATE: Partial<Record<(typeof TENANT_RBAC_MODULES)[numbe
   Loyalty: "LOYALTY",
   "My Website": "WEB_EDITOR",
   Offers: "TRAVEL",
+  "Travel Reports": "TRAVEL",
+  Commissions: "TRAVEL",
+  "Travel Invoices": "TRAVEL",
+  "Travel Calendar": "TRAVEL",
 };
 
 export function isRbacModuleVisible(
@@ -53,23 +57,46 @@ export function defaultPermissionMatrix(
   }));
 }
 
+/** Travel plugin pages introduced after Offers — inherit Offers when row is missing. */
+const TRAVEL_PAGE_RBAC_MODULES = [
+  "Travel Reports",
+  "Commissions",
+  "Travel Invoices",
+  "Travel Calendar",
+] as const satisfies ReadonlyArray<(typeof TENANT_RBAC_MODULES)[number]>;
+
 export function mergeApiPermissions(
   apiPerms: RolePermission[],
   _hasModule?: (key: TenantModuleKey) => boolean,
 ): RolePermission[] {
   const byModule = new Map(apiPerms.map((p) => [p.module, p]));
+  const offers = byModule.get("Offers");
   return TENANT_RBAC_MODULES.map((module) => {
     const existing = byModule.get(module);
-    return existing
-      ? {
-          module,
-          view: existing.view,
-          create: existing.create,
-          edit: existing.edit,
-          delete: existing.delete,
-          manage: existing.manage ?? false,
-        }
-      : { module, view: false, create: false, edit: false, delete: false, manage: false };
+    if (existing) {
+      return {
+        module,
+        view: existing.view,
+        create: existing.create,
+        edit: existing.edit,
+        delete: existing.delete,
+        manage: existing.manage ?? false,
+      };
+    }
+    if (
+      offers &&
+      (TRAVEL_PAGE_RBAC_MODULES as readonly string[]).includes(module)
+    ) {
+      return {
+        module,
+        view: offers.view,
+        create: offers.create,
+        edit: offers.edit,
+        delete: offers.delete,
+        manage: false,
+      };
+    }
+    return { module, view: false, create: false, edit: false, delete: false, manage: false };
   });
 }
 

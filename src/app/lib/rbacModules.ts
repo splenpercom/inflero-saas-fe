@@ -26,6 +26,10 @@ export const TENANT_RBAC_MODULES = [
   "My Website",
   "Tasks",
   "Offers",
+  "Travel Reports",
+  "Commissions",
+  "Travel Invoices",
+  "Travel Calendar",
 ] as const;
 
 export type TenantRbacModule = (typeof TENANT_RBAC_MODULES)[number];

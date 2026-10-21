@@ -7,6 +7,7 @@ import {
   Clock, MapPin, Banknote, MessageSquare, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
+import { pickLang } from "../../../app/i18n/pickLang";
 import { useAuth } from "../../../app/context/AuthContext";
 import { useBranch } from "../../../app/context/BranchContext";
 import { useConfirm } from "../../../app/context/ConfirmContext";
@@ -33,7 +34,18 @@ import {
   type TravelOfferRow,
 } from "../../../app/api/offers";
 import { createCustomer, fetchCustomers } from "../../../app/api/people";
+import {
+  createTenantUser,
+  fetchTenantRoles,
+  fetchTenantUsers,
+  type TenantUserRow,
+} from "../../../app/api/userManagement";
 import { AddCustomerModal, type CustomerFormData } from "../../../app/components/corporate/people/AddCustomerModal";
+import {
+  AddUserModal,
+  type AddUserFormData,
+} from "../../../app/components/corporate/AddUserModal";
+import { ModernSelect } from "../../../app/components/ui/ModernSelect";
 import { FilterSelect } from "../ui/filter-select";
 import { exportToExcel } from "../lib/exportExcel";
 
@@ -143,7 +155,7 @@ function passengerFilled(p: Passenger): boolean {
 }
 
 function passengerLabel(i: number, numAdults: number, language: string): string {
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   if (i < numAdults) return `${tr("Böyük", "Adult")} ${i + 1}`;
   return `${tr("Uşaq", "Child")} ${i - numAdults + 1}`;
 }
@@ -409,12 +421,12 @@ function ClientNameInput({
   value: string;
   customerId: string | null;
   onChange: (name: string, customerId: string | null) => void;
-  language: string;
+  language: "en" | "az" | "ru";
   inputClass: string;
   excludeOfferId?: string;
   onNewCustomer: () => void;
 }) {
-  const tr = (az: string, en: string) => language === "az" ? az : en;
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const [showSug, setShowSug] = useState(false);
   const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
   const [nameSuggestions, setNameSuggestions] = useState<NameSuggestion[]>([]);
@@ -671,7 +683,7 @@ function ClientNameInput({
                   <p className="text-[9px] text-gray-400">{o.saleDate}</p>
                 </div>
                 <span className={`flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${STATUS_BADGE[o.status]}`}>
-                  {STATUS_LABEL[o.status].en}
+                  {pickLang(language, STATUS_LABEL[o.status].az, STATUS_LABEL[o.status].en)}
                 </span>
               </div>
             ))}
@@ -696,11 +708,16 @@ function AddOfferModal({
   onOfferUpdated?: (row: TravelOffer) => void;
 }) {
   const { language } = useLanguage();
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const { user: authUser } = useAuth();
+  const { branchId } = useBranch();
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [form, setForm] = useState(() => initForm(editOffer));
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [savingCustomer, setSavingCustomer] = useState(false);
+  const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
+  const [savingEmployee, setSavingEmployee] = useState(false);
+  const [roleOptions, setRoleOptions] = useState<{ id: string; name: string }[]>([]);
   const [payments, setPayments] = useState<OfferPaymentRow[]>([]);
   const [changeRequests, setChangeRequests] = useState<OfferChangeRequestRow[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -709,12 +726,75 @@ function AddOfferModal({
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [offerStatus, setOfferStatus] = useState<OfferStatusUi | undefined>(editOffer?.status);
   const [resolveBusy, setResolveBusy] = useState(false);
+  const [branchUsers, setBranchUsers] = useState<TenantUserRow[]>([]);
   const changesOpen = offerStatus === "changing";
+  const branchRevision = useBranchRevision();
+  const isOwnerActor = authUser?.isTenantOwner === true;
 
   const pendingBankPayments = useMemo(
     () => payments.filter((p) => p.method === "bank" && p.status === "pending"),
     [payments],
   );
+
+  const agentOptions = useMemo(() => {
+    const opts = [
+      { value: "", label: tr("Seçin (opsional)", "Select (optional)") },
+      ...branchUsers.map((u) => ({ value: u.id, label: u.name })),
+    ];
+    // Keep legacy free-text agent visible when editing an older offer.
+    if (form.agent.trim()) {
+      const matched = branchUsers.some((u) => u.name === form.agent.trim());
+      if (!matched) {
+        opts.push({ value: `__legacy__:${form.agent}`, label: form.agent });
+      }
+    }
+    return opts;
+  }, [branchUsers, form.agent, language]);
+
+  const selectedAgentValue = useMemo(() => {
+    const name = form.agent.trim();
+    if (!name) return "";
+    const byName = branchUsers.find((u) => u.name === name);
+    if (byName) return byName.id;
+    return `__legacy__:${form.agent}`;
+  }, [branchUsers, form.agent]);
+
+  const reloadBranchUsers = useCallback(async () => {
+    try {
+      const rows = await fetchTenantUsers();
+      setBranchUsers(rows.filter((u) => u.status === "Active"));
+    } catch {
+      setBranchUsers([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reloadBranchUsers();
+  }, [reloadBranchUsers, branchRevision]);
+
+  useEffect(() => {
+    if (!addEmployeeOpen) return;
+    let cancelled = false;
+    fetchTenantRoles()
+      .then((rows) => {
+        if (cancelled) return;
+        const opts = rows
+          .filter((r) => {
+            const n = r.name.toLowerCase();
+            if (n === "administrator") return false;
+            if (!isOwnerActor && n === "manager") return false;
+            return true;
+          })
+          .map((r) => ({ id: r.id, name: r.name }));
+        setRoleOptions(opts);
+      })
+      .catch(() => {
+        if (!cancelled) setRoleOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [addEmployeeOpen, isOwnerActor]);
 
   useEffect(() => {
     setOfferStatus(editOffer?.status);
@@ -931,29 +1011,29 @@ function AddOfferModal({
     await onSave(buildBody("sent"), { navigatePublic: true });
   }, [onSave, buildBody]);
 
-  function generateInvoice(lang: "en" | "az") {
-    const isAz = lang === "az";
+  function generateInvoice(lang: "en" | "az" | "ru") {
+    const t = (az: string, en: string, ru?: string) => pickLang(lang, az, en, ru);
     const costAZN = calcAZN(form.costPrice.amount, form.costPrice.rate).toFixed(2);
     const saleAZN = calcAZN(form.salePrice.amount, form.salePrice.rate).toFixed(2);
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${isAz ? "Hesab-faktura" : "Invoice"}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${t("Hesab-faktura", "Invoice", "Счёт-фактура")}</title>
 <style>body{font-family:Arial,sans-serif;margin:40px;color:#111;font-size:13px}h1{color:#14b8a6;font-size:22px;margin-bottom:2px}.sub{color:#666;font-size:12px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#14b8a6;color:#fff;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em}td{padding:7px 12px;border-bottom:1px solid #eee}.bold{font-weight:700;color:#14b8a6}.footer{margin-top:40px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}</style></head><body>
-<h1>Inflero Travel</h1><div class="sub">${isAz ? "Hesab-faktura" : "Invoice"} &mdash; ${new Date().toLocaleDateString()}</div>
-<table><tr><th colspan="2">${isAz ? "Müştəri" : "Client Information"}</th></tr>
-<tr><td>${isAz ? "Ad" : "Client"}</td><td class="bold">${form.clientName || "—"}</td></tr>
-<tr><td>${isAz ? "Ödəniş son tarixi" : "Payment Deadline"}</td><td>${form.paymentDeadline || "—"}</td></tr>
-<tr><td>${isAz ? "Tədarükçü" : "Supplier"}</td><td>${form.supplier || "—"}</td></tr>
-<tr><td>Agent</td><td>${form.agent || "—"}</td></tr></table>
-<table><tr><th colspan="2">${isAz ? "Səyahət Detalları" : "Travel Details"}</th></tr>
-<tr><td>${isAz ? "Növ" : "Type"}</td><td>${form.saleType}</td></tr>
-<tr><td>${isAz ? "Haradan" : "From"}</td><td>${form.from || "—"}</td></tr>
-<tr><td>${isAz ? "Haraya" : "To"}</td><td>${form.to || "—"} ${form.country ? `(${form.country})` : ""}</td></tr>
-<tr><td>${isAz ? "Otel" : "Hotel"}</td><td>${form.hotelName || "—"}</td></tr>
-<tr><td>${isAz ? "Tarix" : "Travel Date"}</td><td>${form.saleDate}</td></tr>
-<tr><td>${isAz ? "Böyüklər / Uşaqlar" : "Adults / Children"}</td><td>${form.numAdults} / ${form.numChildren}</td></tr></table>
-<table><tr><th>${isAz ? "Maliyyə" : "Financial Summary"}</th><th style="text-align:right">AZN</th></tr>
-<tr><td>${isAz ? "Maya dəyəri" : "Cost Price"}</td><td style="text-align:right">${costAZN}</td></tr>
-<tr><td class="bold">${isAz ? "Satış qiyməti" : "Sale Price"}</td><td style="text-align:right" class="bold">${saleAZN}</td></tr></table>
-${form.passengers.length ? `<table><tr><th>#</th><th>${isAz ? "Ad" : "Full Name"}</th><th>${isAz ? "Doğum tarixi" : "Date of Birth"}</th><th>${isAz ? "Pasport №" : "Passport #"}</th><th>${isAz ? "Bitmə tarixi" : "Expiry"}</th></tr>${form.passengers.map((p, i) => `<tr><td>${i + 1}</td><td>${p.fullName || "—"}</td><td>${p.dob || "—"}</td><td>${p.passportNo || "—"}</td><td>${p.passportExpiry || "—"}</td></tr>`).join("")}</table>` : ""}
+<h1>Inflero Travel</h1><div class="sub">${t("Hesab-faktura", "Invoice", "Счёт-фактура")} &mdash; ${new Date().toLocaleDateString()}</div>
+<table><tr><th colspan="2">${t("Müştəri", "Client Information", "Информация о клиенте")}</th></tr>
+<tr><td>${t("Ad", "Client", "Клиент")}</td><td class="bold">${form.clientName || "—"}</td></tr>
+<tr><td>${t("Ödəniş son tarixi", "Payment Deadline")}</td><td>${form.paymentDeadline || "—"}</td></tr>
+<tr><td>${t("Tədarükçü", "Supplier")}</td><td>${form.supplier || "—"}</td></tr>
+<tr><td>${t("Agent", "Agent")}</td><td>${form.agent || "—"}</td></tr></table>
+<table><tr><th colspan="2">${t("Səyahət Detalları", "Travel Details", "Детали поездки")}</th></tr>
+<tr><td>${t("Növ", "Type", "Тип")}</td><td>${form.saleType}</td></tr>
+<tr><td>${t("Haradan", "From", "Откуда")}</td><td>${form.from || "—"}</td></tr>
+<tr><td>${t("Haraya", "To", "Куда")}</td><td>${form.to || "—"} ${form.country ? `(${form.country})` : ""}</td></tr>
+<tr><td>${t("Otel", "Hotel")}</td><td>${form.hotelName || "—"}</td></tr>
+<tr><td>${t("Tarix", "Travel Date")}</td><td>${form.saleDate}</td></tr>
+<tr><td>${t("Böyüklər / Uşaqlar", "Adults / Children", "Взрослые / Дети")}</td><td>${form.numAdults} / ${form.numChildren}</td></tr></table>
+<table><tr><th>${t("Maliyyə", "Financial Summary", "Финансовая сводка")}</th><th style="text-align:right">AZN</th></tr>
+<tr><td>${t("Maya dəyəri", "Cost Price", "Себестоимость")}</td><td style="text-align:right">${costAZN}</td></tr>
+<tr><td class="bold">${t("Satış qiyməti", "Sale Price")}</td><td style="text-align:right" class="bold">${saleAZN}</td></tr></table>
+${form.passengers.length ? `<table><tr><th>#</th><th>${t("Ad", "Full Name", "ФИО")}</th><th>${t("Doğum tarixi", "Date of Birth")}</th><th>${t("Pasport №", "Passport #", "Паспорт №")}</th><th>${t("Bitmə tarixi", "Expiry", "Срок")}</th></tr>${form.passengers.map((p, i) => `<tr><td>${i + 1}</td><td>${p.fullName || "—"}</td><td>${p.dob || "—"}</td><td>${p.passportNo || "—"}</td><td>${p.passportExpiry || "—"}</td></tr>`).join("")}</table>` : ""}
 <div class="footer">Inflero Travel Management System &mdash; ${new Date().getFullYear()}</div>
 <script>window.onload=()=>window.print();</script></body></html>`;
     const win = window.open("", "_blank");
@@ -980,7 +1060,7 @@ ${form.passengers.length ? `<table><tr><th>#</th><th>${isAz ? "Ad" : "Full Name"
                     <span className="text-[10px] text-gray-400 font-mono">{editOffer.displayCode}</span>
                     {offerStatus && (
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${STATUS_BADGE[offerStatus]}`}>
-                        {language === "az" ? STATUS_LABEL[offerStatus].az : STATUS_LABEL[offerStatus].en}
+                        {pickLang(language, STATUS_LABEL[offerStatus].az, STATUS_LABEL[offerStatus].en)}
                       </span>
                     )}
                     {pendingBankPayments.length > 0 && (
@@ -1370,24 +1450,62 @@ ${form.passengers.length ? `<table><tr><th>#</th><th>${isAz ? "Ad" : "Full Name"
                       <label className={lbl}>{tr("Ödəniş son tarixi","Payment deadline")}</label>
                       <input type="date" value={form.paymentDeadline} onChange={e => set("paymentDeadline")(e.target.value)} className={inp} />
                     </div>
-                    <button type="button" onClick={() => generateInvoice("en")}
-                      className="flex-shrink-0 px-2.5 py-1.5 text-xs border border-[#14b8a6] text-[#14b8a6] rounded-lg hover:bg-[#14b8a6]/10 dark:hover:bg-[#14b8a6]/10 font-medium transition-colors whitespace-nowrap">
-                      Invoice EN
-                    </button>
+                    <div className="flex flex-shrink-0 gap-1">
+                      <button type="button" onClick={() => generateInvoice("en")}
+                        className="px-2 py-1.5 text-xs border border-[#14b8a6] text-[#14b8a6] rounded-lg hover:bg-[#14b8a6]/10 dark:hover:bg-[#14b8a6]/10 font-medium transition-colors whitespace-nowrap">
+                        EN
+                      </button>
+                      <button type="button" onClick={() => generateInvoice("az")}
+                        className="px-2 py-1.5 text-xs border border-[#14b8a6] text-[#14b8a6] rounded-lg hover:bg-[#14b8a6]/10 dark:hover:bg-[#14b8a6]/10 font-medium transition-colors whitespace-nowrap">
+                        AZ
+                      </button>
+                      <button type="button" onClick={() => generateInvoice("ru")}
+                        className="px-2 py-1.5 text-xs border border-[#14b8a6] text-[#14b8a6] rounded-lg hover:bg-[#14b8a6]/10 dark:hover:bg-[#14b8a6]/10 font-medium transition-colors whitespace-nowrap">
+                        RU
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
                       <label className={lbl}>{tr("Tədarükçü","Supplier")}</label>
                       <input value={form.supplier} onChange={e => set("supplier")(e.target.value)} placeholder={tr("Tədarükçü adı","Supplier name")} className={inp} />
                     </div>
-                    <button type="button" onClick={() => generateInvoice("az")}
-                      className="flex-shrink-0 px-2.5 py-1.5 text-xs border border-[#14b8a6] text-[#14b8a6] rounded-lg hover:bg-[#14b8a6]/10 dark:hover:bg-[#14b8a6]/10 font-medium transition-colors whitespace-nowrap">
-                      Invoice AZ
-                    </button>
                   </div>
                   <div>
                     <label className={lbl}>{tr("Agent","Agent")}</label>
-                    <input value={form.agent} onChange={e => set("agent")(e.target.value)} placeholder={tr("Agent adı","Agent name")} className={inp} />
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 min-w-0">
+                        <ModernSelect
+                          value={selectedAgentValue}
+                          onChange={(userId) => {
+                            if (!userId) {
+                              setForm((f) => ({ ...f, agent: "" }));
+                              return;
+                            }
+                            if (userId.startsWith("__legacy__:")) {
+                              setForm((f) => ({ ...f, agent: userId.slice("__legacy__:".length) }));
+                              return;
+                            }
+                            const user = branchUsers.find((u) => u.id === userId);
+                            setForm((f) => ({ ...f, agent: user?.name ?? "" }));
+                          }}
+                          options={agentOptions}
+                          placeholder={tr("İşçi axtar...", "Search employee...")}
+                          searchable
+                          searchPlaceholder={tr("Ad ilə axtar...", "Search by name...")}
+                          className="w-full"
+                          minWidth={180}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAddEmployeeOpen(true)}
+                        className="flex-shrink-0 px-2.5 py-1.5 text-xs border border-[#14b8a6] text-[#14b8a6] rounded-lg hover:bg-[#14b8a6]/10 font-medium whitespace-nowrap"
+                        title={tr("Yeni işçi əlavə et", "Add employee")}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1476,6 +1594,56 @@ ${form.passengers.length ? `<table><tr><th>#</th><th>${isAz ? "Ad" : "Full Name"
         </div>
       </div>
 
+      <AddUserModal
+        key={addEmployeeOpen ? "add-agent-open" : "add-agent-closed"}
+        isOpen={addEmployeeOpen}
+        onClose={() => {
+          if (!savingEmployee) setAddEmployeeOpen(false);
+        }}
+        roles={roleOptions}
+        showBranchSelect={false}
+        saving={savingEmployee}
+        onSave={async (data: AddUserFormData) => {
+          if (!data.roleId) {
+            notifyFromError(null, tr("Rol seçin", "Select a role"));
+            return;
+          }
+          if (data.password !== data.confirmPassword) {
+            notifyFromError(null, tr("Şifrələr uyğun gəlmir", "Passwords do not match"));
+            return;
+          }
+          if (!branchId) {
+            notifyFromError(
+              null,
+              tr("İşçi əlavə etmək üçün filial seçin", "Select a branch to add an employee"),
+            );
+            return;
+          }
+          setSavingEmployee(true);
+          try {
+            const created = await createTenantUser({
+              firstName: data.firstName,
+              lastName: data.lastName,
+              email: data.email,
+              phone: data.phone,
+              password: data.password,
+              roleId: data.roleId,
+              storeId: branchId,
+              dateOfBirth: data.dateOfBirth || null,
+              dateOfJoin: data.joiningDate || null,
+            });
+            await reloadBranchUsers();
+            setForm((f) => ({ ...f, agent: created.name }));
+            setAddEmployeeOpen(false);
+            notifySuccess(tr("İşçi əlavə edildi", "Employee added"));
+          } catch (err) {
+            notifyFromError(err, tr("İşçi əlavə edilə bilmədi", "Failed to add employee"));
+          } finally {
+            setSavingEmployee(false);
+          }
+        }}
+      />
+
       <AddCustomerModal
         isOpen={addCustomerOpen}
         onClose={() => {
@@ -1518,7 +1686,7 @@ export function Offers() {
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Offers");
-  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [offers, setOffers] = useState<TravelOffer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1882,13 +2050,13 @@ export function Offers() {
                           >
                             {STATUS_OPTIONS.map((s) => (
                               <option key={s} value={s}>
-                                {language === "az" ? STATUS_LABEL[s].az : STATUS_LABEL[s].en}
+                                {pickLang(language, STATUS_LABEL[s].az, STATUS_LABEL[s].en)}
                               </option>
                             ))}
                           </select>
                         ) : (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[o.status]}`}>
-                            {language === "az" ? STATUS_LABEL[o.status].az : STATUS_LABEL[o.status].en}
+                            {pickLang(language, STATUS_LABEL[o.status].az, STATUS_LABEL[o.status].en)}
                           </span>
                         )}
                       </td>
