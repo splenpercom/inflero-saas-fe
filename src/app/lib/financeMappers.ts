@@ -105,6 +105,7 @@ export type FinancePagedQuery = {
 
 export type ExpensesListQuery = FinancePagedQuery & {
   categoryId?: string;
+  userId?: string;
   status?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -147,6 +148,7 @@ export function expensesListQueryString(q: ExpensesListQuery = {}): string {
     pageSize: q.pageSize,
     search: q.search?.trim(),
     categoryId: q.categoryId,
+    userId: q.userId,
     status: q.status && q.status !== "all" ? mapExpenseStatusToApi(q.status) : undefined,
     dateFrom: q.dateFrom,
     dateTo: q.dateTo,

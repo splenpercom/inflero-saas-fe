@@ -39,6 +39,10 @@ export interface ExpenseListRow {
   category: string;
   categoryId: string | null;
   accountId: string | null;
+  storeId?: string | null;
+  storeName?: string | null;
+  userId?: string | null;
+  employeeName?: string | null;
   description: string;
   date: string;
   amount: string;
@@ -189,6 +193,7 @@ export async function createExpense(body: {
   expenseName: string;
   categoryId?: string | null;
   accountId?: string | null;
+  userId?: string | null;
   description?: string | null;
   date?: string;
   amount: string;
@@ -205,6 +210,7 @@ export async function updateExpense(
     expenseName?: string;
     categoryId?: string | null;
     accountId?: string | null;
+    userId?: string | null;
     description?: string | null;
     date?: string;
     amount?: string;

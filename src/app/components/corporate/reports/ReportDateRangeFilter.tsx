@@ -13,6 +13,8 @@ interface ReportDateRangeFilterProps {
   onCustomToChange: (value: string) => void;
   className?: string;
   includeYear?: boolean;
+  /** When false, hides quarter (e.g. Today / Week / Month / Custom only). */
+  includeQuarter?: boolean;
 }
 
 export function ReportDateRangeFilter({
@@ -24,6 +26,7 @@ export function ReportDateRangeFilter({
   onCustomToChange,
   className = "",
   includeYear = true,
+  includeQuarter = true,
 }: ReportDateRangeFilterProps) {
   const { language } = useLanguage();
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
@@ -38,7 +41,9 @@ export function ReportDateRangeFilter({
           { value: "today", label: pt("Today", "Bu Gün") },
           { value: "week", label: pt("This Week", "Bu Həftə") },
           { value: "month", label: pt("This Month", "Bu Ay") },
-          { value: "quarter", label: pt("This Quarter", "Bu Rüb") },
+          ...(includeQuarter
+            ? [{ value: "quarter", label: pt("This Quarter", "Bu Rüb") }]
+            : []),
           ...(includeYear
             ? [{ value: "year", label: pt("This Year", "Bu İl") }]
             : []),

@@ -159,7 +159,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) return false;
       if (user.isTenantOwner) return true;
       const p = user.role?.permissions.find((x) => x.module === module);
-      return !!p?.[action];
+      if (p) return !!p[action];
+      // Pre-seed: travel page modules inherit Offers until RolePermission rows exist.
+      if (
+        module === "Travel Reports" ||
+        module === "Commissions" ||
+        module === "Travel Invoices" ||
+        module === "Travel Calendar"
+      ) {
+        const offers = user.role?.permissions.find((x) => x.module === "Offers");
+        return !!offers?.[action];
+      }
+      return false;
     },
     [user],
   );

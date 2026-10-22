@@ -18,6 +18,7 @@ export const ALL_BRANCHES_NAV_ENTRIES: AllBranchesNavEntry[] = [
   { labelKey: "employees", path: "/dashboard/user-management", permissionModule: "User Management" },
   { labelKey: "userRoles", path: "/dashboard/user-management/roles", permissionModule: "User Management" },
   { labelKey: "warehouses", path: "/dashboard/people/warehouses", permissionModule: "Stock" },
+  { labelKey: "tasks", path: "/dashboard/tasks", permissionModule: "Tasks" },
   { labelKey: "deletionLogs", path: "/dashboard/settings/logs", permissionModule: "Settings" },
   { labelKey: "settings", path: "/dashboard/settings", permissionModule: "Settings" },
 ];
@@ -38,6 +39,10 @@ export function isAllBranchesAllowedPath(pathname: string): boolean {
   }
 
   if (path.startsWith("/dashboard/user-management")) {
+    return true;
+  }
+
+  if (path === "/dashboard/tasks" || path.startsWith("/dashboard/tasks/")) {
     return true;
   }
 

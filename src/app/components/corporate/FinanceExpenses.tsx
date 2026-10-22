@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { cn } from "../ui/utils";
 import {
   Search,
@@ -13,10 +13,12 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
+import { formatNowDateTime } from "../../lib/dateFormat";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
+import { useBranch } from "../../context/BranchContext";
+import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { AddExpenseModal, type ExpenseFormData } from "./AddExpenseModal";
 import { ViewExpenseModal } from "./ViewExpenseModal";
 import { DateInput } from "../ui/DateInput";
@@ -30,6 +32,7 @@ import {
   updateExpense,
   type ExpenseListRow,
 } from "../../api/finance";
+import { fetchTenantUsers, type TenantUserRow } from "../../api/userManagement";
 import {
   dateInputToIso,
   formatFinanceDate,
@@ -49,6 +52,8 @@ import { pickLang } from "../../i18n/pickLang";
 export function FinanceExpenses() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated } = useAuth();
+  const { branchId } = useBranch();
+  const branchRevision = useBranchRevision();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Expenses");
   const askConfirm = useConfirm();
   const { categories, reload: reloadCategories } = useExpenseCategories();
@@ -58,9 +63,11 @@ export function FinanceExpenses() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [expenses, setExpenses] = useState<ExpenseListRow[]>([]);
+  const [employees, setEmployees] = useState<TenantUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
@@ -86,7 +93,35 @@ export function FinanceExpenses() {
 
   useEffect(() => {
     resetToFirstPage();
-  }, [debouncedSearch, selectedCategory, selectedStatus, dateFrom, dateTo, resetToFirstPage]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, selectedEmployee, dateFrom, dateTo, branchRevision, resetToFirstPage]);
+
+  useEffect(() => {
+    if (!(isAuthenticated || isDemo) || !canView) {
+      setEmployees([]);
+      return;
+    }
+    let cancelled = false;
+    fetchTenantUsers()
+      .then((list) => {
+        if (!cancelled) {
+          setEmployees(list.filter((u) => u.status === "Active"));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setEmployees([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isDemo, canView]);
+
+  const employeeOptions = useMemo(() => {
+    const active = employees.filter((u) => {
+      if (!branchId) return true;
+      return u.storeId === branchId || u.managedStoreIds.includes(branchId) || u.isTenantOwner;
+    });
+    return active.map((u) => ({ id: u.id, name: u.name }));
+  }, [employees, branchId]);
 
   const loadExpenses = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
@@ -100,6 +135,7 @@ export function FinanceExpenses() {
       const result = await fetchExpenses({
         search: debouncedSearch.trim() || undefined,
         categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
+        userId: selectedEmployee !== "all" ? selectedEmployee : undefined,
         status: selectedStatus,
         dateFrom: dateFrom ? dateInputToIso(dateFrom) : undefined,
         dateTo: dateTo ? dateInputToIso(dateTo) : undefined,
@@ -113,7 +149,7 @@ export function FinanceExpenses() {
     } finally {
       setLoading(false);
     }
-  }, [isDemo, isAuthenticated, canView, debouncedSearch, selectedCategory, selectedStatus, dateFrom, dateTo, currentPage, itemsPerPage, setTotals]);
+  }, [isDemo, isAuthenticated, canView, debouncedSearch, selectedCategory, selectedEmployee, selectedStatus, dateFrom, dateTo, currentPage, itemsPerPage, setTotals, branchRevision]);
 
   useEffect(() => {
     void loadExpenses();
@@ -148,6 +184,7 @@ export function FinanceExpenses() {
       description: data.description || null,
       categoryId: data.categoryId,
       accountId: data.accountId || null,
+      userId: data.userId || null,
       date: dateInputToIso(data.date),
       amount: parseFloat(data.amount).toFixed(2),
       reference: data.reference || null,
@@ -238,6 +275,7 @@ export function FinanceExpenses() {
   const exportRows = expenses.map((item) => [
     item.reference ?? "—",
     item.expenseName,
+    item.employeeName ?? "—",
     item.category,
     item.description,
     formatFinanceDate(item.date),
@@ -253,7 +291,7 @@ export function FinanceExpenses() {
     doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDateTime(language)}`, 14, 28);
     autoTable(doc, {
       startY: 35,
-      head: [[tr("İstinad", "Reference"), tr("Xərc Adı", "Expense Name"), tr("Kateqoriya", "Category"), tr("Təsvir", "Description"), tr("Tarix", "Date"), tr("Məbləğ", "Amount"), tr("Status", "Status")]],
+      head: [[tr("İstinad", "Reference"), tr("Xərc Adı", "Expense Name"), tr("İşçi", "Employee"), tr("Kateqoriya", "Category"), tr("Təsvir", "Description"), tr("Tarix", "Date"), tr("Məbləğ", "Amount"), tr("Status", "Status")]],
       body: exportRows,
       styles: { fontSize: 9, cellPadding: 2 },
       headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -262,7 +300,7 @@ export function FinanceExpenses() {
   };
 
   const handleExportExcel = () => {
-    const headers = [tr("İstinad", "Reference"), tr("Xərc Adı", "Expense Name"), tr("Kateqoriya", "Category"), tr("Təsvir", "Description"), tr("Tarix", "Date"), tr("Məbləğ", "Amount"), tr("Status", "Status")];
+    const headers = [tr("İstinad", "Reference"), tr("Xərc Adı", "Expense Name"), tr("İşçi", "Employee"), tr("Kateqoriya", "Category"), tr("Təsvir", "Description"), tr("Tarix", "Date"), tr("Məbləğ", "Amount"), tr("Status", "Status")];
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([headers, ...exportRows]);
     XLSX.utils.book_append_sheet(wb, ws, tr("Xərclər", "Expenses"));
@@ -314,6 +352,17 @@ export function FinanceExpenses() {
               placeholder={tr("Kateqoriya", "Category")}
             />
             <ModernSelect
+              value={selectedEmployee}
+              onChange={setSelectedEmployee}
+              className="w-[160px]"
+              minWidth={160}
+              options={[
+                { value: "all", label: tr("İşçi", "Employee") },
+                ...employeeOptions.map((e) => ({ value: e.id, label: e.name })),
+              ]}
+              placeholder={tr("İşçi", "Employee")}
+            />
+            <ModernSelect
               value={selectedStatus}
               onChange={setSelectedStatus}
               className="w-[130px]"
@@ -336,6 +385,7 @@ export function FinanceExpenses() {
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("İSTİNAD", "REFERENCE")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("XƏRC ADI", "EXPENSE NAME")}</th>
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("İŞÇİ", "EMPLOYEE")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("KATEQORİYA", "CATEGORY")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("TƏSVIR", "DESCRIPTION")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("TARİX", "DATE")}</th>
@@ -346,9 +396,9 @@ export function FinanceExpenses() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
                 ) : expenses.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Xərc tapılmadı", "No expenses found")}</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Xərc tapılmadı", "No expenses found")}</td></tr>
                 ) : (
                   expenses.map((expense, index) => (
                     <tr key={expense.id} className={cn("border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors", index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/30 dark:bg-gray-800/10")}>
@@ -368,6 +418,7 @@ export function FinanceExpenses() {
                           ) : null}
                         </div>
                       </td>
+                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{expense.employeeName || "—"}</td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{expense.category}</td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap max-w-[180px] truncate">{expense.description}</td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatFinanceDate(expense.date)}</td>
@@ -446,6 +497,7 @@ export function FinanceExpenses() {
         onSave={handleSaveExpense}
         categories={categories}
         bankAccounts={bankAccounts}
+        employees={employeeOptions}
         editExpense={editExpense}
         onManageCategories={() => setIsManageCategoriesModalOpen(true)}
       />

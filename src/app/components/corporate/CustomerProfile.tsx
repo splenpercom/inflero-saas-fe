@@ -11,6 +11,9 @@ import {
   Car,
   CreditCard,
   User,
+  FileText,
+  Plane,
+  FolderOpen,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -30,11 +33,19 @@ import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { AddCustomerModal, type CustomerFormData } from "./people/AddCustomerModal";
 import { CustomerVehiclesModal } from "./people/CustomerVehiclesModal";
 import { CustomerLoyaltyPanel } from "../../../modules/loyalty";
+import { CustomerTravelPanels } from "../../../modules/travel";
 import { cn } from "../ui/utils";
 
 import { pickLang } from "../../i18n/pickLang";
 
-type ProfileTab = "overview" | "purchases" | "loyalty" | "vehicles";
+type ProfileTab =
+  | "overview"
+  | "purchases"
+  | "loyalty"
+  | "vehicles"
+  | "invoices"
+  | "offers"
+  | "documents";
 
 function StatusBadge({ status }: { status: string }) {
   const active = status === "Active";
@@ -59,6 +70,8 @@ export function CustomerProfile() {
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const autoEnabled = hasModule("AUTO");
   const loyaltyEnabled = hasModule("LOYALTY");
+  // Demo forces hasModule=*true*; match shell: only real TRAVEL tenants get travel tabs.
+  const travelEnabled = !isDemo && hasModule("TRAVEL");
   const { canView, canEdit } = useModulePermissions("Customers");
   const branchRevision = useBranchRevision();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -77,16 +90,26 @@ export function CustomerProfile() {
   const tabs = useMemo(() => {
     const list: { id: ProfileTab; label: string; icon: typeof User }[] = [
       { id: "overview", label: tr("Ümumi", "Overview"), icon: User },
-      { id: "purchases", label: tr("Satınalmalar", "Purchases"), icon: Receipt },
     ];
-    if (loyaltyEnabled) {
+    // Purchases is ERP/POS — hide when Travel plugin owns the customer profile surface.
+    if (!travelEnabled) {
+      list.push({ id: "purchases", label: tr("Satınalmalar", "Purchases"), icon: Receipt });
+    }
+    if (loyaltyEnabled && !travelEnabled) {
       list.push({ id: "loyalty", label: tr("Loyalty", "Loyalty"), icon: CreditCard });
     }
-    if (autoEnabled) {
+    if (autoEnabled && !travelEnabled) {
       list.push({ id: "vehicles", label: tr("Avtomobillər", "Vehicles"), icon: Car });
     }
+    if (travelEnabled) {
+      list.push(
+        { id: "invoices", label: tr("Fakturalar", "Invoices"), icon: FileText },
+        { id: "offers", label: tr("Təkliflər", "Offers"), icon: Plane },
+        { id: "documents", label: tr("Sənədlər", "Documents"), icon: FolderOpen },
+      );
+    }
     return list;
-  }, [loyaltyEnabled, autoEnabled, language]);
+  }, [loyaltyEnabled, autoEnabled, travelEnabled, language]);
 
   useEffect(() => {
     if (!tabs.some((t) => t.id === activeTab)) {
@@ -294,43 +317,74 @@ export function CustomerProfile() {
         {activeTab === "overview" && (
           <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={() => setActiveTab("purchases")}
-                className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
-              >
-                <p className="text-lg font-bold text-[#14b8a6]">{purchases.length}</p>
-                <p className="text-[10px] text-gray-400">{tr("Satınalma", "Purchases")}</p>
-              </button>
-              <div className="rounded-lg bg-gray-50 px-3 py-3 text-center dark:bg-gray-800/50">
-                <p className="text-lg font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(totalSpent)}
-                </p>
-                <p className="text-[10px] text-gray-400">{tr("Cəmi xərclənib", "Total spent")}</p>
-              </div>
-              {loyaltyEnabled && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("loyalty")}
-                  className="col-span-2 rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800 sm:col-span-1"
-                >
-                  <p className="truncate font-mono text-sm font-semibold text-gray-900 dark:text-white">
-                    {customer.loyaltyCardBarcode || "—"}
-                  </p>
-                  <p className="text-[10px] text-gray-400">
-                    {tr("Kart", "Card")} · {formatCurrency(Number(customer.walletBalance ?? 0))}
-                  </p>
-                </button>
-              )}
-              {autoEnabled && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("vehicles")}
-                  className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
-                >
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">{vehicles.length}</p>
-                  <p className="text-[10px] text-gray-400">{tr("Avtomobil", "Vehicles")}</p>
-                </button>
+              {travelEnabled ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("invoices")}
+                    className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
+                  >
+                    <FileText className="mx-auto mb-1 h-5 w-5 text-[#14b8a6]" />
+                    <p className="text-[10px] text-gray-400">{tr("Fakturalar", "Invoices")}</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("offers")}
+                    className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
+                  >
+                    <Plane className="mx-auto mb-1 h-5 w-5 text-[#14b8a6]" />
+                    <p className="text-[10px] text-gray-400">{tr("Təkliflər", "Offers")}</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("documents")}
+                    className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
+                  >
+                    <FolderOpen className="mx-auto mb-1 h-5 w-5 text-[#14b8a6]" />
+                    <p className="text-[10px] text-gray-400">{tr("Sənədlər", "Documents")}</p>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("purchases")}
+                    className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
+                  >
+                    <p className="text-lg font-bold text-[#14b8a6]">{purchases.length}</p>
+                    <p className="text-[10px] text-gray-400">{tr("Satınalma", "Purchases")}</p>
+                  </button>
+                  <div className="rounded-lg bg-gray-50 px-3 py-3 text-center dark:bg-gray-800/50">
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {formatCurrency(totalSpent)}
+                    </p>
+                    <p className="text-[10px] text-gray-400">{tr("Cəmi xərclənib", "Total spent")}</p>
+                  </div>
+                  {loyaltyEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("loyalty")}
+                      className="col-span-2 rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800 sm:col-span-1"
+                    >
+                      <p className="truncate font-mono text-sm font-semibold text-gray-900 dark:text-white">
+                        {customer.loyaltyCardBarcode || "—"}
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        {tr("Kart", "Card")} · {formatCurrency(Number(customer.walletBalance ?? 0))}
+                      </p>
+                    </button>
+                  )}
+                  {autoEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("vehicles")}
+                      className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
+                    >
+                      <p className="text-lg font-bold text-gray-900 dark:text-white">{vehicles.length}</p>
+                      <p className="text-[10px] text-gray-400">{tr("Avtomobil", "Vehicles")}</p>
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
@@ -360,7 +414,7 @@ export function CustomerProfile() {
           </section>
         )}
 
-        {activeTab === "purchases" && (
+        {activeTab === "purchases" && !travelEnabled && (
           <section>
             {purchasesLoading ? (
               <div className="rounded-xl border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-900">
@@ -432,7 +486,7 @@ export function CustomerProfile() {
           </section>
         )}
 
-        {activeTab === "loyalty" && loyaltyEnabled && (
+        {activeTab === "loyalty" && loyaltyEnabled && !travelEnabled && (
           <CustomerLoyaltyPanel
             customerId={customer.id}
             onChanged={(summary) =>
@@ -449,7 +503,7 @@ export function CustomerProfile() {
           />
         )}
 
-        {activeTab === "vehicles" && autoEnabled && (
+        {activeTab === "vehicles" && autoEnabled && !travelEnabled && (
           <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
@@ -494,6 +548,16 @@ export function CustomerProfile() {
             </div>
           </section>
         )}
+
+        {travelEnabled &&
+          (activeTab === "invoices" || activeTab === "offers" || activeTab === "documents") && (
+            <CustomerTravelPanels
+              tab={activeTab}
+              customerId={customer.id}
+              customerName={customer.name}
+              customerPhone={customer.phone}
+            />
+          )}
       </div>
 
       <AddCustomerModal
