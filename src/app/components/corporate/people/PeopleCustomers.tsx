@@ -147,7 +147,10 @@ export function PeopleCustomers() {
   const handleDelete = async (id: string) => {
     if (!(await askConfirm({
       title: tr("Silmə təsdiqi", "Confirm deletion"),
-      message: tr("Bu müştərini silmək istədiyinizə əminsiniz?", "Are you sure you want to delete this customer?"),
+      message: tr(
+        "Bu müştərini silmək istədiyinizə əminsiniz? Bağlı səyahət təklifləri və sənədləri də silinəcək.",
+        "Are you sure you want to delete this customer? Linked travel offers and documents will also be permanently removed.",
+      ),
       variant: "danger",
     }))) return;
     if (isDemo || !isAuthenticated || !canDelete) return;

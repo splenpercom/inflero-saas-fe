@@ -51,6 +51,13 @@ const ENTITY_LABELS: Record<string, { az: string; en: string; ru: string }> = {
   Role: { az: "Rol", en: "Role", ru: "Роль" },
   Department: { az: "Şöbə", en: "Department", ru: "Отдел" },
   TenantSettingsAsset: { az: "Ayar faylı", en: "Settings asset", ru: "Файл настроек" },
+  Task: { az: "Tapşırıq", en: "Task", ru: "Задача" },
+  TravelOffer: { az: "Səyahət təklifi", en: "Travel offer", ru: "Туристическое предложение" },
+  TravelOfferDocument: {
+    az: "Təklif sənədi",
+    en: "Offer document",
+    ru: "Документ предложения",
+  },
 };
 
 function formatDateTime(iso: string, language: string): string {

@@ -45,12 +45,14 @@ export interface CustomerVehicle {
 export type PeopleListQuery = {
   search?: string;
   status?: "active" | "inactive" | "all";
+  limit?: number;
 };
 
 function peopleQueryString(q: PeopleListQuery = {}): string {
   const params = new URLSearchParams();
   if (q.search) params.set("search", q.search);
   if (q.status && q.status !== "all") params.set("status", q.status);
+  if (q.limit != null) params.set("limit", String(q.limit));
   const s = params.toString();
   return s ? `?${s}` : "";
 }
