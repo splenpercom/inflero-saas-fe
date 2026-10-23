@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { DigitKeypad } from "../ui/DigitKeypad";
 import { pickLang } from "../../i18n/pickLang";
 import { useLanguage } from "../../i18n/LanguageContext";
+
+/** Above POS table picker (9999) and occupied-table dialog (10000). */
+const PASSCODE_Z = "z-[11000]";
 
 type PosStaffPasscodeOverlayProps = {
   open: boolean;
@@ -72,8 +76,13 @@ export function PosStaffPasscodeOverlay({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-gray-950/95 text-white">
+  return createPortal(
+    <div
+      className={`fixed inset-0 ${PASSCODE_Z} flex flex-col bg-gray-950/95 text-white`}
+      role="dialog"
+      aria-modal="true"
+      aria-label={tr("İşçi kodu", "Staff passcode")}
+    >
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-white/50">
@@ -137,6 +146,7 @@ export function PosStaffPasscodeOverlay({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
