@@ -10,6 +10,7 @@ import {
   updatePosOrder,
   type PosOrderDetail,
 } from "../../api/sales";
+import { fiscalizeCardPaymentsOnOrder } from "../../lib/omnicashier/fiscalize";
 import {
   formatSalesDateTime,
   isDraftOrderStatus,
@@ -220,13 +221,15 @@ export function SaleDetailModal({
         paymentMethod: mapPaymentMethodToApi(finalizePaymentMethod),
       });
       const remaining = parseFloat(updated.due);
+      let paidDetail = updated;
       if (finalizePaid && remaining > 0.001) {
-        await recordPosOrderPayment(order.id, {
+        paidDetail = await recordPosOrderPayment(order.id, {
           amount: remaining,
           method: mapPaymentMethodToApi(finalizePaymentMethod),
           note: "Payment on draft finalize",
         });
       }
+      void fiscalizeCardPaymentsOnOrder(paidDetail).catch(() => {});
       notifySuccess(tr("Sifariş tamamlandı", "Order finalized"));
       onFinalized?.();
       onClose();
@@ -405,6 +408,7 @@ export function SaleDetailModal({
           });
         }
       }
+      void fiscalizeCardPaymentsOnOrder(detail).catch(() => {});
       setOrder(detail);
       setReceiptChoiceOpen(false);
       await printReceiptForOrder(detail);

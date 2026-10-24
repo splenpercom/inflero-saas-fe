@@ -1,13 +1,18 @@
 import { useEffect, useState, useCallback } from "react";
-import { X, DollarSign, Plus, Ban } from "lucide-react";
+import { X, DollarSign, Plus, Ban, RefreshCw, Loader2 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { fetchPosOrder, type PosOrderDetail } from "../../api/sales";
 import { voidFinancePayment } from "../../api/finance";
+import {
+  isCardPaymentMethod,
+  retryFiscalizeCardSale,
+} from "../../lib/omnicashier/fiscalize";
+import { isOmnicashierConfigured } from "../../lib/omnicashierSettings";
 import { formatSalesDate, isDraftOrderStatus } from "../../lib/salesMappers";
-import { notifyFromError, notifySuccess } from "../../lib/toast";
+import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { pickLang } from "../../i18n/pickLang";
 
 interface ShowPaymentsModalProps {
@@ -49,6 +54,8 @@ export function ShowPaymentsModal({
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
+  const [retryingFiscalId, setRetryingFiscalId] = useState<string | null>(null);
+  const omniOn = isOmnicashierConfigured();
 
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
@@ -108,6 +115,32 @@ export function ShowPaymentsModal({
     } finally {
       setVoidingPaymentId(null);
     }
+  };
+
+  const handleRetryFiscal = async (paymentId: string) => {
+    if (!order || isDemo || !omniOn) return;
+    setRetryingFiscalId(paymentId);
+    try {
+      const result = await retryFiscalizeCardSale(order, paymentId);
+      await loadOrder();
+      if (result.status === "ok") {
+        notifySuccess(tr("Fiskal qəbz uğurlu", "Fiscal receipt OK"));
+      } else if (result.status === "failed") {
+        notifyWarning(result.error.slice(0, 160));
+      }
+      onChanged?.();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setRetryingFiscalId(null);
+    }
+  };
+
+  const fiscalLabel = (status: string | null | undefined) => {
+    if (status === "OK") return tr("Fiskal OK", "Fiscal OK");
+    if (status === "FAILED") return tr("Fiskal xəta", "Fiscal failed");
+    if (status === "PENDING") return tr("Fiskal…", "Fiscal…");
+    return null;
   };
 
   return (
@@ -211,7 +244,12 @@ export function ShowPaymentsModal({
                           <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
                             {tr("İstinad / Qeyd", "Reference / Note")}
                           </th>
-                          {canVoidFinance && !isDemo ? (
+                          {omniOn ? (
+                            <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
+                              {tr("Fiskal", "Fiscal")}
+                            </th>
+                          ) : null}
+                          {(canVoidFinance || omniOn) && !isDemo ? (
                             <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
                               {tr("Əməliyyat", "Action")}
                             </th>
@@ -219,7 +257,16 @@ export function ShowPaymentsModal({
                         </tr>
                       </thead>
                       <tbody>
-                        {payments.map((payment) => (
+                        {payments.map((payment) => {
+                          const fl = fiscalLabel(payment.fiscalStatus);
+                          const canRetryFiscal =
+                            omniOn &&
+                            isCardPaymentMethod(payment.method) &&
+                            (payment.fiscalStatus === "FAILED" ||
+                              payment.fiscalStatus === "NONE" ||
+                              payment.fiscalStatus === "PENDING" ||
+                              !payment.fiscalLongId);
+                          return (
                           <tr key={payment.paymentId} className="border-b border-gray-100 dark:border-gray-800">
                             <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">
                               {formatSalesDate(payment.date)}
@@ -232,22 +279,66 @@ export function ShowPaymentsModal({
                             </td>
                             <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">
                               {payment.reference || payment.note || "—"}
+                              {payment.fiscalError && payment.fiscalStatus === "FAILED" ? (
+                                <span className="block text-[10px] text-red-500 mt-0.5 truncate max-w-[12rem]" title={payment.fiscalError}>
+                                  {payment.fiscalError}
+                                </span>
+                              ) : null}
                             </td>
-                            {canVoidFinance && !isDemo ? (
+                            {omniOn ? (
+                              <td className="py-2 px-3 text-xs">
+                                {fl ? (
+                                  <span
+                                    className={
+                                      payment.fiscalStatus === "OK"
+                                        ? "text-green-600 dark:text-green-400"
+                                        : payment.fiscalStatus === "FAILED"
+                                          ? "text-red-600 dark:text-red-400"
+                                          : "text-amber-600 dark:text-amber-400"
+                                    }
+                                  >
+                                    {fl}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
+                            ) : null}
+                            {(canVoidFinance || omniOn) && !isDemo ? (
                               <td className="py-2 px-3 text-right">
-                                <button
-                                  type="button"
-                                  disabled={voidingPaymentId === payment.paymentId}
-                                  onClick={() => void handleVoidPayment(payment.paymentId)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
-                                  title={tr("Ləğv et", "Void")}
-                                >
-                                  <Ban className="w-3 h-3" />
-                                </button>
+                                <div className="inline-flex items-center gap-1">
+                                  {canRetryFiscal && canManageOrderPayments ? (
+                                    <button
+                                      type="button"
+                                      disabled={retryingFiscalId === payment.paymentId}
+                                      onClick={() => void handleRetryFiscal(payment.paymentId)}
+                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-900/20 disabled:opacity-50"
+                                      title={tr("Fiskalı yenidən cəhd et", "Retry fiscal")}
+                                    >
+                                      {retryingFiscalId === payment.paymentId ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <RefreshCw className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  ) : null}
+                                  {canVoidFinance ? (
+                                    <button
+                                      type="button"
+                                      disabled={voidingPaymentId === payment.paymentId}
+                                      onClick={() => void handleVoidPayment(payment.paymentId)}
+                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                                      title={tr("Ləğv et", "Void")}
+                                    >
+                                      <Ban className="w-3 h-3" />
+                                    </button>
+                                  ) : null}
+                                </div>
                               </td>
                             ) : null}
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
