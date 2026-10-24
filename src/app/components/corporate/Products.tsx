@@ -19,6 +19,7 @@ import {
   ArrowDown,
   Check,
   Columns3,
+  Barcode,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -31,6 +32,7 @@ import {
   fetchCategories,
   fetchBrands,
   deleteProduct,
+  generateMissingProductBarcodes,
   type CategoryRecord,
   type BrandRecord,
   type ProductListItem,
@@ -163,6 +165,26 @@ export function Products() {
       importFailed: { en: "Failed", az: "Uğursuz" },
       select: { en: "Select", az: "Seç" },
       columns: { en: "Columns", az: "Sütunlar" },
+      generateBarcodes: {
+        en: "Generate barcodes",
+        az: "Barkod yarat",
+      },
+      generateBarcodesConfirm: {
+        en: "Generate barcodes for all products that do not have one yet?",
+        az: "Barkodu olmayan bütün məhsullar üçün barkod yaradılsın?",
+      },
+      generateBarcodesDone: {
+        en: "Barcodes generated",
+        az: "Barkodlar yaradıldı",
+      },
+      generateBarcodesNone: {
+        en: "All products already have barcodes",
+        az: "Bütün məhsulların artıq barkodu var",
+      },
+      generatingBarcodes: {
+        en: "Generating…",
+        az: "Yaradılır…",
+      },
     };
     return mapLang(language, translations[key], key);
   };
@@ -188,6 +210,7 @@ export function Products() {
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<ProductImportResult | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [generatingBarcodes, setGeneratingBarcodes] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sorting functionality
@@ -552,6 +575,29 @@ export function Products() {
     downloadProductDemoCsv({ stockEnabled });
   };
 
+  const handleGenerateMissingBarcodes = async () => {
+    if (isDemo || !isAuthenticated || !canEdit || generatingBarcodes) return;
+    const ok = window.confirm(pt("generateBarcodesConfirm"));
+    if (!ok) return;
+    setGeneratingBarcodes(true);
+    try {
+      const result = await generateMissingProductBarcodes();
+      if (result.updated === 0) {
+        notifySuccess(pt("generateBarcodesNone"));
+      } else {
+        notifySuccess(`${pt("generateBarcodesDone")}: ${result.updated}`);
+        void loadProducts();
+      }
+    } catch (err) {
+      notifyFromError(
+        err,
+        pickLang(language, "Barkodlar yaradıla bilmədi", "Failed to generate barcodes"),
+      );
+    } finally {
+      setGeneratingBarcodes(false);
+    }
+  };
+
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -838,6 +884,21 @@ export function Products() {
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
               </button>
+
+              {canEdit && !isDemo && (
+              <button
+                type="button"
+                onClick={() => void handleGenerateMissingBarcodes()}
+                disabled={generatingBarcodes}
+                title={pt("generateBarcodes")}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                <Barcode className={cn("w-3.5 h-3.5", generatingBarcodes && "animate-pulse")} />
+                <span className="hidden sm:inline">
+                  {generatingBarcodes ? pt("generatingBarcodes") : pt("generateBarcodes")}
+                </span>
+              </button>
+              )}
 
               {canCreate && !isDemo && (
               <button

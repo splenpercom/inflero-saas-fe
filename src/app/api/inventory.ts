@@ -432,6 +432,15 @@ export async function updateProduct(id: string, body: ProductUpdateBody) {
   return res.data;
 }
 
+/** Generate barcodes for all products in scope that have no itemBarcode. */
+export async function generateMissingProductBarcodes() {
+  const res = await apiPost<{
+    success: boolean;
+    data: { updated: number; skipped: number };
+  }>("/tenant/inventory/products/generate-missing-barcodes", {});
+  return res.data;
+}
+
 export async function deleteProduct(id: string) {
   return apiDelete<{ success: boolean; message: string }>(`/tenant/inventory/products/${id}`);
 }
