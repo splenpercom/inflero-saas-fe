@@ -203,6 +203,7 @@ export function Products() {
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [barcodeConfirmOpen, setBarcodeConfirmOpen] = useState(false);
 
   // Import modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -575,13 +576,22 @@ export function Products() {
     downloadProductDemoCsv({ stockEnabled });
   };
 
+  const handleGenerateBarcodesClick = () => {
+    if (isDemo || !isAuthenticated || !canEdit || generatingBarcodes) return;
+    setBarcodeConfirmOpen(true);
+  };
+
+  const handleGenerateBarcodesCancel = () => {
+    if (generatingBarcodes) return;
+    setBarcodeConfirmOpen(false);
+  };
+
   const handleGenerateMissingBarcodes = async () => {
     if (isDemo || !isAuthenticated || !canEdit || generatingBarcodes) return;
-    const ok = window.confirm(pt("generateBarcodesConfirm"));
-    if (!ok) return;
     setGeneratingBarcodes(true);
     try {
       const result = await generateMissingProductBarcodes();
+      setBarcodeConfirmOpen(false);
       if (result.updated === 0) {
         notifySuccess(pt("generateBarcodesNone"));
       } else {
@@ -888,7 +898,7 @@ export function Products() {
               {canEdit && !isDemo && (
               <button
                 type="button"
-                onClick={() => void handleGenerateMissingBarcodes()}
+                onClick={handleGenerateBarcodesClick}
                 disabled={generatingBarcodes}
                 title={pt("generateBarcodes")}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
@@ -1385,6 +1395,62 @@ export function Products() {
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   {pickLang(language, "Məhsulu sil", "Delete Product")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Generate barcodes confirmation */}
+        {barcodeConfirmOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {pt("generateBarcodes")}
+                </h2>
+                <button
+                  type="button"
+                  onClick={handleGenerateBarcodesCancel}
+                  disabled={generatingBarcodes}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#ccfbf1] dark:bg-[#14b8a6]/20 flex items-center justify-center">
+                    <Barcode className="w-6 h-6 text-[#0d9488] dark:text-[#14b8a6]" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                      {pickLang(language, "Əminsiniz?", "Are you sure?")}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {pt("generateBarcodesConfirm")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleGenerateBarcodesCancel}
+                  disabled={generatingBarcodes}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {pickLang(language, "Ləğv et", "Cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateMissingBarcodes()}
+                  disabled={generatingBarcodes}
+                  className="px-4 py-2 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {generatingBarcodes ? pt("generatingBarcodes") : pt("generateBarcodes")}
                 </button>
               </div>
             </div>
