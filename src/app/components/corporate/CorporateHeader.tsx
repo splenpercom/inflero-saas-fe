@@ -149,6 +149,7 @@ export const CorporateHeader = memo(function CorporateHeader({
   }, [hasPermission, language]);
 
   const canViewPos = hasModule("POS") && hasPermission("POS", "view");
+  const clinicEnabled = !isDemo && hasModule("CLINIC");
   const canViewReservations = hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
 
   // Check fullscreen status
@@ -229,7 +230,11 @@ export const CorporateHeader = memo(function CorporateHeader({
           {canViewInventory && (
             <StatBadge
               icon={Package}
-              label={pt("Products", "Məhsullar")}
+              label={
+                clinicEnabled
+                  ? pt("Services", "Xidmətlər")
+                  : pt("Products", "Məhsullar")
+              }
               count={productCount}
               variant="primary"
             />
@@ -281,10 +286,16 @@ export const CorporateHeader = memo(function CorporateHeader({
               to="/dashboard/sales/pos?fresh=1"
               onClick={() => clearPosEditOrderSession()}
               className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-[#14b8a6]/15 dark:hover:bg-[#14b8a6]/25 smooth-transition"
-              title={pt("Open POS", "POS-u aç")}
+              title={
+                clinicEnabled
+                  ? pt("Open Services", "Xidmətləri aç")
+                  : pt("Open POS", "POS-u aç")
+              }
             >
               <ShoppingCart className="w-3.5 h-3.5 text-[#14b8a6]" />
-              <span className="hidden sm:inline text-xs font-medium text-[#14b8a6]">{pt("POS", "POS")}</span>
+              <span className="hidden sm:inline text-xs font-medium text-[#14b8a6]">
+                {clinicEnabled ? pt("Services", "Xidmətlər") : pt("POS", "POS")}
+              </span>
             </Link>
             <div className="w-px self-stretch bg-[#14b8a6]/25 dark:bg-[#14b8a6]/35" aria-hidden />
             <button
