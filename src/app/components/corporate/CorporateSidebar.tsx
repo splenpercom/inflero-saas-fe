@@ -123,6 +123,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const companyLogo = getCompanyLogoUrl(user?.tenant, isDarkMode);
   const brandLogo = getBrandLogoUrl(user?.tenant, isDarkMode);
   const brandAlt = user?.tenant?.name ?? "Inflero";
+  // Demo treats every module as enabled — keep ERP shell labels unchanged in demo.
+  const clinicEnabled = !isDemo && hasModule("CLINIC");
 
   // Translation helper for sidebar
   const st = (key: string) => {
@@ -184,11 +186,15 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       stockAdjustment: { en: "Stock Adjustment", az: "Anbar Düzəlişi" },
       stockTransfer: { en: "Stock Transfer", az: "Anbar Transferi" },
       
-      // Sales Sub-items
-      posOrders: { en: "Orders", az: "Sifarişlər" },
+      // Sales Sub-items (Clinic overlays POS → Services labels only)
+      posOrders: clinicEnabled
+        ? { en: "Service orders", az: "Xidmət sifarişləri" }
+        : { en: "Orders", az: "Sifarişlər" },
       invoices: { en: "Invoices", az: "Qaimələr" },
       salesReturn: { en: "Sales Return", az: "Satış Qaytarması" },
-      pos: { en: "POS", az: "POS" },
+      pos: clinicEnabled
+        ? { en: "Services", az: "Xidmətlər" }
+        : { en: "POS", az: "POS" },
       
       // Purchases Sub-items
       purchase: { en: "Purchase", az: "Satınalma" },

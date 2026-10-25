@@ -72,6 +72,7 @@ export function CustomerProfile() {
   const loyaltyEnabled = hasModule("LOYALTY");
   // Demo forces hasModule=*true*; match shell: only real TRAVEL tenants get travel tabs.
   const travelEnabled = !isDemo && hasModule("TRAVEL");
+  const clinicEnabled = !isDemo && hasModule("CLINIC");
   const { canView, canEdit } = useModulePermissions("Customers");
   const branchRevision = useBranchRevision();
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
@@ -92,8 +93,15 @@ export function CustomerProfile() {
       { id: "overview", label: tr("Ümumi", "Overview"), icon: User },
     ];
     // Purchases is ERP/POS — hide when Travel plugin owns the customer profile surface.
+    // Clinic relabels Purchases as service transaction history (same POS-order data).
     if (!travelEnabled) {
-      list.push({ id: "purchases", label: tr("Satınalmalar", "Purchases"), icon: Receipt });
+      list.push({
+        id: "purchases",
+        label: clinicEnabled
+          ? tr("Xidmətlər", "Services")
+          : tr("Satınalmalar", "Purchases"),
+        icon: Receipt,
+      });
     }
     if (loyaltyEnabled && !travelEnabled) {
       list.push({ id: "loyalty", label: tr("Loyalty", "Loyalty"), icon: CreditCard });
@@ -109,7 +117,7 @@ export function CustomerProfile() {
       );
     }
     return list;
-  }, [loyaltyEnabled, autoEnabled, travelEnabled, language]);
+  }, [loyaltyEnabled, autoEnabled, travelEnabled, clinicEnabled, language]);
 
   useEffect(() => {
     if (!tabs.some((t) => t.id === activeTab)) {
@@ -352,7 +360,11 @@ export function CustomerProfile() {
                     className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
                   >
                     <p className="text-lg font-bold text-[#14b8a6]">{purchases.length}</p>
-                    <p className="text-[10px] text-gray-400">{tr("Satınalma", "Purchases")}</p>
+                    <p className="text-[10px] text-gray-400">
+                      {clinicEnabled
+                        ? tr("Xidmət", "Services")
+                        : tr("Satınalma", "Purchases")}
+                    </p>
                   </button>
                   <div className="rounded-lg bg-gray-50 px-3 py-3 text-center dark:bg-gray-800/50">
                     <p className="text-lg font-bold text-gray-900 dark:text-white">
@@ -424,7 +436,9 @@ export function CustomerProfile() {
               <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-900">
                 <Receipt className="mx-auto mb-2 h-8 w-8 text-gray-300" />
                 <p className="text-xs text-gray-400">
-                  {tr("Satınalma tarixçəsi yoxdur", "No purchase history")}
+                  {clinicEnabled
+                    ? tr("Xidmət tarixçəsi yoxdur", "No service purchase history")
+                    : tr("Satınalma tarixçəsi yoxdur", "No purchase history")}
                 </p>
               </div>
             ) : (
