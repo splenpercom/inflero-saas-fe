@@ -117,19 +117,26 @@ export function Products() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
+  const clinicEnabled = !isDemo && hasModule("CLINIC");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch(); 
   // Translation helper - temporary until translations.ts is updated
   const pt = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
-      title: { en: "Products", az: "Məhsullar" },
-      searchPlaceholder: { en: "Search products...", az: "Məhsul axtarın..." },
+      title: clinicEnabled
+        ? { en: "Services", az: "Xidmətlər" }
+        : { en: "Products", az: "Məhsullar" },
+      searchPlaceholder: clinicEnabled
+        ? { en: "Search services...", az: "Xidmət axtarın..." }
+        : { en: "Search products...", az: "Məhsul axtarın..." },
       allCategories: { en: "All Categories", az: "Bütün Kateqoriyalar" },
       allBrands: { en: "All Brands", az: "Bütün Brendlər" },
       addProduct: { en: "Create", az: "Yarat" },
       sku: { en: "SKU", az: "SKU" },
-      productName: { en: "PRODUCT NAME", az: "MƏHSUL ADI" },
+      productName: clinicEnabled
+        ? { en: "SERVICE NAME", az: "XİDMƏT ADI" }
+        : { en: "PRODUCT NAME", az: "MƏHSUL ADI" },
       category: { en: "CATEGORY", az: "KATEQORİYA" },
       brand: { en: "BRAND", az: "BREND" },
       price: { en: "SALE PRICE", az: "SATIŞ QİYMƏTİ" },
@@ -144,7 +151,9 @@ export function Products() {
       furnitures: { en: "Furnitures", az: "Mebellər" },
       bags: { en: "Bags", az: "Çantalar" },
       phones: { en: "Phones", az: "Telefonlar" },
-      importProducts: { en: "Import Products", az: "Məhsul İdxal Et" },
+      importProducts: clinicEnabled
+        ? { en: "Import Services", az: "Xidmət İdxal Et" }
+        : { en: "Import Products", az: "Məhsul İdxal Et" },
       step1: { en: "Step 1: Download Demo File", az: "Addım 1: Demo Faylı Yükləyin" },
       downloadDemoCSV: { en: "Download Demo CSV", az: "Demo CSV Yükləyin" },
       downloadDemoDesc: { en: "Download the demo file to see the correct format.", az: "Düzgün formatı görmək üçün demo faylı yükləyin." },
@@ -154,7 +163,9 @@ export function Products() {
       csvFiles: { en: "CSV files", az: "CSV faylları" },
       importing: { en: "Importing...", az: "İdxal edilir..." },
       close: { en: "Close", az: "Bağla" },
-      productsImported: { en: "Products imported successfully!", az: "Məhsullar uğurla idxal edildi!" },
+      productsImported: clinicEnabled
+        ? { en: "Services imported successfully!", az: "Xidmətlər uğurla idxal edildi!" }
+        : { en: "Products imported successfully!", az: "Məhsullar uğurla idxal edildi!" },
       importPartial: { en: "Import finished with some errors", az: "İdxal bəzi xətalarla bitdi" },
       importNoRows: { en: "No product rows found in the file", az: "Faylda məhsul sətri tapılmadı" },
       importStockSkipped: {

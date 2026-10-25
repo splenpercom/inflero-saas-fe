@@ -168,8 +168,10 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       travelReports: { en: "Reports", az: "Hesabatlar" },
       travelOfferPage: { en: "Offer Page", az: "Təklif Səhifəsi" },
       
-      // Inventory Sub-items
-      products: { en: "Products", az: "Məhsullar" },
+      // Inventory Sub-items (Clinic: Products → Services; hide dedicated Services page)
+      products: clinicEnabled
+        ? { en: "Services", az: "Xidmətlər" }
+        : { en: "Products", az: "Məhsullar" },
       services: { en: "Services", az: "Xidmətlər" },
       createProduct: { en: "Create", az: "Yarat" },
       expiredProducts: { en: "Expired Products", az: "Vaxtı Keçmiş Məhsullar" },
@@ -544,7 +546,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
             if (travelEnabled && sub.labelKey === "income") return false;
             if (travelEnabled && sub.labelKey === "suppliers") return false;
             if (["expiredProducts", "lowStocks"].includes(sub.labelKey) && !hasModule("STOCK")) return false;
-            if (sub.labelKey === "services" && !inventoryServicesEnabled) return false;
+            // Clinic uses Products (relabeled Services) as the catalog — hide inventory Services page.
+            if (sub.labelKey === "services" && (clinicEnabled || !inventoryServicesEnabled)) return false;
             // Suppliers stay available without STOCK — required for purchases.
             if (["pos", "posOrders"].includes(sub.labelKey) && !hasModule("POS")) return false;
             if (sub.labelKey === "stockTransfer" && !branchManagementEnabled) return false;
@@ -589,7 +592,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       ...travelRest,
       ...bottom,
     ];
-  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, travelNavItems, travelEnabled, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled]);
+  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, travelNavItems, travelEnabled, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled, clinicEnabled]);
 
   const tenantSlug = user?.tenant?.slug ?? null;
   const myStorePath = tenantSlug ? storePath(tenantSlug) : null;

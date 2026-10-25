@@ -4052,7 +4052,11 @@ export function CorporatePOS() {
                   <input
                     type="text"
                     inputMode="none"
-                    placeholder={tr("Məhsul/xidmət axtar və ya skan et...", "Search or scan product...")}
+                    placeholder={
+                      clinicEnabled
+                        ? tr("Xidmət axtar və ya skan et...", "Search or scan service...")
+                        : tr("Məhsul/xidmət axtar və ya skan et...", "Search or scan product...")
+                    }
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleSearchBarcodeKeyDown}
@@ -4221,7 +4225,9 @@ export function CorporatePOS() {
                         "Basılı saxlayıb yuxarı/aşağı sürükləyin",
                         "Hold and drag up/down across rows",
                       )
-                    : tr("Məhsullar", "Products")}
+                    : clinicEnabled
+                      ? tr("Xidmətlər", "Services")
+                      : tr("Məhsullar", "Products")}
                 </p>
                 <div className="flex items-center gap-1.5">
                   {clinicEnabled ? (
@@ -4286,7 +4292,9 @@ export function CorporatePOS() {
                 </div>
               ) : filteredProducts.length === 0 ? (
                 <div className="flex items-center justify-center h-32 text-xs text-gray-400">
-                  {tr("Məhsul tapılmadı", "No products found")}
+                  {clinicEnabled
+                    ? tr("Xidmət tapılmadı", "No services found")
+                    : tr("Məhsul tapılmadı", "No products found")}
                 </div>
               ) : (
               <div
