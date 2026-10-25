@@ -14,6 +14,7 @@ import {
   FileText,
   Plane,
   FolderOpen,
+  BedDouble,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -27,6 +28,10 @@ import {
   type PeopleCustomer,
 } from "../../api/people";
 import { fetchPosOrders, type PosOrderListRow } from "../../api/sales";
+import {
+  fetchHotelReservations,
+  type HotelReservation,
+} from "../../api/hotel";
 import { formatSalesDate } from "../../lib/salesMappers";
 import { formatCurrency } from "../../utils/currency";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
@@ -41,11 +46,20 @@ import { pickLang } from "../../i18n/pickLang";
 type ProfileTab =
   | "overview"
   | "purchases"
+  | "reservations"
   | "loyalty"
   | "vehicles"
   | "invoices"
   | "offers"
   | "documents";
+
+function hotelStatusLabel(
+  status: HotelReservation["status"],
+  tr: (az: string, en: string) => string,
+) {
+  if (status === "CANCELLED") return tr("Ləğv", "Cancelled");
+  return tr("Rezerv", "Reserved");
+}
 
 function StatusBadge({ status }: { status: string }) {
   const active = status === "Active";
@@ -70,8 +84,9 @@ export function CustomerProfile() {
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const autoEnabled = hasModule("AUTO");
   const loyaltyEnabled = hasModule("LOYALTY");
-  // Demo forces hasModule=*true*; match shell: only real TRAVEL tenants get travel tabs.
+  // Demo forces hasModule=*true*; match shell: only real TRAVEL/HOTELS tenants get plugin tabs.
   const travelEnabled = !isDemo && hasModule("TRAVEL");
+  const hotelsEnabled = !isDemo && hasModule("HOTELS");
   const clinicEnabled = !isDemo && hasModule("CLINIC");
   const { canView, canEdit } = useModulePermissions("Customers");
   const branchRevision = useBranchRevision();
@@ -80,6 +95,8 @@ export function CustomerProfile() {
   const [customer, setCustomer] = useState<PeopleCustomer | null>(null);
   const [purchases, setPurchases] = useState<PosOrderListRow[]>([]);
   const [purchasesLoading, setPurchasesLoading] = useState(false);
+  const [reservations, setReservations] = useState<HotelReservation[]>([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editCustomerOpen, setEditCustomerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,9 +109,9 @@ export function CustomerProfile() {
     const list: { id: ProfileTab; label: string; icon: typeof User }[] = [
       { id: "overview", label: tr("Ümumi", "Overview"), icon: User },
     ];
-    // Purchases is ERP/POS — hide when Travel plugin owns the customer profile surface.
+    // Purchases is ERP/POS — hide when Travel/Hotels plugin owns the customer profile surface.
     // Clinic relabels Purchases as service transaction history (same POS-order data).
-    if (!travelEnabled) {
+    if (!travelEnabled && !hotelsEnabled) {
       list.push({
         id: "purchases",
         label: clinicEnabled
@@ -103,10 +120,17 @@ export function CustomerProfile() {
         icon: Receipt,
       });
     }
-    if (loyaltyEnabled && !travelEnabled) {
+    if (hotelsEnabled) {
+      list.push({
+        id: "reservations",
+        label: tr("Rezervasiyalar", "Reservations"),
+        icon: BedDouble,
+      });
+    }
+    if (loyaltyEnabled && !travelEnabled && !hotelsEnabled) {
       list.push({ id: "loyalty", label: tr("Loyalty", "Loyalty"), icon: CreditCard });
     }
-    if (autoEnabled && !travelEnabled) {
+    if (autoEnabled && !travelEnabled && !hotelsEnabled) {
       list.push({ id: "vehicles", label: tr("Avtomobillər", "Vehicles"), icon: Car });
     }
     if (travelEnabled) {
@@ -117,7 +141,7 @@ export function CustomerProfile() {
       );
     }
     return list;
-  }, [loyaltyEnabled, autoEnabled, travelEnabled, clinicEnabled, language]);
+  }, [loyaltyEnabled, autoEnabled, travelEnabled, hotelsEnabled, clinicEnabled, language]);
 
   useEffect(() => {
     if (!tabs.some((t) => t.id === activeTab)) {
@@ -126,7 +150,7 @@ export function CustomerProfile() {
   }, [tabs, activeTab]);
 
   const loadPurchases = useCallback(async () => {
-    if (!id || !(isAuthenticated || isDemo)) {
+    if (!id || hotelsEnabled || travelEnabled || !(isAuthenticated || isDemo)) {
       setPurchases([]);
       return;
     }
@@ -146,7 +170,24 @@ export function CustomerProfile() {
     } finally {
       setPurchasesLoading(false);
     }
-  }, [id, isDemo, isAuthenticated, branchRevision]);
+  }, [id, isDemo, isAuthenticated, branchRevision, hotelsEnabled, travelEnabled]);
+
+  const loadReservations = useCallback(async () => {
+    if (!id || !hotelsEnabled || !(isAuthenticated || isDemo)) {
+      setReservations([]);
+      return;
+    }
+    setReservationsLoading(true);
+    try {
+      setReservations(
+        await fetchHotelReservations({ status: "all", customerId: id, limit: 200 }),
+      );
+    } catch {
+      setReservations([]);
+    } finally {
+      setReservationsLoading(false);
+    }
+  }, [id, hotelsEnabled, isDemo, isAuthenticated, branchRevision]);
 
   const loadData = useCallback(async () => {
     if (!id || !(isAuthenticated || isDemo) || !canView) {
@@ -173,8 +214,12 @@ export function CustomerProfile() {
     void loadPurchases();
   }, [loadPurchases]);
 
+  useEffect(() => {
+    void loadReservations();
+  }, [loadReservations]);
+
   const loadVehicles = useCallback(async () => {
-    if (!autoEnabled || !id || !(isAuthenticated || isDemo) || !canView) {
+    if (!autoEnabled || hotelsEnabled || travelEnabled || !id || !(isAuthenticated || isDemo) || !canView) {
       setVehicles([]);
       return;
     }
@@ -187,13 +232,14 @@ export function CustomerProfile() {
     } finally {
       setVehiclesLoading(false);
     }
-  }, [autoEnabled, id, isAuthenticated, isDemo, canView]);
+  }, [autoEnabled, hotelsEnabled, travelEnabled, id, isAuthenticated, isDemo, canView]);
 
   useEffect(() => {
     void loadVehicles();
   }, [loadVehicles]);
 
   const totalSpent = purchases.reduce((sum, order) => sum + order.grandTotal, 0);
+  const activeReservationCount = reservations.filter((r) => r.status !== "CANCELLED").length;
 
   if (loading) {
     return (
@@ -352,6 +398,25 @@ export function CustomerProfile() {
                     <p className="text-[10px] text-gray-400">{tr("Sənədlər", "Documents")}</p>
                   </button>
                 </>
+              ) : hotelsEnabled ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("reservations")}
+                    className="rounded-lg bg-gray-50 px-3 py-3 text-center transition-colors hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800"
+                  >
+                    <p className="text-lg font-bold text-[#14b8a6]">{reservations.length}</p>
+                    <p className="text-[10px] text-gray-400">
+                      {tr("Rezervasiya", "Reservations")}
+                    </p>
+                  </button>
+                  <div className="rounded-lg bg-gray-50 px-3 py-3 text-center dark:bg-gray-800/50">
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {activeReservationCount}
+                    </p>
+                    <p className="text-[10px] text-gray-400">{tr("Aktiv", "Active")}</p>
+                  </div>
+                </>
               ) : (
                 <>
                   <button
@@ -426,7 +491,77 @@ export function CustomerProfile() {
           </section>
         )}
 
-        {activeTab === "purchases" && !travelEnabled && (
+        {activeTab === "reservations" && hotelsEnabled && (
+          <section>
+            {reservationsLoading ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-900">
+                <p className="text-xs text-gray-400">{tr("Yüklənir...", "Loading...")}</p>
+              </div>
+            ) : reservations.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-900">
+                <BedDouble className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+                <p className="text-xs text-gray-400">
+                  {tr("Rezervasiya tarixçəsi yoxdur", "No reservation history")}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/50">
+                        <th className="px-4 py-3 text-left text-[10px] font-medium uppercase text-gray-500">
+                          {tr("Otaq", "Room")}
+                        </th>
+                        <th className="px-4 py-3 text-left text-[10px] font-medium uppercase text-gray-500">
+                          {tr("Giriş", "Check-in")}
+                        </th>
+                        <th className="px-4 py-3 text-left text-[10px] font-medium uppercase text-gray-500">
+                          {tr("Çıxış", "Check-out")}
+                        </th>
+                        <th className="px-4 py-3 text-left text-[10px] font-medium uppercase text-gray-500">
+                          {tr("İşçi", "Assignee")}
+                        </th>
+                        <th className="px-4 py-3 text-left text-[10px] font-medium uppercase text-gray-500">
+                          {tr("Status", "Status")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservations.map((row) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => navigate("/dashboard/hotel/reservations")}
+                          className="cursor-pointer border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/40"
+                        >
+                          <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-gray-900 dark:text-white">
+                            {row.room
+                              ? `${row.room.number != null ? `#${row.room.number} ` : ""}${row.room.name}`
+                              : "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
+                            {row.checkInAt ? new Date(row.checkInAt).toLocaleString() : "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
+                            {row.checkOutAt ? new Date(row.checkOutAt).toLocaleString() : "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
+                            {row.assignee?.name ?? "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
+                            {hotelStatusLabel(row.status, tr)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === "purchases" && !travelEnabled && !hotelsEnabled && (
           <section>
             {purchasesLoading ? (
               <div className="rounded-xl border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-900">
@@ -500,7 +635,7 @@ export function CustomerProfile() {
           </section>
         )}
 
-        {activeTab === "loyalty" && loyaltyEnabled && !travelEnabled && (
+        {activeTab === "loyalty" && loyaltyEnabled && !travelEnabled && !hotelsEnabled && (
           <CustomerLoyaltyPanel
             customerId={customer.id}
             onChanged={(summary) =>
@@ -517,7 +652,7 @@ export function CustomerProfile() {
           />
         )}
 
-        {activeTab === "vehicles" && autoEnabled && !travelEnabled && (
+        {activeTab === "vehicles" && autoEnabled && !travelEnabled && !hotelsEnabled && (
           <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">

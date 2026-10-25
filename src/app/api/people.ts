@@ -10,6 +10,7 @@ export interface PeopleCustomer {
   phone: string;
   country: string;
   status: UiPeopleStatus;
+  storeId?: string | null;
   vehicleCount: number;
   plates: string[];
   /** When LOYALTY module is on. */

@@ -93,13 +93,15 @@ export const CorporateHeader = memo(function CorporateHeader({
   const { productCount, todayOrdersCount } = useHeaderStats();
   const subscriptionBadge = useSubscriptionBadge(pt);
 
-  const canViewInventory = hasAnyRbacPermission(hasPermission, RBAC_INVENTORY_CHILDREN, "view");
 
   const handleLogout = async () => {
     exitDemo();
     await logout();
     navigate("/");
   };
+
+  const hotelsEnabled = !isDemo && hasModule("HOTELS");
+  const clinicEnabled = !isDemo && hasModule("CLINIC");
 
   const quickActions = useMemo(() => {
     const actions: {
@@ -145,12 +147,25 @@ export const CorporateHeader = memo(function CorporateHeader({
         action: "create",
       },
     ];
-    return actions.filter((action) => hasPermission(action.module, action.action));
-  }, [hasPermission, language]);
+    return actions.filter((action) => {
+      if (!hasPermission(action.module, action.action)) return false;
+      if (
+        hotelsEnabled &&
+        (action.path.startsWith("/dashboard/inventory") ||
+          action.path.startsWith("/dashboard/purchases") ||
+          action.path.startsWith("/dashboard/people/suppliers"))
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [hasPermission, language, hotelsEnabled]);
 
-  const canViewPos = hasModule("POS") && hasPermission("POS", "view");
-  const clinicEnabled = !isDemo && hasModule("CLINIC");
-  const canViewReservations = hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
+  const canViewPos = !hotelsEnabled && hasModule("POS") && hasPermission("POS", "view");
+  const canViewReservations =
+    !hotelsEnabled && hasModule("RESERVATIONS") && hasPermission("Reservations", "view");
+  const canViewInventory =
+    !hotelsEnabled && hasAnyRbacPermission(hasPermission, RBAC_INVENTORY_CHILDREN, "view");
 
   // Check fullscreen status
   useEffect(() => {

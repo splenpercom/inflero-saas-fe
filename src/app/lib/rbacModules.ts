@@ -30,6 +30,8 @@ export const TENANT_RBAC_MODULES = [
   "Commissions",
   "Travel Invoices",
   "Travel Calendar",
+  "Hotel Rooms",
+  "Hotel Reservations",
 ] as const;
 
 export type TenantRbacModule = (typeof TENANT_RBAC_MODULES)[number];
@@ -51,6 +53,9 @@ export const RBAC_FINANCE_CHILDREN = ["Expenses", "Income", "Payments"] as const
 
 /** Dining section children. */
 export const RBAC_DINING_CHILDREN = ["Menu", "Tables", "Bookings"] as const satisfies ReadonlyArray<TenantRbacModule>;
+
+/** Hotels section children. */
+export const RBAC_HOTELS_CHILDREN = ["Hotel Rooms", "Hotel Reservations"] as const satisfies ReadonlyArray<TenantRbacModule>;
 
 /** True if any listed module grants the action. */
 export function hasAnyRbacPermission(

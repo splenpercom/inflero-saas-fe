@@ -33,6 +33,8 @@ const RBAC_MODULE_TENANT_GATE: Partial<Record<(typeof TENANT_RBAC_MODULES)[numbe
   Commissions: "TRAVEL",
   "Travel Invoices": "TRAVEL",
   "Travel Calendar": "TRAVEL",
+  "Hotel Rooms": "HOTELS",
+  "Hotel Reservations": "HOTELS",
 };
 
 export function isRbacModuleVisible(

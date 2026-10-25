@@ -64,14 +64,16 @@ function emptyToNull(value: string): string | null {
 export function Settings() {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, refresh, hasModule, user } = useAuth();
-  const posEnabled = hasModule("POS");
+  const hotelsEnabled = !isDemo && hasModule("HOTELS");
+  const clinicEnabled = !isDemo && hasModule("CLINIC");
+  const posEnabled = !hotelsEnabled && hasModule("POS");
   // Dining plugin is tenant-level; Bar & Print add-on visibility still follows tenant DINING.
   const diningEnabled =
     isDemo
       ? hasModule("DINING")
       : user?.tenant?.modules?.DINING === true;
-  const reservationsEnabled = hasModule("RESERVATIONS");
-  const addonsEnabled = posEnabled || reservationsEnabled;
+  const reservationsEnabled = !hotelsEnabled && hasModule("RESERVATIONS");
+  const addonsEnabled = !hotelsEnabled && (posEnabled || reservationsEnabled);
   const { canView, canEdit } = useModulePermissions("Settings");
   const { isGlobalMode, branchManagementEnabled, selectedBranch } = useBranch();
   const branchRevision = useBranchRevision();
@@ -508,7 +510,8 @@ export function Settings() {
             payload.tableHourlyBillingEnabled = tableHourlyBillingEnabled;
           }
         }
-        if (canEditBranchAddons && addonsEnabled) {
+        // Clinic uses Products→Services; do not write Inventory services toggle.
+        if (canEditBranchAddons && addonsEnabled && !clinicEnabled) {
           payload.inventoryServicesEnabled = inventoryServicesEnabled;
         }
       }
@@ -1017,6 +1020,7 @@ export function Settings() {
                       )}
                     </div>
                   )}
+                  {!clinicEnabled && (
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-medium text-gray-900 dark:text-white">
@@ -1045,6 +1049,7 @@ export function Settings() {
                       />
                     </button>
                   </div>
+                  )}
 
                   {posEnabled && (
                   <>

@@ -62,6 +62,9 @@ import {
   TravelErpBlock,
   TasksPage,
 } from "../modules/travel";
+import { hotelDashboardRouteElements, HotelsErpBlock } from "../modules/hotel";
+import { HotelsShellPageGuard } from "./components/modules/HotelsErpBlockGuard";
+import { HotelsComingSoonPage } from "./components/modules/HotelsComingSoonPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DemoBanner } from "./components/DemoBanner";
 import { PaymentStatusGate, BillingResultPage } from "./components/billing/PaymentStatusGate";
@@ -269,9 +272,11 @@ function AppShell() {
                     <DashboardPermissionGuard>
                       <>
                         <DemoBanner />
-                        <ModuleRouteGuard module="POS">
-                          <CorporatePOS />
-                        </ModuleRouteGuard>
+                        <HotelsErpBlock>
+                          <ModuleRouteGuard module="POS">
+                            <CorporatePOS />
+                          </ModuleRouteGuard>
+                        </HotelsErpBlock>
                       </>
                     </DashboardPermissionGuard>
                   </AllBranchesScopeGuard>
@@ -294,11 +299,45 @@ function AppShell() {
                   toggleDarkMode={toggleDarkMode}
                 >
                   <TravelErpBlock>
+                  <HotelsErpBlock>
                   <Routes>
               {/* Corporate ERP Routes */}
-              <Route path="/" element={<DashboardHome />} />
-              <Route path="/home" element={<DashboardHome />} />
-              <Route path="new-dashboard" element={<DashboardHome />} />
+              <Route
+                path="/"
+                element={
+                  <HotelsShellPageGuard
+                    comingSoon={
+                      <HotelsComingSoonPage title="Dashboard" titleAz="İdarə Paneli" />
+                    }
+                  >
+                    <DashboardHome />
+                  </HotelsShellPageGuard>
+                }
+              />
+              <Route
+                path="/home"
+                element={
+                  <HotelsShellPageGuard
+                    comingSoon={
+                      <HotelsComingSoonPage title="Dashboard" titleAz="İdarə Paneli" />
+                    }
+                  >
+                    <DashboardHome />
+                  </HotelsShellPageGuard>
+                }
+              />
+              <Route
+                path="new-dashboard"
+                element={
+                  <HotelsShellPageGuard
+                    comingSoon={
+                      <HotelsComingSoonPage title="Dashboard" titleAz="İdarə Paneli" />
+                    }
+                  >
+                    <DashboardHome />
+                  </HotelsShellPageGuard>
+                }
+              />
               <Route path="profile" element={<Profile />} />
               <Route path="orders" element={<CorporateOrders />} />
 
@@ -361,7 +400,18 @@ function AppShell() {
               />
 
               {/* Reports and User Management */}
-              <Route path="reports" element={<Reports />} />
+              <Route
+                path="reports"
+                element={
+                  <HotelsShellPageGuard
+                    comingSoon={
+                      <HotelsComingSoonPage title="Reports" titleAz="Hesabatlar" />
+                    }
+                  >
+                    <Reports />
+                  </HotelsShellPageGuard>
+                }
+              />
               <Route path="reports/sales" element={<Navigate to="/dashboard/reports" replace />} />
               <Route path="reports/employee-sales" element={<Navigate to="/dashboard/reports" replace />} />
               <Route path="reports/finance" element={<Navigate to="/dashboard/reports" replace />} />
@@ -411,10 +461,12 @@ function AppShell() {
               {diningDashboardRouteElements}
               {loyaltyDashboardRouteElements}
               {travelDashboardRouteElements}
+              {hotelDashboardRouteElements}
 
               {/* Catch all - redirect to dashboard home */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
+                  </HotelsErpBlock>
                   </TravelErpBlock>
                 </LayoutWrapper>
                 </ProtectedRoute>
