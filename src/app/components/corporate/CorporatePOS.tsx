@@ -36,6 +36,8 @@ import {
   Truck,
   Clock,
   Glasses,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -1102,6 +1104,7 @@ export function CorporatePOS() {
   const diningEnabled = hasModule("DINING");
   const loyaltyEnabled = hasModule("LOYALTY");
   const opticsEnabled = hasModule("OPTICS");
+  const clinicEnabled = hasModule("CLINIC");
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const { canCreate, canEdit } = useModulePermissions("POS");
@@ -1122,6 +1125,10 @@ export function CorporatePOS() {
   const [productOrder, setProductOrder] = useState<string[]>([]);
   const [dragProductId, setDragProductId] = useState<string | null>(null);
   const [dragOverProductId, setDragOverProductId] = useState<string | null>(null);
+  /** Clinic defaults to list; non-Clinic stays grid-only (toggle is Clinic-gated). */
+  const [catalogView, setCatalogView] = useState<"grid" | "list">(
+    clinicEnabled ? "list" : "grid",
+  );
   const [productDragGhost, setProductDragGhost] = useState<{
     x: number;
     y: number;
@@ -3066,7 +3073,7 @@ export function CorporatePOS() {
       return false;
     }
     if (cart.length === 0 && !canCheckoutHourlyOnly) {
-      alert(tr("Səbəti doldurun", "Please add items to cart"));
+      notifyWarning(tr("Səbəti doldurun", "Please add items to cart"));
       return false;
     }
     // KOT/Bar need product lines — hourly-only bills have nothing for the kitchen.
@@ -3079,12 +3086,22 @@ export function CorporatePOS() {
       );
       return false;
     }
+    if (clinicEnabled && !selectedCustomerId) {
+      notifyWarning(tr("Müştəri seçin", "Please select a customer"));
+      return false;
+    }
+    if (clinicEnabled && !selectedBillerId) {
+      notifyWarning(tr("İşçi seçin", "Please select an employee"));
+      return false;
+    }
     if (!paymentStatusChoice) {
-      alert(tr("Ödəniş statusunu seçin", "Please select payment status (Paid / Pending)"));
+      notifyWarning(
+        tr("Ödəniş statusunu seçin", "Please select payment status (Paid / Pending)"),
+      );
       return false;
     }
     if (!selectedBillerId) {
-      alert(tr("Kassir seçin", "Please select an employee / biller"));
+      notifyWarning(tr("Kassir seçin", "Please select an employee / biller"));
       return false;
     }
     if (isGlobalMode || !branchId) {
@@ -4206,30 +4223,62 @@ export function CorporatePOS() {
                       )
                     : tr("Məhsullar", "Products")}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProductReorderMode((v) => {
-                      const next = !v;
-                      if (next) setCategoryReorderMode(false);
-                      return next;
-                    });
-                    setDragProductId(null);
-                    setDragOverProductId(null);
-                    setProductDragGhost(null);
-                  }}
-                  className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
-                    productReorderMode
-                      ? "bg-[#14b8a6] border-[#14b8a6] text-white"
-                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                  }`}
-                  title={tr("Məhsulları sırala", "Reorder products")}
-                >
-                  <ListOrdered className="w-3 h-3" />
-                  {productReorderMode
-                    ? tr("Bitir", "Done")
-                    : tr("Sırala", "Reorder")}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {clinicEnabled ? (
+                    <div className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-700 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setCatalogView("list")}
+                        className={`p-1.5 transition-colors ${
+                          catalogView === "list"
+                            ? "bg-[#14b8a6] text-white"
+                            : "bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }`}
+                        title={tr("Siyahı", "List view")}
+                        aria-label={tr("Siyahı", "List view")}
+                      >
+                        <List className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCatalogView("grid")}
+                        className={`p-1.5 transition-colors ${
+                          catalogView === "grid"
+                            ? "bg-[#14b8a6] text-white"
+                            : "bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }`}
+                        title={tr("Tor", "Grid view")}
+                        aria-label={tr("Tor", "Grid view")}
+                      >
+                        <LayoutGrid className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductReorderMode((v) => {
+                        const next = !v;
+                        if (next) setCategoryReorderMode(false);
+                        return next;
+                      });
+                      setDragProductId(null);
+                      setDragOverProductId(null);
+                      setProductDragGhost(null);
+                    }}
+                    className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
+                      productReorderMode
+                        ? "bg-[#14b8a6] border-[#14b8a6] text-white"
+                        : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    }`}
+                    title={tr("Məhsulları sırala", "Reorder products")}
+                  >
+                    <ListOrdered className="w-3 h-3" />
+                    {productReorderMode
+                      ? tr("Bitir", "Done")
+                      : tr("Sırala", "Reorder")}
+                  </button>
+                </div>
               </div>
               {productsLoading ? (
                 <div className="flex items-center justify-center h-32 text-xs text-gray-400">
@@ -4241,7 +4290,11 @@ export function CorporatePOS() {
                 </div>
               ) : (
               <div
-                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 pb-20 lg:pb-4"
+                className={
+                  clinicEnabled && catalogView === "list"
+                    ? "flex flex-col gap-1.5 pb-20 lg:pb-4"
+                    : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 pb-20 lg:pb-4"
+                }
                 style={dragProductId ? { touchAction: "none" } : undefined}
               >
                 {filteredProducts.map((product, index) => {
@@ -4258,6 +4311,7 @@ export function CorporatePOS() {
                     dragOverProductId === product.id &&
                     dragProductId !== product.id;
                   const cols = getPosProductColumnCount();
+                  const isListRow = clinicEnabled && catalogView === "list";
 
                   return (
                   <div
@@ -4290,6 +4344,8 @@ export function CorporatePOS() {
                       }
                     }}
                     className={`relative bg-white dark:bg-gray-900 border rounded-lg p-2 transition-all text-left group touch-manipulation select-none ${
+                      isListRow ? "flex items-center gap-3" : ""
+                    } ${
                       isDragging ? "opacity-40 scale-[0.97] ring-2 ring-[#14b8a6]/50" : ""
                     } ${
                       isDropTarget
@@ -4358,22 +4414,37 @@ export function CorporatePOS() {
                         </div>
                       </div>
                     )}
-                    {isService && (
+                    {isService && !isListRow && (
                       <span className="absolute top-1 left-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                         {tr("Xidmət", "Service")}
                       </span>
                     )}
-                    {!productReorderMode && !isService && stockEnabled && outOfStock && (
+                    {!productReorderMode && !isService && stockEnabled && outOfStock && !isListRow && (
                       <span className="absolute top-1 right-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
                         {tr("Stokda yoxdur", "Out of stock")}
                       </span>
                     )}
-                    <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-md flex items-center justify-center text-2xl mb-1.5 border border-gray-300 dark:border-gray-700 group-hover:border-[#14b8a6] transition-colors overflow-hidden">
+                    <div
+                      className={`${
+                        isListRow
+                          ? "w-12 h-12 shrink-0"
+                          : "aspect-square mb-1.5"
+                      } bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-md flex items-center justify-center text-2xl border border-gray-300 dark:border-gray-700 group-hover:border-[#14b8a6] transition-colors overflow-hidden`}
+                    >
                       <ProductThumb image={product.image} className="w-full h-full object-cover" />
                     </div>
+                    <div className={isListRow ? "min-w-0 flex-1" : undefined}>
                     <div className="text-[9px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">{product.code}</div>
-                    <div className="flex items-start justify-between gap-1.5">
-                      <h3 className="text-[11px] font-medium text-gray-900 dark:text-white line-clamp-2 min-w-0 flex-1 leading-tight">
+                    <div
+                      className={`flex justify-between gap-1.5 ${
+                        isListRow ? "items-center" : "items-start"
+                      }`}
+                    >
+                      <h3
+                        className={`text-[11px] font-medium text-gray-900 dark:text-white min-w-0 flex-1 leading-tight ${
+                          isListRow ? "truncate" : "line-clamp-2"
+                        }`}
+                      >
                         {product.name}
                       </h3>
                       <div className="flex flex-col items-end gap-0.5 shrink-0 pt-0.5">
@@ -4393,9 +4464,10 @@ export function CorporatePOS() {
                         )}
                       </div>
                     </div>
+                    </div>
                     {!productReorderMode && canMutateCart && qtyInCart > 0 && (
                       <div
-                        className="mt-1.5 flex items-center justify-end"
+                        className={`${isListRow ? "ml-auto shrink-0" : "mt-1.5"} flex items-center justify-end`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center gap-0.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg">
