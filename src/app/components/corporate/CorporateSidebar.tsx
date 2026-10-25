@@ -35,6 +35,7 @@ import {
   Percent,
   CheckSquare,
   Receipt,
+  BedDouble,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -158,6 +159,8 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       qrMenu: { en: "QR Menu", az: "QR Menyu" },
       bookATable: { en: "Book a Table", az: "Masa Rezervasiya" },
       loyalty: { en: "Loyalty", az: "Loyalty" },
+      hotelRooms: { en: "Rooms", az: "Otaqlar" },
+      hotelReservations: { en: "Reservations", az: "Rezervasiyalar" },
       tasks: { en: "Tasks", az: "Tapşırıqlar" },
 
       // Travel plugin (labels without "Travel" — plugin owns the shell when enabled)
@@ -507,6 +510,29 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
 
   // Demo treats every module as enabled — keep ERP shell unchanged in demo.
   const travelEnabled = !isDemo && hasModule("TRAVEL");
+  const hotelsEnabled = !isDemo && hasModule("HOTELS");
+
+  const hotelNavItems: NavItem[] = useMemo(
+    () => [
+      {
+        icon: BedDouble,
+        labelKey: "hotelRooms",
+        label: st("hotelRooms"),
+        path: "/dashboard/hotel/rooms",
+        permissionModule: "Hotel Rooms",
+      },
+      {
+        icon: CalendarDays,
+        labelKey: "hotelReservations",
+        label: st("hotelReservations"),
+        path: "/dashboard/hotel/reservations",
+        permissionModule: "Hotel Reservations",
+      },
+    ],
+    // st() depends on language via closure
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [language],
+  );
 
   const visibleNavItems = useMemo(() => {
     const canAccess = (module: TenantRbacModule, action: PermissionAction = "view") =>
@@ -520,6 +546,16 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         // Travel mode: hide core ERP surfaces listed in product requirements.
         if (travelEnabled && ["dashboard", "inventory", "sales", "reports"].includes(item.labelKey)) {
           return null;
+        }
+        // Hotels shell: hide inventory/sales/purchases/stock; dashboard+reports stay as Coming Soon.
+        if (
+          hotelsEnabled &&
+          ["inventory", "sales", "purchases", "stock"].includes(item.labelKey)
+        ) {
+          return null;
+        }
+        if (hotelsEnabled && ["dashboard", "reports"].includes(item.labelKey)) {
+          return { ...item, comingSoon: true };
         }
         if (item.labelKey === "stock" && !hasModule("STOCK")) return null;
         if (item.labelKey === "reservations" && !hasModule("RESERVATIONS")) return null;
@@ -575,6 +611,17 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       })
       .filter((item): item is NavItem => item !== null);
 
+    if (hotelsEnabled) {
+      const BOTTOM_KEYS = new Set(["settings", "deletionLogs"]);
+      const bottom = filtered.filter((i) => BOTTOM_KEYS.has(i.labelKey));
+      const middle = filtered.filter((i) => !BOTTOM_KEYS.has(i.labelKey));
+      const hotelVisible = hotelNavItems.filter((item) => {
+        if (!item.permissionModule) return true;
+        return canAccess(item.permissionModule, "view");
+      });
+      return [...hotelVisible, ...middle, ...bottom];
+    }
+
     if (!travelEnabled) return filtered;
 
     // Travel shell order: Reports → rest → Settings last.
@@ -592,7 +639,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       ...travelRest,
       ...bottom,
     ];
-  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, travelNavItems, travelEnabled, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled, clinicEnabled]);
+  }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, travelNavItems, hotelNavItems, travelEnabled, hotelsEnabled, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled, clinicEnabled]);
 
   const tenantSlug = user?.tenant?.slug ?? null;
   const myStorePath = tenantSlug ? storePath(tenantSlug) : null;

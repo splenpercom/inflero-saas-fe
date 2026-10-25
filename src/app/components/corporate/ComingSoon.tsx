@@ -8,9 +8,22 @@ interface ComingSoonProps {
   titleAz: string;
   description?: string;
   descriptionAz?: string;
+  backTo?: string;
+  backLabelEn?: string;
+  backLabelAz?: string;
+  hideBack?: boolean;
 }
 
-export function ComingSoon({ title, titleAz, description, descriptionAz }: ComingSoonProps) {
+export function ComingSoon({
+  title,
+  titleAz,
+  description,
+  descriptionAz,
+  backTo = "/dashboard/reports",
+  backLabelEn = "Back to Reports",
+  backLabelAz = "Hesabatlara qayıt",
+  hideBack = false,
+}: ComingSoonProps) {
   const { language } = useLanguage();
   const t = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -26,15 +39,17 @@ export function ComingSoon({ title, titleAz, description, descriptionAz }: Comin
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
+        {!hideBack && (
         <div className="flex items-center gap-3 mb-2">
           <Link
-            to="/reports"
+            to={backTo}
             className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-[#14b8a6] dark:hover:text-[#14b8a6] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>{t("Hesabatlara qayıt", "Back to Reports")}</span>
+            <span>{t(backLabelAz, backLabelEn)}</span>
           </Link>
         </div>
+        )}
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
           {pageTitle}
         </h1>
