@@ -5,10 +5,12 @@ import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
 import {
   createSalesReturn,
+  fetchPosOrder,
   fetchReturnablePosOrders,
   type ReturnablePosOrder,
   type ReturnablePosOrderItem,
 } from "../../api/sales";
+import { fiscalizeCardPaymentsOnReturn } from "../../lib/omnicashier/fiscalize";
 import { formatSalesDate } from "../../lib/salesMappers";
 import { useSalesCustomers } from "../../hooks/useSalesCustomers";
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
@@ -179,7 +181,7 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
 
     setSaving(true);
     try {
-      await createSalesReturn({
+      const created = await createSalesReturn({
         customerId: customerId || selectedOrder.customerId || null,
         posOrderId: selectedOrder.id,
         storeId: !isGlobalMode && branchId ? branchId : selectedOrder.storeId,
@@ -190,6 +192,17 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
         })),
       });
       notifySuccess(tr("Satış qaytarması yaradıldı", "Sales return created"));
+      // OmniCashier money_back for CARD auto-refund — never blocks Inflero return.
+      void (async () => {
+        try {
+          const parent = created.posOrderId
+            ? await fetchPosOrder(created.posOrderId).catch(() => null)
+            : null;
+          await fiscalizeCardPaymentsOnReturn(created, parent);
+        } catch {
+          // toasted inside fiscalize
+        }
+      })();
       onSaved();
       onClose();
     } catch (err) {

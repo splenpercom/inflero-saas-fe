@@ -50,6 +50,7 @@ import {
   type PosOrderListRow,
   type ProductionStatusApi,
 } from "../../api/sales";
+import { fiscalizeCardPaymentsOnOrder } from "../../lib/omnicashier/fiscalize";
 import { ApiError } from "../../api/client";
 import { fetchTenantSettings } from "../../api/tenantSettings";
 import { usePosStaffPasscodeGate } from "../../hooks/usePosStaffPasscodeGate";
@@ -1104,13 +1105,14 @@ export function POSOrders() {
     };
     const uiMethod = methodMap[paymentData.paymentMethod] ?? "cash";
     try {
-      await recordPosOrderPayment(selectedOrderId, {
+      const detail = await recordPosOrderPayment(selectedOrderId, {
         amount: paymentData.amount,
         method: mapPaymentMethodToApi(uiMethod),
         reference: paymentData.reference || null,
         note: paymentData.note || null,
       });
       notifySuccess(tr("Ödəniş uğurla yaradıldı", "Payment created successfully"));
+      void fiscalizeCardPaymentsOnOrder(detail).catch(() => {});
       setPaymentsReloadKey((k) => k + 1);
       await loadItems();
     } catch (err) {

@@ -70,6 +70,8 @@ export interface PosOrderLineItem {
   remainingQty?: number;
 }
 
+export type PaymentFiscalStatusApi = "NONE" | "PENDING" | "OK" | "FAILED";
+
 export interface PosOrderPaymentRow {
   targetType: string;
   paymentId: string;
@@ -79,7 +81,24 @@ export interface PosOrderPaymentRow {
   date: string;
   note: string | null;
   reference: string | null;
+  /** OmniCashier fiscal metadata (additive). */
+  fiscalStatus?: PaymentFiscalStatusApi | null;
+  fiscalLongId?: string | null;
+  fiscalShortId?: string | null;
+  fiscalDocumentNumber?: string | null;
+  fiscalShiftDocNumber?: string | null;
+  fiscalError?: string | null;
+  fiscalAt?: string | null;
 }
+
+export type PaymentFiscalPatchBody = {
+  fiscalStatus: PaymentFiscalStatusApi;
+  fiscalLongId?: string | null;
+  fiscalShortId?: string | null;
+  fiscalDocumentNumber?: string | null;
+  fiscalShiftDocNumber?: string | null;
+  fiscalError?: string | null;
+};
 
 export type OpticsEyeValues = {
   sph?: string;
@@ -601,6 +620,24 @@ export async function recordPosOrderPayment(id: string, body: RecordPaymentBody)
     `/tenant/sales/pos-orders/${id}/payments`,
     body,
   );
+  return res.data;
+}
+
+/** Attach OmniCashier fiscal result to a Payment (additive; never changes amount/method). */
+export async function patchPaymentFiscal(paymentId: string, body: PaymentFiscalPatchBody) {
+  const res = await apiPatch<{
+    success: boolean;
+    data: {
+      id: string;
+      fiscalStatus: PaymentFiscalStatusApi;
+      fiscalLongId: string | null;
+      fiscalShortId: string | null;
+      fiscalDocumentNumber: string | null;
+      fiscalShiftDocNumber: string | null;
+      fiscalError: string | null;
+      fiscalAt: string | null;
+    };
+  }>(`/tenant/sales/payments/${paymentId}/fiscal`, body);
   return res.data;
 }
 

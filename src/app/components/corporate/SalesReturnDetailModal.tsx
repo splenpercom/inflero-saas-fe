@@ -5,11 +5,13 @@ import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import {
+  fetchPosOrder,
   fetchSalesReturn,
   recordSalesReturnPayment,
   type SalesReturnDetail,
 } from "../../api/sales";
 import { voidFinancePayment } from "../../api/finance";
+import { fiscalizeCardPaymentsOnReturn } from "../../lib/omnicashier/fiscalize";
 import {
   formatSalesDate,
   mapPaymentMethodToApi,
@@ -143,6 +145,18 @@ export function SalesReturnDetailModal({
       const newDue = parseFloat(updated.due);
       setPaymentAmount(newDue > 0 ? String(newDue) : "");
       notifySuccess(tr("Ödəniş qeydə alındı", "Payment recorded"));
+      void (async () => {
+        try {
+          const parent = updated.posOrderId
+            ? await fetchPosOrder(updated.posOrderId).catch(() => null)
+            : null;
+          await fiscalizeCardPaymentsOnReturn(updated, parent);
+          const refreshed = await fetchSalesReturn(updated.id).catch(() => null);
+          if (refreshed) setDetail(refreshed);
+        } catch {
+          // toasted inside fiscalize
+        }
+      })();
       onChanged();
     } catch (err) {
       notifyFromError(err);

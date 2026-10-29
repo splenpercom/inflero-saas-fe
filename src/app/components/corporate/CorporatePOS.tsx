@@ -62,6 +62,7 @@ import {
   type PeopleCustomer,
 } from "../../api/people";
 import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, startPosOrderHourlyTimer, updatePosOrder, type OpticsPrescriptionMeta, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
+import { fiscalizeCardPaymentsOnOrder } from "../../lib/omnicashier/fiscalize";
 import { lookupLoyaltyCard } from "../../api/loyalty";
 import {
   LoyaltyEarnRedeemDialog,
@@ -3174,6 +3175,13 @@ export function CorporatePOS() {
     });
   };
 
+  /** OmniCashier Card fiscalization — never blocks / never rolls back Inflero payment. */
+  const maybeFiscalizeCardPayments = (detail: PosOrderDetail) => {
+    void fiscalizeCardPaymentsOnOrder(detail).catch(() => {
+      // Errors already toasted inside fiscalize; keep POS flow going.
+    });
+  };
+
   const resolveTableLabel = (fallbackWalkIn = false) => {
     if (selectedTableId) {
       return (
@@ -3628,6 +3636,7 @@ export function CorporatePOS() {
         );
         notifyFromError(payErr);
       }
+      maybeFiscalizeCardPayments(detail);
 
       const tableLabel = diningEnabled ? resolveTableLabel(false) : undefined;
 
@@ -3725,6 +3734,7 @@ export function CorporatePOS() {
       } catch (payErr) {
         notifyFromError(payErr);
       }
+      maybeFiscalizeCardPayments(detail);
 
       const tableLabel = resolveTableLabel(true);
       const additionalItems = reprintKot
@@ -3864,6 +3874,7 @@ export function CorporatePOS() {
       } catch (payErr) {
         notifyFromError(payErr);
       }
+      maybeFiscalizeCardPayments(detail);
       const tableLabel = resolveTableLabel(true);
 
       try {
@@ -3969,6 +3980,7 @@ export function CorporatePOS() {
       } catch (payErr) {
         notifyFromError(payErr);
       }
+      maybeFiscalizeCardPayments(detail);
 
       const receiptData = buildReceiptFromDetail(
         detail,

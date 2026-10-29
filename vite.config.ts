@@ -42,6 +42,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:4000',
         changeOrigin: true,
       },
+      // Local OmniCashier mock (npm run mock:omnicashier) — avoids HTTPS→HTTP mixed content
+      '/omni-api': {
+        target: 'http://127.0.0.1:8989',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/omni-api/, ''),
+      },
     },
   },
 

@@ -1,7 +1,7 @@
 import { pickLang } from "../../i18n/pickLang";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router";
-import { Upload, X, MapPin, Loader2, Printer } from "lucide-react";
+import { Upload, X, MapPin, Loader2, Printer, Landmark } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
@@ -20,13 +20,15 @@ import { notifyFromError, notifyInfo, notifySuccess, notifyWarning } from "../..
 import { ModernSelect } from "../ui/ModernSelect";
 import { LocationMapPicker } from "../ui/LocationMapPicker";
 import { PosPrinterSettings } from "./PosPrinterSettings";
+import { OmnicashierSettingsPanel } from "./OmnicashierSettingsPanel";
 
 type SettingsSection =
   | "companyInfo"
   | "address"
   | "socials"
   | "addons"
-  | "printers";
+  | "printers"
+  | "omnicashier";
 
 type CommissionDraft = {
   commissionType: "FIXED" | "PERCENT" | "";
@@ -83,15 +85,19 @@ export function Settings() {
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
-    searchParams.get("section") === "printers" && posEnabled && diningEnabled
-      ? "printers"
-      : "companyInfo",
-  );
+  const [activeSection, setActiveSection] = useState<SettingsSection>(() => {
+    const section = searchParams.get("section");
+    if (section === "printers" && posEnabled && diningEnabled) return "printers";
+    if (section === "omnicashier" && posEnabled) return "omnicashier";
+    return "companyInfo";
+  });
 
   useEffect(() => {
-    if (searchParams.get("section") === "printers" && posEnabled && diningEnabled) {
+    const section = searchParams.get("section");
+    if (section === "printers" && posEnabled && diningEnabled) {
       setActiveSection("printers");
+    } else if (section === "omnicashier" && posEnabled) {
+      setActiveSection("omnicashier");
     }
   }, [searchParams, posEnabled, diningEnabled]);
 
@@ -99,6 +105,8 @@ export function Settings() {
     setActiveSection(section);
     if (section === "printers") {
       setSearchParams({ section: "printers" }, { replace: true });
+    } else if (section === "omnicashier") {
+      setSearchParams({ section: "omnicashier" }, { replace: true });
     } else if (searchParams.has("section")) {
       setSearchParams({}, { replace: true });
     }
@@ -622,6 +630,10 @@ export function Settings() {
       setActiveSection("companyInfo");
       if (searchParams.has("section")) setSearchParams({}, { replace: true });
     }
+    if (!posEnabled && activeSection === "omnicashier") {
+      setActiveSection("companyInfo");
+      if (searchParams.has("section")) setSearchParams({}, { replace: true });
+    }
   }, [addonsEnabled, posEnabled, diningEnabled, activeSection, searchParams, setSearchParams]);
 
   // Hide / clear Bar / QR alarm add-ons when Dining is not on this tenant.
@@ -715,6 +727,16 @@ export function Settings() {
               >
                 <Printer className="w-3.5 h-3.5" />
                 {pt("POS Printers", "POS Printerlər")}
+              </button>
+            )}
+            {posEnabled && (
+              <button
+                type="button"
+                onClick={() => selectSection("omnicashier")}
+                className={`${navItemClass("omnicashier")} flex items-center gap-1.5`}
+              >
+                <Landmark className="w-3.5 h-3.5" />
+                {pt("OmniCashier", "OmniCashier")}
               </button>
             )}
           </nav>
@@ -1513,11 +1535,29 @@ export function Settings() {
                 <PosPrinterSettings embedded />
               </div>
             )}
+
+            {posEnabled && activeSection === "omnicashier" && (
+              <div>
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-[#14b8a6]" />
+                    {pt("OmniCashier", "OmniCashier")}
+                  </h2>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    {pt(
+                      "Fiscal device for this PC/terminal (Card payments & sales returns).",
+                      "Bu kompüter/terminal üçün fiskal cihaz (kart ödənişləri və satış qaytarmaları).",
+                    )}
+                  </p>
+                </div>
+                <OmnicashierSettingsPanel embedded />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Action Buttons */}
-        {canEdit && activeSection !== "printers" && (
+        {canEdit && activeSection !== "printers" && activeSection !== "omnicashier" && (
           <div className="flex items-center justify-end gap-3 pt-3">
             {!canEditBranchSettings && (
               <p className="mr-auto text-[11px] text-amber-700 dark:text-amber-300">
