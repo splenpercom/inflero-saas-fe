@@ -275,7 +275,7 @@ export function TravelReports() {
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
-      <div className="px-4 sm:px-6 xl:px-8 py-4 max-w-[1600px] mx-auto space-y-5">
+      <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4 space-y-5">
 
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>

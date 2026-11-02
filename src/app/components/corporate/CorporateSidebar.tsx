@@ -30,7 +30,6 @@ import {
   ExternalLink,
   ScrollText,
   Award,
-  Plane,
   Tag,
   Percent,
   CheckSquare,
@@ -169,7 +168,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       invoiceTravel: { en: "Invoices", az: "Fakturalar" },
       travelCalendar: { en: "Calendar", az: "Təqvim" },
       travelReports: { en: "Reports", az: "Hesabatlar" },
-      travelOfferPage: { en: "Offer Page", az: "Təklif Səhifəsi" },
       
       // Inventory Sub-items (Clinic: Products → Services; hide dedicated Services page)
       products: clinicEnabled
@@ -497,11 +495,11 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
 
   const travelNavItems: NavItem[] = useMemo(
     () => [
-      { icon: BarChart3, labelKey: "travelReports", label: st("travelReports"), path: "/dashboard/travel-reports", permissionModule: "Travel Reports" },
       { icon: Tag, labelKey: "travelOffers", label: st("travelOffers"), path: "/dashboard/offers", permissionModule: "Offers" },
-      { icon: Percent, labelKey: "travelCommissions", label: st("travelCommissions"), path: "/dashboard/commissions", permissionModule: "Commissions" },
-      { icon: Receipt, labelKey: "invoiceTravel", label: st("invoiceTravel"), path: "/dashboard/invoices-travel", permissionModule: "Travel Invoices" },
       { icon: CalendarDays, labelKey: "travelCalendar", label: st("travelCalendar"), path: "/dashboard/travel-calendar", permissionModule: "Travel Calendar" },
+      { icon: Receipt, labelKey: "invoiceTravel", label: st("invoiceTravel"), path: "/dashboard/invoices-travel", permissionModule: "Travel Invoices" },
+      { icon: BarChart3, labelKey: "travelReports", label: st("travelReports"), path: "/dashboard/travel-reports", permissionModule: "Travel Reports" },
+      { icon: Percent, labelKey: "travelCommissions", label: st("travelCommissions"), path: "/dashboard/commissions", permissionModule: "Commissions" },
     ],
     // st() depends on language via closure
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -624,19 +622,42 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
 
     if (!travelEnabled) return filtered;
 
-    // Travel shell order: Reports → rest → Settings last.
+    // Travel shell order:
+    // Offers → Calendar → Invoices → Tasks → Finances → Reports → remaining → Settings.
     const BOTTOM_KEYS = new Set(["settings", "deletionLogs"]);
+    const PINNED_MIDDLE_KEYS = ["tasks", "finances"] as const;
     const bottom = filtered.filter((i) => BOTTOM_KEYS.has(i.labelKey));
     const middle = filtered.filter((i) => !BOTTOM_KEYS.has(i.labelKey));
+    const pinnedMiddle = PINNED_MIDDLE_KEYS
+      .map((key) => middle.find((i) => i.labelKey === key))
+      .filter((i): i is NavItem => Boolean(i));
+    const middleRest = middle.filter(
+      (i) => !PINNED_MIDDLE_KEYS.includes(i.labelKey as (typeof PINNED_MIDDLE_KEYS)[number]),
+    );
     const travelVisible = travelNavItems.filter((item) => {
       if (!item.permissionModule) return true;
       return canAccess(item.permissionModule, "view");
     });
-    const [travelReports, ...travelRest] = travelVisible;
+    const byKey = (key: string) => travelVisible.find((i) => i.labelKey === key);
+    const travelPrimary = [
+      byKey("travelOffers"),
+      byKey("travelCalendar"),
+      byKey("invoiceTravel"),
+    ].filter((i): i is NavItem => Boolean(i));
+    const travelReports = byKey("travelReports");
+    const travelRemaining = travelVisible.filter(
+      (i) =>
+        !["travelOffers", "travelCalendar", "invoiceTravel", "travelReports"].includes(
+          i.labelKey,
+        ),
+    );
+
     return [
+      ...travelPrimary,
+      ...pinnedMiddle,
       ...(travelReports ? [travelReports] : []),
-      ...middle,
-      ...travelRest,
+      ...travelRemaining,
+      ...middleRest,
       ...bottom,
     ];
   }, [hasPermission, hasModule, language, newResCount, isOwnerAllBranches, allBranchesNavItems, navItems, travelNavItems, hotelNavItems, travelEnabled, hotelsEnabled, branchManagementEnabled, hasBranches, user?.isTenantOwner, isDemo, inventoryServicesEnabled, clinicEnabled]);
@@ -975,39 +996,13 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
           })}
         </div>
 
-      {(travelEnabled || hasModule("DINING") || hasModule("RESERVATIONS") || (hasModule("WEB_EDITOR") && myStorePath && !isDemo)) && (
+      {(hasModule("DINING") || hasModule("RESERVATIONS") || (hasModule("WEB_EDITOR") && myStorePath && !isDemo)) && (
         <div
           className={cn(
             "border-t border-white/10 dark:border-white/5 p-2 space-y-1 mt-0.5",
             "pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
           )}
         >
-          {travelEnabled && (
-            <Link
-              to="/offer-view/preview"
-              onClick={onClose}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-1.5 min-h-9 rounded-lg smooth-transition group w-full active:scale-[0.99]",
-                "bg-gradient-to-r from-[#14b8a6]/10 to-[#0f766e]/10",
-                "border border-[#14b8a6]/25 dark:border-[#14b8a6]/30",
-                "hover:from-[#14b8a6]/15 hover:to-[#0f766e]/15 hover:shadow-sm",
-                rail && "lg:justify-center",
-              )}
-            >
-              <div className="w-7 h-7 rounded-lg bg-[#14b8a6] flex items-center justify-center flex-shrink-0">
-                <Plane className="w-3.5 h-3.5 text-white" />
-              </div>
-              <div className={cn("flex-1 min-w-0", hideOnRailDesktop)}>
-                <p className="text-[9px] text-[#14b8a6]/70 uppercase tracking-wide leading-none mb-0.5">
-                  {pickLang(language, "Müştəri", "Client")}
-                </p>
-                <p className="text-xs font-semibold text-[#0f766e] dark:text-[#14b8a6] truncate leading-none">
-                  {st("travelOfferPage")}
-                </p>
-              </div>
-              <ChevronRight className={cn("w-3 h-3 text-[#14b8a6]/50 flex-shrink-0", hideOnRailDesktop)} />
-            </Link>
-          )}
           {hasModule("RESERVATIONS") && tenantSlug && (
             <Link
               to={
