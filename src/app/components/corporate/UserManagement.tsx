@@ -749,12 +749,7 @@ export function UserManagement() {
                         }`}
                       >
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-xs font-medium border border-gray-300 dark:border-gray-700">
-                              {user.avatar}
-                            </div>
-                            <span className="text-xs text-gray-900 dark:text-white">{user.name}</span>
-                          </div>
+                          <span className="text-xs text-gray-900 dark:text-white">{user.name}</span>
                         </td>
                         {isGlobalMode && (
                           <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap max-w-[12rem]">

@@ -32,6 +32,7 @@ import {
   fetchCategories,
   fetchBrands,
   deleteProduct,
+  bulkDeleteProducts,
   generateMissingProductBarcodes,
   type CategoryRecord,
   type BrandRecord,
@@ -211,9 +212,12 @@ export function Products() {
   const columnsMenuRef = useRef<HTMLDivElement | null>(null);
   const skipPageResetRef = useRef(true);
 
-  // Delete confirmation dialog
+  // Delete confirmation dialog (single or bulk)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [barcodeConfirmOpen, setBarcodeConfirmOpen] = useState(false);
 
   // Import modal state
@@ -317,6 +321,7 @@ export function Products() {
   }, [columnsOpen]);
 
   const visibleColCount =
+    (canDelete ? 1 : 0) + // selection checkbox
     (col("sku") ? 1 : 0) +
     (col("productName") ? 1 : 0) +
     (col("brand") ? 1 : 0) +
@@ -561,26 +566,97 @@ export function Products() {
   };
 
   const handleDeleteClick = (productId: string) => {
+    if (deleting) return;
+    setBulkDeleteIds([]);
     setProductToDelete(productId);
     setDeleteDialogOpen(true);
   };
 
+  const handleBulkDeleteClick = () => {
+    if (deleting || !canDelete || selectedIds.size === 0) return;
+    setProductToDelete(null);
+    setBulkDeleteIds([...selectedIds]);
+    setDeleteDialogOpen(true);
+  };
+
   const handleDeleteConfirm = async () => {
-    if (!productToDelete || !(isAuthenticated || isDemo) || !canDelete) return;
+    if (!(isAuthenticated || isDemo) || !canDelete || deleting) return;
+    const bulk = bulkDeleteIds.length > 0;
+    const singleId = productToDelete;
+    if (!bulk && !singleId) return;
+
+    setDeleting(true);
     try {
-      await deleteProduct(productToDelete);
-      notifySuccess(pickLang(language, "Məhsul silindi", "Product deleted"));
+      if (bulk) {
+        let deletedCount = 0;
+        let skippedCount = 0;
+        const deletedIds: string[] = [];
+        // API accepts max 100 ids — chunk larger selections.
+        for (let i = 0; i < bulkDeleteIds.length; i += 100) {
+          const chunk = bulkDeleteIds.slice(i, i + 100);
+          const result = await bulkDeleteProducts(chunk);
+          deletedCount += result.deleted.length;
+          skippedCount += result.skipped.length;
+          deletedIds.push(...result.deleted);
+        }
+        if (deletedIds.length > 0) {
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            for (const id of deletedIds) next.delete(id);
+            return next;
+          });
+          void loadProducts();
+        }
+        if (deletedCount > 0 && skippedCount === 0) {
+          notifySuccess(
+            pickLang(
+              language,
+              `${deletedCount} məhsul silindi`,
+              `${deletedCount} product(s) deleted`,
+            ),
+          );
+        } else if (deletedCount > 0) {
+          notifyWarning(
+            pickLang(
+              language,
+              `${deletedCount} silindi, ${skippedCount} keçildi (tapılmadı / icazə yoxdur)`,
+              `${deletedCount} deleted, ${skippedCount} skipped (not found / out of scope)`,
+            ),
+          );
+        } else {
+          notifyWarning(
+            pickLang(
+              language,
+              "Heç bir məhsul silinmədi (tapılmadı və ya icazə yoxdur)",
+              "No products were deleted (not found or out of scope)",
+            ),
+          );
+        }
+      } else if (singleId) {
+        await deleteProduct(singleId);
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(singleId);
+          return next;
+        });
+        notifySuccess(pickLang(language, "Məhsul silindi", "Product deleted"));
+        void loadProducts();
+      }
       setDeleteDialogOpen(false);
       setProductToDelete(null);
-      void loadProducts();
+      setBulkDeleteIds([]);
     } catch (err) {
       notifyFromError(err);
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleDeleteCancel = () => {
+    if (deleting) return;
     setDeleteDialogOpen(false);
     setProductToDelete(null);
+    setBulkDeleteIds([]);
   };
 
   const handleDownloadDemo = () => {
@@ -700,6 +776,43 @@ export function Products() {
   };
 
   const paginatedProducts = products;
+
+  const selectedOnPage = useMemo(
+    () => paginatedProducts.filter((p) => selectedIds.has(p.id)),
+    [paginatedProducts, selectedIds],
+  );
+  const allPageSelected =
+    paginatedProducts.length > 0 && paginatedProducts.every((p) => selectedIds.has(p.id));
+  const somePageSelected = selectedOnPage.length > 0 && !allPageSelected;
+
+  const toggleSelectAllPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        for (const p of paginatedProducts) next.delete(p.id);
+      } else {
+        for (const p of paginatedProducts) next.add(p.id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Drop selection when filters/search change; keep across pagination.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [debouncedSearch, selectedCategory, selectedBrand, branchRevision]);
+
+  const isBulkDelete = bulkDeleteIds.length > 0;
+  const deleteCount = isBulkDelete ? bulkDeleteIds.length : productToDelete ? 1 : 0;
 
   return (
     <div className="bg-gray-50 dark:bg-gray-950">
@@ -932,6 +1045,21 @@ export function Products() {
               </button>
               )}
 
+              {canDelete && selectedIds.size > 0 && (
+              <button
+                type="button"
+                onClick={handleBulkDeleteClick}
+                disabled={deleting}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                title={pickLang(language, "Seçilmişləri sil", "Delete selected")}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>
+                  {pickLang(language, "Sil", "Delete")} ({selectedIds.size})
+                </span>
+              </button>
+              )}
+
               {canCreate && (
               <button
                 onClick={handleAddProduct}
@@ -956,6 +1084,22 @@ export function Products() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                  {canDelete && (
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap w-10">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = somePageSelected;
+                      }}
+                      onChange={toggleSelectAllPage}
+                      disabled={loading || paginatedProducts.length === 0 || deleting}
+                      className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                      title={pickLang(language, "Səhifədəkiləri seç", "Select page")}
+                      aria-label={pickLang(language, "Səhifədəkiləri seç", "Select page")}
+                    />
+                  </th>
+                  )}
                   {col("sku") && (
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
                     {pt("sku")}
@@ -1089,11 +1233,25 @@ export function Products() {
                   <tr
                     key={product.id}
                     className={`border-b border-gray-200 dark:border-gray-800 ${
-                      index % 2 === 0
-                        ? "bg-white dark:bg-gray-900"
-                        : "bg-gray-50 dark:bg-gray-800/30"
+                      selectedIds.has(product.id)
+                        ? "bg-[#ccfbf1]/40 dark:bg-[#14b8a6]/10"
+                        : index % 2 === 0
+                          ? "bg-white dark:bg-gray-900"
+                          : "bg-gray-50 dark:bg-gray-800/30"
                     }`}
                   >
+                    {canDelete && (
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(product.id)}
+                        onChange={() => toggleSelectRow(product.id)}
+                        disabled={deleting}
+                        className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                        aria-label={pickLang(language, "Sətiri seç", "Select row")}
+                      />
+                    </td>
+                    )}
                     {col("sku") && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {product.sku}
@@ -1362,11 +1520,15 @@ export function Products() {
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {pickLang(language, "Məhsulu sil", "Delete Product")}
+                  {isBulkDelete
+                    ? pickLang(language, "Məhsulları sil", "Delete Products")
+                    : pickLang(language, "Məhsulu sil", "Delete Product")}
                 </h2>
                 <button
+                  type="button"
                   onClick={handleDeleteCancel}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                  disabled={deleting}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1383,11 +1545,17 @@ export function Products() {
                       {pickLang(language, "Əminsiniz?", "Are you sure?")}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {pickLang(
-                        language,
-                        "Bu əməliyyat geri qaytarıla bilməz. Məhsul bazadan həmişəlik silinəcək.",
-                        "This action cannot be undone. This will permanently delete the product from the database.",
-                      )}
+                      {isBulkDelete
+                        ? pickLang(
+                            language,
+                            `Seçilmiş ${deleteCount} məhsul silinəcək. Bu əməliyyat geri qaytarıla bilməz.`,
+                            `${deleteCount} selected product(s) will be deleted. This action cannot be undone.`,
+                          )
+                        : pickLang(
+                            language,
+                            "Bu əməliyyat geri qaytarıla bilməz. Məhsul silinəcək.",
+                            "This action cannot be undone. This will delete the product.",
+                          )}
                     </p>
                   </div>
                 </div>
@@ -1396,16 +1564,24 @@ export function Products() {
               {/* Footer */}
               <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-3">
                 <button
+                  type="button"
                   onClick={handleDeleteCancel}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-colors"
+                  disabled={deleting}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   {pickLang(language, "Ləğv et", "Cancel")}
                 </button>
                 <button
-                  onClick={handleDeleteConfirm}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  type="button"
+                  onClick={() => void handleDeleteConfirm()}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
-                  {pickLang(language, "Məhsulu sil", "Delete Product")}
+                  {deleting
+                    ? pickLang(language, "Silinir…", "Deleting…")
+                    : isBulkDelete
+                      ? pickLang(language, `Sil (${deleteCount})`, `Delete (${deleteCount})`)
+                      : pickLang(language, "Məhsulu sil", "Delete Product")}
                 </button>
               </div>
             </div>

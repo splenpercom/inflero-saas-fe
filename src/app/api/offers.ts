@@ -72,6 +72,8 @@ export interface OfferChangeRequestRow {
   note: string;
   rating: number | null;
   createdAt: string;
+  staffReply?: string | null;
+  staffRepliedAt?: string | null;
 }
 
 export interface OfferBankDetails {
@@ -348,10 +350,13 @@ export async function publishOffer(id: string): Promise<{
 }
 
 /** Staff resolves an open change request → status becomes sent (public unlock). */
-export async function resolveOfferChanges(id: string): Promise<TravelOfferRow> {
+export async function resolveOfferChanges(
+  id: string,
+  body?: { reply?: string | null },
+): Promise<TravelOfferRow> {
   const res = await apiPost<ApiEnvelope<TravelOfferRow>>(
     `/tenant/travel/offers/${encodeURIComponent(id)}/resolve-changes`,
-    {},
+    body ?? {},
   );
   return res.data;
 }

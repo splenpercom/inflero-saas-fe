@@ -56,10 +56,6 @@ function emptyForm() {
   };
 }
 
-function getInitials(name: string): string {
-  return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
-}
-
 const STATUS_BADGE: Record<string, string> = {
   paid: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
   pending: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700",
@@ -574,14 +570,9 @@ export function Commissions() {
                           className="border-b border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/80 dark:hover:bg-gray-800/40"
                         >
                           <td className="px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-[#0f2744] text-white text-[10px] flex items-center justify-center font-semibold shrink-0">
-                                {getInitials(c.employeeName)}
-                              </div>
-                              <div>
-                                <div className="text-xs font-medium text-gray-900 dark:text-white">{c.employeeName}</div>
-                                <div className="text-[10px] text-gray-500">{c.role}</div>
-                              </div>
+                            <div>
+                              <div className="text-xs font-medium text-gray-900 dark:text-white">{c.employeeName}</div>
+                              <div className="text-[10px] text-gray-500">{c.role}</div>
                             </div>
                           </td>
                           <td className="px-3 py-2">
@@ -719,14 +710,9 @@ export function Commissions() {
                           className="border-b border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/80 dark:hover:bg-gray-800/40"
                         >
                           <td className="px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-[#0f2744] text-white text-[10px] flex items-center justify-center font-semibold shrink-0">
-                                {getInitials(r.employeeName)}
-                              </div>
-                              <div>
-                                <div className="text-xs font-medium text-gray-900 dark:text-white">{r.employeeName}</div>
-                                <div className="text-[10px] text-gray-500">{r.role}</div>
-                              </div>
+                            <div>
+                              <div className="text-xs font-medium text-gray-900 dark:text-white">{r.employeeName}</div>
+                              <div className="text-[10px] text-gray-500">{r.role}</div>
                             </div>
                           </td>
                           <td className="px-3 py-2">
