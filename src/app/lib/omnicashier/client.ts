@@ -76,8 +76,10 @@ async function postOmni(
     } catch {
       throw new OmnicashierError(-1, `OmniCashier HTTP ${res.status}: invalid JSON response`);
     }
+    // Real OmniCashier tablets return code 1 for success ("login success", etc.).
+    // Docs/mock use 0. Accept both; other codes are errors (e.g. 401).
     const code = typeof json.code === "number" ? json.code : -1;
-    if (code !== 0) {
+    if (code !== 0 && code !== 1) {
       throw new OmnicashierError(
         code,
         typeof json.message === "string" ? json.message : `OmniCashier error ${code}`,
