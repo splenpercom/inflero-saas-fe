@@ -1797,7 +1797,7 @@ export function Offers() {
     try {
       const token = o.publicToken || (canMutate ? await ensurePublicToken(o) : "");
       if (!token) return;
-      navigate(`/offer-view/${token}`);
+      window.open(`${window.location.origin}/offer-view/${token}`, "_blank", "noopener,noreferrer");
     } catch (err) {
       notifyFromError(err);
     }
@@ -1828,7 +1828,7 @@ export function Offers() {
       notifySuccess(editingOffer ? tr("Təklif yeniləndi", "Offer updated") : tr("Təklif yaradıldı", "Offer created"));
       await loadOffers();
       if (opts?.navigatePublic && token) {
-        navigate(`/offer-view/${token}`);
+        window.open(`${window.location.origin}/offer-view/${token}`, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
       notifyFromError(err);

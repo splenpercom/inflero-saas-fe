@@ -3,7 +3,14 @@
  * All ops are HTTP POST + application/json;charset=UTF-8.
  */
 
-import { loadOmnicashierSettings, omnicashierBaseUrl, type OmnicashierSettings } from "../omnicashierSettings";
+import {
+  loadOmnicashierSettings,
+  needsOmniLanBridge,
+  omnicashierBaseUrl,
+  omnicashierTargetHeader,
+  omnicashierUsesTargetHeader,
+  type OmnicashierSettings,
+} from "../omnicashierSettings";
 
 export type OmnicashierFiscalResult = {
   document_number: number;
@@ -48,10 +55,18 @@ async function postOmni(
   const controller = new AbortController();
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json;charset=UTF-8",
+  };
+  // Vite /omni-api or localhost bridge: forward to real device IP.
+  if (omnicashierUsesTargetHeader(settings)) {
+    const target = omnicashierTargetHeader(settings);
+    if (target) headers["X-Omni-Target"] = target;
+  }
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json;charset=UTF-8" },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -76,6 +91,12 @@ async function postOmni(
       throw new OmnicashierError(-2, "OmniCashier request timed out");
     }
     const msg = err instanceof Error ? err.message : String(err);
+    if (needsOmniLanBridge(settings) && /Failed to fetch|NetworkError|ERR_CONNECTION|Load failed/i.test(msg)) {
+      throw new OmnicashierError(
+        -3,
+        "Cannot reach OmniCashier bridge on 127.0.0.1:18989. On this POS PC install Inflero OmniBridge (install.bat) — HTTPS cannot call the device IP directly.",
+      );
+    }
     // Mixed content / CORS / network
     throw new OmnicashierError(-3, msg || "OmniCashier network error");
   } finally {

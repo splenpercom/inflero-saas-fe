@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "omni:bridge": "node scripts/omni-lan-bridge.mjs",
+    "omni:bridge:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/omni-bridge/build-exe.ps1"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

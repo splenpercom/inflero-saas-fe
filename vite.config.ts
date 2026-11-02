@@ -42,11 +42,37 @@ export default defineConfig({
         target: 'http://127.0.0.1:4000',
         changeOrigin: true,
       },
-      // Local OmniCashier mock (npm run mock:omnicashier) — avoids HTTPS→HTTP mixed content
+      // OmniCashier: default → local mock; with X-Omni-Target → real LAN device (HTTPS-safe).
+      // Vite does not honor http-proxy-middleware `router` — override target per request.
       '/omni-api': {
         target: 'http://127.0.0.1:8989',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/omni-api/, ''),
+        configure: (proxy) => {
+          const resolveOmniTarget = (req: { headers: Record<string, unknown> }) => {
+            const raw = req.headers['x-omni-target']
+            if (typeof raw !== 'string' || !raw.trim()) return 'http://127.0.0.1:8989'
+            const cleaned = raw.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+            const hostPort = cleaned.split('/')[0]
+            if (!hostPort) return 'http://127.0.0.1:8989'
+            const h = hostPort.split(':')[0].toLowerCase()
+            const ok =
+              h === '127.0.0.1' ||
+              h === 'localhost' ||
+              /^10\.\d+\.\d+\.\d+$/.test(h) ||
+              /^192\.168\.\d+\.\d+$/.test(h) ||
+              /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(h)
+            return ok ? `http://${hostPort}` : 'http://127.0.0.1:8989'
+          }
+          const originalWeb = proxy.web.bind(proxy)
+          proxy.web = (req: unknown, res: unknown, opts: Record<string, unknown> = {}) => {
+            const target = resolveOmniTarget(req as { headers: Record<string, unknown> })
+            return originalWeb(req, res, { ...opts, target })
+          }
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('x-omni-target')
+          })
+        },
       },
     },
   },
