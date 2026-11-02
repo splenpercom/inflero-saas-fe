@@ -445,6 +445,17 @@ export async function deleteProduct(id: string) {
   return apiDelete<{ success: boolean; message: string }>(`/tenant/inventory/products/${id}`);
 }
 
+export async function bulkDeleteProducts(ids: string[]) {
+  const res = await apiPost<{
+    success: boolean;
+    data: {
+      deleted: string[];
+      skipped: Array<{ id: string; reason: string }>;
+    };
+  }>("/tenant/inventory/products/bulk-delete", { ids });
+  return res.data;
+}
+
 export async function uploadProductImage(file: File, productId?: string) {
   const fd = new FormData();
   fd.append("file", file);

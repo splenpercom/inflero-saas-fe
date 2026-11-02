@@ -48,6 +48,7 @@ import {
 import { ModernSelect } from "../../../app/components/ui/ModernSelect";
 import { FilterSelect } from "../ui/filter-select";
 import { exportToExcel } from "../lib/exportExcel";
+import { OfferChangeRequestChat } from "./OfferChangeRequestChat";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -176,10 +177,6 @@ const TRANSFER_OPTIONS= [{ value: "", label: "Select..." }, ...["Included","Sepa
 const INSURANCE_OPTIONS=[{ value: "", label: "Select..." }, ...["None","Basic","Premium"].map(v => ({ value: v, label: v }))];
 const MEAL_OPTIONS    = [{ value: "", label: "Select..." }, ...["None","Breakfast Only","Half Board","Full Board","All Inclusive"].map(v => ({ value: v, label: v }))];
 
-function getEmpInitials(name: string): string {
-  return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?";
-}
-
 const STATUS_BADGE: Record<OfferStatusUi, string> = {
   active:   "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700",
   inactive: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600",
@@ -199,16 +196,6 @@ const STATUS_LABEL: Record<OfferStatusUi, { en: string; az: string }> = {
   rejected: { en: "Rejected",  az: "Rədd edildi"    },
   changing: { en: "Changing",  az: "Dəyişiklik"     },
 };
-
-const STATUS_OPTIONS: OfferStatusUi[] = [
-  "active",
-  "inactive",
-  "sent",
-  "expired",
-  "accepted",
-  "rejected",
-  "changing",
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -726,6 +713,7 @@ function AddOfferModal({
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [offerStatus, setOfferStatus] = useState<OfferStatusUi | undefined>(editOffer?.status);
   const [resolveBusy, setResolveBusy] = useState(false);
+  const [resolveReply, setResolveReply] = useState("");
   const [branchUsers, setBranchUsers] = useState<TenantUserRow[]>([]);
   const changesOpen = offerStatus === "changing";
   const branchRevision = useBranchRevision();
@@ -804,10 +792,12 @@ function AddOfferModal({
     if (!editOffer?.id) {
       setPayments([]);
       setChangeRequests([]);
+      setResolveReply("");
       return;
     }
     let cancelled = false;
     setDetailLoading(true);
+    setResolveReply("");
     fetchOffer(editOffer.id)
       .then((row) => {
         if (cancelled) return;
@@ -830,10 +820,15 @@ function AddOfferModal({
     if (!editOffer || !canEditPayments || !changesOpen) return;
     setResolveBusy(true);
     try {
-      const row = await resolveOfferChanges(editOffer.id);
+      const reply = resolveReply.trim();
+      const row = await resolveOfferChanges(
+        editOffer.id,
+        reply ? { reply } : {},
+      );
       const mapped = mapRow(row);
       setOfferStatus(mapped.status);
       setChangeRequests(Array.isArray(row.changeRequests) ? row.changeRequests : []);
+      setResolveReply("");
       onOfferUpdated?.(mapped);
       onPaymentsChanged?.();
       notifySuccess(
@@ -1198,7 +1193,7 @@ ${form.passengers.length ? `<table><tr><th>#</th><th>${t("Ad", "Full Name", "Ф�
                     >
                       <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${changesOpen ? "text-orange-500" : "text-amber-500"}`} />
                       <h3 className="text-xs font-semibold text-gray-900 dark:text-white flex-1">
-                        {tr("Dəyişiklik sorğuları", "Change requests")}
+                        {tr("Dəyişiklik söhbəti", "Change chat")}
                         {changeRequests.length > 0 ? ` (${changeRequests.length})` : ""}
                       </h3>
                       {showChangeHistory ? (
@@ -1207,84 +1202,67 @@ ${form.passengers.length ? `<table><tr><th>#</th><th>${t("Ad", "Full Name", "Ф�
                         <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
                       )}
                     </button>
-                    {changesOpen && canEditPayments && (
-                      <button
-                        type="button"
-                        disabled={resolveBusy}
-                        onClick={() => void handleResolveChanges()}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white disabled:opacity-50 flex-shrink-0"
-                        title={tr(
-                          "Həll olundu — status Göndərildi olur, müştəri yenidən cavab verə bilər",
-                          "Resolved — status becomes Sent so the client can respond again",
-                        )}
-                      >
-                        <CheckCircle className="w-3 h-3" />
-                        {resolveBusy
-                          ? tr("…", "…")
-                          : tr("Həll olundu", "Resolved")}
-                      </button>
-                    )}
                   </div>
                   {changesOpen && (
                     <p className="text-[10px] text-orange-700 dark:text-orange-300 mb-3">
                       {tr(
-                        "Müştəri dəyişiklik istəyib. Təklifi yeniləyin, sonra Həll olundu basın — ictimai səhifə yenidən açılacaq.",
-                        "Client requested changes. Update the offer, then click Resolved — the public page unlocks again.",
+                        "Müştəri dəyişiklik istəyib. Təklifi yeniləyin, cavab yazın, sonra Həll olundu basın — ictimai səhifə yenidən açılacaq.",
+                        "Client requested changes. Update the offer, write a reply, then click Resolved — the public page unlocks again.",
                       )}
                     </p>
                   )}
                   {!changesOpen && changeRequests.length > 0 && (
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-3">
                       {tr(
-                        "Açıq dəyişiklik yoxdur. Tarixçə aşağıdadır.",
-                        "No open change request. History is below.",
+                        "Açıq dəyişiklik yoxdur. Söhbət tarixçəsi aşağıdadır.",
+                        "No open change request. Chat history is below.",
                       )}
                     </p>
                   )}
                   {showChangeHistory && (
-                    changeRequests.length === 0 ? (
-                      <p className="text-[11px] text-gray-500">
-                        {tr("Tarixçə yoxdur", "No change requests")}
-                      </p>
-                    ) : (
-                      <ul className="space-y-2 max-h-48 overflow-y-auto">
-                        {changeRequests.map((c, idx) => (
-                          <li
-                            key={c.id}
-                            className={`rounded-lg border px-3 py-2 ${
-                              idx === 0 && changesOpen
-                                ? "border-orange-300 dark:border-orange-700 bg-white dark:bg-gray-900"
-                                : "border-gray-100 dark:border-gray-800 bg-white/60 dark:bg-gray-900/60"
-                            }`}
-                          >
-                            {idx === 0 && (
-                              <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${
-                                changesOpen
-                                  ? "text-orange-600 dark:text-orange-400"
-                                  : "text-gray-500"
-                              }`}>
-                                {changesOpen
-                                  ? tr("Sonuncu (açıq)", "Latest (open)")
-                                  : tr("Sonuncu", "Latest")}
-                              </p>
-                            )}
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <span className="text-[10px] text-gray-500">
-                                {new Date(c.createdAt).toLocaleString()}
-                              </span>
-                              {c.rating != null && c.rating > 0 && (
-                                <span className="text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                                  {"★".repeat(c.rating)}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
-                              {c.note}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    )
+                    <OfferChangeRequestChat
+                      items={changeRequests}
+                      openLatest={changesOpen}
+                      maxHeightClass="max-h-56"
+                      labels={{
+                        client: tr("Müştəri", "Client"),
+                        agency: tr("Agentlik", "Agency"),
+                        empty: tr("Tarixçə yoxdur", "No change requests"),
+                        waiting: tr("Cavab gözlənilir…", "Awaiting your reply…"),
+                      }}
+                    />
+                  )}
+                  {changesOpen && canEditPayments && (
+                    <div className="mt-3 space-y-2 border-t border-orange-200 dark:border-orange-800 pt-3">
+                      <label className="block text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                        {tr("Cavabınız", "Your reply")}
+                      </label>
+                      <textarea
+                        value={resolveReply}
+                        onChange={(e) => setResolveReply(e.target.value)}
+                        rows={3}
+                        placeholder={tr(
+                          "Müştəriyə yeniləməni izah edin…",
+                          "Explain the update to the client…",
+                        )}
+                        className="w-full px-3 py-2 text-[12px] border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none"
+                      />
+                      <button
+                        type="button"
+                        disabled={resolveBusy}
+                        onClick={() => void handleResolveChanges()}
+                        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white disabled:opacity-50"
+                        title={tr(
+                          "Həll olundu — status Göndərildi olur, müştəri yenidən cavab verə bilər",
+                          "Resolved — status becomes Sent so the client can respond again",
+                        )}
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        {resolveBusy
+                          ? tr("…", "…")
+                          : tr("Cavabla həll et", "Reply & resolve")}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1858,17 +1836,6 @@ export function Offers() {
     }
   }
 
-  async function handleStatusChange(o: TravelOffer, status: OfferStatusUi) {
-    if (!canEdit || !canMutate || status === o.status) return;
-    try {
-      const row = await updateOffer(o.id, { status });
-      setOffers((prev) => prev.map((x) => (x.id === o.id ? mapRow(row) : x)));
-      notifySuccess(tr("Status yeniləndi", "Status updated"));
-    } catch (err) {
-      notifyFromError(err);
-    }
-  }
-
   return (
     <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
       <div className="p-4 sm:p-4 xl:p-6 2xl:px-8 py-4">
@@ -2042,23 +2009,9 @@ export function Offers() {
                       </td>
 
                       <td className="px-3 py-2 whitespace-nowrap">
-                        {canEdit && canMutate ? (
-                          <select
-                            value={o.status}
-                            onChange={(e) => void handleStatusChange(o, e.target.value as OfferStatusUi)}
-                            className={`text-[10px] font-medium rounded px-1.5 py-0.5 border bg-transparent focus:outline-none focus:ring-1 focus:ring-[#14b8a6] ${STATUS_BADGE[o.status]}`}
-                          >
-                            {STATUS_OPTIONS.map((s) => (
-                              <option key={s} value={s}>
-                                {pickLang(language, STATUS_LABEL[s].az, STATUS_LABEL[s].en)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[o.status]}`}>
-                            {pickLang(language, STATUS_LABEL[o.status].az, STATUS_LABEL[o.status].en)}
-                          </span>
-                        )}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[o.status]}`}>
+                          {pickLang(language, STATUS_LABEL[o.status].az, STATUS_LABEL[o.status].en)}
+                        </span>
                       </td>
 
                       <td className="px-3 py-2 whitespace-nowrap">
@@ -2071,15 +2024,10 @@ export function Offers() {
                             <button
                               type="button"
                               onClick={() => navigate(agentPath)}
-                              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                              className="text-xs text-gray-900 dark:text-white whitespace-nowrap hover:underline underline-offset-2"
                               title={tr("Təklifi yaradan", "Offer creator")}
                             >
-                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 text-[10px] font-bold flex-shrink-0">
-                                {getEmpInitials(agentLabel || "?")}
-                              </div>
-                              <p className="text-xs text-gray-900 dark:text-white whitespace-nowrap">
-                                {agentLabel || "—"}
-                              </p>
+                              {agentLabel || "—"}
                             </button>
                           );
                         })()}
