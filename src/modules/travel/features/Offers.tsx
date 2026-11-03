@@ -1673,6 +1673,11 @@ export function Offers() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedSaleType, setSelectedSaleType] = useState("all");
+  const [selectedClient, setSelectedClient] = useState("all");
+  const [selectedAgentId, setSelectedAgentId] = useState("all");
+  const [clientFilterOptions, setClientFilterOptions] = useState<{ value: string; label: string }[]>([]);
+  const [agentFilterOptions, setAgentFilterOptions] = useState<{ value: string; label: string }[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingOffer, setEditingOffer] = useState<TravelOffer | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -1697,7 +1702,45 @@ export function Offers() {
 
   useEffect(() => {
     resetToFirstPage();
-  }, [debouncedSearch, selectedStatus, branchRevision, resetToFirstPage]);
+  }, [
+    debouncedSearch,
+    selectedStatus,
+    selectedSaleType,
+    selectedClient,
+    selectedAgentId,
+    branchRevision,
+    resetToFirstPage,
+  ]);
+
+  useEffect(() => {
+    if (!(isAuthenticated || isDemo) || !canView) {
+      setClientFilterOptions([]);
+      setAgentFilterOptions([]);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all([
+      fetchOfferClientNames().catch(() => [] as string[]),
+      fetchTenantUsers().catch(() => [] as TenantUserRow[]),
+    ]).then(([names, users]) => {
+      if (cancelled) return;
+      setClientFilterOptions(
+        names
+          .filter((n) => n.trim())
+          .sort((a, b) => a.localeCompare(b))
+          .map((n) => ({ value: n, label: n })),
+      );
+      setAgentFilterOptions(
+        users
+          .filter((u) => u.status === "Active")
+          .map((u) => ({ value: u.id, label: u.name || u.email }))
+          .sort((a, b) => a.label.localeCompare(b.label)),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isDemo, canView, branchRevision]);
 
   const loadOffers = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
@@ -1711,6 +1754,9 @@ export function Offers() {
       const result = await fetchOffers({
         search: debouncedSearch.trim() || undefined,
         status: selectedStatus === "all" ? "all" : (selectedStatus as TravelOffer["status"]),
+        saleType: selectedSaleType !== "all" ? selectedSaleType : undefined,
+        clientName: selectedClient !== "all" ? selectedClient : undefined,
+        createdByUserId: selectedAgentId !== "all" ? selectedAgentId : undefined,
         page: currentPage,
         pageSize: itemsPerPage,
       });
@@ -1729,6 +1775,9 @@ export function Offers() {
     canView,
     debouncedSearch,
     selectedStatus,
+    selectedSaleType,
+    selectedClient,
+    selectedAgentId,
     currentPage,
     itemsPerPage,
     branchRevision,
@@ -1893,25 +1942,51 @@ export function Offers() {
 
         {/* Filter bar */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 relative max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input type="text" placeholder={tr("Axtar...","Search...")} value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
-            </div>
-            <div className="flex gap-2 ml-auto">
-              <FilterSelect value={selectedStatus} onChange={setSelectedStatus}
-                options={[
-                  { value: "all",      label: tr("Status","Status")        },
-                  { value: "active",   label: tr("Aktiv","Active")         },
-                  { value: "sent",     label: tr("Göndərildi","Sent")      },
-                  { value: "inactive", label: tr("Qeyri-aktiv","Inactive") },
-                  { value: "expired",  label: tr("Vaxtı bitmiş","Expired") },
-                  { value: "accepted", label: tr("Qəbul edildi","Accepted") },
-                  { value: "rejected", label: tr("Rədd edildi","Rejected") },
-                  { value: "changing", label: tr("Dəyişiklik","Changing") },
-                ]} />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-wrap">
+              <div className="flex-1 relative min-w-[160px] max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input type="text" placeholder={tr("Axtar...","Search...")} value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]" />
+              </div>
+              <div className="flex flex-wrap gap-2 sm:ml-auto">
+                <FilterSelect
+                  value={selectedSaleType}
+                  onChange={setSelectedSaleType}
+                  options={[
+                    { value: "all", label: tr("Növ", "Type") },
+                    ...SALE_TYPES,
+                  ]}
+                />
+                <FilterSelect
+                  value={selectedClient}
+                  onChange={setSelectedClient}
+                  options={[
+                    { value: "all", label: tr("Müştəri", "Client") },
+                    ...clientFilterOptions,
+                  ]}
+                />
+                <FilterSelect
+                  value={selectedAgentId}
+                  onChange={setSelectedAgentId}
+                  options={[
+                    { value: "all", label: tr("Agent", "Agent") },
+                    ...agentFilterOptions,
+                  ]}
+                />
+                <FilterSelect value={selectedStatus} onChange={setSelectedStatus}
+                  options={[
+                    { value: "all",      label: tr("Status","Status")        },
+                    { value: "active",   label: tr("Aktiv","Active")         },
+                    { value: "sent",     label: tr("Göndərildi","Sent")      },
+                    { value: "inactive", label: tr("Qeyri-aktiv","Inactive") },
+                    { value: "expired",  label: tr("Vaxtı bitmiş","Expired") },
+                    { value: "accepted", label: tr("Qəbul edildi","Accepted") },
+                    { value: "rejected", label: tr("Rədd edildi","Rejected") },
+                    { value: "changing", label: tr("Dəyişiklik","Changing") },
+                  ]} />
+              </div>
             </div>
           </div>
         </div>

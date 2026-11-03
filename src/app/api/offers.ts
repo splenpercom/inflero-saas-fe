@@ -146,6 +146,7 @@ export interface OffersListQuery {
   pageSize?: number;
   search?: string;
   status?: OfferStatusUi | "all";
+  saleType?: string;
   clientName?: string;
   customerId?: string;
   createdByUserId?: string;
@@ -190,6 +191,7 @@ function offersQueryString(query: OffersListQuery = {}): string {
   if (query.pageSize != null) params.set("pageSize", String(query.pageSize));
   if (query.search?.trim()) params.set("search", query.search.trim());
   if (query.status && query.status !== "all") params.set("status", query.status);
+  if (query.saleType?.trim()) params.set("saleType", query.saleType.trim());
   if (query.clientName?.trim()) params.set("clientName", query.clientName.trim());
   if (query.customerId?.trim()) params.set("customerId", query.customerId.trim());
   if (query.createdByUserId?.trim()) params.set("createdByUserId", query.createdByUserId.trim());

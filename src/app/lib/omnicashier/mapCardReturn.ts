@@ -36,6 +36,61 @@ function round3(n: number): number {
   return Math.round((n + Number.EPSILON) * 1000) / 1000;
 }
 
+type OmniReturnItem = {
+  itemName: string;
+  itemCodeType: number;
+  itemCode: string;
+  itemQuantityType: number;
+  itemQuantity: number;
+  itemPrice: number;
+  itemSum: number;
+  itemVatPercent: number;
+  discount: number;
+};
+
+/**
+ * Keep Σ itemSum === refund after 2dp price×qty rounding.
+ * Prefer qty≈1 lines so itemPrice*itemQuantity stays exact; never recompute
+ * itemSum from rounded price×qty after applying drift (that reintroduces ±0.01/0.02).
+ */
+function absorbLineDrift(items: OmniReturnItem[], drift: number): void {
+  if (Math.abs(drift) < 0.01 || items.length === 0) return;
+
+  const tryApply = (idx: number, d: number): boolean => {
+    const it = items[idx]!;
+    const newSum = round2(it.itemSum + d);
+    if (!(newSum > 0)) return false;
+    const qty = it.itemQuantity;
+    if (!(qty > 0)) return false;
+    if (Math.abs(qty - 1) < 0.0005) {
+      it.itemSum = newSum;
+      it.itemPrice = newSum;
+      return true;
+    }
+    const newPrice = round2(newSum / qty);
+    if (round2(newPrice * qty) !== newSum) return false;
+    it.itemSum = newSum;
+    it.itemPrice = newPrice;
+    return true;
+  };
+
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (Math.abs(items[i]!.itemQuantity - 1) < 0.0005 && tryApply(i, drift)) return;
+  }
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (Math.abs(items[i]!.itemQuantity - 1) >= 0.0005 && tryApply(i, drift)) return;
+  }
+
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i]!;
+    const newSum = round2(it.itemSum + drift);
+    if (!(newSum > 0)) continue;
+    it.itemSum = newSum;
+    it.itemPrice = it.itemQuantity > 0 ? round2(newSum / it.itemQuantity) : newSum;
+    return;
+  }
+}
+
 export function mapCardReturnToOmni(input: MapCardReturnInput): {
   prev_doc_number?: number;
   data: Record<string, unknown>;
@@ -52,17 +107,7 @@ export function mapCardReturnToOmni(input: MapCardReturnInput): {
       : input.defaultVatPercent;
 
   const raw = (input.items ?? []).filter((it) => Number(it.quantity) > 0);
-  let items: Array<{
-    itemName: string;
-    itemCodeType: number;
-    itemCode: string;
-    itemQuantityType: number;
-    itemQuantity: number;
-    itemPrice: number;
-    itemSum: number;
-    itemVatPercent: number;
-    discount: number;
-  }>;
+  let items: OmniReturnItem[];
 
   if (raw.length === 0) {
     items = [
@@ -128,16 +173,10 @@ export function mapCardReturnToOmni(input: MapCardReturnInput): {
         },
       ];
     }
-    const sumNow = round2(items.reduce((a, it) => a + it.itemSum, 0));
-    const drift = round2(pay - sumNow);
-    if (Math.abs(drift) >= 0.01) {
-      const last = items[items.length - 1]!;
-      last.itemSum = round2(last.itemSum + drift);
-      if (last.itemQuantity > 0) {
-        last.itemPrice = round2(last.itemSum / last.itemQuantity);
-        last.itemSum = round2(last.itemPrice * last.itemQuantity);
-      }
-    }
+    absorbLineDrift(
+      items,
+      round2(pay - round2(items.reduce((a, it) => a + it.itemSum, 0))),
+    );
   }
 
   const sum = round2(items.reduce((a, it) => a + it.itemSum, 0));

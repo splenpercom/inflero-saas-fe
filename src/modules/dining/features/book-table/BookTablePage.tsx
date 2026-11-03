@@ -23,6 +23,7 @@ import {
   fetchPublicDiningBookingConfig,
 } from "../../../../app/api/publicDining";
 import { ApiError } from "../../../../app/api/client";
+import { BrowseMenuPanel } from "../qr-menu/BrowseMenuPanel";
 
 type BookLang = "az" | "en" | "ru";
 
@@ -410,6 +411,7 @@ function BookingForm({
   tables,
   settings,
   info,
+  lang,
   t,
 }: {
   tenantSlug: string;
@@ -418,6 +420,7 @@ function BookingForm({
   tables: TableOpt[];
   settings: Settings;
   info: RestaurantInfo;
+  lang: BookLang;
   t: BookStrings;
 }) {
   const [selectedTableId, setSelectedTableId] = useState(initialTableId ?? "");
@@ -500,35 +503,46 @@ function BookingForm({
 
   if (submitted) {
     return (
-      <div className="flex flex-col items-center text-center px-4 py-10">
-        <div className="w-20 h-20 rounded-full bg-[#ccfbf1] flex items-center justify-center mb-5">
-          <Check className="w-10 h-10 text-[#0f766e]" />
+      <div className="flex flex-col px-4 py-10">
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 rounded-full bg-[#ccfbf1] flex items-center justify-center mb-5">
+            <Check className="w-10 h-10 text-[#0f766e]" />
+          </div>
+          <p className="text-2xl font-bold text-gray-900 mb-2">{t.bookingSubmitted}</p>
+          <p className="text-base text-gray-600 mb-1">
+            {selectedTable?.name ?? t.tableFallback(selectedTableId)}
+          </p>
+          <p className="text-sm text-gray-500 mb-1">
+            {form.date} {t.at} {form.time}
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            {form.guests} {form.guests === 1 ? t.guest : t.guestsWord} · {form.name}
+          </p>
+          <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl px-4 py-4 mb-8">
+            <p className="text-sm text-amber-700">{t.confirmSoon}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSubmitted(false);
+              setForm({ name: "", phone: "", date: "", time: "", guests: 2, notes: "" });
+              setSelectedTableId(initialTableId ?? "");
+            }}
+            style={{ touchAction: "manipulation", minHeight: "54px" }}
+            className="w-full rounded-2xl bg-[#14b8a6] active:bg-[#0d9488] text-white text-base font-bold transition-colors"
+          >
+            {t.bookAnother}
+          </button>
         </div>
-        <p className="text-2xl font-bold text-gray-900 mb-2">{t.bookingSubmitted}</p>
-        <p className="text-base text-gray-600 mb-1">
-          {selectedTable?.name ?? t.tableFallback(selectedTableId)}
-        </p>
-        <p className="text-sm text-gray-500 mb-1">
-          {form.date} {t.at} {form.time}
-        </p>
-        <p className="text-sm text-gray-500 mb-6">
-          {form.guests} {form.guests === 1 ? t.guest : t.guestsWord} · {form.name}
-        </p>
-        <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl px-4 py-4 mb-8">
-          <p className="text-sm text-amber-700">{t.confirmSoon}</p>
+
+        <div className="w-full border-t border-gray-100 mt-10 pt-6">
+          <BrowseMenuPanel
+            tenantSlug={tenantSlug}
+            branchCode={branchCode}
+            lang={lang}
+            embedded
+          />
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setSubmitted(false);
-            setForm({ name: "", phone: "", date: "", time: "", guests: 2, notes: "" });
-            setSelectedTableId(initialTableId ?? "");
-          }}
-          style={{ touchAction: "manipulation", minHeight: "54px" }}
-          className="w-full rounded-2xl bg-[#14b8a6] active:bg-[#0d9488] text-white text-base font-bold transition-colors"
-        >
-          {t.bookAnother}
-        </button>
       </div>
     );
   }
@@ -1120,6 +1134,7 @@ export function BookTablePage() {
             tables={tables}
             settings={settings}
             info={info}
+            lang={lang}
             t={t}
           />
         </div>

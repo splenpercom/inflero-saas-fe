@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import {
   Search, Plus, FileText, FileSpreadsheet, RefreshCw,
   ChevronDown, Eye, Trash2, X, CheckCircle, Clock, TrendingUp,
-  Edit2, Save,
+  Edit2, Save, Wallet,
 } from "lucide-react";
 import { useLanguage } from "../../../app/i18n/LanguageContext";
 import { pickLang } from "../../../app/i18n/pickLang";
@@ -20,6 +20,7 @@ import {
   fetchTravelCommissionRules,
   fetchTravelCommissions,
   patchTravelCommission,
+  payTravelCommission,
   upsertTravelCommissionRule,
   type TravelCommissionEntryRow,
   type TravelCommissionRuleRow,
@@ -147,9 +148,12 @@ export function Commissions() {
   const [editingRuleUserId, setEditingRuleUserId] = useState<string | null>(null);
   const [ruleDraft, setRuleDraft] = useState({ baseRatePercent: "5", monthlyTarget: "30000", targetBonus: "300" });
   const [savingRule, setSavingRule] = useState(false);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [payConfirmEntry, setPayConfirmEntry] = useState<TravelCommissionEntryRow | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [offerOptions, setOfferOptions] = useState<
-    { id: string; displayCode: string; clientName: string }[]
+    { id: string; displayCode: string; clientName: string; saleAzn: number }[]
   >([]);
 
   const {
@@ -215,11 +219,17 @@ export function Commissions() {
     try {
       const res = await fetchOffers({ page: 1, pageSize: 100 });
       setOfferOptions(
-        (res.items ?? []).map((o) => ({
-          id: o.id,
-          displayCode: o.displayCode,
-          clientName: o.clientName,
-        })),
+        (res.items ?? []).map((o) => {
+          const amount = parseFloat(o.salePrice?.amount ?? "0") || 0;
+          const rate = parseFloat(o.salePrice?.rate ?? "1") || 1;
+          const saleAzn = Math.round(amount * rate * 100) / 100;
+          return {
+            id: o.id,
+            displayCode: o.displayCode,
+            clientName: o.clientName,
+            saleAzn,
+          };
+        }),
       );
     } catch {
       setOfferOptions([]);
@@ -252,10 +262,11 @@ export function Commissions() {
   const calcCommission = useMemo(() => {
     const sales = parseFloat(form.salesAmount) || 0;
     const rate = parseFloat(form.commissionRate) || 0;
-    return Math.round((sales * rate) / 100);
+    return Math.round((sales * rate) / 100 * 100) / 100;
   }, [form.salesAmount, form.commissionRate]);
 
-  const calcTotal = calcCommission + (parseFloat(form.bonus) || 0);
+  const calcTotal =
+    Math.round((calcCommission + (parseFloat(form.bonus) || 0)) * 100) / 100;
 
   function openAdd() {
     setEditingEntry(null);
@@ -303,6 +314,60 @@ export function Commissions() {
       await loadEntries();
     } catch (err) {
       alert(err instanceof Error ? err.message : tr("Silinmədi", "Delete failed"));
+    }
+  }
+
+  function openPayConfirm(c: TravelCommissionEntryRow) {
+    if (c.status !== "pending" && c.status !== "processing") return;
+    setPayError(null);
+    setPayConfirmEntry(c);
+  }
+
+  function closePayConfirm() {
+    if (payingId) return;
+    setPayConfirmEntry(null);
+    setPayError(null);
+  }
+
+  async function confirmPay() {
+    const c = payConfirmEntry;
+    if (!c) return;
+    if (c.totalPayout <= 0) {
+      setPayError(tr("Ödəniş məbləği sıfırdır", "Payout amount is zero"));
+      return;
+    }
+    setPayingId(c.id);
+    setPayError(null);
+    try {
+      await payTravelCommission(c.id);
+      setPayConfirmEntry(null);
+      await loadEntries();
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : tr("Ödəniş uğursuz oldu", "Payment failed"));
+    } finally {
+      setPayingId(null);
+    }
+  }
+
+  async function handleVoid(c: TravelCommissionEntryRow) {
+    if (c.status === "voided") return;
+    if (
+      !confirm(
+        c.status === "paid"
+          ? tr(
+              "Ödənilmiş komissiyanı ləğv etmək istəyirsiniz? Bağlı xərc də silinəcək.",
+              "Void this paid commission? The linked expense will also be removed.",
+            )
+          : tr("Bu komissiyanı ləğv etmək istəyirsiniz?", "Void this commission entry?"),
+      )
+    ) {
+      return;
+    }
+    try {
+      await patchTravelCommission(c.id, { status: "VOIDED" });
+      await loadEntries();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : tr("Ləğv uğursuz oldu", "Void failed"));
     }
   }
 
@@ -632,7 +697,18 @@ export function Commissions() {
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
-                              {canEdit && (
+                              {canEdit && (c.status === "pending" || c.status === "processing") && (
+                              <button
+                                type="button"
+                                onClick={() => openPayConfirm(c)}
+                                disabled={payingId === c.id || needsBranch || c.totalPayout <= 0}
+                                className="p-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 disabled:opacity-40"
+                                title={tr("Ödə", "Pay")}
+                              >
+                                <Wallet className="w-3.5 h-3.5" />
+                              </button>
+                              )}
+                              {canEdit && (c.status === "pending" || c.status === "processing") && (
                               <button
                                 type="button"
                                 onClick={() => openEdit(c)}
@@ -642,7 +718,17 @@ export function Commissions() {
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               )}
-                              {canDelete && (
+                              {canEdit && c.status === "paid" && (
+                              <button
+                                type="button"
+                                onClick={() => void handleVoid(c)}
+                                className="p-1 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600"
+                                title={tr("Ləğv et", "Void")}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                              )}
+                              {canDelete && c.status !== "paid" && c.status !== "voided" && (
                               <button
                                 type="button"
                                 onClick={() => void handleDelete(c.id)}
@@ -813,6 +899,91 @@ export function Commissions() {
         <ViewModal c={viewingEntry} onClose={() => setViewingEntry(null)} tr={tr} />
       )}
 
+      {payConfirmEntry && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={closePayConfirm}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md border border-gray-200 dark:border-gray-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                {tr("Komissiyanı ödə", "Pay commission")}
+              </h2>
+              <button
+                type="button"
+                onClick={closePayConfirm}
+                disabled={!!payingId}
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-40"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {tr("Ödənişi təsdiqləyirsiniz?", "Confirm this payout?")}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    {tr(
+                      `${payConfirmEntry.employeeName} üçün ${payConfirmEntry.totalPayout.toLocaleString()} ₼ komissiya ödəniləcək və xərc kimi qeyd olunacaq.`,
+                      `${payConfirmEntry.totalPayout.toLocaleString()} ₼ will be paid to ${payConfirmEntry.employeeName} and recorded as an expense.`,
+                    )}
+                  </p>
+                  {(payConfirmEntry.offerDisplayCode || payConfirmEntry.offerTitle) && (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2 truncate">
+                      {tr("Təklif", "Offer")}:{" "}
+                      {payConfirmEntry.offerDisplayCode
+                        ? `${payConfirmEntry.offerTitle ?? "—"} (${payConfirmEntry.offerDisplayCode})`
+                        : (payConfirmEntry.offerTitle ?? "—")}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {payError && (
+                <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded px-2.5 py-2">
+                  {payError}
+                </p>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closePayConfirm}
+                disabled={!!payingId}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40"
+              >
+                {tr("Ləğv et", "Cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmPay()}
+                disabled={!!payingId || payConfirmEntry.totalPayout <= 0}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 inline-flex items-center gap-1.5"
+              >
+                {payingId ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    {tr("Ödənilir...", "Paying...")}
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="w-3.5 h-3.5" />
+                    {tr("Ödə", "Pay")}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeModal}>
           <div
@@ -881,6 +1052,8 @@ export function Commissions() {
                         offerId: id,
                         offerDisplayCode: o?.displayCode ?? "",
                         offerTitle: o?.clientName ?? "",
+                        // Prefill from offer sale price (AZN); leave editable. Clearing offer keeps current amount.
+                        ...(o ? { salesAmount: String(o.saleAzn) } : {}),
                       });
                     }}
                     disabled={editingEntry?.source === "AUTO"}
@@ -889,7 +1062,7 @@ export function Commissions() {
                     <option value="">{tr("Seçin...", "Select...")}</option>
                     {offerOptions.map((o) => (
                       <option key={o.id} value={o.id}>
-                        {o.displayCode} — {o.clientName}
+                        {o.displayCode} — {o.clientName} ({o.saleAzn.toLocaleString()} ₼)
                       </option>
                     ))}
                   </select>
@@ -897,8 +1070,8 @@ export function Commissions() {
                 </div>
                 <p className="mt-1 text-[10px] text-gray-400">
                   {tr(
-                    "Manual qeyd təklifə bağlanmır; yalnız istinad üçün göstərilir.",
-                    "Manual entries do not link to the offer row; used as display reference only.",
+                    "Təklif seçəndə satış məbləği avtomatik doldurulur (redaktə edilə bilər). Manual qeyd təklifə bağlanmır.",
+                    "Selecting an offer prefills sales amount (editable). Manual entries are display reference only.",
                   )}
                 </p>
               </div>
@@ -906,6 +1079,7 @@ export function Commissions() {
                 <label className={labelClass}>{tr("Satış Məbləği (₼)", "Sales Amount (₼)")} *</label>
                 <input
                   type="number"
+                  step="0.01"
                   value={form.salesAmount}
                   onChange={(e) => setForm({ ...form, salesAmount: e.target.value })}
                   className={inputClass}

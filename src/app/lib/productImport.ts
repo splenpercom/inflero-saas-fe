@@ -566,6 +566,8 @@ export type RunProductImportOptions = {
   rows: ProductImportRow[];
   stockEnabled: boolean;
   branchId: string | null;
+  /** When true (BRANCH_MANAGEMENT on), refuse import without a selected branch. */
+  requireBranch?: boolean;
   onProgress?: (done: number, total: number) => void;
 };
 
@@ -573,7 +575,12 @@ export type RunProductImportOptions = {
 export async function runProductImport(
   options: RunProductImportOptions,
 ): Promise<ProductImportResult> {
-  const { rows, stockEnabled, branchId, onProgress } = options;
+  const { rows, stockEnabled, branchId, requireBranch, onProgress } = options;
+
+  if (requireBranch && !branchId) {
+    throw new Error("Select a branch to import products");
+  }
+
   const maps: ResolveMaps = {
     categories: await fetchCategories(),
     brands: await fetchBrands(),
@@ -613,6 +620,7 @@ export async function runProductImport(
       let initialStocks: { storeId: string; quantity: number }[] | undefined;
       if (stockEnabled && productType !== "SERVICE" && row.quantity != null && row.quantity > 0) {
         if (branchId) {
+          // Stock only on the selected branch — never seed other stores.
           initialStocks = [{ storeId: branchId, quantity: row.quantity }];
         } else {
           skippedStock += 1;

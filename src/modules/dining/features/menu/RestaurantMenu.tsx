@@ -2,7 +2,20 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useLanguage } from "../../i18n";
 import { toast } from "sonner";
-import { Search, UtensilsCrossed, RefreshCw, ChevronDown, ChevronRight, CheckSquare, Square } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  Search,
+  UtensilsCrossed,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  CheckSquare,
+  Square,
+  QrCode,
+  Download,
+  Printer,
+  X,
+} from "lucide-react";
 import {
   fetchDiningMenu,
   upsertDiningMenu,
@@ -10,10 +23,152 @@ import {
   type DiningMenuProduct,
 } from "../../../../app/api/dining";
 import { ApiError } from "../../../../app/api/client";
+import { useAuth } from "../../../../app/context/AuthContext";
+import { useBranch } from "../../../../app/context/BranchContext";
 import { useBranchRevision } from "../../../../app/hooks/useBranchRevision";
 import { useConfirm } from "../../../../app/context/ConfirmContext";
 import { Checkbox } from "../../../../app/components/ui/checkbox";
 import { cn } from "../../../../app/components/ui/utils";
+
+function makeBrowseMenuQrUrl(slug: string | null | undefined, branchCode?: string | null) {
+  const base = window.location.origin;
+  if (!slug) return `${base}/menu?mode=browse`;
+  const params = new URLSearchParams();
+  if (branchCode) params.set("branch", branchCode);
+  params.set("mode", "browse");
+  return `${base}/menu/${encodeURIComponent(slug)}?${params.toString()}`;
+}
+
+function BrowseMenuQRModal({
+  qrUrl,
+  title,
+  hint,
+  onClose,
+}: {
+  qrUrl: string;
+  title: string;
+  hint: string;
+  onClose: () => void;
+}) {
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  const getQrSvgMarkup = (): string | null => {
+    const svg = qrRef.current?.querySelector("svg");
+    if (!svg) return null;
+    const clone = svg.cloneNode(true) as SVGElement;
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    return new XMLSerializer().serializeToString(clone);
+  };
+
+  const downloadQR = () => {
+    const markup = getQrSvgMarkup();
+    if (!markup) return;
+    const blob = new Blob([markup], { type: "image/svg+xml" });
+    const a = Object.assign(document.createElement("a"), {
+      href: URL.createObjectURL(blob),
+      download: "menu-browse-qr.svg",
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success("QR code downloaded");
+  };
+
+  const printQR = () => {
+    const markup = getQrSvgMarkup();
+    if (!markup) return;
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText =
+      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
+    if (!doc || !win) {
+      iframe.remove();
+      return;
+    }
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><title></title>
+<style>
+  @page { margin: 0; size: auto; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  svg { width: 70mm; height: 70mm; max-width: 90vw; max-height: 90vh; }
+</style></head><body>${markup}</body></html>`);
+    doc.close();
+    const cleanup = () => {
+      try {
+        iframe.remove();
+      } catch {
+        /* ignore */
+      }
+    };
+    win.onafterprint = cleanup;
+    setTimeout(() => {
+      try {
+        win.focus();
+        win.print();
+      } catch {
+        cleanup();
+      }
+      setTimeout(cleanup, 60_000);
+    }, 50);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-full max-w-xs shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-full p-1 transition-colors"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div
+            ref={qrRef}
+            className="flex items-center justify-center p-4 bg-white rounded-xl border border-gray-100"
+          >
+            <QRCodeSVG value={qrUrl} size={160} level="H" includeMargin />
+          </div>
+          <p className="text-[10px] text-gray-400 font-mono break-all text-center">{qrUrl}</p>
+          <p className="text-[11px] text-gray-500 text-center">{hint}</p>
+        </div>
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={downloadQR}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white text-xs font-medium transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" /> Download SVG
+          </button>
+          <button
+            type="button"
+            onClick={printQR}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            title="Print QR"
+          >
+            <Printer className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]";
@@ -30,10 +185,13 @@ function errMsg(err: unknown) {
 export function RestaurantMenu() {
   const { language } = useLanguage();
   const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const { user } = useAuth();
+  const { selectedBranch, branchManagementEnabled, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const askConfirm = useConfirm();
   const navigate = useNavigate();
   const dirtyRef = useRef(false);
+  const slug = user?.tenant?.slug ?? null;
 
   const [categories, setCategories] = useState<DiningMenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +199,13 @@ export function RestaurantMenu() {
   const [q, setQ] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [dirty, setDirty] = useState(false);
+  const [showBrowseQr, setShowBrowseQr] = useState(false);
+
+  const qrNeedsBranch = branchManagementEnabled && (isGlobalMode || !selectedBranch?.code);
+  const browseQrUrl = useMemo(
+    () => makeBrowseMenuQrUrl(slug, selectedBranch?.code ?? null),
+    [slug, selectedBranch?.code],
+  );
 
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -282,12 +447,38 @@ export function RestaurantMenu() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {dirty && (
             <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
               {tr("Saxlanmayıb", "Unsaved")}
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              if (qrNeedsBranch) {
+                toast.error(
+                  tr("Menyu QR üçün filial seçin", "Select a branch to show the menu QR"),
+                );
+                return;
+              }
+              if (!slug) {
+                toast.error(tr("Tenant slug tapılmadı", "Tenant slug not found"));
+                return;
+              }
+              setShowBrowseQr(true);
+            }}
+            disabled={qrNeedsBranch || !slug}
+            className="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700 flex items-center gap-1.5 text-gray-700 dark:text-gray-300 disabled:opacity-50"
+            title={
+              qrNeedsBranch
+                ? tr("Menyu QR üçün filial seçin", "Select a branch for menu QR")
+                : tr("Baxış menyu QR (sifarişsiz)", "Browse menu QR (no ordering)")
+            }
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            {tr("Menyu QR", "Menu QR")}
+          </button>
           <button
             type="button"
             onClick={() => void handleRefresh()}
@@ -306,6 +497,27 @@ export function RestaurantMenu() {
           </button>
         </div>
       </div>
+
+      {qrNeedsBranch && (
+        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+          {tr(
+            "Baxış menyu QR göstərmək üçün filial seçin.",
+            "Select a branch to show the browse-menu QR.",
+          )}
+        </p>
+      )}
+
+      {showBrowseQr && (
+        <BrowseMenuQRModal
+          qrUrl={browseQrUrl}
+          title={tr("Menyu QR kodu", "Menu QR code")}
+          hint={tr(
+            "Ekran / skan — yalnız baxış, sifariş yoxdur",
+            "Display / scan — browse only, no ordering",
+          )}
+          onClose={() => setShowBrowseQr(false)}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3">

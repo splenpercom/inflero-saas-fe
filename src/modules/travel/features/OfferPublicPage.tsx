@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router";
 import {
   Plane, MapPin, Hotel, Calendar, Users, Shield,
@@ -6,7 +6,7 @@ import {
   CheckCircle, Clock, ArrowRight, Globe, X,
   ThumbsUp, ThumbsDown, MessageSquare, Upload, FileText,
   ChevronRight, ChevronLeft, Lock, Banknote, AlertCircle,
-  Star, Send, Trash2, RefreshCw,
+  Send, Trash2, RefreshCw,
 } from "lucide-react";
 import {
   deletePublicOfferDocument,
@@ -268,8 +268,8 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
   return (
     <div className="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0">
       <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center"
-        style={{ background: "rgba(0,16,88,0.08)" }}>
-        <Icon className="w-4 h-4 text-[#001058]" />
+        style={{ background: "rgba(20,184,166,0.08)" }}>
+        <Icon className="w-4 h-4 text-[#14b8a6]" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">{label}</p>
@@ -285,7 +285,7 @@ function Card({ title, icon: Icon, children, className = "" }: {
   return (
     <div className={`bg-white border border-gray-200 rounded-2xl overflow-hidden ${className}`}>
       <div className="flex items-center gap-2.5 px-4 sm:px-5 py-4 border-b border-gray-100 bg-gray-50/70">
-        <div className="w-7 h-7 rounded-lg bg-[#001058] flex items-center justify-center flex-shrink-0">
+        <div className="w-7 h-7 rounded-lg bg-[#14b8a6] flex items-center justify-center flex-shrink-0">
           <Icon className="w-3.5 h-3.5 text-white" />
         </div>
         <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
@@ -379,7 +379,7 @@ function CheckoutModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col">
-        <div className="bg-[#001058] px-5 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="bg-[#14b8a6] px-5 py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,0.15)" }}>
               <Lock className="w-3.5 h-3.5 text-white" />
@@ -397,11 +397,11 @@ function CheckoutModal({
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {step === "method" && (
             <>
-              <div className="bg-[#001058]/5 rounded-xl p-4 border border-[#001058]/10">
+              <div className="bg-[#14b8a6]/5 rounded-xl p-4 border border-[#14b8a6]/10">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{tr("Faktura", "Invoice", "Счёт")}</p>
                 <p className="text-sm font-semibold text-gray-800">{offerCode} — {clientName}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {tr("Ödəniləcək məbləğ", "Amount due", "Сумма к оплате")}: <span className="font-bold text-orange-500">{fmtAZNDec(remaining)}</span>
+                  {tr("Ödəniləcək məbləğ", "Amount due", "Сумма к оплате")}: <span className="font-bold text-[#14b8a6]">{fmtAZNDec(remaining)}</span>
                 </p>
                 <p className="text-[11px] text-gray-400 mt-1">{tr("Yalnız tam qalıq məbləğ", "Full outstanding balance only", "Только полная сумма остатка")}</p>
               </div>
@@ -418,7 +418,7 @@ function CheckoutModal({
                       onClick={() => setMethod(k)}
                       className={`flex items-center gap-2 px-3 py-3 border rounded-lg text-xs font-medium transition-colors ${
                         method === k
-                          ? "border-[#001058] bg-[#001058]/5 text-[#001058]"
+                          ? "border-[#14b8a6] bg-[#14b8a6]/5 text-[#14b8a6]"
                           : "border-gray-200 text-gray-600"
                       }`}
                     >
@@ -513,7 +513,7 @@ function CheckoutModal({
               type="button"
               onClick={() => void continueFromMethod()}
               disabled={busy || remaining <= 0}
-              className="w-full py-3 bg-[#001058] hover:bg-[#000844] disabled:opacity-40 text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 bg-[#14b8a6] hover:bg-[#0d9488] disabled:opacity-40 text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
             >
               {busy
                 ? tr("Gözləyin…", "Please wait…", "Подождите…")
@@ -552,7 +552,7 @@ function CheckoutModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-full py-3 bg-[#001058] hover:bg-[#000844] text-white rounded-lg text-sm font-bold transition-colors"
+              className="w-full py-3 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-sm font-bold transition-colors"
             >
               {tr("Bağla", "Close", "Закрыть")}
             </button>
@@ -585,7 +585,6 @@ export function OfferPublicPage() {
   const [actionDone, setActionDone]           = useState<"accepted" | "rejected" | null>(null);
   const [feedback, setFeedback]               = useState("");
   const [declineNote, setDeclineNote]         = useState("");
-  const [feedbackRating, setFeedbackRating]   = useState(0);
   const [feedbackSent, setFeedbackSent]       = useState(false);
   const [showCheckout, setShowCheckout]       = useState(false);
   const [uploadedDocs, setUploadedDocs]       = useState<UploadedDoc[]>([]);
@@ -627,7 +626,6 @@ export function OfferPublicPage() {
     setActionDone(h.actionDone);
     setFeedbackSent(h.feedbackSent);
     if (row.clientResponseNote) setFeedback(row.clientResponseNote);
-    if (row.clientResponseRating) setFeedbackRating(row.clientResponseRating);
     // Unlock actions after staff resolves changes (status leaves "changing").
     if (h.feedbackSent) setClientAction("feedback");
     else if (!h.actionDone) setClientAction("none");
@@ -839,7 +837,6 @@ export function OfferPublicPage() {
     try {
       const row = await publicRequestOfferChanges(id!, {
         note: feedback.trim(),
-        rating: feedbackRating || null,
       });
       applyPublicOffer(row);
       setFeedbackSent(true);
@@ -1001,7 +998,7 @@ export function OfferPublicPage() {
                 type="button"
                 onClick={() => openFilePicker({ replace: doc, side: doc.side ?? null })}
                 disabled={busy}
-                className="p-2 text-gray-400 hover:text-[#001058] disabled:opacity-50"
+                className="p-2 text-gray-400 hover:text-[#14b8a6] disabled:opacity-50"
                 title={tr("Əvəz et", "Replace", "Заменить")}
               >
                 <RefreshCw className="w-4 h-4" />
@@ -1071,8 +1068,8 @@ export function OfferPublicPage() {
     changeRequests.length > 0 ? (
       <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 sm:p-4">
         <div className="flex items-center gap-2 mb-3">
-          <MessageSquare className="w-4 h-4 text-[#001058]" />
-          <p className="text-sm font-semibold text-[#001058]">
+          <MessageSquare className="w-4 h-4 text-[#14b8a6]" />
+          <p className="text-sm font-semibold text-[#14b8a6]">
             {tr("Dəyişiklik söhbəti", "Change chat", "Чат по изменениям")}
           </p>
         </div>
@@ -1146,7 +1143,7 @@ export function OfferPublicPage() {
             type="button"
             onClick={() => setClientAction("feedback")}
             disabled={busy}
-            className="inline-flex items-center justify-center gap-1.5 min-h-[42px] px-3 py-2 text-sm font-semibold text-[#001058] hover:underline underline-offset-2 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[42px] px-3 py-2 text-sm font-semibold text-[#14b8a6] hover:underline underline-offset-2 disabled:opacity-50"
           >
             <MessageSquare className="w-4 h-4" />
             {tr("Dəyişiklik tələb et", "Request a change", "Запросить изменение")}
@@ -1158,25 +1155,9 @@ export function OfferPublicPage() {
 
   const inlineDecisionForms = !effectiveActionDone && !actionsLocked && clientAction === "feedback" && !feedbackSent ? (
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
-      <p className="text-sm font-semibold text-[#001058]">
+      <p className="text-sm font-semibold text-[#14b8a6]">
         {tr("Nəyi dəyişmək istəyirsiniz?", "What would you like changed?", "Что бы вы хотели изменить?")}
       </p>
-      <div>
-        <p className="text-xs font-medium text-gray-700 mb-2">
-          {tr("Bu təklifi qiymətləndirin", "Rate this offer", "Оцените это предложение")}
-        </p>
-        <div className="flex gap-1">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} type="button" onClick={() => setFeedbackRating(n)}>
-              <Star
-                className={`w-6 h-6 transition-colors ${
-                  n <= feedbackRating ? "fill-amber-400 text-amber-400" : "text-gray-300"
-                }`}
-              />
-            </button>
-          ))}
-        </div>
-      </div>
       <textarea
         value={feedback}
         onChange={(e) => setFeedback(e.target.value)}
@@ -1186,7 +1167,7 @@ export function OfferPublicPage() {
           "Dates, hotel, price, inclusions...",
           "Даты, отель, цена, включённое...",
         )}
-        className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#001058] resize-none"
+        className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#14b8a6] resize-none"
       />
       {actionError && <p className="text-xs text-red-600">{actionError}</p>}
       <div className="flex gap-2">
@@ -1194,7 +1175,7 @@ export function OfferPublicPage() {
           type="button"
           onClick={() => void confirmRequestChanges()}
           disabled={!feedback.trim() || busy}
-          className="flex-1 min-h-[44px] py-2.5 flex items-center justify-center gap-2 bg-[#001058] hover:bg-[#000844] disabled:opacity-40 text-white rounded-xl text-sm font-bold transition-colors"
+          className="flex-1 min-h-[44px] py-2.5 flex items-center justify-center gap-2 bg-[#14b8a6] hover:bg-[#0d9488] disabled:opacity-40 text-white rounded-xl text-sm font-bold transition-colors"
         >
           <Send className="w-3.5 h-3.5" /> {tr("Göndər", "Send", "Отправить")}
         </button>
@@ -1283,7 +1264,7 @@ export function OfferPublicPage() {
   if (notFound) {
     return (
       <div className="min-h-dvh bg-gray-50 flex flex-col">
-        <div className="bg-[#001058] sticky top-0 z-20 shadow-md">
+        <div className="bg-[#14b8a6] sticky top-0 z-20 shadow-md">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.15)" }}>
@@ -1322,7 +1303,7 @@ export function OfferPublicPage() {
     <div className="min-h-dvh bg-gray-50 flex flex-col">
 
       {/* ── Sticky top bar ──────────────────────────────────────────────── */}
-      <div className="bg-[#001058] sticky top-0 z-20 shadow-md">
+      <div className="bg-[#14b8a6] sticky top-0 z-20 shadow-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.15)" }}>
@@ -1358,7 +1339,7 @@ export function OfferPublicPage() {
             )}
             {remaining > 0 && !actionDone && !actionsLocked && !pendingBank && (
               <button type="button" onClick={openCheckout}
-                className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap transition-colors">
+                className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-semibold whitespace-nowrap transition-colors">
                 {tr("İndi ödə", "Pay Now", "Оплатить")}
               </button>
             )}
@@ -1438,17 +1419,17 @@ export function OfferPublicPage() {
 
         {/* Compact trip intro (replaces hero) */}
         <div className="mb-5 sm:mb-6">
-          <p className="text-[10px] sm:text-xs text-[#001058]/60 uppercase tracking-widest mb-1.5 font-semibold">
+          <p className="text-[10px] sm:text-xs text-[#14b8a6]/60 uppercase tracking-widest mb-1.5 font-semibold">
             {offer.saleType || tr("Təklif", "Offer", "Предложение")}
           </p>
           {hasRoute ? (
             <div className="flex items-center gap-2 sm:gap-3 mb-3 flex-wrap">
-              <span className="text-2xl sm:text-3xl font-bold text-[#001058] leading-tight">{fromLabel}</span>
+              <span className="text-2xl sm:text-3xl font-bold text-[#14b8a6] leading-tight">{fromLabel}</span>
               <ArrowRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
-              <span className="text-2xl sm:text-3xl font-bold text-[#001058] leading-tight">{toLabel}</span>
+              <span className="text-2xl sm:text-3xl font-bold text-[#14b8a6] leading-tight">{toLabel}</span>
             </div>
           ) : (
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#001058] leading-tight mb-3">{heroHeadline}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#14b8a6] leading-tight mb-3">{heroHeadline}</h1>
           )}
           <div className="flex flex-wrap gap-2 mb-4">
             {[
@@ -1475,7 +1456,7 @@ export function OfferPublicPage() {
                   key={text}
                   className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-gray-100"
                 >
-                  <Icon className="w-3.5 h-3.5 text-[#001058]/70 flex-shrink-0" />
+                  <Icon className="w-3.5 h-3.5 text-[#14b8a6]/70 flex-shrink-0" />
                   <span>{text}</span>
                 </div>
               ))}
@@ -1489,9 +1470,9 @@ export function OfferPublicPage() {
                 >
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: "rgba(0,16,88,0.08)" }}
+                    style={{ background: "rgba(20,184,166,0.08)" }}
                   >
-                    <Icon className="w-4 h-4 text-[#001058]" />
+                    <Icon className="w-4 h-4 text-[#14b8a6]" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] text-gray-400 uppercase tracking-wider leading-none mb-1">{label}</p>
@@ -1522,9 +1503,9 @@ export function OfferPublicPage() {
                   <div key={label} className="bg-gray-50 rounded-xl p-3 flex items-start gap-2.5">
                     <div
                       className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center"
-                      style={{ background: "rgba(0,16,88,0.08)" }}
+                      style={{ background: "rgba(20,184,166,0.08)" }}
                     >
-                      <Icon className="w-3.5 h-3.5 text-[#001058]" />
+                      <Icon className="w-3.5 h-3.5 text-[#14b8a6]" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium leading-none mb-0.5">
@@ -1700,12 +1681,12 @@ export function OfferPublicPage() {
                     onClick={() => selectDocType(t)}
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       active
-                        ? "bg-[#001058] text-white border-[#001058]"
+                        ? "bg-[#14b8a6] text-white border-[#14b8a6]"
                         : complete
                           ? "bg-green-50 text-green-800 border-green-300"
                           : started
                             ? "bg-amber-50 text-amber-800 border-amber-300"
-                            : "bg-white text-gray-600 border-gray-300 hover:border-[#001058]"
+                            : "bg-white text-gray-600 border-gray-300 hover:border-[#14b8a6]"
                     }`}
                   >
                     {complete && (
@@ -1737,10 +1718,10 @@ export function OfferPublicPage() {
                         onClick={() => setDocSide(opt.value)}
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                           active
-                            ? "bg-[#001058]/10 text-[#001058] border-[#001058]"
+                            ? "bg-[#14b8a6]/10 text-[#14b8a6] border-[#14b8a6]"
                             : filled
                               ? "bg-green-50 text-green-700 border-green-200"
-                              : "bg-white text-gray-600 border-gray-300 hover:border-[#001058]"
+                              : "bg-white text-gray-600 border-gray-300 hover:border-[#14b8a6]"
                         }`}
                       >
                         {filled && <CheckCircle className="w-3 h-3 text-green-600" />}
@@ -1779,7 +1760,7 @@ export function OfferPublicPage() {
                     type="button"
                     onClick={() => openFilePicker()}
                     disabled={busy}
-                    className="w-full py-2 text-xs font-medium text-[#001058] border border-dashed border-[#001058]/30 rounded-lg hover:bg-[#001058]/5 disabled:opacity-50"
+                    className="w-full py-2 text-xs font-medium text-[#14b8a6] border border-dashed border-[#14b8a6]/30 rounded-lg hover:bg-[#14b8a6]/5 disabled:opacity-50"
                   >
                     + {tr("Başqa fayl əlavə et", "Add another file", "Добавить ещё файл")}
                   </button>
@@ -1800,14 +1781,14 @@ export function OfferPublicPage() {
                   e.preventDefault();
                   handleFiles(e.dataTransfer.files);
                 }}
-                className="border-2 border-dashed border-gray-300 rounded-xl py-8 px-4 text-center cursor-pointer hover:border-[#001058] transition-colors active:bg-[#001058]/5"
+                className="border-2 border-dashed border-gray-300 rounded-xl py-8 px-4 text-center cursor-pointer hover:border-[#14b8a6] transition-colors active:bg-[#14b8a6]/5"
               >
                 <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
                   <Upload className="w-5 h-5 text-gray-400" />
                 </div>
                 <p className="text-sm font-medium text-gray-700">
                   {tr("Yüklə", "Upload", "Загрузить")}{" "}
-                  <span className="text-[#001058]">
+                  <span className="text-[#14b8a6]">
                     {docTypeLabel(docType)}
                     {docSide ? ` · ${offerDocSideLabel(docType, docSide)}` : ""}
                   </span>
@@ -1876,7 +1857,7 @@ export function OfferPublicPage() {
                         type="checkbox"
                         checked={docsAck}
                         onChange={(e) => setDocsAck(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#001058] focus:ring-[#001058]"
+                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
                       />
                       <span className="text-xs text-gray-700 leading-relaxed">
                         {tr(
@@ -1895,7 +1876,7 @@ export function OfferPublicPage() {
                         docsSubmitting ||
                         busy
                       }
-                      className="w-full py-3 bg-[#001058] hover:bg-[#000844] disabled:opacity-40 text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                      className="w-full py-3 bg-[#14b8a6] hover:bg-[#0d9488] disabled:opacity-40 text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
                     >
                       <Send className="w-4 h-4" />
                       {docsSubmitting ? tr("Göndərilir…", "Submitting…", "Отправка…") : tr("Sənədləri nəzərdən keçirmə üçün göndər", "Submit documents for review", "Отправить документы на проверку")}
@@ -1920,7 +1901,7 @@ export function OfferPublicPage() {
       <div className="border-t border-gray-200 bg-white mt-2">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-[#001058] flex items-center justify-center">
+            <div className="w-6 h-6 rounded-lg bg-[#14b8a6] flex items-center justify-center">
               <Plane className="w-3 h-3 text-white" />
             </div>
             <span className="text-xs font-semibold text-gray-700">Inflero Travel Management</span>
@@ -1952,7 +1933,7 @@ export function OfferPublicPage() {
       >
         <DialogContent className="sm:max-w-md bg-white border-gray-200">
           <DialogHeader>
-            <DialogTitle className="text-[#001058]">
+            <DialogTitle className="text-[#14b8a6]">
               {tr("Təklifi qəbul edirsiniz?", "Accept this offer?", "Принять предложение?")}
             </DialogTitle>
             <DialogDescription className="text-gray-600">
