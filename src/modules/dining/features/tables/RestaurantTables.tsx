@@ -14,6 +14,8 @@ import {
   Search,
   Settings2,
   RefreshCw,
+  FileDown,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "../../../../app/context/AuthContext";
 import { useBranchRevision } from "../../../../app/hooks/useBranchRevision";
@@ -29,6 +31,10 @@ import {
 import { fetchTenantSettings } from "../../../../app/api/tenantSettings";
 import { ApiError } from "../../../../app/api/client";
 import { ModernSelect } from "../../../../app/components/ui/ModernSelect";
+import {
+  downloadAllTableQrsPdf,
+  downloadAllTableQrsZip,
+} from "./tableQrExport";
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors";
@@ -302,6 +308,11 @@ function QRModal({
   const printQR = () => {
     const markup = getQrSvgMarkup();
     if (!markup) return;
+    const safeName = table.name
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.cssText =
@@ -326,11 +337,20 @@ function QRModal({
   }
   body {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4mm;
+    font-family: Arial, Helvetica, sans-serif;
   }
-  svg { width: 70mm; height: 70mm; max-width: 90vw; max-height: 90vh; }
-</style></head><body>${markup}</body></html>`);
+  svg { width: 70mm; height: 70mm; max-width: 90vw; max-height: 80vh; }
+  .table-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+    text-align: center;
+  }
+</style></head><body>${markup}<div class="table-name">${safeName}</div></body></html>`);
     doc.close();
     const cleanup = () => {
       try {
@@ -371,9 +391,10 @@ function QRModal({
         <div className="p-4 space-y-3">
           <div
             ref={qrRef}
-            className="flex items-center justify-center p-4 bg-white rounded-xl border border-gray-100"
+            className="flex flex-col items-center justify-center gap-2 p-4 bg-white rounded-xl border border-gray-100"
           >
             <QRCodeSVG value={qrUrl} size={160} level="H" includeMargin />
+            <p className="text-sm font-semibold text-gray-900 text-center">{table.name}</p>
           </div>
           <p className="text-[10px] text-gray-400 font-mono break-all text-center">{qrUrl}</p>
         </div>
@@ -514,6 +535,7 @@ export function RestaurantTables() {
   const [statusFilter, setStatusFilter] = useState<"all" | UiStatus>("all");
   const [search, setSearch] = useState("");
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
+  const [exportingQrs, setExportingQrs] = useState<"zip" | "pdf" | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -588,6 +610,37 @@ export function RestaurantTables() {
   const filterIdle =
     "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800";
 
+  const exportItems = useMemo(
+    () =>
+      [...tables]
+        .sort((a, b) => a.number - b.number)
+        .map((t) => ({
+          id: t.id,
+          name: t.name,
+          number: t.number,
+          qrUrl: makeQrUrl(slug, t.id),
+        })),
+    [tables, slug],
+  );
+
+  const runQrExport = async (kind: "zip" | "pdf") => {
+    if (exportingQrs || exportItems.length === 0) return;
+    setExportingQrs(kind);
+    try {
+      if (kind === "zip") await downloadAllTableQrsZip(exportItems);
+      else await downloadAllTableQrsPdf(exportItems);
+      toast.success(
+        kind === "zip"
+          ? tr("Bütün QR kodlar yükləndi", "All QR codes downloaded")
+          : tr("QR PDF yükləndi", "QR PDF downloaded"),
+      );
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setExportingQrs(null);
+    }
+  };
+
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -600,13 +653,47 @@ export function RestaurantTables() {
             {tables.length} {tr("masa", "tables")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <button
             type="button"
             onClick={() => void load()}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void runQrExport("zip")}
+            disabled={!!exportingQrs || tables.length === 0}
+            title={tr(
+              "Bütün QR-ləri yüklə (ZIP, masa adı ilə)",
+              "Download all QRs (ZIP, with table names)",
+            )}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            <FileDown className={`w-3.5 h-3.5 ${exportingQrs === "zip" ? "animate-pulse" : ""}`} />
+            <span className="hidden sm:inline">
+              {exportingQrs === "zip"
+                ? tr("Yüklənir…", "Downloading…")
+                : tr("Bütün QR", "Download all QRs")}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void runQrExport("pdf")}
+            disabled={!!exportingQrs || tables.length === 0}
+            title={tr(
+              "Bütün QR-ləri PDF olaraq yüklə (masa adı altında)",
+              "Download all QRs as PDF (table name under each)",
+            )}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            <FileText className={`w-3.5 h-3.5 ${exportingQrs === "pdf" ? "animate-pulse" : ""}`} />
+            <span className="hidden sm:inline">
+              {exportingQrs === "pdf"
+                ? tr("Yüklənir…", "Downloading…")
+                : tr("QR PDF", "Download QR PDF")}
+            </span>
           </button>
           <button
             type="button"
