@@ -29,6 +29,7 @@ import {
   type PublicQrOrderStatus,
 } from "../../../../app/api/publicDining";
 import { ApiError } from "../../../../app/api/client";
+import { BrowseMenuPanel } from "./BrowseMenuPanel";
 
 type QrLang = "az" | "en" | "ru";
 
@@ -893,7 +894,21 @@ function ActiveOrderPanel({
   );
 }
 
+/** Public menu entry: browse mode is opt-in via ?mode=browse; otherwise keep ordering UI. */
 export function QRMenuSite() {
+  const { tenantSlug } = useParams<{ tenantSlug: string; tableId?: string }>();
+  const [searchParams] = useSearchParams();
+  const branchCode = searchParams.get("branch") || undefined;
+  const isBrowse = searchParams.get("mode") === "browse";
+
+  if (isBrowse && tenantSlug) {
+    return <BrowseMenuPanel tenantSlug={tenantSlug} branchCode={branchCode} />;
+  }
+
+  return <QRMenuSiteOrderable />;
+}
+
+function QRMenuSiteOrderable() {
   const { tenantSlug, tableId: tableIdParam } = useParams<{ tenantSlug: string; tableId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const branchCode = searchParams.get("branch") || undefined;
