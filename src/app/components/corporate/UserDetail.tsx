@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
+import { useReportDateRange } from "../../hooks/useReportDateRange";
 import { NoAccessPanel } from "../permissions/NoAccessPanel";
 import { formatDate } from "../../lib/dateFormat";
 import {
@@ -37,6 +38,7 @@ import {
   mapExpenseStatusLabel,
   type ExpenseStatusApi,
 } from "../../lib/financeMappers";
+import { ReportDateRangeFilter } from "./reports/ReportDateRangeFilter";
 
 type ProfileTab = "expenses" | "commissions" | "offers";
 
@@ -108,6 +110,18 @@ export function UserDetail() {
   const { canView, canEdit } = useModulePermissions("User Management");
   const t = (key: string) => getUserManagementTranslation(key as any, language);
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const {
+    preset: commissionPreset,
+    setPreset: setCommissionPreset,
+    customFrom: commissionCustomFrom,
+    setCustomFrom: setCommissionCustomFrom,
+    customTo: commissionCustomTo,
+    setCustomTo: setCommissionCustomTo,
+    dateFrom: commissionDateFrom,
+    dateTo: commissionDateTo,
+  } = useReportDateRange("month");
+  const commissionFromYmd = useMemo(() => commissionDateFrom.slice(0, 10), [commissionDateFrom]);
+  const commissionToYmd = useMemo(() => commissionDateTo.slice(0, 10), [commissionDateTo]);
 
   const [user, setUser] = useState<TenantUserRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -187,7 +201,11 @@ export function UserDetail() {
     }
     let cancelled = false;
     setTravelCommissionsLoading(true);
-    fetchTravelCommissions({ userId: user.id })
+    fetchTravelCommissions({
+      userId: user.id,
+      from: commissionFromYmd,
+      to: commissionToYmd,
+    })
       .then((rows) => {
         if (!cancelled) setTravelCommissions(Array.isArray(rows) ? rows : []);
       })
@@ -203,7 +221,17 @@ export function UserDetail() {
     return () => {
       cancelled = true;
     };
-  }, [user, isAuthenticated, isDemo, activeTab, travelEnabled, needsBranch, branchRevision]);
+  }, [
+    user,
+    isAuthenticated,
+    isDemo,
+    activeTab,
+    travelEnabled,
+    needsBranch,
+    branchRevision,
+    commissionFromYmd,
+    commissionToYmd,
+  ]);
 
   useEffect(() => {
     if (!user || !(isAuthenticated || isDemo) || activeTab !== "offers") return;
@@ -628,47 +656,61 @@ export function UserDetail() {
 
             {travelEnabled && (
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {tr("Təklif komissiyaları", "Offer commissions")}
-                    </h3>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                      {tr(
-                        "Qəbul edilmiş və ödənilmiş təkliflərdən qazanılan real komissiyalar",
-                        "Real commissions earned from accepted and paid offers",
-                      )}
-                    </p>
-                  </div>
-                  {!needsBranch && !travelCommissionsLoading && travelCommissionTotals.count > 0 && (
-                    <div className="flex flex-wrap gap-3 text-[11px]">
-                      <span className="text-gray-500">
-                        {tr("Satış", "Sales")}:{" "}
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {formatMoney(travelCommissionTotals.sales)}
-                        </span>
-                      </span>
-                      <span className="text-gray-500">
-                        {tr("Komissiya", "Commission")}:{" "}
-                        <span className="font-semibold text-[#14b8a6]">
-                          {formatMoney(travelCommissionTotals.commission)}
-                        </span>
-                      </span>
-                      {travelCommissionTotals.bonus > 0 && (
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {tr("Təklif komissiyaları", "Offer commissions")}
+                      </h3>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                        {tr(
+                          "Seçilmiş filial və tarix aralığı üzrə komissiyalar",
+                          "Commissions for the selected branch and date range",
+                        )}
+                      </p>
+                    </div>
+                    {!needsBranch && !travelCommissionsLoading && travelCommissionTotals.count > 0 && (
+                      <div className="flex flex-wrap gap-3 text-[11px]">
                         <span className="text-gray-500">
-                          {tr("Bonus", "Bonus")}:{" "}
+                          {tr("Satış", "Sales")}:{" "}
                           <span className="font-semibold text-gray-900 dark:text-white">
-                            {formatMoney(travelCommissionTotals.bonus)}
+                            {formatMoney(travelCommissionTotals.sales)}
                           </span>
                         </span>
-                      )}
-                      <span className="text-gray-500">
-                        {tr("Cəmi", "Total")}:{" "}
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {formatMoney(travelCommissionTotals.payout)}
+                        <span className="text-gray-500">
+                          {tr("Komissiya", "Commission")}:{" "}
+                          <span className="font-semibold text-[#14b8a6]">
+                            {formatMoney(travelCommissionTotals.commission)}
+                          </span>
                         </span>
-                      </span>
-                    </div>
+                        {travelCommissionTotals.bonus > 0 && (
+                          <span className="text-gray-500">
+                            {tr("Bonus", "Bonus")}:{" "}
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              {formatMoney(travelCommissionTotals.bonus)}
+                            </span>
+                          </span>
+                        )}
+                        <span className="text-gray-500">
+                          {tr("Cəmi", "Total")}:{" "}
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {formatMoney(travelCommissionTotals.payout)}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {!needsBranch && (
+                    <ReportDateRangeFilter
+                      preset={commissionPreset}
+                      onPresetChange={setCommissionPreset}
+                      customFrom={commissionCustomFrom}
+                      customTo={commissionCustomTo}
+                      onCustomFromChange={setCommissionCustomFrom}
+                      onCustomToChange={setCommissionCustomTo}
+                      includeYear={false}
+                      includeQuarter={false}
+                    />
                   )}
                 </div>
 

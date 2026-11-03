@@ -90,7 +90,7 @@ export function OfferChangeRequestChat({
             {/* Staff reply */}
             {c.staffReply ? (
               <div className="flex justify-end">
-                <div className="max-w-[88%] rounded-2xl rounded-br-md px-3 py-2 bg-[#001058] text-white shadow-sm">
+                <div className="max-w-[88%] rounded-2xl rounded-br-md px-3 py-2 bg-[#14b8a6] text-white shadow-sm">
                   <div className="flex items-center justify-between gap-2 mb-0.5">
                     <span className="text-[9px] font-bold uppercase tracking-wider text-white/70">
                       {labels.agency}

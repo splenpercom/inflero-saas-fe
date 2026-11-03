@@ -90,7 +90,8 @@ export function Payments() {
           selectedTarget === "INVOICE" ||
           selectedTarget === "PURCHASE" ||
           selectedTarget === "PURCHASE_RETURN" ||
-          selectedTarget === "SALES_RETURN"
+          selectedTarget === "SALES_RETURN" ||
+          selectedTarget === "TRAVEL_OFFER"
             ? selectedTarget
             : undefined,
         includeVoided: includeVoided || undefined,
@@ -184,6 +185,8 @@ export function Payments() {
     if (t === "PURCHASE_RETURN") return tr("Satınalma qaytarması", "Purchase return");
     if (t === "POS_ORDER") return tr("POS", "POS");
     if (t === "INVOICE") return tr("Faktura", "Invoice");
+    if (t === "TRAVEL_OFFER") return tr("Səyahət təklifi", "Travel offer");
+    if (t === "SALES_RETURN") return tr("Satış qaytarması", "Sales return");
     if (t === "SALES_RETURN") return tr("Satış qaytarması", "Sales return");
     return "—";
   };
@@ -347,6 +350,7 @@ export function Payments() {
                 { value: "all", label: tr("Növ", "Type") },
                 { value: "POS_ORDER", label: tr("POS", "POS") },
                 { value: "INVOICE", label: tr("Faktura", "Invoice") },
+                { value: "TRAVEL_OFFER", label: tr("Səyahət təklifi", "Travel offer") },
                 { value: "PURCHASE", label: tr("Satınalma", "Purchase") },
                 { value: "PURCHASE_RETURN", label: tr("Satınalma qaytarması", "Purchase return") },
                 { value: "SALES_RETURN", label: tr("Satış qaytarması", "Sales return") },

@@ -111,6 +111,14 @@ export async function patchTravelCommission(
   return res.data;
 }
 
+export async function payTravelCommission(id: string): Promise<TravelCommissionEntryRow> {
+  const res = await apiPost<ApiEnvelope<TravelCommissionEntryRow>>(
+    `/tenant/travel/commissions/${id}/pay`,
+    {},
+  );
+  return res.data;
+}
+
 export async function deleteTravelCommission(id: string): Promise<{ ok: boolean; voided?: boolean }> {
   const res = await apiDelete<ApiEnvelope<{ ok: boolean; voided?: boolean }>>(
     `/tenant/travel/commissions/${id}`,

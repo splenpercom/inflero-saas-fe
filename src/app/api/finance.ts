@@ -283,7 +283,8 @@ export type FinancePaymentTargetType =
   | "INVOICE"
   | "PURCHASE"
   | "PURCHASE_RETURN"
-  | "SALES_RETURN";
+  | "SALES_RETURN"
+  | "TRAVEL_OFFER";
 
 export interface FinancePaymentAllocation {
   targetType: FinancePaymentTargetType;

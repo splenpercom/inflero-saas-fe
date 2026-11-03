@@ -121,7 +121,8 @@ export function Products() {
   const clinicEnabled = !isDemo && hasModule("CLINIC");
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
-  const { branchId } = useBranch(); 
+  const { branchId, branchManagementEnabled } = useBranch();
+  const needsBranchForImport = branchManagementEnabled && !branchId; 
   // Translation helper - temporary until translations.ts is updated
   const pt = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
@@ -172,6 +173,14 @@ export function Products() {
       importStockSkipped: {
         en: "Quantity was skipped for some rows (select a branch to set stock)",
         az: "Bəzi sətirlərdə miqdar buraxıldı (stok üçün filial seçin)",
+      },
+      importSelectBranch: {
+        en: "Select a branch to import products for that branch only",
+        az: "Məhsulları yalnız həmin filial üçün idxal etmək üçün filial seçin",
+      },
+      importBranchOnlyHint: {
+        en: "Products and stock will be created for the selected branch only.",
+        az: "Məhsullar və stok yalnız seçilmiş filial üçün yaradılacaq.",
       },
       importCreated: { en: "Created", az: "Yaradıldı" },
       importFailed: { en: "Failed", az: "Uğursuz" },
@@ -439,6 +448,10 @@ export function Products() {
 
   const handleImportProduct = () => {
     if (isDemo || !isAuthenticated || !canCreate) return;
+    if (needsBranchForImport) {
+      notifyWarning(pt("importSelectBranch"));
+      return;
+    }
     setImportResult(null);
     setImportProgress(0);
     setIsImportModalOpen(true);
@@ -704,6 +717,12 @@ export function Products() {
       return;
     }
 
+    if (needsBranchForImport) {
+      notifyWarning(pt("importSelectBranch"));
+      event.target.value = "";
+      return;
+    }
+
     setIsImporting(true);
     setImportProgress(0);
     setImportResult(null);
@@ -719,6 +738,7 @@ export function Products() {
         rows,
         stockEnabled,
         branchId,
+        requireBranch: branchManagementEnabled,
         onProgress: (done, total) => {
           setImportProgress(total > 0 ? Math.round((done / total) * 100) : 100);
         },
@@ -1038,7 +1058,9 @@ export function Products() {
               <button
                 type="button"
                 onClick={handleImportProduct}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                disabled={needsBranchForImport}
+                title={needsBranchForImport ? pt("importSelectBranch") : undefined}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Import</span>
@@ -1398,6 +1420,16 @@ export function Products() {
 
               {/* Content */}
               <div className="p-6 space-y-4">
+                {branchManagementEnabled && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg px-3 py-2">
+                    {pt("importBranchOnlyHint")}
+                  </p>
+                )}
+                {needsBranchForImport && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+                    {pt("importSelectBranch")}
+                  </p>
+                )}
                 {/* Download Demo File */}
                 <div>
                   <label className="text-sm font-medium text-gray-900 dark:text-white mb-2 block">
@@ -1439,7 +1471,7 @@ export function Products() {
                         className="hidden"
                         accept=".csv,.xlsx,.xls"
                         onChange={(e) => void handleImportFileChange(e)}
-                        disabled={isImporting}
+                        disabled={isImporting || needsBranchForImport}
                       />
                     </label>
                   </div>
