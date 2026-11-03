@@ -35,6 +35,7 @@ import {
   CheckSquare,
   Receipt,
   BedDouble,
+  Store,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -161,6 +162,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       hotelRooms: { en: "Rooms", az: "Otaqlar" },
       hotelReservations: { en: "Reservations", az: "Rezervasiyalar" },
       tasks: { en: "Tasks", az: "Tapşırıqlar" },
+      marketplace: { en: "Marketplace", az: "Marketpleys" },
 
       // Travel plugin (labels without "Travel" — plugin owns the shell when enabled)
       travelOffers: { en: "Offers", az: "Təkliflər" },
@@ -282,6 +284,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const allBranchesNavItems: NavItem[] = useMemo(() => {
     const icons: Record<string, React.ComponentType<{ className?: string }>> = {
       dashboard: LayoutDashboard,
+      marketplace: Store,
       employees: Users,
       userRoles: Users,
       warehouses: Building2,
@@ -413,6 +416,12 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       label: st("reports"),
       path: "/dashboard/reports",
       permissionModule: "Reports",
+    },
+    {
+      icon: Store,
+      labelKey: "marketplace",
+      label: st("marketplace"),
+      path: "/dashboard/marketplace",
     },
     {
       icon: CheckSquare,

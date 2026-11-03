@@ -38,6 +38,7 @@ import { CustomerProfile } from "./components/corporate/CustomerProfile";
 import { Suppliers } from "./components/corporate/people/Suppliers";
 import { Warehouses } from "./components/corporate/people/Warehouses";
 import { Reports } from "./components/corporate/Reports";
+import { Marketplace } from "./components/corporate/Marketplace";
 import { UserManagement } from "./components/corporate/UserManagement";
 import { UserDetail } from "./components/corporate/UserDetail";
 import { Login } from "./components/Login";
@@ -418,6 +419,7 @@ function AppShell() {
               <Route path="reports/product" element={<Navigate to="/dashboard/reports" replace />} />
               <Route path="reports/annual" element={<Navigate to="/dashboard/reports" replace />} />
               {/* Tasks — core surface, not gated by any feature plugin */}
+              <Route path="marketplace" element={<Marketplace />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="user-management/users/:id" element={<UserDetail />} />
               <Route path="user-management/roles" element={<UserManagement />} />

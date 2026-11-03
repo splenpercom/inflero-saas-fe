@@ -20,6 +20,7 @@ import {
   Check,
   Columns3,
   Barcode,
+  Printer,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -49,6 +50,7 @@ import {
   runProductImport,
   type ProductImportResult,
 } from "../../lib/productImport";
+import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
@@ -68,7 +70,14 @@ interface Product {
   quantity: number;
   createdBy: string;
   createdById: string;
+  itemBarcode: string | null;
 }
+
+type SelectedPrintMeta = {
+  name: string;
+  price: number;
+  itemBarcode: string | null;
+};
 
 type SortField = "category" | "brand" | "price" | "cost" | "quantity" | "createdBy";
 type SortDirection = "asc" | "desc" | null;
@@ -206,6 +215,26 @@ export function Products() {
         en: "Generating…",
         az: "Yaradılır…",
       },
+      printBarcodes: {
+        en: "Print barcodes",
+        az: "Barkod çap et",
+      },
+      printingBarcodes: {
+        en: "Printing…",
+        az: "Çap edilir…",
+      },
+      printBarcodesDone: {
+        en: "Barcodes printed",
+        az: "Barkodlar çap edildi",
+      },
+      printBarcodesNone: {
+        en: "Selected products have no barcodes",
+        az: "Seçilmiş məhsulların barkodu yoxdur",
+      },
+      printBarcodesSkipped: {
+        en: "skipped (no barcode)",
+        az: "keçildi (barkod yoxdur)",
+      },
     };
     return mapLang(language, translations[key], key);
   };
@@ -227,7 +256,12 @@ export function Products() {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  /** Meta for selected rows across pages (list only holds the current page). */
+  const [selectedPrintMeta, setSelectedPrintMeta] = useState<Map<string, SelectedPrintMeta>>(
+    () => new Map(),
+  );
   const [barcodeConfirmOpen, setBarcodeConfirmOpen] = useState(false);
+  const [printingBarcodes, setPrintingBarcodes] = useState(false);
 
   // Import modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -329,8 +363,9 @@ export function Products() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [columnsOpen]);
 
+  const showRowSelection = canView;
   const visibleColCount =
-    (canDelete ? 1 : 0) + // selection checkbox
+    (showRowSelection ? 1 : 0) + // selection checkbox (print / delete)
     (col("sku") ? 1 : 0) +
     (col("productName") ? 1 : 0) +
     (col("brand") ? 1 : 0) +
@@ -391,6 +426,7 @@ export function Products() {
         quantity: item.quantity ?? 0,
         createdBy: item.createdBy,
         createdById: item.createdById,
+        itemBarcode: item.itemBarcode?.trim() ? item.itemBarcode.trim() : null,
       }));
       if ((sortField === "quantity" || sortField === "cost") && sortDirection) {
         items = [...items].sort((a, b) => {
@@ -618,6 +654,11 @@ export function Products() {
             for (const id of deletedIds) next.delete(id);
             return next;
           });
+          setSelectedPrintMeta((prev) => {
+            const next = new Map(prev);
+            for (const id of deletedIds) next.delete(id);
+            return next;
+          });
           void loadProducts();
         }
         if (deletedCount > 0 && skippedCount === 0) {
@@ -649,6 +690,11 @@ export function Products() {
         await deleteProduct(singleId);
         setSelectedIds((prev) => {
           const next = new Set(prev);
+          next.delete(singleId);
+          return next;
+        });
+        setSelectedPrintMeta((prev) => {
+          const next = new Map(prev);
           next.delete(singleId);
           return next;
         });
@@ -705,6 +751,48 @@ export function Products() {
       );
     } finally {
       setGeneratingBarcodes(false);
+    }
+  };
+
+  const handlePrintSelectedBarcodes = async () => {
+    if (printingBarcodes || selectedIds.size === 0) return;
+    const labels: Array<{ barcodeValue: string; productName: string; priceLabel: string }> = [];
+    let skipped = 0;
+    for (const id of selectedIds) {
+      const meta = selectedPrintMeta.get(id);
+      const code = (meta?.itemBarcode ?? "").trim();
+      if (!code) {
+        skipped += 1;
+        continue;
+      }
+      labels.push({
+        barcodeValue: code,
+        productName: (meta?.name ?? "").trim(),
+        priceLabel: formatBarcodePriceLabel(String(meta?.price ?? "")),
+      });
+    }
+    if (labels.length === 0) {
+      notifyWarning(pt("printBarcodesNone"));
+      return;
+    }
+    setPrintingBarcodes(true);
+    try {
+      for (const label of labels) {
+        await printBarcodeLabel(label);
+      }
+      const doneMsg = `${pt("printBarcodesDone")}: ${labels.length}`;
+      if (skipped > 0) {
+        notifySuccess(`${doneMsg} · ${skipped} ${pt("printBarcodesSkipped")}`);
+      } else {
+        notifySuccess(doneMsg);
+      }
+    } catch (err) {
+      notifyFromError(
+        err,
+        pickLang(language, "Barkod çapı alınmadı", "Failed to print barcodes"),
+      );
+    } finally {
+      setPrintingBarcodes(false);
     }
   };
 
@@ -815,20 +903,77 @@ export function Products() {
       }
       return next;
     });
+    setSelectedPrintMeta((prev) => {
+      const next = new Map(prev);
+      if (allPageSelected) {
+        for (const p of paginatedProducts) next.delete(p.id);
+      } else {
+        for (const p of paginatedProducts) {
+          next.set(p.id, {
+            name: p.name,
+            price: p.price,
+            itemBarcode: p.itemBarcode,
+          });
+        }
+      }
+      return next;
+    });
   };
 
   const toggleSelectRow = (id: string) => {
+    const product = paginatedProducts.find((p) => p.id === id);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+    setSelectedPrintMeta((prev) => {
+      const next = new Map(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (product) {
+        next.set(id, {
+          name: product.name,
+          price: product.price,
+          itemBarcode: product.itemBarcode,
+        });
+      }
+      return next;
+    });
   };
+
+  // Keep print meta in sync when the current page reloads (e.g. after generate barcodes).
+  useEffect(() => {
+    if (selectedIds.size === 0) return;
+    setSelectedPrintMeta((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const p of products) {
+        if (!selectedIds.has(p.id)) continue;
+        const cur = next.get(p.id);
+        if (
+          !cur ||
+          cur.name !== p.name ||
+          cur.price !== p.price ||
+          cur.itemBarcode !== p.itemBarcode
+        ) {
+          next.set(p.id, {
+            name: p.name,
+            price: p.price,
+            itemBarcode: p.itemBarcode,
+          });
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [products, selectedIds]);
 
   // Drop selection when filters/search change; keep across pagination.
   useEffect(() => {
     setSelectedIds(new Set());
+    setSelectedPrintMeta(new Map());
   }, [debouncedSearch, selectedCategory, selectedBrand, branchRevision]);
 
   const isBulkDelete = bulkDeleteIds.length > 0;
@@ -1039,7 +1184,7 @@ export function Products() {
                 <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
               </button>
 
-              {canEdit && !isDemo && (
+              {canEdit && !isDemo && selectedIds.size === 0 && (
               <button
                 type="button"
                 onClick={handleGenerateBarcodesClick}
@@ -1067,11 +1212,26 @@ export function Products() {
               </button>
               )}
 
+              {showRowSelection && selectedIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => void handlePrintSelectedBarcodes()}
+                disabled={printingBarcodes || deleting}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                title={pt("printBarcodes")}
+              >
+                <Printer className={cn("w-3.5 h-3.5", printingBarcodes && "animate-pulse")} />
+                <span>
+                  {printingBarcodes ? pt("printingBarcodes") : pt("printBarcodes")} ({selectedIds.size})
+                </span>
+              </button>
+              )}
+
               {canDelete && selectedIds.size > 0 && (
               <button
                 type="button"
                 onClick={handleBulkDeleteClick}
-                disabled={deleting}
+                disabled={deleting || printingBarcodes}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 title={pickLang(language, "Seçilmişləri sil", "Delete selected")}
               >
@@ -1106,7 +1266,7 @@ export function Products() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
-                  {canDelete && (
+                  {showRowSelection && (
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap w-10">
                     <input
                       type="checkbox"
@@ -1115,7 +1275,7 @@ export function Products() {
                         if (el) el.indeterminate = somePageSelected;
                       }}
                       onChange={toggleSelectAllPage}
-                      disabled={loading || paginatedProducts.length === 0 || deleting}
+                      disabled={loading || paginatedProducts.length === 0 || deleting || printingBarcodes}
                       className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
                       title={pickLang(language, "Səhifədəkiləri seç", "Select page")}
                       aria-label={pickLang(language, "Səhifədəkiləri seç", "Select page")}
@@ -1262,13 +1422,13 @@ export function Products() {
                           : "bg-gray-50 dark:bg-gray-800/30"
                     }`}
                   >
-                    {canDelete && (
+                    {showRowSelection && (
                     <td className="px-3 py-2 whitespace-nowrap">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(product.id)}
                         onChange={() => toggleSelectRow(product.id)}
-                        disabled={deleting}
+                        disabled={deleting || printingBarcodes}
                         className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
                         aria-label={pickLang(language, "Sətiri seç", "Select row")}
                       />
