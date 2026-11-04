@@ -39,7 +39,16 @@ import {
 const inputCls =
   "w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors";
 
-const AREAS = ["Indoor", "Outdoor", "Terrace", "Bar", "VIP"];
+const AREAS = ["Indoor", "Outdoor", "Terrace", "Bar", "VIP"] as const;
+type AreaKey = (typeof AREAS)[number];
+
+const AREA_LABEL: Record<AreaKey, { az: string; en: string }> = {
+  Indoor: { az: "Daxili", en: "Indoor" },
+  Outdoor: { az: "Açıq hava", en: "Outdoor" },
+  Terrace: { az: "Terras", en: "Terrace" },
+  Bar: { az: "Bar", en: "Bar" },
+  VIP: { az: "VIP", en: "VIP" },
+};
 
 type UiStatus = "available" | "occupied" | "reserved";
 
@@ -134,6 +143,13 @@ function TableModal({
   }) => void;
   onClose: () => void;
 }) {
+  const { language } = useLanguage();
+  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const areaLabel = (key: string) => {
+    const row = AREA_LABEL[key as AreaKey];
+    return row ? tr(row.az, row.en) : key;
+  };
+
   const [name, setName] = useState(initial?.name ?? "");
   const [number, setNumber] = useState(initial?.number ?? defaultNumber);
   const [seats, setSeats] = useState(initial?.seats ?? 4);
@@ -151,7 +167,7 @@ function TableModal({
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-full max-w-sm shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-            {initial ? "Edit Table" : "Add Table"}
+            {initial ? tr("Masanı redaktə et", "Edit Table") : tr("Masa əlavə et", "Add Table")}
           </h2>
           <button
             type="button"
@@ -164,7 +180,7 @@ function TableModal({
         <div className="p-4 space-y-3">
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              Table Number
+              {tr("Masa nömrəsi", "Table Number")}
             </label>
             <input
               type="number"
@@ -176,18 +192,18 @@ function TableModal({
           </div>
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              Table Name <span className="text-red-500">*</span>
+              {tr("Masa adı", "Table Name")} <span className="text-red-500">*</span>
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Table 7, Garden Booth…"
+              placeholder={tr("məs. Masa 7, Bağ kabinəsi…", "e.g. Table 7, Garden Booth…")}
               className={inputCls}
             />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              Seats
+              {tr("Oturacaq", "Seats")}
             </label>
             <div className="flex gap-1.5">
               {[2, 4, 6, 8, 10, 12].map((n) => (
@@ -206,7 +222,7 @@ function TableModal({
           </div>
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              Area
+              {tr("Zona", "Area")}
             </label>
             <div className="flex flex-wrap gap-1.5">
               {AREAS.map((a) => (
@@ -218,7 +234,7 @@ function TableModal({
                     area === a ? active : idle
                   }`}
                 >
-                  {a}
+                  {areaLabel(a)}
                 </button>
               ))}
             </div>
@@ -226,7 +242,7 @@ function TableModal({
           {showHourlyRate && (
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                Hourly rate (optional)
+                {tr("Saatlıq tarif (istəyə bağlı)", "Hourly rate (optional)")}
               </label>
               <input
                 type="number"
@@ -234,7 +250,7 @@ function TableModal({
                 step="0.01"
                 value={hourlyRate}
                 onChange={(e) => setHourlyRate(e.target.value)}
-                placeholder="e.g. 10"
+                placeholder={tr("məs. 10", "e.g. 10")}
                 className={inputCls}
               />
             </div>
@@ -246,7 +262,7 @@ function TableModal({
             onClick={onClose}
             className="px-4 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-xs font-medium transition-colors"
           >
-            Cancel
+            {tr("Ləğv et", "Cancel")}
           </button>
           <button
             type="button"
@@ -265,7 +281,7 @@ function TableModal({
             }}
             className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
           >
-            Save
+            {tr("Yadda saxla", "Save")}
           </button>
         </div>
       </div>
@@ -827,12 +843,13 @@ export function RestaurantTables() {
                           <Users className="w-3 h-3" /> {table.seats}
                         </span>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-3 py-2 whitespace-nowrap w-0">
                         <ModernSelect
                           value={st}
                           onChange={(value) => void setStatus(table.id, value as UiStatus)}
-                          minWidth={100}
-                          buttonClassName={`px-2 py-0.5 text-[10px] font-medium border ${STATUS_BADGE[st]}`}
+                          minWidth={104}
+                          className="w-max"
+                          buttonClassName={`w-max px-2.5 py-0.5 text-[10px] font-medium border ${STATUS_BADGE[st]}`}
                           options={[
                             { value: "available", label: tr("Boş", "Available") },
                             { value: "occupied", label: tr("Dolu", "Occupied") },

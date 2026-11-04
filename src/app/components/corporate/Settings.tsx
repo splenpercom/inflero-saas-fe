@@ -155,6 +155,7 @@ export function Settings() {
     "PENDING" | "PAID" | "NONE"
   >("PENDING");
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
+  const [productsCogsEnabled, setProductsCogsEnabled] = useState(true);
   const [billers, setBillers] = useState<SalesBillerRow[]>([]);
   const [commissionDrafts, setCommissionDrafts] = useState<Record<string, CommissionDraft>>({});
 
@@ -172,6 +173,7 @@ export function Settings() {
     posStaffPasscodeEnabled: boolean;
     posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";
     inventoryServicesEnabled: boolean;
+    productsCogsEnabled: boolean;
     billers: SalesBillerRow[];
   } | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -236,6 +238,7 @@ export function Settings() {
           : "PENDING",
     );
     setInventoryServicesEnabled(data.inventoryServicesEnabled === true);
+    setProductsCogsEnabled(data.productsCogsEnabled !== false);
     setSavedLogoUrl(data.companyLogo);
     setLogoFile(null);
     setLogoPreview(data.companyLogo);
@@ -293,6 +296,7 @@ export function Settings() {
                 ? "NONE"
                 : "PENDING",
           inventoryServicesEnabled: data.inventoryServicesEnabled === true,
+          productsCogsEnabled: data.productsCogsEnabled !== false,
           billers: billerRows,
         };
         snapshotRef.current = {
@@ -522,6 +526,9 @@ export function Settings() {
         if (canEditBranchAddons && addonsEnabled && !clinicEnabled) {
           payload.inventoryServicesEnabled = inventoryServicesEnabled;
         }
+        if (canEditBranchAddons && addonsEnabled) {
+          payload.productsCogsEnabled = productsCogsEnabled;
+        }
       }
 
       await updateTenantSettings(payload);
@@ -558,7 +565,14 @@ export function Settings() {
           posStaffPasscodeEnabled,
           posDefaultPaymentStatus,
           inventoryServicesEnabled,
+          productsCogsEnabled,
           billers: refreshedBillers,
+        };
+      } else if (activeSection === "addons" && addonSnapshotRef.current) {
+        addonSnapshotRef.current = {
+          ...addonSnapshotRef.current,
+          inventoryServicesEnabled,
+          productsCogsEnabled,
         };
       }
 
@@ -616,6 +630,7 @@ export function Settings() {
         setPosStaffPasscodeEnabled(addonSnapshotRef.current.posStaffPasscodeEnabled);
         setPosDefaultPaymentStatus(addonSnapshotRef.current.posDefaultPaymentStatus);
         setInventoryServicesEnabled(addonSnapshotRef.current.inventoryServicesEnabled);
+        setProductsCogsEnabled(addonSnapshotRef.current.productsCogsEnabled);
         applyBillerDrafts(addonSnapshotRef.current.billers);
       }
       notifyInfo(pt("Changes discarded.", "Dəyişikliklər ləğv edildi."));
@@ -1072,6 +1087,39 @@ export function Settings() {
                     </button>
                   </div>
                   )}
+
+                  <div
+                    className={`flex items-start justify-between gap-4 ${
+                      !clinicEnabled ? "pt-2 border-t border-gray-100 dark:border-gray-800" : ""
+                    }`}
+                  >
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Show COGS on products", "Məhsullarda maya dəyərini göstər")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, Cost (COGS) appears on product create, edit, list, and details. Turn off to hide it from the products flow.",
+                          "Aktiv olduqda Maya dəyəri (COGS) məhsul yaratma, redaktə, siyahı və detallarda görünür. Məhsul axınından gizlətmək üçün söndürün.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit || !canEditBranchAddons}
+                      onClick={() => setProductsCogsEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        productsCogsEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={productsCogsEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          productsCogsEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
 
                   {posEnabled && (
                   <>

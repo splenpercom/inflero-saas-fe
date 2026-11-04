@@ -55,6 +55,7 @@ import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import { useBranch } from "../../context/BranchContext";
+import { useProductsCogsEnabled } from "../../hooks/useProductsCogsEnabled";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface Product {
@@ -128,6 +129,7 @@ export function Products() {
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
   const clinicEnabled = !isDemo && hasModule("CLINIC");
+  const productsCogsEnabled = useProductsCogsEnabled();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId, branchManagementEnabled } = useBranch();
@@ -344,12 +346,12 @@ export function Products() {
       { key: "productName", label: pt("productName"), available: true },
       { key: "brand", label: pt("brand"), available: true },
       { key: "price", label: pt("price"), available: true },
-      { key: "cost", label: pt("cost"), available: true },
+      { key: "cost", label: pt("cost"), available: productsCogsEnabled },
       { key: "unit", label: pt("unit"), available: true },
       { key: "quantity", label: pt("qty"), available: stockEnabled },
       { key: "createdBy", label: pt("createdBy"), available: true },
     ],
-    [language, stockEnabled],
+    [language, stockEnabled, productsCogsEnabled],
   );
 
   useEffect(() => {
@@ -364,13 +366,14 @@ export function Products() {
   }, [columnsOpen]);
 
   const showRowSelection = canView;
+  const showCostCol = productsCogsEnabled && col("cost");
   const visibleColCount =
     (showRowSelection ? 1 : 0) + // selection checkbox (print / delete)
     (col("sku") ? 1 : 0) +
     (col("productName") ? 1 : 0) +
     (col("brand") ? 1 : 0) +
     (col("price") ? 1 : 0) +
-    (col("cost") ? 1 : 0) +
+    (showCostCol ? 1 : 0) +
     (col("unit") ? 1 : 0) +
     (stockEnabled && col("quantity") ? 1 : 0) +
     (col("createdBy") ? 1 : 0) +
@@ -1330,7 +1333,7 @@ export function Products() {
                     </div>
                   </th>
                   )}
-                  {col("cost") && (
+                  {showCostCol && (
                   <th
                     className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors select-none"
                     onClick={() => handleSort("cost")}
@@ -1472,7 +1475,7 @@ export function Products() {
                       {product.price} ₼
                     </td>
                     )}
-                    {col("cost") && (
+                    {showCostCol && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap tabular-nums">
                       {product.cost != null ? `${product.cost} ₼` : "—"}
                     </td>

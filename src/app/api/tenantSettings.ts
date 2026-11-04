@@ -42,6 +42,8 @@ export interface TenantSettingsRecord {
   posEditableProductPricesEnabled?: boolean;
   posQrOrderAlarmEnabled?: boolean;
   inventoryServicesEnabled?: boolean;
+  /** When true (default), Cost (COGS) is shown on product create/edit/list/details. */
+  productsCogsEnabled?: boolean;
   tableHourlyBillingEnabled?: boolean;
   posStaffPasscodeEnabled?: boolean;
   /** Default POS payment status pre-selection (NONE = cashier must choose). */
@@ -69,6 +71,7 @@ export type TenantSettingsUpdate = Partial<{
   posEditableProductPricesEnabled: boolean;
   posQrOrderAlarmEnabled: boolean;
   inventoryServicesEnabled: boolean;
+  productsCogsEnabled: boolean;
   tableHourlyBillingEnabled: boolean;
   posStaffPasscodeEnabled: boolean;
   posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";

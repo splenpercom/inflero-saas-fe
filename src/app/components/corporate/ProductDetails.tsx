@@ -20,6 +20,7 @@ import { mapLang, pickLang } from "../../i18n/pickLang";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
+import { useProductsCogsEnabled } from "../../hooks/useProductsCogsEnabled";
 import { fetchProduct, type ProductDetail } from "../../api/inventory";
 import { notifyFromError } from "../../lib/toast";
 import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
@@ -148,6 +149,7 @@ export function ProductDetails() {
   const { id } = useParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
+  const productsCogsEnabled = useProductsCogsEnabled();
   const { canView, canEdit } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -392,6 +394,7 @@ export function ProductDetails() {
                     </span>
                   }
                 />
+                {productsCogsEnabled && (
                 <DetailRow
                   label={pt("cost")}
                   value={
@@ -404,6 +407,7 @@ export function ProductDetails() {
                     )
                   }
                 />
+                )}
                 <DetailRow
                   label={pt("status")}
                   value={
