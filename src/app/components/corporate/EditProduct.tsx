@@ -44,6 +44,7 @@ import {
 import { useLanguage } from "../../i18n/LanguageContext";
 import JsBarcode from "jsbarcode";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
+import { useProductsCogsEnabled } from "../../hooks/useProductsCogsEnabled";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 const LIST_PATH = PRODUCTS_LIST_PATH;
@@ -80,6 +81,7 @@ export function EditProduct() {
   const { id } = useParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
+  const productsCogsEnabled = useProductsCogsEnabled();
   const { canCreate, canEdit } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
@@ -466,7 +468,9 @@ export function EditProduct() {
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
         price: String(parsePrice(price)),
-        purchasePrice: cost.trim() ? String(parsePrice(cost)) : null,
+        ...(productsCogsEnabled
+          ? { purchasePrice: cost.trim() ? String(parsePrice(cost)) : null }
+          : {}),
         discountType: mapDiscountToApi(discountType),
         discountValue: discountValue.trim() ? String(parsePrice(discountValue)) : null,
         ...(stockEnabled
@@ -690,6 +694,7 @@ export function EditProduct() {
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
+                  {productsCogsEnabled && (
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {pt("cost")}
@@ -701,6 +706,7 @@ export function EditProduct() {
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {pt("discountType")}

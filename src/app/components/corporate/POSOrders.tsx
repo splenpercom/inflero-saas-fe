@@ -237,6 +237,7 @@ type OrdersColumnKey =
   | "table"
   | "kot"
   | "production"
+  | "products"
   | "status"
   | "grandTotal"
   | "paid"
@@ -254,6 +255,7 @@ const DEFAULT_ORDERS_COLUMNS: Record<OrdersColumnKey, boolean> = {
   table: true,
   kot: true,
   production: true,
+  products: true,
   status: true,
   grandTotal: true,
   paid: true,
@@ -261,6 +263,15 @@ const DEFAULT_ORDERS_COLUMNS: Record<OrdersColumnKey, boolean> = {
   paymentStatus: true,
   biller: true,
 };
+
+function formatOrderProductsLabel(
+  products: { name: string; quantity: number }[] | undefined,
+): string {
+  if (!products?.length) return "—";
+  return products
+    .map((p) => `${p.quantity}× ${p.name}`)
+    .join(", ");
+}
 
 function loadOrdersColumns(): Record<OrdersColumnKey, boolean> {
   try {
@@ -299,6 +310,7 @@ export function POSOrders() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [touchKbOpen, setTouchKbOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState("all");
+  const [selectedBiller, setSelectedBiller] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   /** When false, completed orders are excluded (status filter "all" only). */
   const [showCompleted, setShowCompleted] = useState(true);
@@ -317,6 +329,7 @@ export function POSOrders() {
   const [selectedKotStatus, setSelectedKotStatus] = useState("all");
   const [selectedProductionStatus, setSelectedProductionStatus] = useState("all");
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
+  const [ordersShowProductsEnabled, setOrdersShowProductsEnabled] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
   const [updatingProductionId, setUpdatingProductionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("last7days");
@@ -375,6 +388,7 @@ export function POSOrders() {
   }, [
     debouncedSearch,
     selectedCustomer,
+    selectedBiller,
     selectedStatus,
     showCompleted,
     selectedPaymentStatus,
@@ -447,6 +461,7 @@ export function POSOrders() {
   useEffect(() => {
     if (!(isAuthenticated || isDemo)) {
       setPosSendToProductionEnabled(false);
+      setOrdersShowProductsEnabled(false);
       setPosStaffPasscodeEnabled(false);
       return;
     }
@@ -455,12 +470,14 @@ export function POSOrders() {
       .then((s) => {
         if (!cancelled) {
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
+          setOrdersShowProductsEnabled(s.ordersShowProductsEnabled === true);
           setPosStaffPasscodeEnabled(s.posStaffPasscodeEnabled === true);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setPosSendToProductionEnabled(false);
+          setOrdersShowProductsEnabled(false);
           setPosStaffPasscodeEnabled(false);
         }
       });
@@ -470,6 +487,7 @@ export function POSOrders() {
   }, [isAuthenticated, isDemo, branchRevision]);
 
   const showProductionColumn = posSendToProductionEnabled && visibleColumns.production;
+  const showProductsColumn = ordersShowProductsEnabled && visibleColumns.products;
 
   const col = (key: OrdersColumnKey) => visibleColumns[key];
 
@@ -494,6 +512,7 @@ export function POSOrders() {
       { key: "table", label: tr("Masa", "Table"), available: diningEnabled },
       { key: "kot", label: tr("KOT", "KOT"), available: diningEnabled },
       { key: "production", label: tr("İstehsal", "Production"), available: posSendToProductionEnabled },
+      { key: "products", label: tr("Məhsullar", "Products"), available: ordersShowProductsEnabled },
       { key: "status", label: tr("Status", "Status"), available: true },
       { key: "grandTotal", label: tr("Ümumi", "Total"), available: true },
       { key: "paid", label: tr("Ödənilib", "Paid"), available: true },
@@ -501,7 +520,7 @@ export function POSOrders() {
       { key: "paymentStatus", label: tr("Ödəniş", "Payment"), available: true },
       { key: "biller", label: tr("Kassir", "Biller"), available: true },
     ],
-    [language, diningEnabled, posSendToProductionEnabled],
+    [language, diningEnabled, posSendToProductionEnabled, ordersShowProductsEnabled],
   );
 
   useEffect(() => {
@@ -523,6 +542,7 @@ export function POSOrders() {
     (diningEnabled && col("table") ? 1 : 0) +
     (diningEnabled && col("kot") ? 1 : 0) +
     (showProductionColumn ? 1 : 0) +
+    (showProductsColumn ? 1 : 0) +
     (col("status") ? 1 : 0);
   const colsAfterMoney =
     (col("paymentStatus") ? 1 : 0) + (col("biller") ? 1 : 0) + 1; // actions
@@ -565,6 +585,7 @@ export function POSOrders() {
         {
           search: debouncedSearch.trim() || undefined,
           customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
+          billerId: selectedBiller !== "all" ? selectedBiller : undefined,
           status: selectedStatus,
           hideCompleted: selectedStatus === "all" && !showCompleted,
           paymentStatus: selectedPaymentStatus,
@@ -618,6 +639,7 @@ export function POSOrders() {
     canView,
     debouncedSearch,
     selectedCustomer,
+    selectedBiller,
     selectedStatus,
     showCompleted,
     selectedPaymentStatus,
@@ -792,14 +814,20 @@ export function POSOrders() {
     const data = await fetchPosOrders({
       search: debouncedSearch.trim() || undefined,
       customerId: selectedCustomer !== "all" ? selectedCustomer : undefined,
+      billerId: selectedBiller !== "all" ? selectedBiller : undefined,
       status: selectedStatus,
       hideCompleted: selectedStatus === "all" && !showCompleted,
       paymentStatus: selectedPaymentStatus,
       paymentMethod: selectedPaymentMethod,
+      source: selectedSource,
       sortBy,
       ...rangeQuery,
       page: 1,
       pageSize: 200,
+      ...(diningEnabled ? { kotStatus: selectedKotStatus } : {}),
+      ...(posSendToProductionEnabled
+        ? { productionStatus: selectedProductionStatus }
+        : {}),
     });
     return data.items ?? [];
   };
@@ -819,6 +847,7 @@ export function POSOrders() {
             "ID",
             tr("Tarix", "Date"),
             tr("Mənbə", "Source"),
+            ...(ordersShowProductsEnabled ? [tr("Məhsullar", "Products")] : []),
             tr("Status", "Status"),
             tr("Ümumi", "Total"),
             tr("Ödənilib", "Paid"),
@@ -832,6 +861,7 @@ export function POSOrders() {
           formatOrderDisplayId(order.reference, order.storeName, order.storeCode, user?.tenant?.name),
           formatSalesDateTime(order.date, language),
           order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
+          ...(ordersShowProductsEnabled ? [formatOrderProductsLabel(order.products)] : []),
           translateStatus(order.status),
           String(order.grandTotal),
           String(order.paid),
@@ -858,6 +888,7 @@ export function POSOrders() {
         "ID",
         tr("Tarix", "Date"),
         tr("Mənbə", "Source"),
+        ...(ordersShowProductsEnabled ? [tr("Məhsullar", "Products")] : []),
         tr("Status", "Status"),
         tr("Ümumi", "Total"),
         tr("Ödənilib", "Paid"),
@@ -870,6 +901,7 @@ export function POSOrders() {
         formatOrderDisplayId(order.reference, order.storeName, order.storeCode, user?.tenant?.name),
         formatSalesDateTime(order.date, language),
         order.sentToBar ? "BAR" : orderSourceTag(order.source, !!order.table),
+        ...(ordersShowProductsEnabled ? [formatOrderProductsLabel(order.products)] : []),
         translateStatus(order.status),
         order.grandTotal,
         order.paid,
@@ -1283,6 +1315,19 @@ export function POSOrders() {
               />
 
               <ModernSelect
+                value={selectedBiller}
+                onChange={setSelectedBiller}
+                placeholder={tr("İşçi", "Employee")}
+                className="w-[160px]"
+                minWidth={160}
+                searchable
+                options={[
+                  { value: "all", label: tr("İşçi", "Employee") },
+                  ...billers.map((b) => ({ value: b.id, label: b.name })),
+                ]}
+              />
+
+              <ModernSelect
                 value={selectedStatus}
                 onChange={setSelectedStatus}
                 placeholder={tr("Status", "Status")}
@@ -1599,6 +1644,11 @@ export function POSOrders() {
                       {tr("İSTEHSAL", "PRODUCTION")}
                     </th>
                   )}
+                  {showProductsColumn && (
+                    <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap min-w-[10rem] max-w-[18rem]">
+                      {tr("MƏHSULLAR", "PRODUCTS")}
+                    </th>
+                  )}
                   {col("status") && (
                     <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">
                       {tr("STATUS", "STATUS")}
@@ -1764,6 +1814,16 @@ export function POSOrders() {
                               {translateProductionStatus(order.productionStatus)}
                             </span>
                           )}
+                        </td>
+                      )}
+                      {showProductsColumn && (
+                        <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-300 max-w-[18rem]">
+                          <span
+                            className="line-clamp-3 break-words"
+                            title={formatOrderProductsLabel(order.products)}
+                          >
+                            {formatOrderProductsLabel(order.products)}
+                          </span>
                         </td>
                       )}
                       {col("status") && (

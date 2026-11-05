@@ -229,9 +229,9 @@ const DEMO_SUPPLIERS = mockSuppliers.map((s) => ({
   status: s.status,
 }));
 
+// Keep in sync with DEMO_USERS (non-owner staff only) — Settings commission uses this list.
 const DEMO_BILLERS = [
-  { id: "bill-1", code: "BL001", name: "James Kirwin", email: "james@demo.local", commissionType: null, commissionValue: null },
-  { id: "bill-2", code: "BL002", name: "Francis Chang", email: "francis@demo.local", commissionType: "PERCENT", commissionValue: "10" },
+  { id: "bill-1", code: "BL001", name: "James Kirwin", email: "staff@demo.local", commissionType: null, commissionValue: null },
 ];
 
 const DEMO_POS_ORDERS = [
@@ -839,6 +839,8 @@ function posOrderDetail(id: string) {
     storeId: row.storeId,
     customerId: row.customerId,
     customerName: row.customerName,
+    customerPhone: null,
+    customerCode: null,
     billerId: "bill-1",
     billerName: row.biller,
     payments: [],

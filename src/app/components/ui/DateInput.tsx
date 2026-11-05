@@ -21,7 +21,10 @@ interface DateInputProps {
   placeholder?: string;
   required?: boolean;
   className?: string;
-  /** When opening with no value, start calendar around this many years in the past (good for DOB). */
+  /**
+   * When opening with no value, start calendar this many years before today.
+   * Default 0 = today (filters / expense dates). Pass ~25–30 for DOB fields.
+   */
   defaultYearsAgo?: number;
 }
 
@@ -40,7 +43,7 @@ export function DateInput({
   placeholder,
   required,
   className = "",
-  defaultYearsAgo = 25,
+  defaultYearsAgo = 0,
 }: DateInputProps) {
   const { language } = useLanguage();
   const [showCalendar, setShowCalendar] = useState(false);

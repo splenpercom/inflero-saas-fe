@@ -189,6 +189,8 @@ export function OpticsPrescriptionDialog({
                       placeholder={tr("Məhsul", "Product", "Товар")}
                       searchPlaceholder={tr("Axtar…", "Search...", "Поиск...")}
                       emptyLabel={tr("Məhsul yoxdur", "No products", "Нет товаров")}
+                      allCategoriesLabel={tr("Bütün kateqoriyalar", "All categories", "Все категории")}
+                      categoryFilterLabel={tr("Kateqoriya", "Category", "Категория")}
                       compact
                       onSelect={(product) => bindProduct(sectionKey, product)}
                     />

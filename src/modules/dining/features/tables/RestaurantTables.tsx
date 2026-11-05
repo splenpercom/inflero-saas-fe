@@ -14,6 +14,8 @@ import {
   Search,
   Settings2,
   RefreshCw,
+  FileDown,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "../../../../app/context/AuthContext";
 import { useBranchRevision } from "../../../../app/hooks/useBranchRevision";
@@ -29,11 +31,24 @@ import {
 import { fetchTenantSettings } from "../../../../app/api/tenantSettings";
 import { ApiError } from "../../../../app/api/client";
 import { ModernSelect } from "../../../../app/components/ui/ModernSelect";
+import {
+  downloadAllTableQrsPdf,
+  downloadAllTableQrsZip,
+} from "./tableQrExport";
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6] transition-colors";
 
-const AREAS = ["Indoor", "Outdoor", "Terrace", "Bar", "VIP"];
+const AREAS = ["Indoor", "Outdoor", "Terrace", "Bar", "VIP"] as const;
+type AreaKey = (typeof AREAS)[number];
+
+const AREA_LABEL: Record<AreaKey, { az: string; en: string }> = {
+  Indoor: { az: "Daxili", en: "Indoor" },
+  Outdoor: { az: "Açıq hava", en: "Outdoor" },
+  Terrace: { az: "Terras", en: "Terrace" },
+  Bar: { az: "Bar", en: "Bar" },
+  VIP: { az: "VIP", en: "VIP" },
+};
 
 type UiStatus = "available" | "occupied" | "reserved";
 
@@ -128,6 +143,13 @@ function TableModal({
   }) => void;
   onClose: () => void;
 }) {
+  const { language } = useLanguage();
+  const tr = (az: string, en: string) => (language === "az" ? az : en);
+  const areaLabel = (key: string) => {
+    const row = AREA_LABEL[key as AreaKey];
+    return row ? tr(row.az, row.en) : key;
+  };
+
   const [name, setName] = useState(initial?.name ?? "");
   const [number, setNumber] = useState(initial?.number ?? defaultNumber);
   const [seats, setSeats] = useState(initial?.seats ?? 4);
@@ -145,7 +167,7 @@ function TableModal({
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl w-full max-w-sm shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-            {initial ? "Edit Table" : "Add Table"}
+            {initial ? tr("Masanı redaktə et", "Edit Table") : tr("Masa əlavə et", "Add Table")}
           </h2>
           <button
             type="button"
@@ -158,7 +180,7 @@ function TableModal({
         <div className="p-4 space-y-3">
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              Table Number
+              {tr("Masa nömrəsi", "Table Number")}
             </label>
             <input
               type="number"
@@ -170,18 +192,18 @@ function TableModal({
           </div>
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              Table Name <span className="text-red-500">*</span>
+              {tr("Masa adı", "Table Name")} <span className="text-red-500">*</span>
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Table 7, Garden Booth…"
+              placeholder={tr("məs. Masa 7, Bağ kabinəsi…", "e.g. Table 7, Garden Booth…")}
               className={inputCls}
             />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              Seats
+              {tr("Oturacaq", "Seats")}
             </label>
             <div className="flex gap-1.5">
               {[2, 4, 6, 8, 10, 12].map((n) => (
@@ -200,7 +222,7 @@ function TableModal({
           </div>
           <div>
             <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-              Area
+              {tr("Zona", "Area")}
             </label>
             <div className="flex flex-wrap gap-1.5">
               {AREAS.map((a) => (
@@ -212,7 +234,7 @@ function TableModal({
                     area === a ? active : idle
                   }`}
                 >
-                  {a}
+                  {areaLabel(a)}
                 </button>
               ))}
             </div>
@@ -220,7 +242,7 @@ function TableModal({
           {showHourlyRate && (
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                Hourly rate (optional)
+                {tr("Saatlıq tarif (istəyə bağlı)", "Hourly rate (optional)")}
               </label>
               <input
                 type="number"
@@ -228,7 +250,7 @@ function TableModal({
                 step="0.01"
                 value={hourlyRate}
                 onChange={(e) => setHourlyRate(e.target.value)}
-                placeholder="e.g. 10"
+                placeholder={tr("məs. 10", "e.g. 10")}
                 className={inputCls}
               />
             </div>
@@ -240,7 +262,7 @@ function TableModal({
             onClick={onClose}
             className="px-4 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-xs font-medium transition-colors"
           >
-            Cancel
+            {tr("Ləğv et", "Cancel")}
           </button>
           <button
             type="button"
@@ -259,7 +281,7 @@ function TableModal({
             }}
             className="px-4 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
           >
-            Save
+            {tr("Yadda saxla", "Save")}
           </button>
         </div>
       </div>
@@ -302,6 +324,11 @@ function QRModal({
   const printQR = () => {
     const markup = getQrSvgMarkup();
     if (!markup) return;
+    const safeName = table.name
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.cssText =
@@ -326,11 +353,23 @@ function QRModal({
   }
   body {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 1mm;
+    font-family: Arial, Helvetica, sans-serif;
   }
-  svg { width: 70mm; height: 70mm; max-width: 90vw; max-height: 90vh; }
-</style></head><body>${markup}</body></html>`);
+  svg { width: 70mm; height: 70mm; max-width: 90vw; max-height: 80vh; display: block; }
+  .table-name {
+    margin: 0;
+    padding: 0;
+    line-height: 1.15;
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+    text-align: center;
+  }
+</style></head><body>${markup}<div class="table-name">${safeName}</div></body></html>`);
     doc.close();
     const cleanup = () => {
       try {
@@ -371,9 +410,12 @@ function QRModal({
         <div className="p-4 space-y-3">
           <div
             ref={qrRef}
-            className="flex items-center justify-center p-4 bg-white rounded-xl border border-gray-100"
+            className="flex flex-col items-center justify-center gap-0.5 p-3 bg-white rounded-xl border border-gray-100"
           >
-            <QRCodeSVG value={qrUrl} size={160} level="H" includeMargin />
+            <QRCodeSVG value={qrUrl} size={160} level="H" includeMargin={false} className="block" />
+            <p className="text-sm font-semibold text-gray-900 text-center leading-tight m-0 pt-0.5">
+              {table.name}
+            </p>
           </div>
           <p className="text-[10px] text-gray-400 font-mono break-all text-center">{qrUrl}</p>
         </div>
@@ -514,6 +556,7 @@ export function RestaurantTables() {
   const [statusFilter, setStatusFilter] = useState<"all" | UiStatus>("all");
   const [search, setSearch] = useState("");
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
+  const [exportingQrs, setExportingQrs] = useState<"zip" | "pdf" | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -588,6 +631,37 @@ export function RestaurantTables() {
   const filterIdle =
     "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800";
 
+  const exportItems = useMemo(
+    () =>
+      [...tables]
+        .sort((a, b) => a.number - b.number)
+        .map((t) => ({
+          id: t.id,
+          name: t.name,
+          number: t.number,
+          qrUrl: makeQrUrl(slug, t.id),
+        })),
+    [tables, slug],
+  );
+
+  const runQrExport = async (kind: "zip" | "pdf") => {
+    if (exportingQrs || exportItems.length === 0) return;
+    setExportingQrs(kind);
+    try {
+      if (kind === "zip") await downloadAllTableQrsZip(exportItems);
+      else await downloadAllTableQrsPdf(exportItems);
+      toast.success(
+        kind === "zip"
+          ? tr("Bütün QR kodlar yükləndi", "All QR codes downloaded")
+          : tr("QR PDF yükləndi", "QR PDF downloaded"),
+      );
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setExportingQrs(null);
+    }
+  };
+
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -600,13 +674,47 @@ export function RestaurantTables() {
             {tables.length} {tr("masa", "tables")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <button
             type="button"
             onClick={() => void load()}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void runQrExport("zip")}
+            disabled={!!exportingQrs || tables.length === 0}
+            title={tr(
+              "Bütün QR-ləri yüklə (ZIP, masa adı ilə)",
+              "Download all QRs (ZIP, with table names)",
+            )}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            <FileDown className={`w-3.5 h-3.5 ${exportingQrs === "zip" ? "animate-pulse" : ""}`} />
+            <span className="hidden sm:inline">
+              {exportingQrs === "zip"
+                ? tr("Yüklənir…", "Downloading…")
+                : tr("Bütün QR", "Download all QRs")}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void runQrExport("pdf")}
+            disabled={!!exportingQrs || tables.length === 0}
+            title={tr(
+              "Bütün QR-ləri PDF olaraq yüklə (masa adı altında)",
+              "Download all QRs as PDF (table name under each)",
+            )}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            <FileText className={`w-3.5 h-3.5 ${exportingQrs === "pdf" ? "animate-pulse" : ""}`} />
+            <span className="hidden sm:inline">
+              {exportingQrs === "pdf"
+                ? tr("Yüklənir…", "Downloading…")
+                : tr("QR PDF", "Download QR PDF")}
+            </span>
           </button>
           <button
             type="button"
@@ -688,19 +796,29 @@ export function RestaurantTables() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
-                  {[
-                    "#",
-                    tr("Ad", "Name"),
-                    tr("Zona", "Area"),
-                    tr("Oturacaq", "Seats"),
-                    tr("Status", "Status"),
-                    tr("Əməliyyat", "Actions"),
-                  ].map((h) => (
+                  {(
+                    [
+                      { key: "#", label: "#" },
+                      { key: "name", label: tr("Ad", "Name") },
+                      { key: "area", label: tr("Zona", "Area") },
+                      { key: "seats", label: tr("Oturacaq", "Seats") },
+                      { key: "status", label: tr("Status", "Status") },
+                      { key: "actions", label: tr("Əməliyyat", "Actions") },
+                    ] as const
+                  ).map((h) => (
                     <th
-                      key={h}
-                      className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap"
+                      key={h.key}
+                      className={`text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap ${
+                        h.key === "actions"
+                          ? "text-right w-0"
+                          : h.key === "status"
+                            ? "text-left w-0"
+                            : h.key === "name"
+                              ? "text-left w-full"
+                              : "text-left"
+                      }`}
                     >
-                      {h}
+                      {h.label}
                     </th>
                   ))}
                 </tr>
@@ -740,12 +858,13 @@ export function RestaurantTables() {
                           <Users className="w-3 h-3" /> {table.seats}
                         </span>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-3 py-2 whitespace-nowrap w-0">
                         <ModernSelect
                           value={st}
                           onChange={(value) => void setStatus(table.id, value as UiStatus)}
-                          minWidth={100}
-                          buttonClassName={`px-2 py-0.5 text-[10px] font-medium border ${STATUS_BADGE[st]}`}
+                          minWidth={104}
+                          className="w-max"
+                          buttonClassName={`w-max px-2.5 py-0.5 text-[10px] font-medium border ${STATUS_BADGE[st]}`}
                           options={[
                             { value: "available", label: tr("Boş", "Available") },
                             { value: "occupied", label: tr("Dolu", "Occupied") },
@@ -753,8 +872,8 @@ export function RestaurantTables() {
                           ]}
                         />
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-3 py-2 whitespace-nowrap w-0 text-right">
+                        <div className="inline-flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => setQrModal(table)}

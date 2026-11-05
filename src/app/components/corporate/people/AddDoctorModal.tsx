@@ -1,0 +1,221 @@
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
+import { useLanguage } from "../../../i18n/LanguageContext";
+import type {
+  DoctorCommissionType,
+  PeopleDoctor,
+  UiPeopleStatus,
+} from "../../../api/people";
+import { ModernSelect } from "../../ui/ModernSelect";
+import { pickLang } from "../../../i18n/pickLang";
+
+export type DoctorFormData = {
+  name: string;
+  email: string;
+  phone: string;
+  status?: UiPeopleStatus;
+  commissionType: DoctorCommissionType | "";
+  commissionValue: string;
+};
+
+interface AddDoctorModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: DoctorFormData) => void | Promise<void>;
+  doctor?: PeopleDoctor | null;
+  saving?: boolean;
+}
+
+export function AddDoctorModal({
+  isOpen,
+  onClose,
+  onSave,
+  doctor,
+  saving = false,
+}: AddDoctorModalProps) {
+  const { language } = useLanguage();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [status, setStatus] = useState<UiPeopleStatus>("Active");
+  const [commissionType, setCommissionType] = useState<DoctorCommissionType | "">("");
+  const [commissionValue, setCommissionValue] = useState("");
+
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+  const isEdit = Boolean(doctor);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setName("");
+      setEmail("");
+      setPhone("");
+      setStatus("Active");
+      setCommissionType("");
+      setCommissionValue("");
+      return;
+    }
+    if (doctor) {
+      setName(doctor.name);
+      setEmail(doctor.email);
+      setPhone(doctor.phone);
+      setStatus(doctor.status);
+      setCommissionType(doctor.commissionType ?? "");
+      setCommissionValue(doctor.commissionValue ?? "");
+    } else {
+      setStatus("Active");
+      setCommissionType("");
+      setCommissionValue("");
+    }
+  }, [isOpen, doctor]);
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    if (commissionType) {
+      const n = Number(commissionValue);
+      if (Number.isNaN(n) || n < 0) return;
+      if (commissionType === "PERCENT" && n > 100) return;
+    }
+    await onSave({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      commissionType,
+      commissionValue: commissionValue.trim(),
+      ...(isEdit ? { status } : {}),
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-5xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+            {isEdit ? tr("Həkimi Redaktə Et", "Edit Doctor") : tr("Həkim Əlavə Et", "Add Doctor")}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-white bg-red-500 hover:bg-red-600 rounded-full p-1 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("Ad", "Name")} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={tr("Həkim adı daxil edin", "Enter doctor name")}
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("E-poçt", "Email")}
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+          <div className={`grid gap-3 ${isEdit ? "grid-cols-2" : "grid-cols-1"}`}>
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("Telefon", "Phone")}
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            {isEdit && (
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("Status", "Status")}
+                </label>
+                <ModernSelect
+                  value={status}
+                  onChange={(value) => setStatus(value as UiPeopleStatus)}
+                  className="w-full"
+                  options={[
+                    { value: "Active", label: tr("Aktiv", "Active") },
+                    { value: "Inactive", label: tr("Qeyri-aktiv", "Inactive") },
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100 dark:border-gray-800">
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("Komissiya növü", "Commission type")}
+              </label>
+              <ModernSelect
+                value={commissionType}
+                onChange={(value) => {
+                  const v = value as DoctorCommissionType | "";
+                  setCommissionType(v);
+                  if (!v) setCommissionValue("");
+                }}
+                className="w-full"
+                options={[
+                  { value: "", label: tr("Yoxdur", "None") },
+                  { value: "FIXED", label: tr("Sabit", "Fixed") },
+                  { value: "PERCENT", label: tr("Faiz", "Percent") },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("Komissiya dəyəri", "Commission value")}
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={commissionType === "PERCENT" ? 100 : undefined}
+                step="any"
+                disabled={!commissionType}
+                value={commissionValue}
+                onChange={(e) => setCommissionValue(e.target.value)}
+                placeholder={commissionType === "PERCENT" ? "%" : "₼"}
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-2 sticky bottom-0 bg-white dark:bg-gray-900">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-1.5 bg-gray-800 text-white rounded-lg text-xs disabled:opacity-50"
+          >
+            {tr("Ləğv Et", "Cancel")}
+          </button>
+          <button
+            onClick={() => void handleSave()}
+            disabled={!name.trim() || saving}
+            className="px-4 py-1.5 bg-[#14b8a6] text-white rounded-lg text-xs disabled:opacity-50"
+          >
+            {saving ? tr("Yadda saxlanılır...", "Saving...") : tr("Təsdiq Et", "Submit")}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}

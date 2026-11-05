@@ -69,6 +69,7 @@ export function Settings() {
   const hotelsEnabled = !isDemo && hasModule("HOTELS");
   const clinicEnabled = !isDemo && hasModule("CLINIC");
   const posEnabled = !hotelsEnabled && hasModule("POS");
+  const opticsEnabled = !hotelsEnabled && hasModule("OPTICS");
   // Dining plugin is tenant-level; Bar & Print add-on visibility still follows tenant DINING.
   const diningEnabled =
     isDemo
@@ -77,11 +78,13 @@ export function Settings() {
   const reservationsEnabled = !hotelsEnabled && hasModule("RESERVATIONS");
   const addonsEnabled = !hotelsEnabled && (posEnabled || reservationsEnabled);
   const { canView, canEdit } = useModulePermissions("Settings");
-  const { isGlobalMode, branchManagementEnabled, selectedBranch } = useBranch();
+  const { isGlobalMode, branchManagementEnabled, selectedBranch, branchId } = useBranch();
   const branchRevision = useBranchRevision();
   /** Company profile + add-ons are per-branch; BM-off resolves sole store via API. Printers stay PC-local. */
   const canEditBranchSettings = !branchManagementEnabled || !isGlobalMode;
   const canEditBranchAddons = canEditBranchSettings;
+  /** Commission staff list requires a concrete branch when Branch Management is on. */
+  const needsBranchForCommission = branchManagementEnabled && isGlobalMode;
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -151,10 +154,13 @@ export function Settings() {
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
+  const [ordersShowProductsEnabled, setOrdersShowProductsEnabled] = useState(false);
+  const [opticsDoctorRequired, setOpticsDoctorRequired] = useState(false);
   const [posDefaultPaymentStatus, setPosDefaultPaymentStatus] = useState<
     "PENDING" | "PAID" | "NONE"
   >("PENDING");
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
+  const [productsCogsEnabled, setProductsCogsEnabled] = useState(true);
   const [billers, setBillers] = useState<SalesBillerRow[]>([]);
   const [commissionDrafts, setCommissionDrafts] = useState<Record<string, CommissionDraft>>({});
 
@@ -170,8 +176,11 @@ export function Settings() {
     posQrOrderAlarmEnabled: boolean;
     tableHourlyBillingEnabled: boolean;
     posStaffPasscodeEnabled: boolean;
+    ordersShowProductsEnabled: boolean;
+    opticsDoctorRequired: boolean;
     posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";
     inventoryServicesEnabled: boolean;
+    productsCogsEnabled: boolean;
     billers: SalesBillerRow[];
   } | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -228,6 +237,8 @@ export function Settings() {
     setPosQrOrderAlarmEnabled(diningEnabled && data.posQrOrderAlarmEnabled !== false);
     setTableHourlyBillingEnabled(diningEnabled && data.tableHourlyBillingEnabled === true);
     setPosStaffPasscodeEnabled(data.posStaffPasscodeEnabled === true);
+    setOrdersShowProductsEnabled(data.ordersShowProductsEnabled === true);
+    setOpticsDoctorRequired(opticsEnabled && data.opticsDoctorRequired === true);
     setPosDefaultPaymentStatus(
       data.posDefaultPaymentStatus === "PAID"
         ? "PAID"
@@ -236,6 +247,7 @@ export function Settings() {
           : "PENDING",
     );
     setInventoryServicesEnabled(data.inventoryServicesEnabled === true);
+    setProductsCogsEnabled(data.productsCogsEnabled !== false);
     setSavedLogoUrl(data.companyLogo);
     setLogoFile(null);
     setLogoPreview(data.companyLogo);
@@ -243,7 +255,7 @@ export function Settings() {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
-  }, [diningEnabled]);
+  }, [diningEnabled, opticsEnabled]);
 
   const applyBillerDrafts = useCallback((rows: SalesBillerRow[]) => {
     setBillers(rows);
@@ -270,7 +282,9 @@ export function Settings() {
       try {
         const [data, billerRows] = await Promise.all([
           fetchTenantSettings(),
-          posEnabled ? fetchSalesBillers().catch(() => [] as SalesBillerRow[]) : Promise.resolve([]),
+          posEnabled && !(branchManagementEnabled && isGlobalMode)
+            ? fetchSalesBillers().catch(() => [] as SalesBillerRow[])
+            : Promise.resolve([] as SalesBillerRow[]),
         ]);
         if (cancelled) return;
         applyFromApi(data);
@@ -286,6 +300,8 @@ export function Settings() {
           posQrOrderAlarmEnabled: data.posQrOrderAlarmEnabled !== false,
           tableHourlyBillingEnabled: data.tableHourlyBillingEnabled === true,
           posStaffPasscodeEnabled: data.posStaffPasscodeEnabled === true,
+          ordersShowProductsEnabled: data.ordersShowProductsEnabled === true,
+          opticsDoctorRequired: data.opticsDoctorRequired === true,
           posDefaultPaymentStatus:
             data.posDefaultPaymentStatus === "PAID"
               ? "PAID"
@@ -293,6 +309,7 @@ export function Settings() {
                 ? "NONE"
                 : "PENDING",
           inventoryServicesEnabled: data.inventoryServicesEnabled === true,
+          productsCogsEnabled: data.productsCogsEnabled !== false,
           billers: billerRows,
         };
         snapshotRef.current = {
@@ -333,7 +350,19 @@ export function Settings() {
         URL.revokeObjectURL(blobUrlRef.current);
       }
     };
-  }, [isDemo, isAuthenticated, canView, applyFromApi, applyBillerDrafts, language, branchRevision, posEnabled]);
+  }, [
+    isDemo,
+    isAuthenticated,
+    canView,
+    applyFromApi,
+    applyBillerDrafts,
+    language,
+    branchRevision,
+    posEnabled,
+    branchManagementEnabled,
+    isGlobalMode,
+    branchId,
+  ]);
 
   const requireSignedIn = () => {
     if (isDemo || !isAuthenticated) {
@@ -510,7 +539,11 @@ export function Settings() {
           payload.posPrintProductBrandEnabled = posPrintProductBrandEnabled;
           payload.posEditableProductPricesEnabled = posEditableProductPricesEnabled;
           payload.posStaffPasscodeEnabled = posStaffPasscodeEnabled;
+          payload.ordersShowProductsEnabled = ordersShowProductsEnabled;
           payload.posDefaultPaymentStatus = posDefaultPaymentStatus;
+          if (opticsEnabled) {
+            payload.opticsDoctorRequired = opticsDoctorRequired;
+          }
           if (diningEnabled) {
             payload.posSendToBarEnabled = posSendToBarEnabled;
             payload.posBarBillShowPricesEnabled = posBarBillShowPricesEnabled;
@@ -522,11 +555,14 @@ export function Settings() {
         if (canEditBranchAddons && addonsEnabled && !clinicEnabled) {
           payload.inventoryServicesEnabled = inventoryServicesEnabled;
         }
+        if (canEditBranchAddons && addonsEnabled) {
+          payload.productsCogsEnabled = productsCogsEnabled;
+        }
       }
 
       await updateTenantSettings(payload);
 
-      if (activeSection === "addons" && posEnabled) {
+      if (activeSection === "addons" && posEnabled && !needsBranchForCommission) {
         for (const b of billers) {
           const draft = commissionDrafts[b.id];
           if (!draft) continue;
@@ -556,9 +592,18 @@ export function Settings() {
           posQrOrderAlarmEnabled,
           tableHourlyBillingEnabled,
           posStaffPasscodeEnabled,
+          ordersShowProductsEnabled,
+          opticsDoctorRequired,
           posDefaultPaymentStatus,
           inventoryServicesEnabled,
+          productsCogsEnabled,
           billers: refreshedBillers,
+        };
+      } else if (activeSection === "addons" && addonSnapshotRef.current) {
+        addonSnapshotRef.current = {
+          ...addonSnapshotRef.current,
+          inventoryServicesEnabled,
+          productsCogsEnabled,
         };
       }
 
@@ -614,8 +659,11 @@ export function Settings() {
         setPosQrOrderAlarmEnabled(addonSnapshotRef.current.posQrOrderAlarmEnabled);
         setTableHourlyBillingEnabled(addonSnapshotRef.current.tableHourlyBillingEnabled);
         setPosStaffPasscodeEnabled(addonSnapshotRef.current.posStaffPasscodeEnabled);
+        setOrdersShowProductsEnabled(addonSnapshotRef.current.ordersShowProductsEnabled);
+        setOpticsDoctorRequired(addonSnapshotRef.current.opticsDoctorRequired);
         setPosDefaultPaymentStatus(addonSnapshotRef.current.posDefaultPaymentStatus);
         setInventoryServicesEnabled(addonSnapshotRef.current.inventoryServicesEnabled);
+        setProductsCogsEnabled(addonSnapshotRef.current.productsCogsEnabled);
         applyBillerDrafts(addonSnapshotRef.current.billers);
       }
       notifyInfo(pt("Changes discarded.", "Dəyişikliklər ləğv edildi."));
@@ -1073,6 +1121,39 @@ export function Settings() {
                   </div>
                   )}
 
+                  <div
+                    className={`flex items-start justify-between gap-4 ${
+                      !clinicEnabled ? "pt-2 border-t border-gray-100 dark:border-gray-800" : ""
+                    }`}
+                  >
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Show COGS on products", "Məhsullarda maya dəyərini göstər")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, Cost (COGS) appears on product create, edit, list, and details. Turn off to hide it from the products flow.",
+                          "Aktiv olduqda Maya dəyəri (COGS) məhsul yaratma, redaktə, siyahı və detallarda görünür. Məhsul axınından gizlətmək üçün söndürün.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit || !canEditBranchAddons}
+                      onClick={() => setProductsCogsEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        productsCogsEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={productsCogsEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          productsCogsEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
                   {posEnabled && (
                   <>
                   <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -1106,6 +1187,14 @@ export function Settings() {
 
                   {employeeCommissionEnabled && (
                     <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+                      {needsBranchForCommission ? (
+                        <p className="px-3 py-4 text-xs text-gray-500 text-center">
+                          {pt(
+                            "Select a branch to manage employee commissions for that location.",
+                            "Bu filial üçün işçi komissiyalarını idarə etmək üçün filial seçin.",
+                          )}
+                        </p>
+                      ) : (
                       <table className="w-full min-w-[520px]">
                         <thead>
                           <tr className="bg-gray-50 dark:bg-gray-800/50 text-left">
@@ -1124,7 +1213,10 @@ export function Settings() {
                           {billers.length === 0 ? (
                             <tr>
                               <td colSpan={3} className="px-3 py-4 text-xs text-gray-500 text-center">
-                                {pt("No employees found", "İşçi tapılmadı")}
+                                {pt(
+                                  "No employees assigned to this branch",
+                                  "Bu filiala təyin olunmuş işçi yoxdur",
+                                )}
                               </td>
                             </tr>
                           ) : (
@@ -1187,6 +1279,7 @@ export function Settings() {
                           )}
                         </tbody>
                       </table>
+                      )}
                     </div>
                   )}
 
@@ -1334,6 +1427,66 @@ export function Settings() {
                       />
                     </button>
                   </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Show products on Orders", "Sifarişlərdə məhsulları göstər")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, the Orders page shows a Products column with each order’s line items (qty × name).",
+                          "Aktiv olduqda Sifarişlər səhifəsində hər sifarişin məhsullarını (say × ad) göstərən sütun görünür.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit || !canEditBranchAddons}
+                      onClick={() => setOrdersShowProductsEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        ordersShowProductsEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={ordersShowProductsEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          ordersShowProductsEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {opticsEnabled && (
+                    <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <div>
+                        <p className="text-xs font-medium text-gray-900 dark:text-white">
+                          {pt("Require doctor on Optics POS", "Optics POS-da həkim mütləqdir")}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          {pt(
+                            "When on, terminal POS sales for this branch require selecting a doctor. QR Menu / Web orders never require a doctor.",
+                            "Aktiv olduqda bu filialın terminal POS satışlarında həkim seçimi mütləqdir. QR Menyu / Veb sifarişlərində həkim tələb olunmur.",
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!canEdit || !canEditBranchAddons}
+                        onClick={() => setOpticsDoctorRequired((v) => !v)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                          opticsDoctorRequired ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                        } disabled:opacity-50`}
+                        aria-pressed={opticsDoctorRequired}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                            opticsDoctorRequired ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
 
                   <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
                     <div>

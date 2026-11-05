@@ -39,6 +39,7 @@ import {
 import { useLanguage } from "../../i18n/LanguageContext";
 import JsBarcode from "jsbarcode";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
+import { useProductsCogsEnabled } from "../../hooks/useProductsCogsEnabled";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface ProductImage {
@@ -79,6 +80,7 @@ export function CreateProduct({
   const duplicateId = embedded ? "" : searchParams.get("duplicate")?.trim() || "";
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
+  const productsCogsEnabled = useProductsCogsEnabled();
   const { canCreate } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
@@ -550,7 +552,11 @@ export function CreateProduct({
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
         price: String(parsePrice(price)),
-        purchasePrice: cost.trim() ? String(parsePrice(cost)) : null,
+        purchasePrice: productsCogsEnabled
+          ? cost.trim()
+            ? String(parsePrice(cost))
+            : null
+          : null,
         discountType: mapDiscountType(discountType),
         discountValue: discountValue.trim() ? String(parsePrice(discountValue)) : null,
         ...(stockEnabled
@@ -954,6 +960,7 @@ export function CreateProduct({
                     />
                   </div>
 
+                  {productsCogsEnabled && (
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {pt("cost")}
@@ -965,6 +972,7 @@ export function CreateProduct({
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">

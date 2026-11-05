@@ -4,7 +4,7 @@ import type { TenantRbacModule } from "./rbacModules";
 const DASHBOARD_HOME_PATHS = new Set(["/dashboard", "/dashboard/home", "/dashboard/new-dashboard"]);
 
 /** Paths always reachable regardless of branch scope (e.g. profile). */
-const ALWAYS_ALLOWED_PREFIXES = ["/dashboard/profile"];
+const ALWAYS_ALLOWED_PREFIXES = ["/dashboard/profile", "/dashboard/marketplace"];
 
 export interface AllBranchesNavEntry {
   labelKey: string;
@@ -15,6 +15,7 @@ export interface AllBranchesNavEntry {
 /** Top-level sidebar entries for tenant owners in all-branches (global) mode. */
 export const ALL_BRANCHES_NAV_ENTRIES: AllBranchesNavEntry[] = [
   { labelKey: "dashboard", path: "/dashboard", permissionModule: "Dashboard" },
+  { labelKey: "marketplace", path: "/dashboard/marketplace", permissionModule: "Dashboard" },
   { labelKey: "employees", path: "/dashboard/user-management", permissionModule: "User Management" },
   { labelKey: "userRoles", path: "/dashboard/user-management/roles", permissionModule: "User Management" },
   { labelKey: "warehouses", path: "/dashboard/people/warehouses", permissionModule: "Stock" },
@@ -55,6 +56,10 @@ export function isAllBranchesAllowedPath(pathname: string): boolean {
   }
 
   if (path.startsWith("/dashboard/my-website")) {
+    return true;
+  }
+
+  if (path === "/dashboard/marketplace" || path.startsWith("/dashboard/marketplace/")) {
     return true;
   }
 

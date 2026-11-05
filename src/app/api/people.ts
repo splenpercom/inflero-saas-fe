@@ -115,6 +115,113 @@ export async function deleteCustomer(id: string) {
   return apiDelete<{ success: boolean; message: string }>(`/tenant/people/customers/${id}`);
 }
 
+export type DoctorCommissionType = "FIXED" | "PERCENT";
+
+export interface PeopleDoctor {
+  id: string;
+  code: string;
+  name: string;
+  email: string;
+  phone: string;
+  status: UiPeopleStatus;
+  storeId?: string | null;
+  commissionType: DoctorCommissionType | null;
+  commissionValue: string | null;
+}
+
+export interface DoctorSalesOrderRow {
+  id: string;
+  reference: string;
+  date: string;
+  status: string;
+  paymentStatus: string;
+  grandTotal: number;
+  doctorCommissionAmount: number | null;
+}
+
+export interface DoctorSalesSummary {
+  doctor: PeopleDoctor;
+  orders: DoctorSalesOrderRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  commissionSum: number;
+}
+
+export async function fetchDoctors(query: PeopleListQuery | string = {}) {
+  const q =
+    typeof query === "string"
+      ? query
+        ? `?search=${encodeURIComponent(query)}`
+        : ""
+      : peopleQueryString(query);
+  const res = await apiGet<{ success: boolean; data: PeopleDoctor[] }>(
+    `/tenant/people/doctors${q}`,
+  );
+  return res.data;
+}
+
+export async function fetchDoctor(id: string) {
+  const res = await apiGet<{ success: boolean; data: PeopleDoctor }>(
+    `/tenant/people/doctors/${id}`,
+  );
+  return res.data;
+}
+
+export async function fetchDoctorSales(
+  id: string,
+  query: { page?: number; pageSize?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (query.page != null) params.set("page", String(query.page));
+  if (query.pageSize != null) params.set("pageSize", String(query.pageSize));
+  const s = params.toString();
+  const res = await apiGet<{ success: boolean; data: DoctorSalesSummary }>(
+    `/tenant/people/doctors/${id}/sales${s ? `?${s}` : ""}`,
+  );
+  return res.data;
+}
+
+export async function createDoctor(body: {
+  name: string;
+  code?: string;
+  email?: string | null;
+  phone?: string | null;
+  status?: UiPeopleStatus;
+  commissionType?: DoctorCommissionType | null;
+  commissionValue?: number | null;
+}) {
+  const res = await apiPost<{ success: boolean; data: PeopleDoctor }>(
+    "/tenant/people/doctors",
+    body,
+  );
+  return res.data;
+}
+
+export async function updateDoctor(
+  id: string,
+  body: Partial<{
+    name: string;
+    code: string;
+    email: string | null;
+    phone: string | null;
+    status: UiPeopleStatus;
+    commissionType: DoctorCommissionType | null;
+    commissionValue: number | null;
+  }>,
+) {
+  const res = await apiPatch<{ success: boolean; data: PeopleDoctor }>(
+    `/tenant/people/doctors/${id}`,
+    body,
+  );
+  return res.data;
+}
+
+export async function deleteDoctor(id: string) {
+  return apiDelete<{ success: boolean; message: string }>(`/tenant/people/doctors/${id}`);
+}
+
 export async function fetchSuppliers(query: PeopleListQuery = {}) {
   const res = await apiGet<{ success: boolean; data: PeopleSupplier[] }>(
     `/tenant/people/suppliers${peopleQueryString(query)}`,

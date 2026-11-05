@@ -35,6 +35,7 @@ import {
   CheckSquare,
   Receipt,
   BedDouble,
+  Store,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -161,6 +162,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       hotelRooms: { en: "Rooms", az: "Otaqlar" },
       hotelReservations: { en: "Reservations", az: "Rezervasiyalar" },
       tasks: { en: "Tasks", az: "Tapşırıqlar" },
+      marketplace: { en: "Marketplace", az: "Marketpleys" },
 
       // Travel plugin (labels without "Travel" — plugin owns the shell when enabled)
       travelOffers: { en: "Offers", az: "Təkliflər" },
@@ -211,6 +213,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       
       // Users Sub-items
       peopleCustomers: { en: "Customers", az: "Müştərilər" },
+      peopleDoctors: { en: "Doctors", az: "Həkimlər" },
       suppliers: { en: "Suppliers", az: "Təchizatçılar" },
       warehouses: { en: "Branches", az: "Filiallar" },
       
@@ -282,6 +285,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
   const allBranchesNavItems: NavItem[] = useMemo(() => {
     const icons: Record<string, React.ComponentType<{ className?: string }>> = {
       dashboard: LayoutDashboard,
+      marketplace: Store,
       employees: Users,
       userRoles: Users,
       warehouses: Building2,
@@ -392,6 +396,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       permissionModule: "Customers",
       subItems: [
         { labelKey: "peopleCustomers", label: st("peopleCustomers"), path: "/dashboard/people/customers", permissionModule: "Customers" },
+        { labelKey: "peopleDoctors", label: st("peopleDoctors"), path: "/dashboard/people/doctors", permissionModule: "Customers" },
         { labelKey: "suppliers", label: st("suppliers"), path: "/dashboard/people/suppliers", permissionModule: "Purchases" },
         {
           labelKey: "employees",
@@ -413,6 +418,12 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       label: st("reports"),
       path: "/dashboard/reports",
       permissionModule: "Reports",
+    },
+    {
+      icon: Store,
+      labelKey: "marketplace",
+      label: st("marketplace"),
+      path: "/dashboard/marketplace",
     },
     {
       icon: CheckSquare,
@@ -579,6 +590,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
           const filteredSubItems = item.subItems.filter((sub) => {
             if (travelEnabled && sub.labelKey === "income") return false;
             if (travelEnabled && sub.labelKey === "suppliers") return false;
+            if (sub.labelKey === "peopleDoctors" && !hasModule("OPTICS")) return false;
             if (["expiredProducts", "lowStocks"].includes(sub.labelKey) && !hasModule("STOCK")) return false;
             // Clinic uses Products (relabeled Services) as the catalog — hide inventory Services page.
             if (sub.labelKey === "services" && (clinicEnabled || !inventoryServicesEnabled)) return false;

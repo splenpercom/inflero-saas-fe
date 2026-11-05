@@ -167,12 +167,16 @@ export function thermalReceiptLabels(language: Language) {
     mileage: t("Yürüş", "Mileage"),
     mileageKm: t("Km göstəricisi", "Odometer"),
     employee: t("İşçi", "Employee"),
+    doctor: t("Həkim", "Doctor"),
     products: t("Məhsul / Xidmət", "Product / Service"),
     orderItems: t("Sifariş", "Order"),
     qty: t("əd", "qty"),
     subtotal: t("Ara cəm", "Subtotal"),
     shipping: t("Çatdırılma", "Shipping"),
     serviceFee: t("Xidmət haqqı", "Service fee"),
+    tax: t("Vergi", "Tax"),
+    discount: t("Endirim", "Discount"),
+    afterDiscount: t("Endirimdən sonra", "After discount"),
     tableHourlyRate: t("Saatlıq tarif", "Hourly rate"),
     tableHourlyStarted: t("Başladı", "Started"),
     tableHourlyCharge: t("Saatlıq ödəniş", "Hourly charge"),
@@ -180,7 +184,7 @@ export function thermalReceiptLabels(language: Language) {
     paid: t("Ödənilib", "Paid"),
     amountDue: t("Qalan borc", "Amount due"),
     payment: t("Ödəniş", "Payment"),
-    status: t("Status", "Status"),
+    status: t("Ödəniş statusu", "Status", "Статус оплаты"),
     thanks: t("Təşəkkür edirik", "Thank you"),
     close: t("Bağla", "Close"),
     print: t("Çap Et", "Print"),
@@ -216,10 +220,14 @@ export type ThermalReceiptPayload = {
   vehicle?: string;
   mileage?: number;
   employee: string;
+  /** Optics referring doctor — omitted from print when empty. */
+  doctor?: string;
   items: { name: string; qty: number; price: number; brand?: string | null }[];
   subtotal: number;
   shipping: number;
   serviceFee: number;
+  /** Tax amount (from taxPercent × after-discount merchandise). */
+  tax?: number;
   /** Table hourly rate snapshot (Dining add-on), shown while timer is/was started. */
   tableHourlyRate?: number;
   /** Formatted timer start time for the receipt. */
@@ -286,6 +294,7 @@ export function buildThermalReceiptHtml(
     customerPhone: data.customerPhone,
     vehicle: data.vehicle ? p(data.vehicle) : undefined,
     employee: p(data.employee),
+    doctor: data.doctor?.trim() ? p(data.doctor.trim()) : undefined,
     paymentMethod: p(data.paymentMethod),
     paymentStatusLabel: p(data.paymentStatusLabel),
     discountLabel: p(data.discountLabel),
@@ -300,6 +309,7 @@ export function buildThermalReceiptHtml(
     subtotal: data.subtotal,
     shipping: data.shipping,
     serviceFee: data.serviceFee,
+    tax: data.tax ?? 0,
     tableHourlyRate: data.tableHourlyRate ?? 0,
     tableHourlyStartedAtLabel: data.tableHourlyStartedAtLabel
       ? p(data.tableHourlyStartedAtLabel)
@@ -321,11 +331,14 @@ export function buildThermalReceiptHtml(
     vehicle: p(labels.vehicle),
     mileage: p(labels.mileage),
     employee: p(labels.employee),
+    doctor: p(labels.doctor),
     products: p(labels.products),
     orderItems: p(labels.orderItems),
     subtotal: p(labels.subtotal),
     shipping: p(labels.shipping),
     serviceFee: p(labels.serviceFee),
+    tax: p(labels.tax),
+    afterDiscount: p(labels.afterDiscount),
     tableHourlyRate: p(labels.tableHourlyRate),
     tableHourlyStarted: p(labels.tableHourlyStarted),
     tableHourlyCharge: p(labels.tableHourlyCharge),
@@ -401,6 +414,7 @@ export function buildThermalReceiptHtml(
   ${d.vehicle && showPrices ? `<div class="row"><span class="label">${L.vehicle}:</span><span>${d.vehicle}</span></div>` : ""}
   ${d.mileage != null && showPrices ? `<div class="row"><span class="label">${L.mileage}:</span><span>${d.mileage} km</span></div>` : ""}
   ${isTicket ? `<div class="row"><span class="label">${L.employee}:</span><span>${d.employee}</span></div>` : ""}
+  ${d.doctor ? `<div class="row"><span class="label">${L.doctor}:</span><span>${d.doctor}</span></div>` : ""}
   <div class="divider-solid"></div>
   <div class="section-title">${productsTitle}</div>
   ${d.items
@@ -422,12 +436,14 @@ export function buildThermalReceiptHtml(
       ? `<div class="center" style="margin-top:8px;font-weight:600;">${ticketCopy}</div>`
       : `
   <div class="row"><span class="label">${L.subtotal}:</span><span>${d.subtotal.toFixed(2)} AZN</span></div>
-  <div class="row"><span class="label">${L.shipping}:</span><span>${d.shipping.toFixed(2)} AZN</span></div>
-  ${d.serviceFee > 0 ? `<div class="row"><span class="label">${L.serviceFee}:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
+  ${d.discount > 0.009 ? `<div class="row"><span class="label">${d.discountLabel || p(labels.discount)}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
+  ${d.discount > 0.009 ? `<div class="row"><span class="label">${L.afterDiscount}:</span><span>${Math.max(0, d.subtotal - d.discount).toFixed(2)} AZN</span></div>` : ""}
+  ${d.shipping > 0.009 ? `<div class="row"><span class="label">${L.shipping}:</span><span>${d.shipping.toFixed(2)} AZN</span></div>` : ""}
+  ${d.serviceFee > 0.009 ? `<div class="row"><span class="label">${L.serviceFee}:</span><span>${d.serviceFee.toFixed(2)} AZN</span></div>` : ""}
+  ${d.tax > 0.009 ? `<div class="row"><span class="label">${L.tax}:</span><span>${d.tax.toFixed(2)} AZN</span></div>` : ""}
   ${(d.tableHourlyRate ?? 0) > 0 ? `<div class="row"><span class="label">${L.tableHourlyRate}:</span><span>${(d.tableHourlyRate ?? 0).toFixed(2)} AZN/h</span></div>` : ""}
   ${d.tableHourlyStartedAtLabel ? `<div class="row"><span class="label">${L.tableHourlyStarted}:</span><span>${d.tableHourlyStartedAtLabel}</span></div>` : ""}
   ${(d.tableHourlyCharge ?? 0) > 0 ? `<div class="row"><span class="label">${L.tableHourlyCharge}:</span><span>${(d.tableHourlyCharge ?? 0).toFixed(2)} AZN</span></div>` : ""}
-  ${d.discount > 0 ? `<div class="row"><span class="label">${d.discountLabel}:</span><span>-${d.discount.toFixed(2)} AZN</span></div>` : ""}
   ${(d.cashbackEarned ?? 0) > 0 ? `<div class="row"><span class="label">${language === "az" ? "Cashback qazanıldı" : "Cashback earned"}:</span><span>${(d.cashbackEarned ?? 0).toFixed(2)} AZN</span></div>` : ""}
   <div class="divider-solid"></div>
   <div class="total-row"><span>${L.total}:</span><span>${d.total.toFixed(2)} AZN</span></div>

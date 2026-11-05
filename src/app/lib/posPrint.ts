@@ -706,14 +706,25 @@ export function posOrderToThermalPayload(
 
   const showBrand = opts.printProductBrand === true;
 
+  // `discount` already includes loyalty redeem when present; fall back to loyalty field.
+  const headerDiscount = parseMoney(order.discount);
+  const loyaltyRedeem = parseMoney(order.loyaltyRedeemAmount);
+  const discount = Math.max(headerDiscount, loyaltyRedeem);
+  const taxPercent = parseMoney(order.taxPercent);
+  const afterDisc = Math.max(0, subtotal - discount);
+  const tax = taxPercent > 0 ? Math.round(((afterDisc * taxPercent) / 100) * 100) / 100 : 0;
+
   return {
     orderNo: order.reference,
     date: dateStr,
     customer: order.customerName?.trim() || t("Anonim", "Anonymous"),
-    customerPhone: opts.customerPhone?.trim() || "—",
+    // Prefer explicit override (POS checkout); else phone from order detail API.
+    customerPhone:
+      opts.customerPhone?.trim() || order.customerPhone?.trim() || "—",
     vehicle: order.vehicleLabel ?? undefined,
     mileage: order.mileageAtService ?? undefined,
     employee: order.billerName?.trim() || "—",
+    ...(order.doctor?.name?.trim() ? { doctor: order.doctor.name.trim() } : {}),
     items: printItems.map((item) => ({
       name: item.productName,
       qty: item.quantity,
@@ -723,6 +734,7 @@ export function posOrderToThermalPayload(
     subtotal,
     shipping: parseMoney(order.shipping),
     serviceFee: parseMoney(order.serviceFee),
+    tax,
     ...(hourlyStartedAtLabel
       ? {
           ...(hourlyRate > 0 ? { tableHourlyRate: hourlyRate } : {}),
@@ -730,11 +742,13 @@ export function posOrderToThermalPayload(
         }
       : {}),
     tableHourlyCharge: includeHourly ? hourlyCharge : 0,
-    discount: parseMoney(order.discount),
+    discount,
     discountLabel:
-      parseMoney(order.loyaltyRedeemAmount) > 0
+      loyaltyRedeem > 0 && headerDiscount <= loyaltyRedeem + 0.009
         ? t("Loyalty endirim", "Loyalty discount")
-        : t("Endirim", "Discount"),
+        : loyaltyRedeem > 0
+          ? t("Endirim (loyalty daxil)", "Discount (incl. loyalty)")
+          : t("Endirim", "Discount"),
     cashbackEarned: parseMoney(order.loyaltyCashbackEarned),
     total,
     paid,

@@ -82,7 +82,7 @@ const PREFIX_RULES: PrefixRule[] = (
   ] satisfies PrefixRule[]
 ).slice().sort((a, b) => b.prefix.length - a.prefix.length);
 
-const ALWAYS_ALLOWED_PREFIXES = ["/dashboard/profile"];
+const ALWAYS_ALLOWED_PREFIXES = ["/dashboard/profile", "/dashboard/marketplace"];
 
 const DASHBOARD_HOME = new Set(["/dashboard", "/dashboard/home", "/dashboard/new-dashboard"]);
 
@@ -120,6 +120,10 @@ export function getNavPermission(
   if (!path) return { module: parentModule, action: "view" };
   // Strip query for path-based checks (sidebar POS uses ?fresh=1).
   const bare = path.split("?")[0] ?? path;
+  // Marketplace is available to every authenticated user (hub public catalog).
+  if (matchesPathPrefix(bare, "/dashboard/marketplace")) {
+    return null;
+  }
   if (overrides?.permissionModule || overrides?.permissionAction) {
     return {
       module: overrides.permissionModule ?? parentModule,

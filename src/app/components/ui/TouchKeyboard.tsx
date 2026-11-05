@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Delete, X } from "lucide-react";
 import { sanitizeNumericTyping } from "../../lib/numericInput";
+import { useLanguage } from "../../i18n/LanguageContext";
+import { pickLang } from "../../i18n/pickLang";
 import { cn } from "./utils";
 
 export type TouchKeyboardProps = {
@@ -64,6 +66,8 @@ function TouchKeyboard({
   allowNegative = false,
   zClassName = "z-[70]",
 }: TouchKeyboardProps) {
+  const { language } = useLanguage();
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const panelRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     startX: number;
@@ -204,7 +208,11 @@ function TouchKeyboard({
       ) : key === "shift" ? (
         "⇧"
       ) : key === "space" ? (
-        "Space"
+        tr("Boşluq", "Space", "Пробел")
+      ) : key === "Clear" ? (
+        tr("Təmizlə", "Clear", "Очистить")
+      ) : key === "Done" ? (
+        tr("Bitir", "Done", "Готово")
       ) : mode === "full" && isLetterKey(key) ? (
         letterLabel(key, shift)
       ) : (
@@ -248,7 +256,10 @@ function TouchKeyboard({
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-1 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
-              {title ?? (mode === "numpad" ? "Numpad" : "Keyboard")}
+              {title ??
+                (mode === "numpad"
+                  ? tr("Rəqəm klaviaturası", "Numpad", "Цифровая клавиатура")
+                  : tr("Klaviatura", "Keyboard", "Клавиатура"))}
             </span>
           </div>
           <button
@@ -256,7 +267,7 @@ function TouchKeyboard({
             className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-white"
             onMouseDown={(e) => e.preventDefault()}
             onClick={onClose}
-            aria-label="Close keyboard"
+            aria-label={tr("Klaviaturanı bağla", "Close keyboard", "Закрыть клавиатуру")}
           >
             <X className="w-4 h-4" />
           </button>

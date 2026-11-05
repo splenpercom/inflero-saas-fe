@@ -1,4 +1,5 @@
 import { pickLang } from "../../i18n/pickLang";
+import { anyMatchesAzSearch } from "../../lib/azSearch";
 import { useState, useRef, useEffect, useCallback, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -58,8 +59,10 @@ import {
   fetchCustomers,
   fetchCustomerVehicles,
   createCustomer,
+  fetchDoctors,
   type CustomerVehicle,
   type PeopleCustomer,
+  type PeopleDoctor,
 } from "../../api/people";
 import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, startPosOrderHourlyTimer, updatePosOrder, type OpticsPrescriptionMeta, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import {
@@ -819,10 +822,12 @@ interface ReceiptData {
   vehicle?: string;
   mileage?: number;
   employee: string;
+  doctor?: string;
   items: { name: string; qty: number; price: number; brand?: string | null }[];
   subtotal: number;
   shipping: number;
   serviceFee: number;
+  tax?: number;
   /** Shown on POS bill when table hourly timer has started (informational; not in total). */
   tableHourlyRate?: number;
   tableHourlyStartedAtLabel?: string;
@@ -878,10 +883,12 @@ function ThermalReceipt({
     vehicle: data.vehicle,
     mileage: data.mileage,
     employee: data.employee,
+    doctor: data.doctor,
     items: data.items,
     subtotal: data.subtotal,
     shipping: data.shipping,
     serviceFee: data.serviceFee,
+    tax: data.tax ?? 0,
     tableHourlyRate: data.tableHourlyRate,
     tableHourlyStartedAtLabel: data.tableHourlyStartedAtLabel,
     tableHourlyCharge: data.tableHourlyCharge ?? 0,
@@ -997,6 +1004,12 @@ function ThermalReceipt({
           <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.phone}:</span><span className="text-right">{data.customerPhone}</span></div>
           {data.vehicle && <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.vehicle}:</span><span className="text-right break-words">{data.vehicle}</span></div>}
           {data.mileage != null && <div className="flex justify-between gap-2"><span className="text-gray-400 shrink-0">{labels.mileage}:</span><span>{data.mileage} km</span></div>}
+          {data.doctor && (
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-400 shrink-0">{labels.doctor}:</span>
+              <span className="text-right break-words">{data.doctor}</span>
+            </div>
+          )}
           <hr className="border-gray-400 dark:border-gray-500 my-1" />
           <p className="text-[11px] font-bold mb-1 uppercase">{labels.products}</p>
           {data.items.map((it, i) => (
@@ -1013,8 +1026,26 @@ function ThermalReceipt({
           ))}
           <hr className="border-dashed border-gray-300 dark:border-gray-600 my-1" />
           <div className="flex justify-between"><span className="text-gray-400">{labels.subtotal}:</span><span>{data.subtotal.toFixed(2)} AZN</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">{labels.shipping}:</span><span>{data.shipping.toFixed(2)} AZN</span></div>
-          {data.serviceFee > 0 && <div className="flex justify-between"><span className="text-gray-400">{labels.serviceFee}:</span><span>{data.serviceFee.toFixed(2)} AZN</span></div>}
+          {data.discount > 0.009 && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">{data.discountLabel || labels.discount}:</span>
+              <span className="text-red-600 dark:text-red-400">-{data.discount.toFixed(2)} AZN</span>
+            </div>
+          )}
+          {data.discount > 0.009 && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">{labels.afterDiscount}:</span>
+              <span>{Math.max(0, data.subtotal - data.discount).toFixed(2)} AZN</span>
+            </div>
+          )}
+          {data.shipping > 0.009 && <div className="flex justify-between"><span className="text-gray-400">{labels.shipping}:</span><span>{data.shipping.toFixed(2)} AZN</span></div>}
+          {data.serviceFee > 0.009 && <div className="flex justify-between"><span className="text-gray-400">{labels.serviceFee}:</span><span>{data.serviceFee.toFixed(2)} AZN</span></div>}
+          {(data.tax ?? 0) > 0.009 && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">{labels.tax}:</span>
+              <span>{(data.tax ?? 0).toFixed(2)} AZN</span>
+            </div>
+          )}
           {(data.tableHourlyRate ?? 0) > 0 && (
             <div className="flex justify-between">
               <span className="text-gray-400">{labels.tableHourlyRate}:</span>
@@ -1033,7 +1064,6 @@ function ThermalReceipt({
               <span>{(data.tableHourlyCharge ?? 0).toFixed(2)} AZN</span>
             </div>
           )}
-          {data.discount > 0 && <div className="flex justify-between"><span className="text-gray-400">{data.discountLabel}:</span><span>-{data.discount.toFixed(2)} AZN</span></div>}
           {(data.cashbackEarned ?? 0) > 0 && (
             <div className="flex justify-between">
               <span className="text-gray-400">
@@ -1183,6 +1213,11 @@ export function CorporatePOS() {
   const [loyaltyDialogInfo, setLoyaltyDialogInfo] = useState<LoyaltyDialogInfo | null>(null);
   const [opticsMeta, setOpticsMeta] = useState<OpticsPrescriptionMeta | null>(null);
   const [opticsDialogOpen, setOpticsDialogOpen] = useState(false);
+  const [doctors, setDoctors] = useState<PeopleDoctor[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  /** Inactive doctor already on an order — keep selectable for that edit only. */
+  const [orderDoctorOption, setOrderDoctorOption] = useState<PeopleDoctor | null>(null);
+  const [opticsDoctorRequired, setOpticsDoctorRequired] = useState(false);
   const [shippingInput, setShippingInput] = useState("");
   const [serviceFeeInput, setServiceFeeInput] = useState("");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
@@ -1225,6 +1260,8 @@ export function CorporatePOS() {
   const [pendingQrOrderId, setPendingQrOrderId] = useState<string | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editingOrderRef, setEditingOrderRef] = useState<string | null>(null);
+  /** Biller on the order being edited — passcode gate uses this employee, not a swapped selection. */
+  const [editingOrderBillerId, setEditingOrderBillerId] = useState<string | null>(null);
   const [editingOrderWasHeld, setEditingOrderWasHeld] = useState(false);
   const [editingAlreadyOnKot, setEditingAlreadyOnKot] = useState(false);
   const [editingAlreadySentToBar, setEditingAlreadySentToBar] = useState(false);
@@ -1346,6 +1383,18 @@ export function CorporatePOS() {
     }
   }, [isDemo, isAuthenticated, branchRevision]);
 
+  const loadDoctors = useCallback(async () => {
+    if (!(isAuthenticated || isDemo) || !opticsEnabled) {
+      setDoctors([]);
+      return;
+    }
+    try {
+      setDoctors(await fetchDoctors({ status: "active" }));
+    } catch {
+      setDoctors([]);
+    }
+  }, [isDemo, isAuthenticated, opticsEnabled, branchRevision]);
+
   useEffect(() => {
     void loadProducts();
   }, [loadProducts]);
@@ -1353,6 +1402,24 @@ export function CorporatePOS() {
   useEffect(() => {
     void loadCustomers();
   }, [loadCustomers]);
+
+  useEffect(() => {
+    void loadDoctors();
+  }, [loadDoctors]);
+
+  useEffect(() => {
+    if (!opticsEnabled) {
+      setSelectedDoctorId("");
+      setOrderDoctorOption(null);
+      setOpticsDoctorRequired(false);
+      return;
+    }
+    if (!selectedDoctorId) return;
+    if (doctors.some((d) => d.id === selectedDoctorId)) return;
+    if (orderDoctorOption?.id === selectedDoctorId) return;
+    setSelectedDoctorId("");
+    setOrderDoctorOption(null);
+  }, [opticsEnabled, branchRevision, doctors, selectedDoctorId, orderDoctorOption?.id]);
 
   const reloadDiningTables = useCallback(async () => {
     if (!diningEnabled || !(isAuthenticated || isDemo) || isGlobalMode || !branchId) {
@@ -1416,6 +1483,7 @@ export function CorporatePOS() {
       setTableHourlyBillingEnabled(false);
       setPosStaffPasscodeEnabled(false);
       setPosDefaultPaymentStatus("PENDING");
+      setOpticsDoctorRequired(false);
       setInventoryServicesEnabled(false);
       return;
     }
@@ -1434,6 +1502,7 @@ export function CorporatePOS() {
           setPosQrOrderAlarmEnabled(diningEnabled && s.posQrOrderAlarmEnabled !== false);
           setTableHourlyBillingEnabled(diningEnabled && s.tableHourlyBillingEnabled === true);
           setPosStaffPasscodeEnabled(s.posStaffPasscodeEnabled === true);
+          setOpticsDoctorRequired(opticsEnabled && s.opticsDoctorRequired === true);
           const defaultPay =
             s.posDefaultPaymentStatus === "PAID"
               ? "PAID"
@@ -1461,6 +1530,7 @@ export function CorporatePOS() {
           setPosQrOrderAlarmEnabled(true);
           setTableHourlyBillingEnabled(false);
           setPosStaffPasscodeEnabled(false);
+          setOpticsDoctorRequired(false);
           setPosDefaultPaymentStatus("PENDING");
           setInventoryServicesEnabled(false);
         }
@@ -1468,7 +1538,7 @@ export function CorporatePOS() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, isDemo, branchRevision, diningEnabled]);
+  }, [isAuthenticated, isDemo, branchRevision, diningEnabled, opticsEnabled]);
 
   useEffect(() => {
     posQrOrderAlarmEnabledRef.current = posQrOrderAlarmEnabled;
@@ -1613,6 +1683,7 @@ export function CorporatePOS() {
       setEditingOrderId(null);
       writePosEditOrderId(null);
       setEditingOrderRef(null);
+      setEditingOrderBillerId(null);
       setEditingOrderWasHeld(false);
       setEditingAlreadyOnKot(false);
       setEditingAlreadySentToBar(false);
@@ -1654,6 +1725,22 @@ export function CorporatePOS() {
       }
       if (detail.opticsMeta) setOpticsMeta(normalizeOpticsMeta(detail.opticsMeta));
       else setOpticsMeta(null);
+      if (detail.doctorId && detail.doctor) {
+        setSelectedDoctorId(detail.doctorId);
+        setOrderDoctorOption({
+          id: detail.doctor.id,
+          code: detail.doctor.code,
+          name: detail.doctor.name,
+          email: "",
+          phone: "",
+          status: "Active",
+          commissionType: null,
+          commissionValue: null,
+        });
+      } else {
+        setSelectedDoctorId("");
+        setOrderDoctorOption(null);
+      }
       setPendingQrPortalOpen(false);
     },
     [],
@@ -1667,6 +1754,7 @@ export function CorporatePOS() {
     if (opts?.suppressEditUi) writePosEditOrderId(null);
     else writePosEditOrderId(detail.id);
     setEditingOrderRef(detail.reference);
+    setEditingOrderBillerId(detail.billerId ?? null);
     setSuppressEditOrderUi(opts?.suppressEditUi === true);
     const statusKey = (detail.status || "").toLowerCase();
     setEditingOrderWasHeld(statusKey === "held" || statusKey === "draft");
@@ -1733,6 +1821,22 @@ export function CorporatePOS() {
     if (detail.mileageAtService != null) setMileageInput(String(detail.mileageAtService));
     if (detail.opticsMeta) setOpticsMeta(normalizeOpticsMeta(detail.opticsMeta));
     else setOpticsMeta(null);
+    if (detail.doctorId && detail.doctor) {
+      setSelectedDoctorId(detail.doctorId);
+      setOrderDoctorOption({
+        id: detail.doctor.id,
+        code: detail.doctor.code,
+        name: detail.doctor.name,
+        email: "",
+        phone: "",
+        status: "Active",
+        commissionType: null,
+        commissionValue: null,
+      });
+    } else {
+      setSelectedDoctorId("");
+      setOrderDoctorOption(null);
+    }
   },
   []);
 
@@ -1875,6 +1979,7 @@ export function CorporatePOS() {
       editOrderHandledRef.current = null;
       editOrderInFlightRef.current = null;
       setEditingOrderRef(null);
+      setEditingOrderBillerId(null);
       setEditingOrderWasHeld(false);
       setEditingAlreadyOnKot(false);
       setEditingAlreadySentToBar(false);
@@ -2042,6 +2147,13 @@ export function CorporatePOS() {
 
   const customerOptions = customers.map((c) => ({ id: c.id, label: c.name, sub: c.phone }));
   const billerOptions = billers.map((b) => ({ id: b.id, label: b.name, sub: b.code }));
+  const doctorOptions = useMemo(() => {
+    const rows = [...doctors];
+    if (orderDoctorOption && !rows.some((d) => d.id === orderDoctorOption.id)) {
+      rows.unshift(orderDoctorOption);
+    }
+    return rows.map((d) => ({ id: d.id, label: d.name, sub: d.code }));
+  }, [doctors, orderDoctorOption]);
   const selectedTable = diningTables.find((t) => t.id === selectedTableId) ?? null;
   const selectedTableLabel = selectedTable
     ? selectedTable.name?.trim() || String(selectedTable.number)
@@ -2892,6 +3004,7 @@ export function CorporatePOS() {
     editOrderHandledRef.current = null;
     editOrderInFlightRef.current = null;
     setEditingOrderRef(null);
+    setEditingOrderBillerId(null);
     setEditingOrderWasHeld(false);
     setEditingAlreadyOnKot(false);
     setEditingAlreadySentToBar(false);
@@ -2910,6 +3023,8 @@ export function CorporatePOS() {
     clearLoyaltySelection();
     setOpticsMeta(null);
     setOpticsDialogOpen(false);
+    setSelectedDoctorId("");
+    setOrderDoctorOption(null);
     setSelectedVehicleId("");
     setMileageInput("");
     setSelectedBillerId(defaultBillerId || "");
@@ -2976,26 +3091,39 @@ export function CorporatePOS() {
       // Persist cart onto the timer order. Status already set by startPosOrderHourlyTimer
       // (Pending for new/draft; leave Completed alone if timer was attached to an open bill).
       if (cart.length > 0) {
-        detail = await updatePosOrder(detail.id, {
-          customerId: selectedCustomerId || null,
-          billerId: selectedBillerId || null,
-          ...(selectedPaymentMethod
-            ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) }
-            : {}),
-          shipping,
-          ...(serviceFee > 0 ? { serviceFee } : {}),
-          discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
-          items: cart.map((i) => ({
-            productId: i.id,
-            quantity: i.quantity,
-            price: cartUnitPrice(i.price),
-          })),
-          tableId: selectedTableId,
-          ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-          ...(autoEnabled && selectedVehicleId && mileageInput.trim()
-            ? { mileageAtService: Number(mileageInput) }
-            : {}),
+        const ownerBillerId = detail.billerId || selectedBillerId;
+        const ownerBiller = billers.find((b) => b.id === ownerBillerId);
+        const pinOk = await ensureWithPasscode({
+          featureOn: posStaffPasscodeEnabled,
+          hasPosPasscode: ownerBiller?.hasPosPasscode === true,
+          staffName: ownerBiller?.name ?? tr("İşçi", "Staff"),
+          invalidPinMessage: tr("Yanlış kod", "Invalid passcode"),
+          run: async (staffPasscode) => {
+            detail = await updatePosOrder(detail.id, {
+              customerId: selectedCustomerId || null,
+              billerId: selectedBillerId || null,
+              ...(opticsEnabled ? { doctorId: selectedDoctorId || null } : {}),
+              ...(selectedPaymentMethod
+                ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) }
+                : {}),
+              shipping,
+              ...(serviceFee > 0 ? { serviceFee } : {}),
+              discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
+              items: cart.map((i) => ({
+                productId: i.id,
+                quantity: i.quantity,
+                price: cartUnitPrice(i.price),
+              })),
+              tableId: selectedTableId,
+              ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+              ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+                ? { mileageAtService: Number(mileageInput) }
+                : {}),
+              ...(staffPasscode ? { staffPasscode } : {}),
+            });
+          },
         });
+        if (!pinOk) return;
       }
       // Stay on POS: same cart + running timer; quiet (not "Edit Order") chrome.
       hydrateCartFromExistingOrder(detail, {
@@ -3026,6 +3154,9 @@ export function CorporatePOS() {
     autoEnabled,
     selectedVehicleId,
     mileageInput,
+    billers,
+    posStaffPasscodeEnabled,
+    ensureWithPasscode,
     hydrateCartFromExistingOrder,
     reloadDiningTables,
     tr,
@@ -3098,6 +3229,10 @@ export function CorporatePOS() {
     }
     if (clinicEnabled && !selectedBillerId) {
       notifyWarning(tr("İşçi seçin", "Please select an employee"));
+      return false;
+    }
+    if (opticsEnabled && opticsDoctorRequired && !selectedDoctorId) {
+      notifyWarning(tr("Həkim seçin", "Please select a doctor"));
       return false;
     }
     if (!paymentStatusChoice) {
@@ -3255,6 +3390,7 @@ export function CorporatePOS() {
     ...(opticsEnabled && opticsMeta && opticsMetaHasContent(opticsMeta)
       ? { opticsMeta }
       : {}),
+    ...(opticsEnabled ? { doctorId: selectedDoctorId || null } : {}),
     items: cart.map((i) => ({
       productId: i.id,
       quantity: i.quantity,
@@ -3344,7 +3480,10 @@ export function CorporatePOS() {
   const runWithStaffPasscode = async (
     action: (staffPasscode?: string) => Promise<void>,
   ): Promise<boolean> => {
-    const biller = billers.find((b) => b.id === selectedBillerId);
+    // Editing: require the order owner's PIN (same employee who placed it).
+    const gateBillerId =
+      editingOrderId && editingOrderBillerId ? editingOrderBillerId : selectedBillerId;
+    const biller = billers.find((b) => b.id === gateBillerId);
     return ensureWithPasscode({
       featureOn: posStaffPasscodeEnabled,
       hasPosPasscode: biller?.hasPosPasscode === true,
@@ -3364,6 +3503,10 @@ export function CorporatePOS() {
           "Use KOT & Print for QR orders",
         ),
       );
+      return;
+    }
+    if (opticsEnabled && opticsDoctorRequired && !selectedDoctorId) {
+      notifyWarning(tr("Həkim seçin", "Please select a doctor"));
       return;
     }
     if (cart.length === 0) {
@@ -3399,46 +3542,61 @@ export function CorporatePOS() {
 
     setCheckoutAction("draft");
     try {
-      const detail = editingOrderId
-        ? await submitEditingOrder({ asDraft: true })
-        : await createPosOrder({
-            status: "HELD",
-            date: new Date().toISOString(),
-            customerId: selectedCustomerId || null,
-            billerId: selectedBillerId || null,
-            ...(selectedPaymentMethod ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) } : {}),
-            shipping,
-            ...(serviceFee > 0 ? { serviceFee } : {}),
-            // Drafts do not apply loyalty — manual discount only; no wallet mutation.
-            discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
-            items: cart.map((i) => ({
-      productId: i.id,
-      quantity: i.quantity,
-      price: cartUnitPrice(i.price),
-    })),
-            initialPaymentAmount: 0,
-            ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-            ...(autoEnabled && selectedVehicleId && mileageInput.trim()
-              ? { mileageAtService: Number(mileageInput) }
-              : {}),
-            ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
-            ...(diningEnabled &&
-            tableHourlyBillingEnabled &&
-            hourlyRateValue > 0 &&
-            !hourlyStartedAt
-              ? { tableHourlyRate: hourlyRateValue }
-              : {}),
-          });
-      notifySuccess(
-        tr(
-          `Qaralama saxlanıldı (${detail.reference})`,
-          `Draft saved (${detail.reference})`,
-        ),
-      );
-      if (detail.tableHourlyStartedAt && !detail.tableHourlyEndedAt) {
-        hydrateCartFromExistingOrder(detail, { suppressEditUi: true });
+      const afterDraftSave = (detail: PosOrderDetail) => {
+        notifySuccess(
+          tr(
+            `Qaralama saxlanıldı (${detail.reference})`,
+            `Draft saved (${detail.reference})`,
+          ),
+        );
+        if (detail.tableHourlyStartedAt && !detail.tableHourlyEndedAt) {
+          hydrateCartFromExistingOrder(detail, { suppressEditUi: true });
+        } else {
+          resetCartAfterSave();
+        }
+      };
+
+      if (editingOrderId) {
+        // Updating an existing order: require that employee's passcode when set.
+        const ok = await runWithStaffPasscode(async (staffPasscode) => {
+          const detail = await submitEditingOrder({ asDraft: true, staffPasscode });
+          afterDraftSave(detail);
+        });
+        if (!ok) return;
       } else {
-        resetCartAfterSave();
+        const detail = await createPosOrder({
+          status: "HELD",
+          date: new Date().toISOString(),
+          customerId: selectedCustomerId || null,
+          billerId: selectedBillerId || null,
+          ...(opticsEnabled ? { doctorId: selectedDoctorId || null } : {}),
+          ...(opticsEnabled && opticsMeta && opticsMetaHasContent(opticsMeta)
+            ? { opticsMeta }
+            : {}),
+          ...(selectedPaymentMethod ? { paymentMethod: mapPaymentMethodToApi(selectedPaymentMethod) } : {}),
+          shipping,
+          ...(serviceFee > 0 ? { serviceFee } : {}),
+          // Drafts do not apply loyalty — manual discount only; no wallet mutation.
+          discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
+          items: cart.map((i) => ({
+            productId: i.id,
+            quantity: i.quantity,
+            price: cartUnitPrice(i.price),
+          })),
+          initialPaymentAmount: 0,
+          ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+          ...(autoEnabled && selectedVehicleId && mileageInput.trim()
+            ? { mileageAtService: Number(mileageInput) }
+            : {}),
+          ...(diningEnabled && selectedTableId ? { tableId: selectedTableId } : {}),
+          ...(diningEnabled &&
+          tableHourlyBillingEnabled &&
+          hourlyRateValue > 0 &&
+          !hourlyStartedAt
+            ? { tableHourlyRate: hourlyRateValue }
+            : {}),
+        });
+        afterDraftSave(detail);
       }
     } catch (err) {
       if (!(await hydrateFromTimerActiveConflict(err))) {
@@ -3485,7 +3643,13 @@ export function CorporatePOS() {
         ? hourlyStartedRaw
         : formatDateTime(started, language);
     })();
-    const apiDiscount = parsePrice(detail.discount);
+    const loyaltyRedeem = parsePrice(detail.loyaltyRedeemAmount);
+    const headerDiscount = parsePrice(detail.discount);
+    const apiDiscount = Math.max(headerDiscount, loyaltyRedeem);
+    const taxPercent = parsePrice(detail.taxPercent);
+    const afterDisc = Math.max(0, apiSubtotal - apiDiscount);
+    const apiTax =
+      taxPercent > 0 ? Math.round(((afterDisc * taxPercent) / 100) * 100) / 100 : 0;
     const rawTotal = parsePrice(detail.grandTotal);
     const rawHourly = parsePrice(detail.tableHourlyCharge);
     const apiTotal = Math.max(0, Math.round((rawTotal - rawHourly) * 100) / 100);
@@ -3512,6 +3676,7 @@ export function CorporatePOS() {
       vehicle: detail.vehicleLabel ?? undefined,
       mileage: detail.mileageAtService ?? undefined,
       employee: detail.billerName ?? receiptBiller,
+      ...(detail.doctor?.name?.trim() ? { doctor: detail.doctor.name.trim() } : {}),
       items: detail.items.map((item) => ({
         name: item.productName,
         qty: item.quantity,
@@ -3523,6 +3688,7 @@ export function CorporatePOS() {
       subtotal: apiSubtotal,
       shipping: apiShipping,
       serviceFee: apiServiceFee,
+      tax: apiTax,
       ...(hourlyStartedAtLabel
         ? {
             ...(apiHourlyRate > 0 ? { tableHourlyRate: apiHourlyRate } : {}),
@@ -3532,9 +3698,11 @@ export function CorporatePOS() {
       tableHourlyCharge: apiHourlyCharge,
       discount: apiDiscount,
       discountLabel: (() => {
-        const loyaltyRedeem = parsePrice(detail.loyaltyRedeemAmount);
-        if (loyaltyRedeem > 0) {
+        if (loyaltyRedeem > 0 && headerDiscount <= loyaltyRedeem + 0.009) {
           return tr("Loyalty endirim", "Loyalty discount");
+        }
+        if (loyaltyRedeem > 0) {
+          return tr("Endirim (loyalty daxil)", "Discount (incl. loyalty)");
         }
         if (appliedDiscount?.type === "percent") {
           return tr(`Endirim (${appliedDiscount.value}%)`, `Discount (${appliedDiscount.value}%)`);
@@ -3569,10 +3737,12 @@ export function CorporatePOS() {
       vehicle: data.vehicle,
       mileage: data.mileage,
       employee: data.employee,
+      doctor: data.doctor,
       items: data.items,
       subtotal: data.subtotal,
       shipping: data.shipping,
       serviceFee: data.serviceFee,
+      tax: data.tax ?? 0,
       tableHourlyRate: data.tableHourlyRate,
       tableHourlyStartedAtLabel: data.tableHourlyStartedAtLabel,
       tableHourlyCharge: data.tableHourlyCharge ?? 0,
@@ -4064,14 +4234,12 @@ export function CorporatePOS() {
 
   const filteredProducts = sortProductsByOrder(
     products.filter((p) => {
-      const q = searchQuery.trim().toLocaleLowerCase();
+      const q = searchQuery.trim();
       if (q) {
-        const matchesSearch =
-          p.name.toLocaleLowerCase().includes(q) ||
-          p.code.toLocaleLowerCase().includes(q) ||
-          (p.barcode && p.barcode.toLocaleLowerCase().includes(q)) ||
-          (p.category && p.category.toLocaleLowerCase().includes(q)) ||
-          (p.brand && p.brand.toLocaleLowerCase().includes(q));
+        const matchesSearch = anyMatchesAzSearch(
+          [p.name, p.code, p.barcode, p.category, p.brand],
+          q,
+        );
         if (!matchesSearch) return false;
         // Free-text search spans all categories (incl. matching by category/brand name).
         return true;
@@ -4726,7 +4894,9 @@ export function CorporatePOS() {
                 <div className="mb-3 space-y-1.5">
                   <div
                     className={`grid gap-1.5 ${
-                      diningEnabled ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"
+                      diningEnabled || opticsEnabled
+                        ? "grid-cols-2 sm:grid-cols-4"
+                        : "grid-cols-2 sm:grid-cols-3"
                     }`}
                   >
                     {/* Customer + add */}
@@ -4771,6 +4941,27 @@ export function CorporatePOS() {
                         searchPlaceholder={tr("İşçi axtar...", "Search employee...")}
                       />
                     </div>
+
+                    {opticsEnabled && (
+                      <div className="min-h-[2.75rem] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
+                        <SelectDropdown
+                          variant="box"
+                          value={selectedDoctorId}
+                          onChange={(id) => {
+                            setSelectedDoctorId(id);
+                            if (!id) setOrderDoctorOption(null);
+                          }}
+                          options={doctorOptions}
+                          placeholder={
+                            opticsDoctorRequired
+                              ? tr("Həkim seçin *", "Select doctor *")
+                              : tr("Həkim seçin", "Select doctor")
+                          }
+                          searchable
+                          searchPlaceholder={tr("Həkim axtar...", "Search doctor...")}
+                        />
+                      </div>
+                    )}
 
                     {/* Table — simple button opens picker */}
                     {diningEnabled && (
@@ -5633,6 +5824,7 @@ export function CorporatePOS() {
             name: p.name,
             code: p.code,
             barcode: p.barcode,
+            category: p.category,
           }))}
           tr={tr}
           onClose={() => setOpticsDialogOpen(false)}

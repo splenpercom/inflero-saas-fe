@@ -18,8 +18,6 @@ export function BranchScopeBanner() {
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
   if (!(isAuthenticated || isDemo)) return null;
-  // Single-store tenants: no branch-scope messaging.
-  if (!branchManagementEnabled) return null;
 
   if (!hasBranches) {
     if (!user?.isTenantOwner && !isDemo) return null;
@@ -30,8 +28,8 @@ export function BranchScopeBanner() {
           {" "}
           —{" "}
           {tr(
-            "Hələ filial yaradılmayıb. Yaratdığınız bütün məlumatlar filiala bağlı olmadan qlobal saxlanılacaq.",
-            "No branch has been created yet. All data you create will be stored globally, not under a branch.",
+            "Hələ filial yaradılmayıb. Əvvəlcə filial yaradın — məlumatlar filial üzrə saxlanılacaq.",
+            "No branch has been created yet. Create a branch first so data can be stored under it.",
           )}{" "}
           <Link
             to="/dashboard/people/warehouses"
@@ -43,6 +41,9 @@ export function BranchScopeBanner() {
       </div>
     );
   }
+
+  // Single-store tenants (BM off) with a branch: no extra branch-scope messaging.
+  if (!branchManagementEnabled) return null;
 
   if (isGlobalMode && !isBranchLocked) {
     const isOwner = !!user?.isTenantOwner;

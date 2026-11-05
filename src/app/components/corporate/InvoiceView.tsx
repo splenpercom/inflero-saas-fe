@@ -324,9 +324,6 @@ export function InvoiceView() {
                   {customer.country && (
                     <p className="text-gray-600 dark:text-gray-400">{customer.country}</p>
                   )}
-                  {customer.email && (
-                    <p className="text-gray-600 dark:text-gray-400">{customer.email}</p>
-                  )}
                   {customer.phone && (
                     <p className="text-gray-600 dark:text-gray-400">{customer.phone}</p>
                   )}
