@@ -46,6 +46,10 @@ export interface TenantSettingsRecord {
   productsCogsEnabled?: boolean;
   tableHourlyBillingEnabled?: boolean;
   posStaffPasscodeEnabled?: boolean;
+  /** When true, Orders list shows a Products column per order. */
+  ordersShowProductsEnabled?: boolean;
+  /** Optics: require doctor selection on terminal POS for this branch. */
+  opticsDoctorRequired?: boolean;
   /** Default POS payment status pre-selection (NONE = cashier must choose). */
   posDefaultPaymentStatus?: "PENDING" | "PAID" | "NONE";
 }
@@ -74,6 +78,8 @@ export type TenantSettingsUpdate = Partial<{
   productsCogsEnabled: boolean;
   tableHourlyBillingEnabled: boolean;
   posStaffPasscodeEnabled: boolean;
+  ordersShowProductsEnabled: boolean;
+  opticsDoctorRequired: boolean;
   posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";
 }>;
 

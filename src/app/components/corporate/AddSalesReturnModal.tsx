@@ -76,8 +76,8 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
         sku: it.sku,
         unitPrice: parseFloat(it.unitPrice) || 0,
         remainingQty: it.remainingQty,
-        selected: false,
-        qty: 0,
+        selected: true,
+        qty: it.remainingQty,
       }));
 
   const loadOrders = useCallback(async () => {

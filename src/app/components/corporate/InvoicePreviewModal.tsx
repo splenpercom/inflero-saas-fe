@@ -127,6 +127,7 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
         language,
         companyName: user?.tenant?.name?.trim() || "Inflero",
         logoSrc,
+        customerPhone: sourceOrder.customerPhone ?? undefined,
       });
       notifySuccess(
         result.channel === "qz"
@@ -282,9 +283,6 @@ export function InvoicePreviewModal({ orderId, isOpen, onClose }: InvoicePreview
                       <p className="font-semibold text-base mb-1">{customer.name}</p>
                       {customer.country && (
                         <p className="text-gray-600 dark:text-gray-400">{customer.country}</p>
-                      )}
-                      {customer.email && (
-                        <p className="text-gray-600 dark:text-gray-400">{customer.email}</p>
                       )}
                       {customer.phone && (
                         <p className="text-gray-600 dark:text-gray-400">{customer.phone}</p>

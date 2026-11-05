@@ -24,6 +24,7 @@ const routeImports: Record<string, () => Promise<any>> = {
   '/finances/expenses': () => import('../components/corporate/FinanceExpenses'),
   '/finances/income': () => import('../components/corporate/Income'),
   '/people/customers': () => import('../components/corporate/people/PeopleCustomers'),
+  '/people/doctors': () => import('../components/corporate/people/PeopleDoctors'),
   '/people/suppliers': () => import('../components/corporate/people/Suppliers'),
   '/people/warehouses': () => import('../components/corporate/people/Warehouses'),
   '/reports': () => import('../components/corporate/Reports'),

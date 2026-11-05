@@ -61,6 +61,8 @@ export function mapPurchaseStatusToApi(ui: string): PurchaseStatusApi {
 export type SalesListQuery = {
   search?: string;
   customerId?: string;
+  /** POS cashier / employee (biller id). */
+  billerId?: string;
   status?: string;
   /** Exclude COMPLETED when status is all / unset. */
   hideCompleted?: boolean;
@@ -84,6 +86,7 @@ export function salesListQueryString(q: SalesListQuery = {}): string {
   const params = new URLSearchParams();
   if (q.search?.trim()) params.set("search", q.search.trim());
   if (q.customerId) params.set("customerId", q.customerId);
+  if (q.billerId) params.set("billerId", q.billerId);
   if (q.status && q.status !== "all") params.set("status", q.status);
   if (q.hideCompleted) params.set("hideCompleted", "true");
   if (q.paymentStatus && q.paymentStatus !== "all") params.set("paymentStatus", q.paymentStatus);

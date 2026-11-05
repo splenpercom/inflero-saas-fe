@@ -165,6 +165,9 @@ export function SaleDetailModal({
     tableHourlyBillingEnabled &&
     !!order?.tableHourlyStartedAt;
   const commissionAmount = order?.commissionAmount ? parseFloat(order.commissionAmount) : 0;
+  const doctorCommissionAmount = order?.doctorCommissionAmount
+    ? parseFloat(order.doctorCommissionAmount)
+    : 0;
   const taxPercent = order?.taxPercent ? parseFloat(order.taxPercent) : 0;
   const itemsSubtotal = order?.items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0) ?? 0;
   const taxAmount = (itemsSubtotal * taxPercent) / 100;
@@ -257,6 +260,7 @@ export function SaleDetailModal({
       language,
       companyName: user?.tenant?.name?.trim() || "Inflero",
       logoSrc,
+      customerPhone: detail.customerPhone ?? undefined,
       printProductBrand: settings?.posPrintProductBrandEnabled === true,
       barShowPrices: diningEnabled && settings?.posBarBillShowPricesEnabled === true,
       includeTableHourlyCharge: hourlyFinalized,
@@ -559,6 +563,22 @@ export function SaleDetailModal({
                   </div>
                 </div>
 
+                {opticsEnabled && order.doctor && (
+                  <div className="glass-card px-2.5 py-2 rounded-lg border border-white/20 dark:border-white/10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
+                        <Glasses className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">{tr("Həkim", "Doctor")}</p>
+                        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                          {order.doctor.name}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="glass-card px-2.5 py-2 rounded-lg border border-white/20 dark:border-white/10">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-md bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center shrink-0">
@@ -850,6 +870,18 @@ export function SaleDetailModal({
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-600 dark:text-gray-400">{tr("Komissiya", "Commission")}:</span>
                         <span className="font-medium text-gray-900 dark:text-white">₼{commissionAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {opticsEnabled &&
+                      order.doctorCommissionEnabled &&
+                      doctorCommissionAmount > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {tr("Həkim komissiyası", "Doctor commission")}:
+                        </span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          ₼{doctorCommissionAmount.toFixed(2)}
+                        </span>
                       </div>
                     )}
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2" />

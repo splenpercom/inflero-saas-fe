@@ -6,7 +6,9 @@ import { zipSync } from "fflate";
 import jsPDF from "jspdf";
 
 const QR_PX = 280;
-const LABEL_PX = 52;
+/** Space between QR bottom edge and label baseline area (keep compact for print/PDF). */
+const LABEL_GAP_PX = 4;
+const LABEL_PX = 26;
 
 function safeFilePart(name: string): string {
   const cleaned = name
@@ -55,7 +57,7 @@ async function renderQrSvgMarkup(value: string, size: number): Promise<string> {
           value: code,
           size,
           level: "H",
-          includeMargin: true,
+          includeMargin: false,
         }),
       );
     });
@@ -122,7 +124,7 @@ export async function buildLabeledQrPng(
 
   const canvas = document.createElement("canvas");
   canvas.width = QR_PX;
-  canvas.height = QR_PX + LABEL_PX;
+  canvas.height = QR_PX + LABEL_GAP_PX + LABEL_PX;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas unavailable");
 
@@ -131,11 +133,11 @@ export async function buildLabeledQrPng(
   ctx.drawImage(qrImg, 0, 0, QR_PX, QR_PX);
 
   ctx.fillStyle = "#111111";
-  ctx.font = "600 20px Arial, Helvetica, sans-serif";
+  ctx.font = "600 18px Arial, Helvetica, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const label = tableName.trim() || "Table";
-  const maxWidth = QR_PX - 16;
+  const maxWidth = QR_PX - 12;
   let draw = label;
   if (ctx.measureText(draw).width > maxWidth) {
     while (draw.length > 1 && ctx.measureText(`${draw}…`).width > maxWidth) {
@@ -143,7 +145,7 @@ export async function buildLabeledQrPng(
     }
     draw = `${draw}…`;
   }
-  ctx.fillText(draw, QR_PX / 2, QR_PX + LABEL_PX / 2);
+  ctx.fillText(draw, QR_PX / 2, QR_PX + LABEL_GAP_PX + LABEL_PX / 2);
 
   const dataUrl = canvas.toDataURL("image/png");
   const bin = atob(dataUrl.split(",")[1] ?? "");
@@ -198,10 +200,10 @@ export async function downloadAllTableQrsPdf(items: TableQrExportItem[]): Promis
   const margin = 12;
   const cols = 3;
   const gapX = 8;
-  const gapY = 10;
+  const gapY = 6;
   const cellW = (pageW - margin * 2 - gapX * (cols - 1)) / cols;
   const imgW = cellW * 0.92;
-  const imgH = imgW * ((QR_PX + LABEL_PX) / QR_PX);
+  const imgH = imgW * ((QR_PX + LABEL_GAP_PX + LABEL_PX) / QR_PX);
   const cellH = imgH;
 
   let col = 0;

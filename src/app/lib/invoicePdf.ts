@@ -28,7 +28,6 @@ export function issuerFromTenantSettings(
     .join(", ");
   if (locality) lines.push(locality);
   if (settings?.country?.trim()) lines.push(settings.country.trim());
-  if (settings?.companyEmail?.trim()) lines.push(settings.companyEmail.trim());
   if (settings?.phone?.trim()) lines.push(settings.phone.trim());
   if (settings?.website?.trim()) lines.push(settings.website.trim());
   return { name, lines };
@@ -76,7 +75,6 @@ export function buildInvoiceDocumentHtml(opts: {
   const customerHtml = customer
     ? `<p style="font-weight:600;font-size:16px;margin:0 0 4px;color:#111827">${escapeHtml(customer.name)}</p>
        ${customer.country ? `<p style="color:#4b5563;margin:0">${escapeHtml(customer.country)}</p>` : ""}
-       ${customer.email ? `<p style="color:#4b5563;margin:0">${escapeHtml(customer.email)}</p>` : ""}
        ${customer.phone ? `<p style="color:#4b5563;margin:0">${escapeHtml(customer.phone)}</p>` : ""}`
     : `<p style="color:#4b5563;margin:0">${escapeHtml(tr("Müştəri təyin edilməyib", "No customer assigned"))}</p>`;
 

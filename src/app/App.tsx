@@ -35,6 +35,8 @@ import { Income } from "./components/corporate/Income";
 import { Payments } from "./components/corporate/Payments";
 import { PeopleCustomers } from "./components/corporate/people/PeopleCustomers";
 import { CustomerProfile } from "./components/corporate/CustomerProfile";
+import { PeopleDoctors } from "./components/corporate/people/PeopleDoctors";
+import { DoctorProfile } from "./components/corporate/DoctorProfile";
 import { Suppliers } from "./components/corporate/people/Suppliers";
 import { Warehouses } from "./components/corporate/people/Warehouses";
 import { Reports } from "./components/corporate/Reports";
@@ -390,6 +392,8 @@ function AppShell() {
               {/* People Routes */}
               <Route path="people/customers" element={<PeopleCustomers />} />
               <Route path="people/customers/:id" element={<CustomerProfile />} />
+              <Route path="people/doctors" element={<PeopleDoctors />} />
+              <Route path="people/doctors/:id" element={<DoctorProfile />} />
               <Route path="people/suppliers" element={<Suppliers />} />
               <Route
                 path="people/warehouses"

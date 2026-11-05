@@ -41,6 +41,8 @@ export interface PosOrderListRow {
   table?: { id: string; number: number; name: string } | null;
   /** Present when source === WEB */
   web?: PosOrderWebMeta | null;
+  /** Aggregated line items (name + qty) for the Orders Products column. */
+  products?: { name: string; quantity: number }[];
 }
 
 export interface SalesBillerRow {
@@ -160,9 +162,18 @@ export interface PosOrderDetail {
   commissionType?: "FIXED" | "PERCENT" | null;
   commissionValue?: string | null;
   commissionAmount?: string | null;
+  doctorId?: string | null;
+  doctor?: { id: string; name: string; code: string } | null;
+  doctorCommissionEnabled?: boolean;
+  doctorCommissionType?: "FIXED" | "PERCENT" | null;
+  doctorCommissionValue?: string | null;
+  doctorCommissionAmount?: string | null;
   storeId: string | null;
   customerId: string | null;
   customerName: string | null;
+  /** Customer phone for thermal receipt reprints from Orders / Sale Detail. */
+  customerPhone?: string | null;
+  customerCode?: string | null;
   billerId: string | null;
   billerName: string | null;
   vehicleId: string | null;
@@ -334,6 +345,8 @@ export type CreatePosOrderBody = {
   loyaltyMode?: "earn" | "redeem" | null;
   /** OPTICS: prescription snapshot. */
   opticsMeta?: OpticsPrescriptionMeta | null;
+  /** OPTICS: referring doctor (branch-scoped). */
+  doctorId?: string | null;
 };
 
 export type CreateInvoiceBody = {

@@ -356,11 +356,14 @@ function QRModal({
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4mm;
+    gap: 1mm;
     font-family: Arial, Helvetica, sans-serif;
   }
-  svg { width: 70mm; height: 70mm; max-width: 90vw; max-height: 80vh; }
+  svg { width: 70mm; height: 70mm; max-width: 90vw; max-height: 80vh; display: block; }
   .table-name {
+    margin: 0;
+    padding: 0;
+    line-height: 1.15;
     font-size: 16px;
     font-weight: 700;
     color: #111;
@@ -407,10 +410,12 @@ function QRModal({
         <div className="p-4 space-y-3">
           <div
             ref={qrRef}
-            className="flex flex-col items-center justify-center gap-2 p-4 bg-white rounded-xl border border-gray-100"
+            className="flex flex-col items-center justify-center gap-0.5 p-3 bg-white rounded-xl border border-gray-100"
           >
-            <QRCodeSVG value={qrUrl} size={160} level="H" includeMargin />
-            <p className="text-sm font-semibold text-gray-900 text-center">{table.name}</p>
+            <QRCodeSVG value={qrUrl} size={160} level="H" includeMargin={false} className="block" />
+            <p className="text-sm font-semibold text-gray-900 text-center leading-tight m-0 pt-0.5">
+              {table.name}
+            </p>
           </div>
           <p className="text-[10px] text-gray-400 font-mono break-all text-center">{qrUrl}</p>
         </div>
@@ -791,19 +796,29 @@ export function RestaurantTables() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
-                  {[
-                    "#",
-                    tr("Ad", "Name"),
-                    tr("Zona", "Area"),
-                    tr("Oturacaq", "Seats"),
-                    tr("Status", "Status"),
-                    tr("Əməliyyat", "Actions"),
-                  ].map((h) => (
+                  {(
+                    [
+                      { key: "#", label: "#" },
+                      { key: "name", label: tr("Ad", "Name") },
+                      { key: "area", label: tr("Zona", "Area") },
+                      { key: "seats", label: tr("Oturacaq", "Seats") },
+                      { key: "status", label: tr("Status", "Status") },
+                      { key: "actions", label: tr("Əməliyyat", "Actions") },
+                    ] as const
+                  ).map((h) => (
                     <th
-                      key={h}
-                      className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap"
+                      key={h.key}
+                      className={`text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2 whitespace-nowrap ${
+                        h.key === "actions"
+                          ? "text-right w-0"
+                          : h.key === "status"
+                            ? "text-left w-0"
+                            : h.key === "name"
+                              ? "text-left w-full"
+                              : "text-left"
+                      }`}
                     >
-                      {h}
+                      {h.label}
                     </th>
                   ))}
                 </tr>
@@ -857,8 +872,8 @@ export function RestaurantTables() {
                           ]}
                         />
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-3 py-2 whitespace-nowrap w-0 text-right">
+                        <div className="inline-flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => setQrModal(table)}
