@@ -291,8 +291,8 @@ export function EditUserModal({
                   </span>
                   <span className="block text-[10px] text-gray-500 mt-0.5">
                     {tr(
-                      "Söndürüldükdə bu işçi POS işçilər siyahısından gizlədilir (işçi kodu aktivdirsə).",
-                      "When off, this staff member is hidden from the POS employee list (when staff passcode is enabled).",
+                      "Söndürüldükdə bu işçi POS işçilər siyahısından gizlədilir və sifariş verə bilməz.",
+                      "When off, this staff member is hidden from the POS employee list and cannot place orders.",
                     )}
                   </span>
                 </span>

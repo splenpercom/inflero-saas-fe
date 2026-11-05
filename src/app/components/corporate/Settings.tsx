@@ -1406,8 +1406,8 @@ export function Settings() {
                       </p>
                       <p className="text-[10px] text-gray-400 mt-0.5">
                         {pt(
-                          "When on, POS filters staff who can place orders and requires each employee’s 4-digit passcode (when set) before placing or sending orders.",
-                          "Aktiv olduqda POS sifariş verə bilən işçiləri filtr edir və (təyin olunubsa) sifariş vermədən və ya göndərməzdən əvvəl hər işçinin 4 rəqəmli kodunu tələb edir.",
+                          "When on, POS requires each employee’s 4-digit passcode (when set) before placing or sending orders. Staff with “Can place order” off are always hidden.",
+                          "Aktiv olduqda POS sifariş vermədən və ya göndərməzdən əvvəl (təyin olunubsa) hər işçinin 4 rəqəmli kodunu tələb edir. “Sifariş verə bilər” söndürülmüş işçilər həmişə gizlədilir.",
                         )}
                       </p>
                     </div>
