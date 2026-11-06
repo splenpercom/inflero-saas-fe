@@ -119,7 +119,8 @@ export function mapProfitLossToFinanceUI(items: ProfitLossItem[]): FinanceMonthl
   return items.map((m) => ({
     month: m.month,
     revenue: (m.sales ?? 0) + (m.service ?? 0),
-    expenses: m.totalExpense ?? 0,
+    // Operating expenses + sold-goods COGS (purchases stay out — cash/inventory only).
+    expenses: (m.totalExpense ?? 0) + (m.soldCogs ?? 0),
     profit: m.netProfit ?? 0,
   }));
 }
@@ -150,11 +151,13 @@ export function mapAnnualRowsToMonthly(rows: AnnualReportRow[], monthLabels: str
   const sales = rows.find((r) => r.key === "sales")?.amounts ?? [];
   const otherIncome = rows.find((r) => r.key === "otherIncome")?.amounts ?? [];
   const expenses = rows.find((r) => r.key === "expenses")?.amounts ?? [];
+  const soldCogs = rows.find((r) => r.key === "soldCogs")?.amounts ?? [];
   const netProfit = rows.find((r) => r.key === "netProfit")?.amounts ?? [];
   return monthLabels.map((month, i) => ({
     month,
     revenue: (sales[i] ?? 0) + (otherIncome[i] ?? 0),
-    expenses: expenses[i] ?? 0,
+    // Operating expenses + sold-goods COGS (purchases row stays separate / cash only).
+    expenses: (expenses[i] ?? 0) + (soldCogs[i] ?? 0),
     profit: netProfit[i] ?? 0,
   }));
 }

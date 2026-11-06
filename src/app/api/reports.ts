@@ -120,6 +120,8 @@ export interface ProfitLossItem {
   grossProfit: number;
   salesExpense: number;
   purchase: number;
+  /** Sold-goods COGS (qty × product cost); used in gross/net profit. */
+  soldCogs?: number;
   salesReturn: number;
   totalExpense: number;
   netProfit: number;
