@@ -1154,6 +1154,8 @@ export function CorporatePOS() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  /** When many categories exist, keep strip compact unless cashier expands it. */
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [categoryReorderMode, setCategoryReorderMode] = useState(false);
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [dragCategoryId, setDragCategoryId] = useState<string | null>(null);
@@ -4342,34 +4344,65 @@ export function CorporatePOS() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
                     {tr("Kateqoriyalar", "Categories")}
+                    {categories.filter((c) => !c.pinned).length > 0 ? (
+                      <span className="ml-1 normal-case tracking-normal text-gray-400">
+                        ({categories.filter((c) => !c.pinned).length})
+                      </span>
+                    ) : null}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCategoryReorderMode((v) => {
-                        const next = !v;
-                        if (next) {
-                          setProductReorderMode(false);
-                          setDragProductId(null);
-                          setDragOverProductId(null);
+                  <div className="flex items-center gap-1.5">
+                    {categories.filter((c) => !c.pinned).length > 12 && (
+                      <button
+                        type="button"
+                        onClick={() => setCategoriesExpanded((v) => !v)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md border bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        title={
+                          categoriesExpanded
+                            ? tr("Kateqoriyaları yığ", "Collapse categories")
+                            : tr("Bütün kateqoriyalar", "Show all categories")
                         }
-                        return next;
-                      });
-                    }}
-                    className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
-                      categoryReorderMode
-                        ? "bg-[#14b8a6] border-[#14b8a6] text-white"
-                        : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                    }`}
-                    title={tr("Kateqoriyaları sırala", "Reorder categories")}
-                  >
-                    <ListOrdered className="w-3 h-3" />
-                    {categoryReorderMode
-                      ? tr("Bitir", "Done")
-                      : tr("Sırala", "Reorder")}
-                  </button>
+                      >
+                        {categoriesExpanded
+                          ? tr("Yığ", "Less")
+                          : tr("Hamısı", "More")}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategoryReorderMode((v) => {
+                          const next = !v;
+                          if (next) {
+                            setCategoriesExpanded(true);
+                            setProductReorderMode(false);
+                            setDragProductId(null);
+                            setDragOverProductId(null);
+                          }
+                          return next;
+                        });
+                      }}
+                      className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
+                        categoryReorderMode
+                          ? "bg-[#14b8a6] border-[#14b8a6] text-white"
+                          : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      }`}
+                      title={tr("Kateqoriyaları sırala", "Reorder categories")}
+                    >
+                      <ListOrdered className="w-3 h-3" />
+                      {categoryReorderMode
+                        ? tr("Bitir", "Done")
+                        : tr("Sırala", "Reorder")}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                {/* Cap height so a large catalog never hides the product grid. */}
+                <div
+                  className={`flex flex-wrap gap-2 overflow-y-auto overscroll-contain pr-0.5 ${
+                    categoryReorderMode || categoriesExpanded
+                      ? "max-h-[min(11rem,28vh)]"
+                      : "max-h-[4.75rem]"
+                  }`}
+                >
                   {categories.map((cat) => {
                     const isServices = cat.id === "services";
                     const isActive = selectedCategory === cat.id;
@@ -4387,7 +4420,7 @@ export function CorporatePOS() {
                           if (!cat.pinned) onCategoryDrop(cat.id);
                         }}
                         onDragEnd={() => setDragCategoryId(null)}
-                        className={`inline-flex items-center gap-0.5 rounded-lg ${
+                        className={`inline-flex items-center gap-0.5 rounded-lg max-w-full ${
                           dragCategoryId === cat.id ? "opacity-60" : ""
                         }`}
                       >
@@ -4407,7 +4440,8 @@ export function CorporatePOS() {
                             if (categoryReorderMode && !cat.pinned) return;
                             setSelectedCategory(cat.id);
                           }}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          title={cat.name}
+                          className={`inline-flex items-center gap-1.5 max-w-[11rem] px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                             isServices
                               ? isActive
                                 ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-300 dark:ring-blue-500/50"
@@ -4419,7 +4453,7 @@ export function CorporatePOS() {
                         >
                           {canReorder && <GripVertical className="w-3 h-3 shrink-0 opacity-70" />}
                           {isServices && <Wrench className="w-3.5 h-3.5 shrink-0" />}
-                          {cat.name}
+                          <span className="truncate">{cat.name}</span>
                         </button>
                         {canReorder && (
                           <button
