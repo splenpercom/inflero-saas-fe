@@ -241,6 +241,8 @@ export type ThermalReceiptPayload = {
   total: number;
   /** Amount already collected (omit or 0 when fully unpaid). */
   paid?: number;
+  /** Cash refunded via sales returns (order reprint after returns). */
+  refunded?: number;
   /** Remaining balance — shown on unpaid / partial bills. */
   amountDue?: number;
   paymentMethod: string;
@@ -319,6 +321,7 @@ export function buildThermalReceiptHtml(
     cashbackEarned: data.cashbackEarned ?? 0,
     total: data.total,
     paid: data.paid ?? 0,
+    refunded: data.refunded ?? 0,
     amountDue: data.amountDue ?? Math.max(0, data.total - (data.paid ?? 0)),
   };
 
@@ -344,6 +347,7 @@ export function buildThermalReceiptHtml(
     tableHourlyCharge: p(labels.tableHourlyCharge),
     total: p(labels.total),
     paid: p(labels.paid),
+    refunded: p(labels.refunded),
     amountDue: p(labels.amountDue),
     payment: p(labels.payment),
     status: p(labels.status),
@@ -454,6 +458,11 @@ export function buildThermalReceiptHtml(
       : d.paid > 0.009
         ? `<div class="row" style="margin-top:2px;"><span class="label">${paidLabel}:</span><span>${d.paid.toFixed(2)} AZN</span></div>`
         : ""
+  }
+  ${
+    d.refunded > 0.009
+      ? `<div class="row"><span class="label">${L.refunded}:</span><span>-${d.refunded.toFixed(2)} AZN</span></div>`
+      : ""
   }
   <div class="row" style="margin-top:4px;"><span class="label">${L.payment}:</span><span>${d.paymentMethod}</span></div>
   <div class="row"><span class="label">${L.status}:</span><span>${d.paymentStatusLabel}</span></div>

@@ -651,6 +651,12 @@ export function posOrderToThermalPayload(
     /** Replace order.items for print (e.g. KOT delta / additional items only). */
     itemsOverride?: PosOrderDetail["items"];
     kitchenBannerOverride?: string;
+    /**
+     * Opt-in only: nets out sales returns (remaining qty + refunded total).
+     * Default off so POS checkout / KOT / Bar / other reprints stay unchanged.
+     * Ignored when `itemsOverride` is set.
+     */
+    applySalesReturns?: boolean;
   },
 ): ThermalReceiptPayload {
   const language = opts.language;
@@ -668,7 +674,60 @@ export function posOrderToThermalPayload(
         ? t("Nağd", "Cash")
         : order.paymentMethod?.trim() || t("Göstərilməyib", "Not specified");
 
-  const printItems = opts.itemsOverride ?? order.items;
+  const sourceItems = opts.itemsOverride ?? order.items;
+  // Strict opt-in — never alter POS checkout / KOT / default reprints.
+  const applyReturns =
+    opts.applySalesReturns === true &&
+    opts.itemsOverride == null &&
+    sourceItems.some((i) => (i.returnedQty ?? 0) > 0);
+
+  const originalMerch = sourceItems.reduce(
+    (sum, item) => sum + parseMoney(item.price) * item.quantity,
+    0,
+  );
+
+  type PrintLine = {
+    productName: string;
+    quantity: number;
+    price: string;
+    brand?: string | null;
+  };
+
+  let printItems: PrintLine[];
+  let fullyReturned = false;
+  if (applyReturns) {
+    const remaining = sourceItems
+      .map((item) => {
+        const returnedQty = item.returnedQty ?? 0;
+        const remainingQty =
+          item.remainingQty ?? Math.max(0, item.quantity - returnedQty);
+        return {
+          productName: item.productName,
+          quantity: remainingQty,
+          price: item.price,
+          brand: item.brand,
+        };
+      })
+      .filter((item) => item.quantity > 0);
+    fullyReturned = remaining.length === 0;
+    // Fully refunded: still list original lines so the slip is not empty; banner marks it.
+    printItems = fullyReturned
+      ? sourceItems.map((item) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          brand: item.brand,
+        }))
+      : remaining;
+  } else {
+    printItems = sourceItems.map((item) => ({
+      productName: item.productName,
+      quantity: item.quantity,
+      price: item.price,
+      brand: item.brand,
+    }));
+  }
+
   const subtotal = printItems.reduce(
     (sum, item) => sum + parseMoney(item.price) * item.quantity,
     0,
@@ -684,17 +743,48 @@ export function posOrderToThermalPayload(
       ? hourlyStartedRaw
       : formatDateTime(started, language);
   })();
+  const refunded = parseMoney(order.refunded);
   const rawTotal = parseMoney(order.grandTotal);
-  const total = includeHourly
-    ? rawTotal
-    : Math.max(0, Math.round((rawTotal - hourlyCharge) * 100) / 100);
+  // Net of returns for reprint; POS checkout has refunded=0 so totals stay identical.
+  const resolvedTotal = (() => {
+    if (fullyReturned) return includeHourly ? hourlyCharge : 0;
+    if (applyReturns) {
+      const net = Math.max(0, Math.round((rawTotal - refunded) * 100) / 100);
+      if (includeHourly) return net;
+      return Math.max(0, Math.round((net - hourlyCharge) * 100) / 100);
+    }
+    if (includeHourly) return rawTotal;
+    return Math.max(0, Math.round((rawTotal - hourlyCharge) * 100) / 100);
+  })();
+
   const paid = parseMoney(order.paid);
-  const rawDue = parseMoney(order.due) || Math.max(0, rawTotal - paid);
-  const amountDue = includeHourly
+  // Preserve legacy due math when not applying returns (same as pre-change).
+  const rawDueLegacy = parseMoney(order.due) || Math.max(0, rawTotal - paid);
+  const rawDue = applyReturns
+    ? parseMoney(order.due) || Math.max(0, resolvedTotal - paid)
+    : rawDueLegacy;
+  const amountDue = applyReturns
     ? Math.max(0, Math.round(rawDue * 100) / 100)
-    : Math.max(0, Math.round((rawDue - hourlyCharge) * 100) / 100);
-  const paymentStatusLabel =
-    order.paymentStatus.toLowerCase() === "paid" || (total > 0 && paid >= total)
+    : includeHourly
+      ? Math.max(0, Math.round(rawDue * 100) / 100)
+      : Math.max(0, Math.round((rawDue - hourlyCharge) * 100) / 100);
+
+  // Keep original status mapping unless we are explicitly netting returns.
+  const paymentStatusLabel = applyReturns
+    ? (() => {
+        const payKey = order.paymentStatus.toLowerCase().replace(/\s+/g, "_");
+        if (payKey === "refunded") return t("Qaytarılıb", "Refunded");
+        if (payKey === "partially_refunded" || payKey === "partial_refund") {
+          return t("Qismən qaytarılıb", "Partially Refunded");
+        }
+        if (payKey === "paid" || (resolvedTotal > 0 && paid >= resolvedTotal && refunded < 0.01)) {
+          return t("Ödənilib", "Paid");
+        }
+        if (payKey === "unpaid") return t("Gözləyir", "Pending");
+        return order.paymentStatus || "—";
+      })()
+    : order.paymentStatus.toLowerCase() === "paid" ||
+        (resolvedTotal > 0 && paid >= resolvedTotal)
       ? t("Ödənilib", "Paid")
       : order.paymentStatus.toLowerCase() === "unpaid"
         ? t("Gözləyir", "Pending")
@@ -709,10 +799,22 @@ export function posOrderToThermalPayload(
   // `discount` already includes loyalty redeem when present; fall back to loyalty field.
   const headerDiscount = parseMoney(order.discount);
   const loyaltyRedeem = parseMoney(order.loyaltyRedeemAmount);
-  const discount = Math.max(headerDiscount, loyaltyRedeem);
+  let discount = Math.max(headerDiscount, loyaltyRedeem);
+  if (applyReturns && !fullyReturned && originalMerch > 0.009) {
+    const ratio = Math.min(1, subtotal / originalMerch);
+    discount = Math.round(discount * ratio * 100) / 100;
+  } else if (fullyReturned) {
+    discount = 0;
+  }
   const taxPercent = parseMoney(order.taxPercent);
   const afterDisc = Math.max(0, subtotal - discount);
-  const tax = taxPercent > 0 ? Math.round(((afterDisc * taxPercent) / 100) * 100) / 100 : 0;
+  const tax =
+    fullyReturned || taxPercent <= 0
+      ? 0
+      : Math.round(((afterDisc * taxPercent) / 100) * 100) / 100;
+
+  const shipping = fullyReturned ? 0 : parseMoney(order.shipping);
+  const serviceFee = fullyReturned ? 0 : parseMoney(order.serviceFee);
 
   return {
     orderNo: order.reference,
@@ -731,9 +833,9 @@ export function posOrderToThermalPayload(
       price: parseMoney(item.price),
       ...(showBrand && item.brand?.trim() ? { brand: item.brand.trim() } : {}),
     })),
-    subtotal,
-    shipping: parseMoney(order.shipping),
-    serviceFee: parseMoney(order.serviceFee),
+    subtotal: fullyReturned ? originalMerch : subtotal,
+    shipping,
+    serviceFee,
     tax,
     ...(hourlyStartedAtLabel
       ? {
@@ -750,8 +852,9 @@ export function posOrderToThermalPayload(
           ? t("Endirim (loyalty daxil)", "Discount (incl. loyalty)")
           : t("Endirim", "Discount"),
     cashbackEarned: parseMoney(order.loyaltyCashbackEarned),
-    total,
+    total: resolvedTotal,
     paid,
+    ...(applyReturns && refunded > 0.009 ? { refunded } : {}),
     amountDue,
     paymentMethod,
     paymentStatusLabel,
@@ -759,6 +862,13 @@ export function posOrderToThermalPayload(
     companyName: opts.companyName,
     logoSrc: opts.logoSrc,
     siteFooter: "https://www.inflero.com/",
+    ...(applyReturns
+      ? {
+          receiptBanner: fullyReturned
+            ? t("*** TAM QAYTARILIB ***", "*** FULLY REFUNDED ***")
+            : t("*** QAYTARMA ƏKS OLUNUB ***", "*** REFLECTS RETURNS ***"),
+        }
+      : {}),
     ...(opts.kitchenBannerOverride
       ? { kitchenBannerOverride: opts.kitchenBannerOverride }
       : {}),
@@ -901,6 +1011,8 @@ export async function printPosOrderTicket(opts: {
   /** Print only these lines (additional KOT items). */
   itemsOverride?: PosOrderDetail["items"];
   kitchenBannerOverride?: string;
+  /** Opt-in: net out sales returns on this reprint only. */
+  applySalesReturns?: boolean;
 }): Promise<PosPrintResult> {
   const payload = posOrderToThermalPayload(opts.order, {
     language: opts.language,
@@ -911,6 +1023,7 @@ export async function printPosOrderTicket(opts: {
     includeTableHourlyCharge: opts.includeTableHourlyCharge === true,
     itemsOverride: opts.itemsOverride,
     kitchenBannerOverride: opts.kitchenBannerOverride,
+    applySalesReturns: opts.applySalesReturns,
   });
   return printPosTicket({
     role: opts.role,

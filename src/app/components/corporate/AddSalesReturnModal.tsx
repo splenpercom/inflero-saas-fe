@@ -472,23 +472,36 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
                           </td>
                           <td className="px-2 py-2 text-right">
                             <input
-                              type="number"
-                              min={1}
-                              max={line.remainingQty}
+                              type="text"
+                              inputMode="numeric"
                               disabled={!line.selected}
-                              value={line.selected ? line.qty : ""}
+                              value={line.selected ? (line.qty > 0 ? String(line.qty) : "") : ""}
                               onChange={(e) => {
-                                const raw = Number(e.target.value);
-                                const qty = Number.isFinite(raw)
-                                  ? Math.min(line.remainingQty, Math.max(1, Math.floor(raw)))
-                                  : 1;
+                                // Digits only; empty is allowed so backspace can clear for retyping.
+                                const digits = e.target.value.replace(/\D/g, "");
+                                if (digits === "") {
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.productId === line.productId
+                                        ? { ...l, qty: 0, selected: true }
+                                        : l,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                const raw = Number.parseInt(digits, 10);
+                                if (!Number.isFinite(raw)) return;
+                                const qty = Math.min(line.remainingQty, Math.max(0, raw));
                                 setLines((prev) =>
                                   prev.map((l) =>
-                                    l.productId === line.productId ? { ...l, qty, selected: true } : l,
+                                    l.productId === line.productId
+                                      ? { ...l, qty, selected: true }
+                                      : l,
                                   ),
                                 );
                               }}
-                              className="w-16 ml-auto block px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-40"
+                              aria-label={tr("Qaytarılacaq miqdar", "Return quantity")}
+                              className="w-16 ml-auto block px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-40 text-right tabular-nums"
                             />
                           </td>
                           <td className="px-2 py-2 text-right text-gray-900 dark:text-white">

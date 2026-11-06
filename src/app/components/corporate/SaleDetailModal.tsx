@@ -268,6 +268,8 @@ export function SaleDetailModal({
       printProductBrand: settings?.posPrintProductBrandEnabled === true,
       barShowPrices: diningEnabled && settings?.posBarBillShowPricesEnabled === true,
       includeTableHourlyCharge: hourlyFinalized,
+      // Only Sale Detail customer receipt nets returns; POS/KOT/other callers stay default-off.
+      applySalesReturns: true,
     });
     notifySuccess(
       result.channel === "qz"
