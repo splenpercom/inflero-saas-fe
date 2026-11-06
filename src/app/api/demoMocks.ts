@@ -1007,6 +1007,8 @@ const DEMO_TENANT_SETTINGS = {
   latitude: 40.4093,
   longitude: 49.8671,
   employeeCommissionEnabled: false,
+  birmarketCommissionEnabled: false,
+  birmarketCommissionPercent: null,
   posServiceFeeEnabled: false,
   posSendToProductionEnabled: false,
   posSendToBarEnabled: false,
