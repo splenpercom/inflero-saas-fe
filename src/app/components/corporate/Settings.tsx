@@ -145,6 +145,8 @@ export function Settings() {
 
   // Add-ons
   const [employeeCommissionEnabled, setEmployeeCommissionEnabled] = useState(false);
+  const [birmarketCommissionEnabled, setBirmarketCommissionEnabled] = useState(false);
+  const [birmarketCommissionPercent, setBirmarketCommissionPercent] = useState("");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
@@ -167,6 +169,8 @@ export function Settings() {
   const snapshotRef = useRef<FormSnapshot | null>(null);
   const addonSnapshotRef = useRef<{
     employeeCommissionEnabled: boolean;
+    birmarketCommissionEnabled: boolean;
+    birmarketCommissionPercent: string;
     posServiceFeeEnabled: boolean;
     posSendToProductionEnabled: boolean;
     posSendToBarEnabled: boolean;
@@ -226,6 +230,12 @@ export function Settings() {
     setLatitude(data.latitude ?? DEFAULT_LAT);
     setLongitude(data.longitude ?? DEFAULT_LNG);
     setEmployeeCommissionEnabled(data.employeeCommissionEnabled === true);
+    setBirmarketCommissionEnabled(data.birmarketCommissionEnabled === true);
+    setBirmarketCommissionPercent(
+      data.birmarketCommissionPercent != null && Number.isFinite(Number(data.birmarketCommissionPercent))
+        ? String(data.birmarketCommissionPercent)
+        : "",
+    );
     setPosServiceFeeEnabled(data.posServiceFeeEnabled === true);
     setPosSendToProductionEnabled(data.posSendToProductionEnabled === true);
     setPosSendToBarEnabled(diningEnabled && data.posSendToBarEnabled === true);
@@ -291,6 +301,12 @@ export function Settings() {
         applyBillerDrafts(billerRows);
         addonSnapshotRef.current = {
           employeeCommissionEnabled: data.employeeCommissionEnabled === true,
+          birmarketCommissionEnabled: data.birmarketCommissionEnabled === true,
+          birmarketCommissionPercent:
+            data.birmarketCommissionPercent != null &&
+            Number.isFinite(Number(data.birmarketCommissionPercent))
+              ? String(data.birmarketCommissionPercent)
+              : "",
           posServiceFeeEnabled: data.posServiceFeeEnabled === true,
           posSendToProductionEnabled: data.posSendToProductionEnabled === true,
           posSendToBarEnabled: data.posSendToBarEnabled === true,
@@ -534,6 +550,21 @@ export function Settings() {
       } else if (activeSection === "addons") {
         if (canEditBranchAddons && posEnabled) {
           payload.employeeCommissionEnabled = employeeCommissionEnabled;
+          payload.birmarketCommissionEnabled = birmarketCommissionEnabled;
+          if (birmarketCommissionEnabled) {
+            const pct = Number(birmarketCommissionPercent);
+            if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+              notifyWarning(
+                pt(
+                  "Enter a Birmarket commission percent between 0 and 100.",
+                  "0–100 arası Birmarket komissiya faizi daxil edin.",
+                ),
+              );
+              setSaving(false);
+              return;
+            }
+            payload.birmarketCommissionPercent = pct;
+          }
           payload.posServiceFeeEnabled = posServiceFeeEnabled;
           payload.posSendToProductionEnabled = posSendToProductionEnabled;
           payload.posPrintProductBrandEnabled = posPrintProductBrandEnabled;
@@ -583,6 +614,8 @@ export function Settings() {
         applyBillerDrafts(refreshedBillers);
         addonSnapshotRef.current = {
           employeeCommissionEnabled,
+          birmarketCommissionEnabled,
+          birmarketCommissionPercent,
           posServiceFeeEnabled,
           posSendToProductionEnabled,
           posSendToBarEnabled,
@@ -650,6 +683,8 @@ export function Settings() {
       applySnapshot(snapshotRef.current);
       if (addonSnapshotRef.current) {
         setEmployeeCommissionEnabled(addonSnapshotRef.current.employeeCommissionEnabled);
+        setBirmarketCommissionEnabled(addonSnapshotRef.current.birmarketCommissionEnabled);
+        setBirmarketCommissionPercent(addonSnapshotRef.current.birmarketCommissionPercent);
         setPosServiceFeeEnabled(addonSnapshotRef.current.posServiceFeeEnabled);
         setPosSendToProductionEnabled(addonSnapshotRef.current.posSendToProductionEnabled);
         setPosSendToBarEnabled(addonSnapshotRef.current.posSendToBarEnabled);
@@ -1184,6 +1219,54 @@ export function Settings() {
                       />
                     </button>
                   </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Birmarket Commission", "Birmarket komissiyası")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, POS can track Birmarket commission per sale (expense mirror). Customer prices and receipts stay unchanged.",
+                          "Aktiv olduqda POS Birmarket komissiyasını izləyə bilər (xərc güzgüsü). Müştəri qiymətləri və qəbzlər dəyişmir.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit || !canEditBranchAddons}
+                      onClick={() => setBirmarketCommissionEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        birmarketCommissionEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={birmarketCommissionEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          birmarketCommissionEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {birmarketCommissionEnabled && (
+                    <div className="flex items-center gap-3 pl-0.5">
+                      <label className="text-[10px] font-medium text-gray-500 uppercase shrink-0">
+                        {pt("Default %", "Standart %")}
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        disabled={!canEdit || !canEditBranchAddons}
+                        value={birmarketCommissionPercent}
+                        onChange={(e) => setBirmarketCommissionPercent(e.target.value)}
+                        className="w-24 px-2 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-50"
+                        placeholder="0"
+                      />
+                    </div>
+                  )}
 
                   {employeeCommissionEnabled && (
                     <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">

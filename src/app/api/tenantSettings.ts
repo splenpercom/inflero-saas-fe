@@ -34,6 +34,10 @@ export interface TenantSettingsRecord {
   latitude: number | null;
   longitude: number | null;
   employeeCommissionEnabled?: boolean;
+  /** Opt-in Birmarket track-only commission (default off). */
+  birmarketCommissionEnabled?: boolean;
+  /** Default Birmarket % when enabled (0–100). */
+  birmarketCommissionPercent?: number | null;
   posServiceFeeEnabled?: boolean;
   posSendToProductionEnabled?: boolean;
   posSendToBarEnabled?: boolean;
@@ -67,6 +71,8 @@ export type TenantSettingsUpdate = Partial<{
   latitude: number | null;
   longitude: number | null;
   employeeCommissionEnabled: boolean;
+  birmarketCommissionEnabled: boolean;
+  birmarketCommissionPercent: number | null;
   posServiceFeeEnabled: boolean;
   posSendToProductionEnabled: boolean;
   posSendToBarEnabled: boolean;

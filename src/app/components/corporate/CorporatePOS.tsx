@@ -133,6 +133,8 @@ interface CartItem {
   image: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
+  /** Birmarket track-only percent for this line (0–100); used only when order Birmarket is on. */
+  birmarketCommissionPercent?: number;
 }
 
 function cartUnitPrice(price: string): number {
@@ -1201,6 +1203,10 @@ export function CorporatePOS() {
   const [occupiedDialogTable, setOccupiedDialogTable] = useState<DiningTable | null>(null);
   const [occupiedDialogBusy, setOccupiedDialogBusy] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [birmarketCommissionFeatureOn, setBirmarketCommissionFeatureOn] = useState(false);
+  const [birmarketDefaultPercent, setBirmarketDefaultPercent] = useState(0);
+  /** Per-cart opt-in; default unchecked for every new cart. */
+  const [birmarketCommissionOn, setBirmarketCommissionOn] = useState(false);
   const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoiceState>("pending");
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [shippingModalOpen, setShippingModalOpen] = useState(false);
@@ -1487,12 +1493,20 @@ export function CorporatePOS() {
       setPosDefaultPaymentStatus("PENDING");
       setOpticsDoctorRequired(false);
       setInventoryServicesEnabled(false);
+      setBirmarketCommissionFeatureOn(false);
+      setBirmarketDefaultPercent(0);
+      setBirmarketCommissionOn(false);
       return;
     }
     let cancelled = false;
     fetchTenantSettings()
       .then((s) => {
         if (!cancelled) {
+          setBirmarketCommissionFeatureOn(s.birmarketCommissionEnabled === true);
+          const defPct = Number(s.birmarketCommissionPercent);
+          setBirmarketDefaultPercent(
+            Number.isFinite(defPct) ? Math.min(100, Math.max(0, defPct)) : 0,
+          );
           setPosServiceFeeEnabled(s.posServiceFeeEnabled === true);
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
           setPosSendToBarEnabled(diningEnabled && s.posSendToBarEnabled === true);
@@ -1535,6 +1549,8 @@ export function CorporatePOS() {
           setOpticsDoctorRequired(false);
           setPosDefaultPaymentStatus("PENDING");
           setInventoryServicesEnabled(false);
+          setBirmarketCommissionFeatureOn(false);
+          setBirmarketDefaultPercent(0);
         }
       });
     return () => {
@@ -1787,16 +1803,24 @@ export function CorporatePOS() {
       originalQty[i.productId] = (originalQty[i.productId] ?? 0) + i.quantity;
     }
     setEditingOriginalQtyByProduct(originalQty);
+    const orderBirmarketOn = detail.birmarketCommissionEnabled === true;
+    setBirmarketCommissionOn(orderBirmarketOn);
     setCart(
-      detail.items.map((i) => ({
-        id: i.productId,
-        name: i.productName,
-        price: formatCartPriceInput(i.price),
-        quantity: i.quantity,
-        image: "📦",
-        productType: (i as { productType?: CartItem["productType"] }).productType,
-        trackStock: (i as { trackStock?: boolean }).trackStock !== false,
-      })),
+      detail.items.map((i) => {
+        const pctRaw = i.birmarketCommissionPercent != null ? Number(i.birmarketCommissionPercent) : NaN;
+        return {
+          id: i.productId,
+          name: i.productName,
+          price: formatCartPriceInput(i.price),
+          quantity: i.quantity,
+          image: "📦",
+          productType: (i as { productType?: CartItem["productType"] }).productType,
+          trackStock: (i as { trackStock?: boolean }).trackStock !== false,
+          ...(orderBirmarketOn && Number.isFinite(pctRaw)
+            ? { birmarketCommissionPercent: Math.min(100, Math.max(0, pctRaw)) }
+            : {}),
+        };
+      }),
     );
     setSelectedTableId(detail.table?.id ?? "");
     setSelectedCustomerId(detail.customerId ?? "");
@@ -2645,6 +2669,9 @@ export function CorporatePOS() {
           image: product.image,
           productType: product.productType,
           trackStock: product.trackStock,
+          ...(birmarketCommissionFeatureOn && birmarketCommissionOn
+            ? { birmarketCommissionPercent: birmarketDefaultPercent }
+            : {}),
         },
       ];
     });
@@ -3032,6 +3059,7 @@ export function CorporatePOS() {
     setSelectedBillerId(defaultBillerId || "");
     setSelectedTableId("");
     setSelectedPaymentMethod(null);
+    setBirmarketCommissionOn(false);
     setPaymentStatusChoice(defaultPaymentStatusChoice);
     setAppliedDiscount(null);
     void loadProducts();
@@ -3111,10 +3139,25 @@ export function CorporatePOS() {
               shipping,
               ...(serviceFee > 0 ? { serviceFee } : {}),
               discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
+              ...(birmarketCommissionFeatureOn
+                ? {
+                    birmarketCommissionEnabled:
+                      birmarketCommissionFeatureOn && birmarketCommissionOn,
+                  }
+                : {}),
               items: cart.map((i) => ({
                 productId: i.id,
                 quantity: i.quantity,
                 price: cartUnitPrice(i.price),
+                ...(birmarketCommissionFeatureOn && birmarketCommissionOn
+                  ? {
+                      birmarketCommissionPercent:
+                        i.birmarketCommissionPercent != null &&
+                        Number.isFinite(i.birmarketCommissionPercent)
+                          ? Math.min(100, Math.max(0, i.birmarketCommissionPercent))
+                          : birmarketDefaultPercent,
+                    }
+                  : {}),
               })),
               tableId: selectedTableId,
               ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
@@ -3373,7 +3416,9 @@ export function CorporatePOS() {
     return fallbackWalkIn ? tr("Gələn müştəri", "Walk-in") : undefined;
   };
 
-  const buildCheckoutBody = (staffPasscode?: string) => ({
+  const buildCheckoutBody = (staffPasscode?: string) => {
+    const birmarketActive = birmarketCommissionFeatureOn && birmarketCommissionOn;
+    return {
     status: "COMPLETED" as const,
     customerId: selectedCustomerId || null,
     ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
@@ -3393,10 +3438,21 @@ export function CorporatePOS() {
       ? { opticsMeta }
       : {}),
     ...(opticsEnabled ? { doctorId: selectedDoctorId || null } : {}),
+    ...(birmarketCommissionFeatureOn
+      ? { birmarketCommissionEnabled: birmarketActive }
+      : {}),
     items: cart.map((i) => ({
       productId: i.id,
       quantity: i.quantity,
       price: cartUnitPrice(i.price),
+      ...(birmarketActive
+        ? {
+            birmarketCommissionPercent:
+              i.birmarketCommissionPercent != null && Number.isFinite(i.birmarketCommissionPercent)
+                ? Math.min(100, Math.max(0, i.birmarketCommissionPercent))
+                : birmarketDefaultPercent,
+          }
+        : {}),
     })),
     // Paid: omit amount → backend collects exact grandTotal (method optional).
     // Pending: explicit 0 so backend does not auto-charge.
@@ -3414,7 +3470,8 @@ export function CorporatePOS() {
       ? { tableHourlyRate: hourlyRateValue }
       : {}),
     ...(staffPasscode ? { staffPasscode } : {}),
-  });
+  };
+  };
 
   /** Persist cart changes onto the order opened from Orders (PATCH, not create). */
   const submitEditingOrder = async (opts?: {
@@ -3580,10 +3637,25 @@ export function CorporatePOS() {
           ...(serviceFee > 0 ? { serviceFee } : {}),
           // Drafts do not apply loyalty — manual discount only; no wallet mutation.
           discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
+          ...(birmarketCommissionFeatureOn
+            ? {
+                birmarketCommissionEnabled:
+                  birmarketCommissionFeatureOn && birmarketCommissionOn,
+              }
+            : {}),
           items: cart.map((i) => ({
             productId: i.id,
             quantity: i.quantity,
             price: cartUnitPrice(i.price),
+            ...(birmarketCommissionFeatureOn && birmarketCommissionOn
+              ? {
+                  birmarketCommissionPercent:
+                    i.birmarketCommissionPercent != null &&
+                    Number.isFinite(i.birmarketCommissionPercent)
+                      ? Math.min(100, Math.max(0, i.birmarketCommissionPercent))
+                      : birmarketDefaultPercent,
+                }
+              : {}),
           })),
           initialPaymentAmount: 0,
           ...(autoEnabled && selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
@@ -5241,6 +5313,51 @@ export function CorporatePOS() {
                               </span>
                             )}
                           </div>
+                          {birmarketCommissionFeatureOn && birmarketCommissionOn && (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[9px] text-gray-400 shrink-0">%</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={
+                                  item.birmarketCommissionPercent != null
+                                    ? String(item.birmarketCommissionPercent)
+                                    : String(birmarketDefaultPercent)
+                                }
+                                onChange={(e) => {
+                                  const raw = sanitizeNumericTyping(e.target.value, {
+                                    allowDecimal: true,
+                                  });
+                                  const n = parseNumericInput(raw, birmarketDefaultPercent);
+                                  const clamped = Math.min(100, Math.max(0, n));
+                                  setCart((prev) =>
+                                    prev.map((c) =>
+                                      c.id === item.id
+                                        ? { ...c, birmarketCommissionPercent: clamped }
+                                        : c,
+                                    ),
+                                  );
+                                }}
+                                disabled={!canMutateCart}
+                                className="w-12 px-1 py-0.5 text-[10px] text-right bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#14b8a6] disabled:opacity-40"
+                                aria-label={tr("Birmarket %", "Birmarket %")}
+                              />
+                              <span className="text-[9px] text-gray-400 tabular-nums">
+                                ₼
+                                {(
+                                  (Number.isFinite(cartUnitPrice(item.price))
+                                    ? cartUnitPrice(item.price)
+                                    : 0) *
+                                  item.quantity *
+                                  ((item.birmarketCommissionPercent != null &&
+                                  Number.isFinite(item.birmarketCommissionPercent)
+                                    ? item.birmarketCommissionPercent
+                                    : birmarketDefaultPercent) /
+                                    100)
+                                ).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
                           {canEditLinePrice ? (
                             <div className="flex items-center gap-1 mt-0.5">
                               <input
@@ -5334,7 +5451,7 @@ export function CorporatePOS() {
                     <p className="text-xs font-medium text-gray-900 dark:text-white shrink-0">
                       {tr("Ödəniş Üsulu", "Payment Method")}
                     </p>
-                    <div className="flex items-center gap-1.5 ml-auto">
+                    <div className="flex items-center gap-1.5 ml-auto flex-wrap justify-end">
                       {paymentMethods.map((m) => {
                         const Icon = m.icon;
                         return (
@@ -5355,6 +5472,37 @@ export function CorporatePOS() {
                           </button>
                         );
                       })}
+                      {birmarketCommissionFeatureOn && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBirmarketCommissionOn((prev) => {
+                              const next = !prev;
+                              if (next) {
+                                setCart((lines) =>
+                                  lines.map((l) => ({
+                                    ...l,
+                                    birmarketCommissionPercent:
+                                      l.birmarketCommissionPercent != null &&
+                                      Number.isFinite(l.birmarketCommissionPercent)
+                                        ? l.birmarketCommissionPercent
+                                        : birmarketDefaultPercent,
+                                  })),
+                                );
+                              }
+                              return next;
+                            });
+                          }}
+                          className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                            birmarketCommissionOn
+                              ? "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 border-[#14b8a6] dark:border-[#14b8a6] text-[#14b8a6] dark:text-[#14b8a6]"
+                              : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          }`}
+                          aria-pressed={birmarketCommissionOn}
+                        >
+                          <span>Birmarket</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 

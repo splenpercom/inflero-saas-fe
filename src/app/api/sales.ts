@@ -66,6 +66,10 @@ export interface PosOrderLineItem {
   price: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
+  /** Birmarket track-only line percent (null when not a Birmarket sale). */
+  birmarketCommissionPercent?: string | null;
+  /** Birmarket track-only line amount snapshot. */
+  birmarketCommissionAmount?: string | null;
   /** Units already returned for this product on the order (product-level). */
   returnedQty?: number;
   /** quantity - returnedQty, floored at 0. */
@@ -162,6 +166,9 @@ export interface PosOrderDetail {
   commissionType?: "FIXED" | "PERCENT" | null;
   commissionValue?: string | null;
   commissionAmount?: string | null;
+  /** Opt-in Birmarket tracking (does not change grandTotal). */
+  birmarketCommissionEnabled?: boolean;
+  birmarketCommissionAmount?: string | null;
   doctorId?: string | null;
   doctor?: { id: string; name: string; code: string } | null;
   doctorCommissionEnabled?: boolean;
@@ -316,7 +323,13 @@ export interface SalesReturnDetail {
   items: SalesReturnLineItem[];
 }
 
-export type PosOrderItemInput = { productId: string; quantity: number; price?: number };
+export type PosOrderItemInput = {
+  productId: string;
+  quantity: number;
+  price?: number;
+  /** Birmarket track-only percent for this line (0–100). */
+  birmarketCommissionPercent?: number;
+};
 
 export type CreatePosOrderBody = {
   status?: OrderStatusApi;
@@ -347,6 +360,8 @@ export type CreatePosOrderBody = {
   opticsMeta?: OpticsPrescriptionMeta | null;
   /** OPTICS: referring doctor (branch-scoped). */
   doctorId?: string | null;
+  /** Opt-in Birmarket tracking (omit/false = off). */
+  birmarketCommissionEnabled?: boolean;
 };
 
 export type CreateInvoiceBody = {

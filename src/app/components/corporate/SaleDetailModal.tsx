@@ -168,6 +168,10 @@ export function SaleDetailModal({
   const doctorCommissionAmount = order?.doctorCommissionAmount
     ? parseFloat(order.doctorCommissionAmount)
     : 0;
+  const birmarketCommissionAmount = order?.birmarketCommissionAmount
+    ? parseFloat(order.birmarketCommissionAmount)
+    : 0;
+  const showBirmarketLineColumns = order?.birmarketCommissionEnabled === true;
   const taxPercent = order?.taxPercent ? parseFloat(order.taxPercent) : 0;
   const itemsSubtotal = order?.items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0) ?? 0;
   const taxAmount = (itemsSubtotal * taxPercent) / 100;
@@ -728,12 +732,25 @@ export function SaleDetailModal({
                         <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
                           {tr("Cəmi", "Total")}
                         </th>
+                        {showBirmarketLineColumns && (
+                          <>
+                            <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
+                              {tr("Birmarket %", "Birmarket %")}
+                            </th>
+                            <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
+                              {tr("Birmarket kom.", "Birmarket comm.")}
+                            </th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {order.items.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-4 text-center text-xs text-gray-500">
+                          <td
+                            colSpan={showBirmarketLineColumns ? 7 : 5}
+                            className="py-4 text-center text-xs text-gray-500"
+                          >
                             {tr("Məhsul yoxdur", "No items")}
                           </td>
                         </tr>
@@ -746,6 +763,14 @@ export function SaleDetailModal({
                             item.remainingQty ?? Math.max(0, item.quantity - returnedQty);
                           const fullyRefunded = returnedQty > 0 && remainingQty <= 0;
                           const partiallyRefunded = returnedQty > 0 && remainingQty > 0;
+                          const lineBmPct =
+                            item.birmarketCommissionPercent != null
+                              ? parseFloat(item.birmarketCommissionPercent)
+                              : NaN;
+                          const lineBmAmt =
+                            item.birmarketCommissionAmount != null
+                              ? parseFloat(item.birmarketCommissionAmount)
+                              : NaN;
                           return (
                             <tr
                               key={item.id}
@@ -786,6 +811,16 @@ export function SaleDetailModal({
                               <td className="py-2 px-3 text-xs text-right font-semibold text-gray-900 dark:text-white">
                                 ₼{lineTotal.toFixed(2)}
                               </td>
+                              {showBirmarketLineColumns && (
+                                <>
+                                  <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white tabular-nums">
+                                    {Number.isFinite(lineBmPct) ? `${lineBmPct}%` : "—"}
+                                  </td>
+                                  <td className="py-2 px-3 text-xs text-right font-medium text-gray-900 dark:text-white tabular-nums">
+                                    {Number.isFinite(lineBmAmt) ? `₼${lineBmAmt.toFixed(2)}` : "—"}
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           );
                         })
@@ -881,6 +916,16 @@ export function SaleDetailModal({
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
                           ₼{doctorCommissionAmount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {order.birmarketCommissionEnabled && birmarketCommissionAmount > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {tr("Birmarket komissiyası", "Birmarket commission")}:
+                        </span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          ₼{birmarketCommissionAmount.toFixed(2)}
                         </span>
                       </div>
                     )}
