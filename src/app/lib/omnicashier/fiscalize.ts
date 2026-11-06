@@ -133,6 +133,10 @@ export async function fiscalizeCardSalePayment(
     const mapped = mapCardSaleToOmni({
       paymentAmount: amount,
       orderGrandTotal: Number(order.grandTotal),
+      orderDiscount: order.discount != null ? Number(order.discount) : null,
+      shipping: order.shipping != null ? Number(order.shipping) : null,
+      serviceFee: order.serviceFee != null ? Number(order.serviceFee) : null,
+      hourlyCharge: order.tableHourlyCharge != null ? Number(order.tableHourlyCharge) : null,
       items: (order.items ?? []).map((it) => ({
         productName: it.productName,
         sku: it.sku,
@@ -236,7 +240,7 @@ export async function fiscalizeCardReturnPayment(
   ret: SalesReturnDetail,
   payment: PosOrderPaymentRow,
   parentOrderPayments: PosOrderPaymentRow[] | undefined,
-  opts?: { silentSkip?: boolean },
+  opts?: { silentSkip?: boolean; orderGrandTotal?: number | null },
 ): Promise<FiscalizeOutcome> {
   const settings = loadOmnicashierSettings();
   if (!isOmnicashierConfigured(settings)) {
@@ -291,6 +295,7 @@ export async function fiscalizeCardReturnPayment(
       vatPercent: settings.defaultVatPercent,
       parent,
       prevDocNumber,
+      orderGrandTotal: opts?.orderGrandTotal,
     });
 
     const fiscal = await omniMoneyBack(
@@ -334,7 +339,11 @@ export async function fiscalizeCardPaymentsOnReturn(
   const pending = findUnfiscalizedCardPayments(ret.payments);
   const out: FiscalizeOutcome[] = [];
   for (const p of pending) {
-    out.push(await fiscalizeCardReturnPayment(ret, p, parentOrder?.payments));
+    out.push(
+      await fiscalizeCardReturnPayment(ret, p, parentOrder?.payments, {
+        orderGrandTotal: parentOrder?.grandTotal != null ? Number(parentOrder.grandTotal) : null,
+      }),
+    );
   }
   return out;
 }

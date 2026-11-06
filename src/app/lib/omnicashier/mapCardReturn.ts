@@ -1,8 +1,13 @@
 /**
  * Map SalesReturn + parent fiscal sale ids → OmniCashier money_back (check_type 100).
+ * Same catalog-price + discount allocation as sales so refund slips stay consistent.
  */
 
-import { sanitizeOmniItemName } from "./charset";
+import {
+  allocateCatalogLinesToPayment,
+  round2,
+  sumOmniItemNets,
+} from "./allocatePaymentLines";
 
 export type OmniReturnLineIn = {
   productName: string;
@@ -26,70 +31,9 @@ export type MapCardReturnInput = {
   vatPercent?: number | null;
   parent: ParentFiscalIds;
   prevDocNumber?: number | null;
+  /** Original order grand total when known (helps fee/shipping lines). */
+  orderGrandTotal?: number | null;
 };
-
-function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-
-function round3(n: number): number {
-  return Math.round((n + Number.EPSILON) * 1000) / 1000;
-}
-
-type OmniReturnItem = {
-  itemName: string;
-  itemCodeType: number;
-  itemCode: string;
-  itemQuantityType: number;
-  itemQuantity: number;
-  itemPrice: number;
-  itemSum: number;
-  itemVatPercent: number;
-  discount: number;
-};
-
-/**
- * Keep Σ itemSum === refund after 2dp price×qty rounding.
- * Prefer qty≈1 lines so itemPrice*itemQuantity stays exact; never recompute
- * itemSum from rounded price×qty after applying drift (that reintroduces ±0.01/0.02).
- */
-function absorbLineDrift(items: OmniReturnItem[], drift: number): void {
-  if (Math.abs(drift) < 0.01 || items.length === 0) return;
-
-  const tryApply = (idx: number, d: number): boolean => {
-    const it = items[idx]!;
-    const newSum = round2(it.itemSum + d);
-    if (!(newSum > 0)) return false;
-    const qty = it.itemQuantity;
-    if (!(qty > 0)) return false;
-    if (Math.abs(qty - 1) < 0.0005) {
-      it.itemSum = newSum;
-      it.itemPrice = newSum;
-      return true;
-    }
-    const newPrice = round2(newSum / qty);
-    if (round2(newPrice * qty) !== newSum) return false;
-    it.itemSum = newSum;
-    it.itemPrice = newPrice;
-    return true;
-  };
-
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (Math.abs(items[i]!.itemQuantity - 1) < 0.0005 && tryApply(i, drift)) return;
-  }
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (Math.abs(items[i]!.itemQuantity - 1) >= 0.0005 && tryApply(i, drift)) return;
-  }
-
-  for (let i = items.length - 1; i >= 0; i--) {
-    const it = items[i]!;
-    const newSum = round2(it.itemSum + drift);
-    if (!(newSum > 0)) continue;
-    it.itemSum = newSum;
-    it.itemPrice = it.itemQuantity > 0 ? round2(newSum / it.itemQuantity) : newSum;
-    return;
-  }
-}
 
 export function mapCardReturnToOmni(input: MapCardReturnInput): {
   prev_doc_number?: number;
@@ -106,80 +50,23 @@ export function mapCardReturnToOmni(input: MapCardReturnInput): {
       ? Number(input.vatPercent)
       : input.defaultVatPercent;
 
-  const raw = (input.items ?? []).filter((it) => Number(it.quantity) > 0);
-  let items: OmniReturnItem[];
+  const items = allocateCatalogLinesToPayment({
+    paymentAmount: pay,
+    orderGrandTotal: input.orderGrandTotal,
+    vatPercent,
+    items: (input.items ?? []).map((it) => ({
+      productName: it.productName,
+      sku: it.sku,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+    })),
+    emptyLabel: "Refund",
+    emptyCode: "REF",
+    feeLabel: "Service",
+    feeCode: "FEE",
+  });
 
-  if (raw.length === 0) {
-    items = [
-      {
-        itemName: sanitizeOmniItemName("Refund"),
-        itemCodeType: 3,
-        itemCode: "REF",
-        itemQuantityType: 0,
-        itemQuantity: 1,
-        itemPrice: pay,
-        itemSum: pay,
-        itemVatPercent: vatPercent,
-        discount: 0,
-      },
-    ];
-  } else {
-    const full = raw.map((it) => {
-      const qty = Number(it.quantity);
-      const price = round2(Number(it.unitPrice));
-      return {
-        name: it.productName || "Item",
-        sku: String(it.sku || "").slice(0, 32),
-        qty,
-        lineSum: round2(price * qty),
-      };
-    });
-    const fullSum = round2(full.reduce((a, r) => a + r.lineSum, 0)) || pay;
-    items = [];
-    let allocated = 0;
-    for (let i = 0; i < full.length; i++) {
-      const row = full[i]!;
-      const isLast = i === full.length - 1;
-      const share = isLast ? round2(pay - allocated) : round2((row.lineSum / fullSum) * pay);
-      if (!isLast) allocated = round2(allocated + share);
-      if (share <= 0) continue;
-      const qty = round3(row.qty);
-      const itemPrice = qty > 0 ? round2(share / qty) : share;
-      const itemSum = round2(itemPrice * qty);
-      items.push({
-        itemName: sanitizeOmniItemName(row.name),
-        itemCodeType: 0,
-        itemCode: row.sku || "0",
-        itemQuantityType: 0,
-        itemQuantity: qty,
-        itemPrice,
-        itemSum,
-        itemVatPercent: vatPercent,
-        discount: 0,
-      });
-    }
-    if (items.length === 0) {
-      items = [
-        {
-          itemName: sanitizeOmniItemName("Refund"),
-          itemCodeType: 3,
-          itemCode: "REF",
-          itemQuantityType: 0,
-          itemQuantity: 1,
-          itemPrice: pay,
-          itemSum: pay,
-          itemVatPercent: vatPercent,
-          discount: 0,
-        },
-      ];
-    }
-    absorbLineDrift(
-      items,
-      round2(pay - round2(items.reduce((a, it) => a + it.itemSum, 0))),
-    );
-  }
-
-  const sum = round2(items.reduce((a, it) => a + it.itemSum, 0));
+  const sum = sumOmniItemNets(items);
 
   return {
     ...(input.prevDocNumber != null ? { prev_doc_number: input.prevDocNumber } : {}),
