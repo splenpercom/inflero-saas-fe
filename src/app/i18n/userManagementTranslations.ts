@@ -63,7 +63,7 @@ export const userManagementTranslations = {
     delete: "Delete",
     manage: "Manage",
     managePayments: "Payments",
-    managePaymentsHint: "Allow recording payments on POS orders (Orders only)",
+    managePaymentsHint: "Allow recording payments from Orders. POS Edit also covers payments on the POS screen.",
     createRole: "Create Role",
     updateRole: "Update Role",
     
@@ -278,7 +278,7 @@ export const userManagementTranslations = {
     delete: "Sil",
     manage: "İdarə et",
     managePayments: "Ödənişlər",
-    managePaymentsHint: "POS sifarişlərində ödəniş qeyd etməyə icazə (yalnız Sifarişlər)",
+    managePaymentsHint: "Sifarişlərdən ödəniş qeyd etməyə icazə. POS Edit POS ekranında da ödənişi əhatə edir.",
     createRole: "Rol Yarat",
     updateRole: "Rol Yenilə",
     
@@ -476,7 +476,7 @@ export const userManagementTranslations = {
     delete: "Удалить",
     manage: "Управление",
     managePayments: "Оплаты",
-    managePaymentsHint: "Разрешить запись оплат по заказам POS (только Заказы)",
+    managePaymentsHint: "Разрешить запись оплат из Заказов. POS Edit также покрывает оплату на экране POS.",
     createRole: "Создать роль",
     updateRole: "Обновить роль",
     newPassword: "Новый пароль",
