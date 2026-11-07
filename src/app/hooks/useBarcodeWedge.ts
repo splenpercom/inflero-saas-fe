@@ -2,8 +2,12 @@ import { useCallback, useEffect, useRef, type KeyboardEvent } from "react";
 
 const CODE_LIKE = /^[A-Za-z0-9\-._/]+$/;
 
-/** Default max gap between keystrokes to treat input as a scanner burst (ms). */
-export const DEFAULT_WEDGE_MAX_KEY_GAP_MS = 80;
+/**
+ * Default max gap between keystrokes to treat input as a scanner burst (ms).
+ * Many CCD/USB wedges are slower than 80ms between chars; a too-low gap resets the
+ * buffer mid-barcode so Enter fires a truncated code → intermittent "not found".
+ */
+export const DEFAULT_WEDGE_MAX_KEY_GAP_MS = 140;
 
 export type BarcodeWedgeOptions = {
   minLength?: number;
@@ -70,12 +74,16 @@ export function useBarcodeWedge(
       if (e.key === "Enter") {
         const fromBuffer = bufferRef.current.trim();
         const fromField = (e.currentTarget.value ?? "").trim();
+        // Prefer the longest valid candidate. If a slow wedge reset the buffer mid-scan,
+        // the controlled input still holds the full code — using the short buffer alone
+        // caused "product not found" while the grid still showed the matching product.
+        const candidates = [fromBuffer, fromField].filter(
+          (c) => c.length >= minLength && isBarcodeLikeCode(c),
+        );
         const code =
-          fromBuffer.length >= minLength && isBarcodeLikeCode(fromBuffer)
-            ? fromBuffer
-            : fromField.length >= minLength && isBarcodeLikeCode(fromField)
-              ? fromField
-              : "";
+          candidates.length === 0
+            ? ""
+            : candidates.reduce((a, b) => (b.length > a.length ? b : a));
 
         reset();
         if (!code) return;
