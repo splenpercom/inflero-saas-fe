@@ -8,6 +8,11 @@ import { useStockProductSearch } from "../../hooks/useStockProductSearch";
 import { StockLocationFields, isLocationValid } from "./StockLocationFields";
 import { ModernSelect } from "../ui/ModernSelect";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import {
+  parseNumericInput,
+  roundToMaxDp,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 import { pickLang } from "../../i18n/pickLang";
 interface AddAdjustmentModalProps {
@@ -69,8 +74,8 @@ export function AddAdjustmentModal({ isOpen, onClose, onSaved }: AddAdjustmentMo
 
   const handleSave = async () => {
     if (isDemo || !isAuthenticated) return;
-    const qty = parseInt(quantity, 10);
-    if (!productId || !isLocationValid(location) || Number.isNaN(qty) || qty === 0) return;
+    const qty = roundToMaxDp(parseNumericInput(quantity, NaN), 3);
+    if (!productId || !isLocationValid(location) || !Number.isFinite(qty) || qty === 0) return;
 
     setSaving(true);
     try {
@@ -95,12 +100,12 @@ export function AddAdjustmentModal({ isOpen, onClose, onSaved }: AddAdjustmentMo
 
   if (!isOpen) return null;
 
-  const qtyNum = parseInt(quantity, 10);
+  const qtyNum = roundToMaxDp(parseNumericInput(quantity, NaN), 3);
   const canSubmit =
     productId &&
     isLocationValid(location) &&
     quantity &&
-    !Number.isNaN(qtyNum) &&
+    Number.isFinite(qtyNum) &&
     qtyNum !== 0;
 
   return (
@@ -175,9 +180,12 @@ export function AddAdjustmentModal({ isOpen, onClose, onSaved }: AddAdjustmentMo
               {tr("Tənzimləmə miqdarı", "Adjustment quantity")} <span className="text-red-500">*</span>
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              onChange={(e) =>
+                setQuantity(sanitizeNumericTypingMaxDp(e.target.value, 3, { allowNegative: true }))
+              }
               placeholder={tr("+50 və ya -30", "+50 or -30")}
               className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             />

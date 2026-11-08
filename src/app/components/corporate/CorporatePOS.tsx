@@ -45,7 +45,12 @@ import {
   useLastPointerType,
   usePrefersTouchKeyboard,
 } from "../../hooks/usePrefersTouchKeyboard";
-import { parseNumericInput, sanitizeNumericTyping } from "../../lib/numericInput";
+import {
+  parseNumericInput,
+  roundToMaxDp,
+  sanitizeNumericTyping,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useBranch } from "../../context/BranchContext";
@@ -120,6 +125,8 @@ interface Product {
   stock: number;
   code: string;
   barcode: string;
+  /** Unit shortName (e.g. kg, g) from inventory. */
+  unit?: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
 }
@@ -131,6 +138,7 @@ interface CartItem {
   price: string;
   quantity: number;
   image: string;
+  unit?: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
   /** Birmarket track-only percent for this line (0–100); used only when order Birmarket is on. */
@@ -144,6 +152,32 @@ function cartUnitPrice(price: string): number {
 function formatCartPriceInput(raw: string | number): string {
   return sanitizeNumericTyping(String(raw), { allowDecimal: true });
 }
+
+/** Weight / scale units — POS opens price numpad on select/scan. */
+function isWeightUnit(unit?: string | null): boolean {
+  if (!unit) return false;
+  const u = unit.trim().toLowerCase();
+  return (
+    u === "kg" ||
+    u === "g" ||
+    u === "gram" ||
+    u === "grams" ||
+    u === "kilogram" ||
+    u === "kilograms" ||
+    u === "kq" ||
+    u === "q" ||
+    u === "qram" ||
+    u === "kiloqram"
+  );
+}
+
+type TouchKbField =
+  | "search"
+  | "shipping"
+  | "serviceFee"
+  | "mileage"
+  | "discount"
+  | "cartPrice";
 
 type PaymentMethod = "cash" | "card";
 type PaymentStatusChoice = "paid" | "pending";
@@ -181,7 +215,7 @@ function savePosCategoryOrder(storageKey: string, order: string[]) {
   savePosIdOrder(storageKey, order);
 }
 
-/** Editable cart/product quantity — type a value or use +/-. Commits on blur/Enter. */
+/** Editable cart/product quantity — decimals up to 3 dp. Commits on blur/Enter. */
 function PosQtyInput({
   value,
   disabled,
@@ -202,8 +236,8 @@ function PosQtyInput({
   }, [value]);
 
   const commit = () => {
-    const n = parseInt(text.replace(/\D/g, ""), 10);
-    if (!Number.isFinite(n) || n < 1) {
+    const n = roundToMaxDp(parseNumericInput(text, NaN), 3);
+    if (!Number.isFinite(n) || n <= 0) {
       setText(String(value));
       return;
     }
@@ -214,14 +248,15 @@ function PosQtyInput({
   return (
     <input
       type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
+      inputMode="decimal"
       disabled={disabled}
       value={text}
       aria-label={ariaLabel}
       onClick={(e) => e.stopPropagation()}
       onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) => setText(e.target.value.replace(/\D/g, "").slice(0, 5))}
+      onChange={(e) =>
+        setText(sanitizeNumericTypingMaxDp(e.target.value, 3, { allowDecimal: true }))
+      }
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
@@ -235,7 +270,7 @@ function PosQtyInput({
       }}
       className={
         className ??
-        "text-[11px] font-medium text-gray-900 dark:text-white px-0.5 w-8 min-w-[1.5rem] text-center bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-40"
+        "text-[11px] font-medium text-gray-900 dark:text-white px-0.5 w-10 min-w-[2rem] text-center bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-40"
       }
     />
   );
@@ -1254,8 +1289,10 @@ export function CorporatePOS() {
   const [inventoryServicesEnabled, setInventoryServicesEnabled] = useState(false);
   const [touchKb, setTouchKb] = useState<null | {
     mode: "full" | "numpad";
-    field: "search" | "shipping" | "serviceFee" | "mileage" | "discount";
+    field: TouchKbField;
+    productId?: string;
   }>(null);
+  const openWeightPricePadRef = useRef<(productId: string) => void>(() => {});
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -1315,6 +1352,7 @@ export function CorporatePOS() {
       stock: isService ? Number.MAX_SAFE_INTEGER : (item.quantity ?? 0),
       code: item.sku,
       barcode: (item.itemBarcode ?? "").trim(),
+      unit: (item.unit ?? "").trim() || undefined,
       productType: item.productType,
       trackStock: !isService,
     };
@@ -2656,7 +2694,13 @@ export function CorporatePOS() {
       const inCart = prev.find((i) => i.id === product.id);
       if (inCart) {
         return prev.map((i) =>
-          i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i,
+          i.id === product.id
+            ? {
+                ...i,
+                quantity: i.quantity + 1,
+                unit: i.unit ?? product.unit,
+              }
+            : i,
         );
       }
       return [
@@ -2667,6 +2711,7 @@ export function CorporatePOS() {
           price: formatCartPriceInput(product.price),
           quantity: 1,
           image: product.image,
+          unit: product.unit,
           productType: product.productType,
           trackStock: product.trackStock,
           ...(birmarketCommissionFeatureOn && birmarketCommissionOn
@@ -2675,6 +2720,9 @@ export function CorporatePOS() {
         },
       ];
     });
+    if (isWeightUnit(product.unit)) {
+      openWeightPricePadRef.current(product.id);
+    }
     return true;
   };
 
@@ -2876,17 +2924,26 @@ export function CorporatePOS() {
   const openTouchKb = useCallback(
     (
       mode: "full" | "numpad",
-      field: "search" | "shipping" | "serviceFee" | "mileage" | "discount",
+      field: TouchKbField,
       force = false,
+      productId?: string,
     ) => {
       const fromTouch =
         lastPointerType.current === "touch" || lastPointerType.current === "pen";
       if (force || prefersTouchKeyboard || fromTouch) {
-        setTouchKb({ mode, field });
+        setTouchKb({
+          mode,
+          field,
+          ...(field === "cartPrice" && productId ? { productId } : {}),
+        });
       }
     },
     [prefersTouchKeyboard, lastPointerType],
   );
+  openWeightPricePadRef.current = (productId: string) => {
+    // Force: barcode scan has no touch pointer, but weight lines need the pad on POS.
+    openTouchKb("numpad", "cartPrice", true, productId);
+  };
 
   const removeFromCart = (id: string) => {
     if (!canMutateCart) return;
@@ -2904,8 +2961,8 @@ export function CorporatePOS() {
       !product?.trackStock ||
       product?.productType === "SERVICE";
 
-    let next = Math.floor(quantity);
-    if (!Number.isFinite(next) || next < 1) {
+    let next = roundToMaxDp(quantity, 3);
+    if (!Number.isFinite(next) || next <= 0) {
       setCart((p) => p.filter((i) => i.id !== id));
       return;
     }
@@ -2995,7 +3052,9 @@ export function CorporatePOS() {
             ? mileageInput
             : touchKb?.field === "discount"
               ? discountValue
-              : "";
+              : touchKb?.field === "cartPrice" && touchKb.productId
+                ? (cart.find((i) => i.id === touchKb.productId)?.price ?? "")
+                : "";
 
   const handleTouchKbChange = (next: string) => {
     if (!touchKb) return;
@@ -3017,6 +3076,16 @@ export function CorporatePOS() {
           sanitizeNumericTyping(next, { allowDecimal: discountType !== "percent" }),
         );
         break;
+      case "cartPrice": {
+        if (!touchKb.productId || !canMutateCart) return;
+        const sanitized = sanitizeNumericTyping(next, { allowDecimal: true });
+        setCart((prev) =>
+          prev.map((i) =>
+            i.id === touchKb.productId ? { ...i, price: sanitized } : i,
+          ),
+        );
+        break;
+      }
     }
   };
 
@@ -5281,7 +5350,10 @@ export function CorporatePOS() {
                       item.productType === "SERVICE" ||
                       !product?.trackStock ||
                       product?.productType === "SERVICE";
-                    const canEditLinePrice = isService || posEditableProductPricesEnabled;
+                    const lineUnit = item.unit ?? product?.unit;
+                    const weightLine = isWeightUnit(lineUnit);
+                    const canEditLinePrice =
+                      isService || posEditableProductPricesEnabled || weightLine;
                     const available = product
                       ? getAvailableStock(product.id, product.stock)
                       : 0;
@@ -5374,9 +5446,23 @@ export function CorporatePOS() {
                                     ),
                                   );
                                 }}
-                                className="w-20 px-1.5 py-0.5 text-[11px] font-semibold text-[#14b8a6] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onFocus={() =>
+                                  openTouchKb("numpad", "cartPrice", false, item.id)
+                                }
+                                onClick={() =>
+                                  openTouchKb("numpad", "cartPrice", true, item.id)
+                                }
+                                disabled={!canMutateCart}
+                                className="w-20 px-1.5 py-0.5 text-[11px] font-semibold text-[#14b8a6] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-40"
+                                aria-label={
+                                  weightLine
+                                    ? tr("Çəki qiyməti", "Weight price")
+                                    : tr("Qiymət", "Price")
+                                }
                               />
-                              <span className="text-[9px] text-gray-400">₼</span>
+                              <span className="text-[9px] text-gray-400">
+                                ₼{weightLine && lineUnit ? `/${lineUnit}` : ""}
+                              </span>
                             </div>
                           ) : (
                             <p className="text-[11px] font-semibold text-[#14b8a6] dark:text-[#14b8a6] leading-tight">
@@ -6208,7 +6294,9 @@ export function CorporatePOS() {
                   ? tr("Xidmət haqqı", "Service fee")
                   : touchKb.field === "mileage"
                     ? tr("Km göstərici", "Mileage")
-                    : tr("Endirim", "Discount")
+                    : touchKb.field === "cartPrice"
+                      ? tr("Qiymət", "Price")
+                      : tr("Endirim", "Discount")
           }
         />
       )}

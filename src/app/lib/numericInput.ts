@@ -60,6 +60,25 @@ export function parseNumericInput(raw: string, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** Cap fractional digits while typing (e.g. product price/qty → 3). */
+export function sanitizeNumericTypingMaxDp(
+  raw: string,
+  maxDp: number,
+  opts?: SanitizeNumericOpts,
+): string {
+  const cleaned = sanitizeNumericTyping(raw, opts);
+  if (!cleaned.includes(".")) return cleaned;
+  const [whole, frac = ""] = cleaned.split(".");
+  return `${whole}.${frac.slice(0, Math.max(0, maxDp))}`;
+}
+
+/** Round to at most `maxDp` decimal places for API payloads. */
+export function roundToMaxDp(n: number, maxDp: number): number {
+  if (!Number.isFinite(n)) return n;
+  const f = 10 ** maxDp;
+  return Math.round((n + Number.EPSILON) * f) / f;
+}
+
 /** For number | "" controlled state: empty → "", else finite number. */
 export function numericOrEmptyFromEvent(raw: string): number | "" {
   if (raw.trim() === "") return "";

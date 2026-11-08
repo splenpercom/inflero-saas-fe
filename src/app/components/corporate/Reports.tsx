@@ -256,7 +256,8 @@ export function Reports() {
     return rows.map((r) => ({
       month: r.month,
       revenue: r.revenue ?? 0,
-      profit: Math.max(0, (r.revenue ?? 0) - (r.expense ?? 0)),
+      // Same basis as Overview: revenue − (sold COGS + approved expenses). Allow negatives.
+      profit: Math.round(((r.revenue ?? 0) - (r.expense ?? 0)) * 100) / 100,
     }));
   }, [summary]);
 

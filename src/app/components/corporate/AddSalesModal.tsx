@@ -18,7 +18,11 @@ import {
 } from "../../hooks/usePrefersTouchKeyboard";
 
 import { pickLang } from "../../i18n/pickLang";
-import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+import {
+  asNumber,
+  sanitizeNumericTyping,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 interface ProductItem {
   id: string;
@@ -161,7 +165,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
         handleUpdateProduct(
           touchKb.productId,
           "qty",
-          bufferToNumber(sanitizeNumericTyping(next, { allowDecimal: false })),
+          bufferToNumber(sanitizeNumericTypingMaxDp(next, 3)),
         );
         break;
     }
@@ -514,9 +518,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                           inputMode="none"
                           value={product.qty === "" ? "" : product.qty}
                           onChange={(e) => {
-                            const s = sanitizeNumericTyping(e.target.value, {
-                              allowDecimal: false,
-                            });
+                            const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
                             handleUpdateProduct(product.id, "qty", s === "" ? "" : Number(s));
                           }}
                           onFocus={() => openTouchKb({ kind: "lineQty", productId: product.id })}

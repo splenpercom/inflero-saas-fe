@@ -11,7 +11,11 @@ import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
-import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+import {
+  asNumber,
+  sanitizeNumericTyping,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 interface LineItem {
   key: string;
@@ -258,9 +262,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
                       inputMode="numeric"
                       value={line.quantity === "" ? "" : line.quantity}
                       onChange={(e) => {
-                        const s = sanitizeNumericTyping(e.target.value, {
-                          allowDecimal: false,
-                        });
+                        const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
                         updateLine(line.key, {
                           quantity: s === "" ? "" : Number(s),
                         });

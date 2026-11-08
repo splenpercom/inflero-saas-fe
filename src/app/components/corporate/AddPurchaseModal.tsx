@@ -26,7 +26,12 @@ import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
-import { asNumber, parseNumericInput, sanitizeNumericTyping } from "../../lib/numericInput";
+import {
+  asNumber,
+  parseNumericInput,
+  sanitizeNumericTyping,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 interface ProductLine {
   productId: string;
@@ -800,9 +805,7 @@ export function AddPurchaseModal({
                               inputMode="numeric"
                               value={product.qty}
                               onChange={(e) => {
-                                const s = sanitizeNumericTyping(e.target.value, {
-                                  allowDecimal: false,
-                                });
+                                const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
                                 handleUpdateLine(product.productId, "qty", s);
                               }}
                               className="w-full min-w-[3.5rem] px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"

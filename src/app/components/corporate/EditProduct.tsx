@@ -21,6 +21,10 @@ import { parsePrice } from "../../lib/inventoryMappers";
 import { resolveProductsListReturn, PRODUCTS_LIST_PATH } from "../../lib/productsNavigation";
 import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import {
+  roundToMaxDp,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 import { ModernSelect } from "../ui/ModernSelect";
 import { ModernMultiSelect } from "../ui/ModernMultiSelect";
 import { DateInput } from "../ui/DateInput";
@@ -149,6 +153,7 @@ export function EditProduct() {
   const [discountType, setDiscountType] = useState("");
   const [discountValue, setDiscountValue] = useState("");
   const [quantityAlert, setQuantityAlert] = useState("");
+  const [showOnPos, setShowOnPos] = useState(true);
   const [manufacturedDate, setManufacturedDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -245,9 +250,10 @@ export function EditProduct() {
       setCost(product.purchasePrice ?? "");
       setDiscountType(mapDiscountToUi(product.discountType));
       setDiscountValue(product.discountValue ?? "");
-      setQuantityAlert(product.quantityAlert != null ? String(product.quantityAlert) : "");
-      setManufacturedDate(product.manufacturedDate?.slice(0, 10) ?? "");
-      setExpiryDate(product.expiryDate?.slice(0, 10) ?? "");
+        setQuantityAlert(product.quantityAlert != null ? String(product.quantityAlert) : "");
+        setShowOnPos(product.showOnPos !== false);
+        setManufacturedDate(product.manufacturedDate?.slice(0, 10) ?? "");
+        setExpiryDate(product.expiryDate?.slice(0, 10) ?? "");
 
       const urls = productImageUrls(product.images);
       setImages(urls.map((url, index) => ({ id: `img-${index}`, url })));
@@ -457,7 +463,7 @@ export function EditProduct() {
         }
       }
 
-      const qty = quantity.trim() ? parseInt(quantity, 10) : 0;
+      const qty = quantity.trim() ? roundToMaxDp(parsePrice(quantity), 3) : 0;
       const payload: Parameters<typeof updateProduct>[1] = {
         name: productName.trim(),
         description: description.trim() || null,
@@ -467,14 +473,25 @@ export function EditProduct() {
         brandId: brand || null,
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
-        price: String(parsePrice(price)),
+        price: String(roundToMaxDp(parsePrice(price), 3)),
         ...(productsCogsEnabled
-          ? { purchasePrice: cost.trim() ? String(parsePrice(cost)) : null }
+          ? {
+              purchasePrice: cost.trim()
+                ? String(roundToMaxDp(parsePrice(cost), 3))
+                : null,
+            }
           : {}),
         discountType: mapDiscountToApi(discountType),
-        discountValue: discountValue.trim() ? String(parsePrice(discountValue)) : null,
+        discountValue: discountValue.trim()
+          ? String(roundToMaxDp(parsePrice(discountValue), 3))
+          : null,
+        showOnPos,
         ...(stockEnabled
-          ? { quantityAlert: quantityAlert.trim() ? parseInt(quantityAlert, 10) : null }
+          ? {
+              quantityAlert: quantityAlert.trim()
+                ? roundToMaxDp(parsePrice(quantityAlert), 3)
+                : null,
+            }
           : {}),
         manufacturedDate: manufacturedDate || null,
         expiryDate: expiryDate || null,
@@ -671,9 +688,12 @@ export function EditProduct() {
                         {pt("quantity")}
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
+                        onChange={(e) =>
+                          setQuantity(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                        }
                         className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                       {!branchId && (
@@ -688,9 +708,12 @@ export function EditProduct() {
                       {pt("price")} <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={price}
-                      onChange={(e) => setPrice(e.target.value)}
+                      onChange={(e) =>
+                        setPrice(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                      }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
@@ -700,9 +723,12 @@ export function EditProduct() {
                       {pt("cost")}
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={cost}
-                      onChange={(e) => setCost(e.target.value)}
+                      onChange={(e) =>
+                        setCost(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                      }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
@@ -727,9 +753,12 @@ export function EditProduct() {
                       {pt("discountValue")}
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={discountValue}
-                      onChange={(e) => setDiscountValue(e.target.value)}
+                      onChange={(e) =>
+                        setDiscountValue(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                      }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
@@ -739,13 +768,31 @@ export function EditProduct() {
                         {pt("quantityAlert")}
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={quantityAlert}
-                        onChange={(e) => setQuantityAlert(e.target.value)}
+                        onChange={(e) =>
+                          setQuantityAlert(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                        }
                         className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
                   )}
+                  <div className="flex items-center gap-2 col-span-2 md:col-span-3 xl:col-span-4 pt-1">
+                    <input
+                      id="edit-show-on-pos"
+                      type="checkbox"
+                      checked={showOnPos}
+                      onChange={(e) => setShowOnPos(e.target.checked)}
+                      className="h-3.5 w-3.5 rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                    />
+                    <label
+                      htmlFor="edit-show-on-pos"
+                      className="text-xs font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      {tr("POS-da göstər", "Show on POS")}
+                    </label>
+                  </div>
                 </div>
               </div>
             )}

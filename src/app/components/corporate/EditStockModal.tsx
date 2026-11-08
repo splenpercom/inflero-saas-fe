@@ -8,6 +8,11 @@ import { fetchTenantUsers } from "../../api/userManagement";
 import { branchLabel, formatStockDate } from "../../lib/stockMappers";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { ModernSelect } from "../ui/ModernSelect";
+import {
+  parseNumericInput,
+  roundToMaxDp,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 import { pickLang } from "../../i18n/pickLang";
 interface EditStockModalProps {
@@ -53,8 +58,8 @@ export function EditStockModal({ isOpen, onClose, onSaved, stockItem }: EditStoc
 
   const handleSave = async () => {
     if (!stockItem || !(isAuthenticated || isDemo)) return;
-    const quantity = parseInt(qty, 10);
-    if (Number.isNaN(quantity) || quantity < 0) return;
+    const quantity = roundToMaxDp(parseNumericInput(qty, NaN), 3);
+    if (!Number.isFinite(quantity) || quantity < 0) return;
     setSaving(true);
     try {
       await patchStockLevel(stockItem.id, {
@@ -122,10 +127,10 @@ export function EditStockModal({ isOpen, onClose, onSaved, stockItem }: EditStoc
               {tr("Miqdar", "Quantity")} <span className="text-red-500">*</span>
             </label>
             <input
-              type="number"
-              min={0}
+              type="text"
+              inputMode="decimal"
               value={qty}
-              onChange={(e) => setQty(e.target.value)}
+              onChange={(e) => setQty(sanitizeNumericTypingMaxDp(e.target.value, 3))}
               className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
             />
           </div>

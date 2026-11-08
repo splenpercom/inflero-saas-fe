@@ -23,7 +23,11 @@ import {
 } from "../../hooks/usePrefersTouchKeyboard";
 import { pickLang } from "../../i18n/pickLang";
 import { fetchCustomerVehicles, type CustomerVehicle } from "../../api/people";
-import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+import {
+  asNumber,
+  sanitizeNumericTyping,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 interface ProductItem {
   id: string;
@@ -318,7 +322,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
         handleUpdateProduct(
           touchKb.productId,
           "qty",
-          bufferToNumber(sanitizeNumericTyping(next, { allowDecimal: false })),
+          bufferToNumber(sanitizeNumericTypingMaxDp(next, 3)),
         );
         break;
       case "linePrice":
@@ -834,9 +838,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                               inputMode="none"
                               value={product.qty === "" ? "" : product.qty}
                               onChange={(e) => {
-                                const s = sanitizeNumericTyping(e.target.value, {
-                                  allowDecimal: false,
-                                });
+                                const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
                                 handleUpdateProduct(
                                   product.id,
                                   "qty",
