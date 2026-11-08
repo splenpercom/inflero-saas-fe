@@ -19,7 +19,11 @@ import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
-import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+import {
+  asNumber,
+  sanitizeNumericTyping,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 interface ProductLine {
   productId: string;
@@ -577,9 +581,7 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
                           inputMode="numeric"
                           value={product.qty === "" ? "" : product.qty}
                           onChange={(e) => {
-                            const s = sanitizeNumericTyping(e.target.value, {
-                              allowDecimal: false,
-                            });
+                            const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
                             handleUpdateLine(
                               product.productId,
                               "qty",

@@ -14,6 +14,11 @@ import { fiscalizeCardPaymentsOnReturn } from "../../lib/omnicashier/fiscalize";
 import { formatSalesDate } from "../../lib/salesMappers";
 import { useSalesCustomers } from "../../hooks/useSalesCustomers";
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
+import {
+  parseNumericInput,
+  roundToMaxDp,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 import { pickLang } from "../../i18n/pickLang";
 
@@ -477,9 +482,9 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
                               disabled={!line.selected}
                               value={line.selected ? (line.qty > 0 ? String(line.qty) : "") : ""}
                               onChange={(e) => {
-                                // Digits only; empty is allowed so backspace can clear for retyping.
-                                const digits = e.target.value.replace(/\D/g, "");
-                                if (digits === "") {
+                                // Empty allowed so backspace can clear for retyping; max 3 dp.
+                                const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
+                                if (s === "" || s === ".") {
                                   setLines((prev) =>
                                     prev.map((l) =>
                                       l.productId === line.productId
@@ -489,7 +494,7 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
                                   );
                                   return;
                                 }
-                                const raw = Number.parseInt(digits, 10);
+                                const raw = roundToMaxDp(parseNumericInput(s, NaN), 3);
                                 if (!Number.isFinite(raw)) return;
                                 const qty = Math.min(line.remainingQty, Math.max(0, raw));
                                 setLines((prev) =>

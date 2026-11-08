@@ -22,6 +22,10 @@ import { parsePrice } from "../../lib/inventoryMappers";
 import { resolveProductsListReturn } from "../../lib/productsNavigation";
 import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import {
+  roundToMaxDp,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 import { ModernSelect } from "../ui/ModernSelect";
 import { ModernMultiSelect } from "../ui/ModernMultiSelect";
 import { DateInput } from "../ui/DateInput";
@@ -178,6 +182,7 @@ export function CreateProduct({
   const [discountType, setDiscountType] = useState("");
   const [discountValue, setDiscountValue] = useState("");
   const [quantityAlert, setQuantityAlert] = useState("");
+  const [showOnPos, setShowOnPos] = useState(true);
   const [manufacturedDate, setManufacturedDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
 
@@ -297,6 +302,7 @@ export function CreateProduct({
         setDiscountType(mapDiscountToUi(product.discountType));
         setDiscountValue(product.discountValue ?? "");
         setQuantityAlert(product.quantityAlert != null ? String(product.quantityAlert) : "");
+        setShowOnPos(product.showOnPos !== false);
         setManufacturedDate(product.manufacturedDate?.slice(0, 10) ?? "");
         setExpiryDate(product.expiryDate?.slice(0, 10) ?? "");
         const urls = productImageUrls(product.images);
@@ -497,6 +503,7 @@ export function CreateProduct({
     setDiscountType("");
     setDiscountValue("");
     setQuantityAlert("");
+    setShowOnPos(true);
     setManufacturedDate("");
     setExpiryDate("");
     setImages((prev) => {
@@ -537,7 +544,7 @@ export function CreateProduct({
         }
       }
 
-      const qty = quantity.trim() ? parseInt(quantity, 10) : 0;
+      const qty = quantity.trim() ? roundToMaxDp(parsePrice(quantity), 3) : 0;
       const initialStocks =
         stockEnabled && qty > 0 && branchId ? [{ storeId: branchId, quantity: qty }] : undefined;
 
@@ -551,16 +558,24 @@ export function CreateProduct({
         brandId: brand || null,
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
-        price: String(parsePrice(price)),
+        price: String(roundToMaxDp(parsePrice(price), 3)),
         purchasePrice: productsCogsEnabled
           ? cost.trim()
-            ? String(parsePrice(cost))
+            ? String(roundToMaxDp(parsePrice(cost), 3))
             : null
           : null,
         discountType: mapDiscountType(discountType),
-        discountValue: discountValue.trim() ? String(parsePrice(discountValue)) : null,
+        discountValue: discountValue.trim()
+          ? String(roundToMaxDp(parsePrice(discountValue), 3))
+          : null,
+        showOnPos,
         ...(stockEnabled
-          ? { quantityAlert: quantityAlert.trim() ? parseInt(quantityAlert, 10) : null, initialStocks }
+          ? {
+              quantityAlert: quantityAlert.trim()
+                ? roundToMaxDp(parsePrice(quantityAlert), 3)
+                : null,
+              initialStocks,
+            }
           : {}),
         manufacturedDate: manufacturedDate || null,
         expiryDate: expiryDate || null,
@@ -940,9 +955,12 @@ export function CreateProduct({
                         {pt("quantity")}
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
+                        onChange={(e) =>
+                          setQuantity(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                        }
                         className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
@@ -953,9 +971,12 @@ export function CreateProduct({
                       {pt("price")} <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={price}
-                      onChange={(e) => setPrice(e.target.value)}
+                      onChange={(e) =>
+                        setPrice(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                      }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
@@ -966,9 +987,12 @@ export function CreateProduct({
                       {pt("cost")}
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={cost}
-                      onChange={(e) => setCost(e.target.value)}
+                      onChange={(e) =>
+                        setCost(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                      }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
@@ -995,9 +1019,12 @@ export function CreateProduct({
                       {pt("discountValue")}
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={discountValue}
-                      onChange={(e) => setDiscountValue(e.target.value)}
+                      onChange={(e) =>
+                        setDiscountValue(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                      }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
                   </div>
@@ -1008,13 +1035,32 @@ export function CreateProduct({
                         {pt("quantityAlert")}
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={quantityAlert}
-                        onChange={(e) => setQuantityAlert(e.target.value)}
+                        onChange={(e) =>
+                          setQuantityAlert(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                        }
                         className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
                     </div>
                   )}
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      id="create-show-on-pos"
+                      type="checkbox"
+                      checked={showOnPos}
+                      onChange={(e) => setShowOnPos(e.target.checked)}
+                      className="h-3.5 w-3.5 rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                    />
+                    <label
+                      htmlFor="create-show-on-pos"
+                      className="text-xs font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      {tr("POS-da göstər", "Show on POS")}
+                    </label>
+                  </div>
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">

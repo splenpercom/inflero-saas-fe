@@ -90,6 +90,8 @@ export interface ProductListItem {
   expiryDate: string | null;
   /** Optional barcode printed on labels; used by POS scanners. */
   itemBarcode?: string | null;
+  /** When true (default), product is listed/sold on POS. */
+  showOnPos?: boolean;
 }
 
 export interface PagedProducts {
@@ -168,6 +170,7 @@ export type ProductCreateBody = {
   discountType?: string | null;
   discountValue?: string | null;
   quantityAlert?: number | null;
+  showOnPos?: boolean;
   manufacturer?: string | null;
   manufacturedDate?: string | null;
   expiryDate?: string | null;

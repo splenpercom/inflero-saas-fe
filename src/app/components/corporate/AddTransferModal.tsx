@@ -11,6 +11,11 @@ import {
   type StockLocationValue,
 } from "./StockLocationFields";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
+import {
+  parseNumericInput,
+  roundToMaxDp,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
 
 import { pickLang } from "../../i18n/pickLang";
 interface LineItem {
@@ -79,8 +84,11 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
 
     const items = lines
       .filter((l) => l.productId && l.quantity)
-      .map((l) => ({ productId: l.productId, quantity: parseInt(l.quantity, 10) }))
-      .filter((l) => !Number.isNaN(l.quantity) && l.quantity > 0);
+      .map((l) => ({
+        productId: l.productId,
+        quantity: roundToMaxDp(parseNumericInput(l.quantity, NaN), 3),
+      }))
+      .filter((l) => Number.isFinite(l.quantity) && l.quantity > 0);
 
     if (items.length === 0 || !isLocationValid(fromLoc) || !isLocationValid(toLoc)) return;
 
@@ -107,7 +115,13 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
 
   if (!isOpen) return null;
 
-  const validLines = lines.every((l) => !l.productId || (l.productId && l.quantity && parseInt(l.quantity, 10) > 0));
+  const validLines = lines.every(
+    (l) =>
+      !l.productId ||
+      (l.productId &&
+        l.quantity &&
+        roundToMaxDp(parseNumericInput(l.quantity, NaN), 3) > 0),
+  );
   const canSubmit =
     isLocationValid(fromLoc) &&
     isLocationValid(toLoc) &&
@@ -235,7 +249,11 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
                   type="number"
                   min={1}
                   value={line.quantity}
-                  onChange={(e) => updateLine(index, { quantity: e.target.value })}
+                  onChange={(e) =>
+                    updateLine(index, {
+                      quantity: sanitizeNumericTypingMaxDp(e.target.value, 3),
+                    })
+                  }
                   placeholder={tr("Miqdar", "Qty")}
                   className="w-20 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                 />
