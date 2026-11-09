@@ -92,6 +92,14 @@ export interface ProductListItem {
   itemBarcode?: string | null;
   /** When true (default), product is listed/sold on POS. */
   showOnPos?: boolean;
+  /** Rongta label-scale mode (NONE | WEIGHT). */
+  scaleSaleMode?: "NONE" | "WEIGHT";
+  /** Profile-17 item code (5 digits, keep leading zeros). */
+  scaleItemCode?: string | null;
+  scaleLfCode?: string | null;
+  scaleUnit?: "KG" | "G";
+  scaleSyncVersion?: number;
+  scaleSyncedVersion?: number | null;
 }
 
 export interface PagedProducts {
@@ -163,6 +171,10 @@ export type ProductCreateBody = {
   warrantyId?: string | null;
   barcodeSymbology?: string | null;
   itemBarcode?: string | null;
+  scaleSaleMode?: "NONE" | "WEIGHT";
+  scaleItemCode?: string | null;
+  scaleLfCode?: string | null;
+  scaleUnit?: "KG" | "G";
   price: string;
   purchasePrice?: string | null;
   taxType?: string | null;
@@ -414,6 +426,19 @@ export async function lookupProductByCode(
   const qs = new URLSearchParams({ code: code.trim() });
   const res = await apiGet<{ success: boolean; data: ProductListItem }>(
     `/tenant/inventory/products/lookup?${qs.toString()}`,
+    { signal: options?.signal },
+  );
+  return res.data;
+}
+
+/** Resolve Rongta scale item code (5 digits) to a WEIGHT-mode product. */
+export async function lookupProductByScaleItemCode(
+  itemCode: string,
+  options?: { signal?: AbortSignal },
+) {
+  const qs = new URLSearchParams({ itemCode: itemCode.trim() });
+  const res = await apiGet<{ success: boolean; data: ProductListItem }>(
+    `/tenant/inventory/products/lookup-scale?${qs.toString()}`,
     { signal: options?.signal },
   );
   return res.data;

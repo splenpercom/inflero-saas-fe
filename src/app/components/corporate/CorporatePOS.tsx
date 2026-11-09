@@ -59,7 +59,24 @@ import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBarcodeWedge, useGlobalBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { formatCurrency } from "../../utils/currency";
 import { AddCustomerModal, type CustomerFormData } from "./people/AddCustomerModal";
-import { fetchPosProducts, lookupProductByCode, type ProductListItem } from "../../api/inventory";
+import {
+  fetchPosProducts,
+  lookupProductByCode,
+  lookupProductByScaleItemCode,
+  type ProductListItem,
+} from "../../api/inventory";
+import { decodeScaleBarcode } from "../../lib/scaleBarcode/decode";
+import {
+  DEFAULT_ENABLED_SCALE_PROFILES,
+  SCALE_WEIGHT_BOUNDS,
+} from "../../lib/scaleBarcode/profiles";
+import {
+  fromMinorUnits,
+  gramsToKgQuantity,
+  scaleLineTotalMinor,
+  toMinorUnits,
+} from "../../lib/scaleBarcode/price";
+import type { PosOrderItemScaleMeta } from "../../api/sales";
 import {
   fetchCustomers,
   fetchCustomerVehicles,
@@ -155,6 +172,8 @@ interface CartItem {
   loyaltyOfferId?: string | null;
   /** Stable key so paid + free of same product can coexist. */
   lineKey?: string;
+  /** Rongta printed-label audit (one line per unique raw barcode). */
+  scaleMeta?: PosOrderItemScaleMeta;
 }
 
 function cartUnitPrice(price: string): number {
@@ -1281,6 +1300,7 @@ export function CorporatePOS() {
   const [shippingInput, setShippingInput] = useState("");
   const [serviceFeeInput, setServiceFeeInput] = useState("");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
+  const [scaleLabelScanEnabled, setScaleLabelScanEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
   const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
@@ -1563,6 +1583,7 @@ export function CorporatePOS() {
             Number.isFinite(defPct) ? Math.min(100, Math.max(0, defPct)) : 0,
           );
           setPosServiceFeeEnabled(s.posServiceFeeEnabled === true);
+          setScaleLabelScanEnabled(s.scaleLabelScanEnabled === true);
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
           setPosSendToBarEnabled(diningEnabled && s.posSendToBarEnabled === true);
           setPosBarBillShowPricesEnabled(
@@ -1884,6 +1905,8 @@ export function CorporatePOS() {
     setCart(
       detail.items.map((i) => {
         const pctRaw = i.birmarketCommissionPercent != null ? Number(i.birmarketCommissionPercent) : NaN;
+        const scaleMeta = i.scaleMeta ?? undefined;
+        const isFree = i.isLoyaltyFree === true;
         return {
           id: i.productId,
           name: i.productName,
@@ -1892,7 +1915,21 @@ export function CorporatePOS() {
           image: "📦",
           productType: (i as { productType?: CartItem["productType"] }).productType,
           trackStock: (i as { trackStock?: boolean }).trackStock !== false,
-          ...(orderBirmarketOn && Number.isFinite(pctRaw)
+          ...(isFree
+            ? {
+                isLoyaltyFree: true,
+                loyaltyOfferId: i.loyaltyOfferId ?? null,
+                lineKey: `free:${i.loyaltyOfferId ?? ""}:${i.productId}`,
+              }
+            : {}),
+          ...(scaleMeta?.rawBarcode
+            ? {
+                scaleMeta,
+                lineKey: `scale:${scaleMeta.lineInstanceId ?? `${scaleMeta.rawBarcode}:${i.id}`}`,
+                unit: "kg",
+              }
+            : {}),
+          ...(orderBirmarketOn && Number.isFinite(pctRaw) && !isFree
             ? { birmarketCommissionPercent: Math.min(100, Math.max(0, pctRaw)) }
             : {}),
         };
@@ -2713,15 +2750,74 @@ export function CorporatePOS() {
 
   const cartLineKey = (item: CartItem) => item.lineKey ?? item.id;
 
-  const addToCart = (product: Product): boolean => {
+  type AddToCartOpts = {
+    quantity?: number;
+    skipWeightPad?: boolean;
+    scaleMeta?: PosOrderItemScaleMeta;
+  };
+
+  const addToCart = (product: Product, opts?: AddToCartOpts): boolean => {
     if (!canMutateCart) return false;
     const isService = !product.trackStock || product.productType === "SERVICE";
-    const existing = cart.find((i) => !i.isLoyaltyFree && i.id === product.id);
+    const available = getAvailableStock(product.id, product.stock);
+
+    // Rongta scale label path: fixed kg qty + catalog price; skip weight price pad.
+    if (opts?.scaleMeta) {
+      const qty =
+        opts.quantity != null && Number.isFinite(opts.quantity)
+          ? Math.round(opts.quantity * 1000) / 1000
+          : gramsToKgQuantity(opts.scaleMeta.netWeightGrams);
+      if (!(qty > 0)) return false;
+      const freeQty = cart
+        .filter((i) => i.isLoyaltyFree && i.id === product.id)
+        .reduce((s, i) => s + i.quantity, 0);
+      const paidOtherQty = cart
+        .filter((i) => !i.isLoyaltyFree && i.id === product.id)
+        .reduce((s, i) => s + i.quantity, 0);
+      const nextQty = paidOtherQty + qty + freeQty;
+      if (!isService && stockEnabled && available <= 0) {
+        warnOutOfStock(product);
+        return false;
+      }
+      if (!isService && stockEnabled && nextQty > available) {
+        warnInsufficientStock(product, available);
+        return false;
+      }
+      const instanceId =
+        opts.scaleMeta.lineInstanceId?.trim() ||
+        `li-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      const scaleMeta: PosOrderItemScaleMeta = {
+        ...opts.scaleMeta,
+        lineInstanceId: instanceId,
+      };
+      const lineKey = `scale:${instanceId}`;
+      playBeep();
+      setCart((prev) => [
+        ...prev,
+        {
+          id: product.id,
+          lineKey,
+          name: product.name,
+          price: formatCartPriceInput(product.price),
+          quantity: qty,
+          image: product.image,
+          unit: product.unit || "kg",
+          productType: product.productType,
+          trackStock: product.trackStock,
+          scaleMeta,
+          ...(birmarketCommissionFeatureOn && birmarketCommissionOn
+            ? { birmarketCommissionPercent: birmarketDefaultPercent }
+            : {}),
+        },
+      ]);
+      return true;
+    }
+
+    const existing = cart.find((i) => !i.isLoyaltyFree && !i.scaleMeta && i.id === product.id);
     const freeQty = cart
       .filter((i) => i.isLoyaltyFree && i.id === product.id)
       .reduce((s, i) => s + i.quantity, 0);
     const nextQty = (existing ? existing.quantity : 0) + 1 + freeQty;
-    const available = getAvailableStock(product.id, product.stock);
 
     if (!isService && stockEnabled && available <= 0) {
       warnOutOfStock(product);
@@ -2734,10 +2830,10 @@ export function CorporatePOS() {
 
     playBeep();
     setCart((prev) => {
-      const inCart = prev.find((i) => !i.isLoyaltyFree && i.id === product.id);
+      const inCart = prev.find((i) => !i.isLoyaltyFree && !i.scaleMeta && i.id === product.id);
       if (inCart) {
         return prev.map((i) =>
-          !i.isLoyaltyFree && i.id === product.id
+          !i.isLoyaltyFree && !i.scaleMeta && i.id === product.id
             ? {
                 ...i,
                 quantity: i.quantity + 1,
@@ -2763,7 +2859,7 @@ export function CorporatePOS() {
         },
       ];
     });
-    if (isWeightUnit(product.unit)) {
+    if (!opts?.skipWeightPad && isWeightUnit(product.unit)) {
       openWeightPricePadRef.current(product.id);
     }
     return true;
@@ -2861,6 +2957,140 @@ export function CorporatePOS() {
       lookupInFlightCodeRef.current = trimmed;
 
       try {
+        // Rongta Path A: decode profile-17 labels only when branch flag is on.
+        // not_scale_barcode → fall through to existing SKU/barcode/loyalty path.
+        if (scaleLabelScanEnabled) {
+          const decoded = decodeScaleBarcode(trimmed, DEFAULT_ENABLED_SCALE_PROFILES);
+          if (decoded.ok) {
+            if (isDemo) {
+              notifyWarning(
+                tr(
+                  "Demo rejimində tərəzi skanı yoxdur — canlı filialda yoxlayın",
+                  "Scale label scan is not available in demo — test on a live branch",
+                ),
+              );
+              return false;
+            }
+            const grams = decoded.grams ?? 0;
+            if (grams > SCALE_WEIGHT_BOUNDS.maxGramsBlock) {
+              notifyError(
+                tr(
+                  "Çəki tərəzi limitindən böyükdür",
+                  "Weight exceeds scale maximum",
+                ),
+              );
+              return false;
+            }
+            if (grams > 0 && grams < SCALE_WEIGHT_BOUNDS.minGramsWarn) {
+              notifyWarning(
+                tr(
+                  "Çəki minimumdan kiçikdir — yoxlayın",
+                  "Weight is below scale minimum — verify tare/load",
+                ),
+              );
+            }
+            const dup = cart.find(
+              (i) => i.scaleMeta?.rawBarcode === decoded.raw,
+            );
+            if (dup) {
+              const ok = window.confirm(
+                tr(
+                  "Bu etiket artıq səbətdədir. Yenidən əlavə edilsin?",
+                  "This label is already in the cart. Add it again?",
+                ),
+              );
+              if (!ok) return "ignored";
+            }
+            try {
+              const item = await lookupProductByScaleItemCode(decoded.itemCode, {
+                signal: ac.signal,
+              });
+              if (seq !== lookupSeqRef.current || ac.signal.aborted) return "ignored";
+              const product = mapListItemToProduct(item);
+              const unitPrice = Number(product.price) || 0;
+              const unitPriceMinor = toMinorUnits(unitPrice);
+              const lineTotalMinor = scaleLineTotalMinor(grams, unitPriceMinor);
+              const qtyKg = gramsToKgQuantity(grams);
+              const scaleMeta: PosOrderItemScaleMeta = {
+                rawBarcode: decoded.raw,
+                profile: decoded.profile,
+                itemCode: decoded.itemCode,
+                netWeightGrams: grams,
+                lineInstanceId: `li-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+                unitPriceMinorPerKg: unitPriceMinor,
+                lineTotalMinor,
+                priceSource: "inflero_current",
+                productSyncVersion: item.scaleSyncVersion ?? 0,
+                scaleSyncedVersion: item.scaleSyncedVersion ?? null,
+                warnings:
+                  item.scaleSyncedVersion != null &&
+                  item.scaleSyncVersion != null &&
+                  item.scaleSyncVersion !== item.scaleSyncedVersion
+                    ? ["price_version_mismatch"]
+                    : [],
+              };
+              const added = addToCartRef.current(product, {
+                quantity: qtyKg,
+                skipWeightPad: true,
+                scaleMeta,
+              });
+              if (!added) return false;
+              setSearchQuery("");
+              notifySuccess(
+                tr(
+                  `Əlavə olundu: ${product.name} · ${qtyKg.toFixed(3)} kg · ${fromMinorUnits(lineTotalMinor)} ₼`,
+                  `Added: ${product.name} · ${qtyKg.toFixed(3)} kg · ${fromMinorUnits(lineTotalMinor)}`,
+                ),
+              );
+              lastLookupCodeRef.current = { code: trimmed, at: Date.now() };
+              return true;
+            } catch (scaleErr) {
+              if (seq !== lookupSeqRef.current || isAbortError(scaleErr) || ac.signal.aborted) {
+                return "ignored";
+              }
+              if (isNetworkError(scaleErr)) {
+                notifyError(
+                  tr(
+                    "Şəbəkə xətası — tərəzi məhsulu yüklənmədi",
+                    "Network error — could not load scale product",
+                  ),
+                );
+                return false;
+              }
+              notifyError(
+                tr(
+                  `Tərəzi məhsulu tapılmadı (${decoded.itemCode})`,
+                  `Scale product not found (${decoded.itemCode})`,
+                ),
+              );
+              return false;
+            }
+          }
+          if (
+            decoded.reason === "bad_checksum" ||
+            decoded.reason === "zero_weight" ||
+            decoded.reason === "profile_disabled" ||
+            decoded.reason === "bad_length"
+          ) {
+            notifyError(
+              tr(
+                decoded.reason === "bad_checksum"
+                  ? "Etiket barkodu etibarsızdır (yoxlama rəqəmi)"
+                  : decoded.reason === "zero_weight"
+                    ? "Etiketdə çəki sıfırdır"
+                    : "Bu barkod profili aktiv deyil",
+                decoded.reason === "bad_checksum"
+                  ? "Invalid scale barcode (checksum)"
+                  : decoded.reason === "zero_weight"
+                    ? "Scale label has zero weight"
+                    : "This barcode profile is not enabled",
+              ),
+            );
+            return false;
+          }
+          // not_scale_barcode → existing path below
+        }
+
         const needle = trimmed.toLowerCase();
         const local = productsRef.current.find(
           (p) =>
@@ -3001,6 +3231,7 @@ export function CorporatePOS() {
       appliedDiscount,
       loyaltyMode,
       loyaltyProgramType,
+      scaleLabelScanEnabled,
     ],
   );
 
@@ -3148,7 +3379,24 @@ export function CorporatePOS() {
 
     if (next === item.quantity) return;
     setCart((p) =>
-      p.map((i) => (cartLineKey(i) === lineKeyOrId ? { ...i, quantity: next } : i)),
+      p.map((i) => {
+        if (cartLineKey(i) !== lineKeyOrId) return i;
+        if (!i.scaleMeta) return { ...i, quantity: next };
+        // Keep audit grams in sync when cashier edits kg on a scale line.
+        const grams = Math.round(next * 1000);
+        const unitPriceMinor =
+          i.scaleMeta.unitPriceMinorPerKg ??
+          toMinorUnits(Number.isFinite(cartUnitPrice(i.price)) ? cartUnitPrice(i.price) : 0);
+        return {
+          ...i,
+          quantity: next,
+          scaleMeta: {
+            ...i.scaleMeta,
+            netWeightGrams: grams,
+            lineTotalMinor: scaleLineTotalMinor(grams, unitPriceMinor),
+          },
+        };
+      }),
     );
   };
 
@@ -3683,6 +3931,7 @@ export function CorporatePOS() {
       ...(i.isLoyaltyFree
         ? { isLoyaltyFree: true, loyaltyOfferId: i.loyaltyOfferId ?? null }
         : {}),
+      ...(i.scaleMeta ? { scaleMeta: i.scaleMeta } : {}),
       ...(birmarketActive && !i.isLoyaltyFree
         ? {
             birmarketCommissionPercent:

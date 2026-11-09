@@ -148,6 +148,7 @@ export function Settings() {
   const [birmarketCommissionEnabled, setBirmarketCommissionEnabled] = useState(false);
   const [birmarketCommissionPercent, setBirmarketCommissionPercent] = useState("");
   const [posServiceFeeEnabled, setPosServiceFeeEnabled] = useState(false);
+  const [scaleLabelScanEnabled, setScaleLabelScanEnabled] = useState(false);
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [posSendToBarEnabled, setPosSendToBarEnabled] = useState(false);
   const [posBarBillShowPricesEnabled, setPosBarBillShowPricesEnabled] = useState(false);
@@ -172,6 +173,7 @@ export function Settings() {
     birmarketCommissionEnabled: boolean;
     birmarketCommissionPercent: string;
     posServiceFeeEnabled: boolean;
+    scaleLabelScanEnabled: boolean;
     posSendToProductionEnabled: boolean;
     posSendToBarEnabled: boolean;
     posBarBillShowPricesEnabled: boolean;
@@ -237,6 +239,7 @@ export function Settings() {
         : "",
     );
     setPosServiceFeeEnabled(data.posServiceFeeEnabled === true);
+    setScaleLabelScanEnabled(data.scaleLabelScanEnabled === true);
     setPosSendToProductionEnabled(data.posSendToProductionEnabled === true);
     setPosSendToBarEnabled(diningEnabled && data.posSendToBarEnabled === true);
     setPosBarBillShowPricesEnabled(
@@ -308,6 +311,7 @@ export function Settings() {
               ? String(data.birmarketCommissionPercent)
               : "",
           posServiceFeeEnabled: data.posServiceFeeEnabled === true,
+          scaleLabelScanEnabled: data.scaleLabelScanEnabled === true,
           posSendToProductionEnabled: data.posSendToProductionEnabled === true,
           posSendToBarEnabled: data.posSendToBarEnabled === true,
           posBarBillShowPricesEnabled: data.posBarBillShowPricesEnabled === true,
@@ -566,6 +570,7 @@ export function Settings() {
             payload.birmarketCommissionPercent = pct;
           }
           payload.posServiceFeeEnabled = posServiceFeeEnabled;
+          payload.scaleLabelScanEnabled = scaleLabelScanEnabled;
           payload.posSendToProductionEnabled = posSendToProductionEnabled;
           payload.posPrintProductBrandEnabled = posPrintProductBrandEnabled;
           payload.posEditableProductPricesEnabled = posEditableProductPricesEnabled;
@@ -617,6 +622,7 @@ export function Settings() {
           birmarketCommissionEnabled,
           birmarketCommissionPercent,
           posServiceFeeEnabled,
+          scaleLabelScanEnabled,
           posSendToProductionEnabled,
           posSendToBarEnabled,
           posBarBillShowPricesEnabled,
@@ -686,6 +692,7 @@ export function Settings() {
         setBirmarketCommissionEnabled(addonSnapshotRef.current.birmarketCommissionEnabled);
         setBirmarketCommissionPercent(addonSnapshotRef.current.birmarketCommissionPercent);
         setPosServiceFeeEnabled(addonSnapshotRef.current.posServiceFeeEnabled);
+        setScaleLabelScanEnabled(addonSnapshotRef.current.scaleLabelScanEnabled);
         setPosSendToProductionEnabled(addonSnapshotRef.current.posSendToProductionEnabled);
         setPosSendToBarEnabled(addonSnapshotRef.current.posSendToBarEnabled);
         setPosBarBillShowPricesEnabled(addonSnapshotRef.current.posBarBillShowPricesEnabled);
@@ -1390,6 +1397,35 @@ export function Settings() {
                       <span
                         className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
                           posServiceFeeEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Scale label scan", "Tərəzi etiket skanı")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, POS accepts Rongta profile-17 weight labels from the barcode scanner (weigh → print → scan). Off by default.",
+                          "Aktiv olduqda POS Rongta profil-17 çəki etiketlərini barkod skanerdən qəbul edir (çəkin → çap → skan). Standart olaraq sönülüdür.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit || !canEditBranchAddons}
+                      onClick={() => setScaleLabelScanEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        scaleLabelScanEnabled ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={scaleLabelScanEnabled}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          scaleLabelScanEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
                         }`}
                       />
                     </button>

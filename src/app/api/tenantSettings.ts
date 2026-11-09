@@ -56,6 +56,8 @@ export interface TenantSettingsRecord {
   opticsDoctorRequired?: boolean;
   /** Default POS payment status pre-selection (NONE = cashier must choose). */
   posDefaultPaymentStatus?: "PENDING" | "PAID" | "NONE";
+  /** When true, POS decodes Rongta profile-17 weight labels (default off). */
+  scaleLabelScanEnabled?: boolean;
 }
 
 export type TenantSettingsUpdate = Partial<{
@@ -87,6 +89,7 @@ export type TenantSettingsUpdate = Partial<{
   ordersShowProductsEnabled: boolean;
   opticsDoctorRequired: boolean;
   posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";
+  scaleLabelScanEnabled: boolean;
 }>;
 
 export async function fetchTenantSettings() {

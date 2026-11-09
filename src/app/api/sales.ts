@@ -55,6 +55,21 @@ export interface SalesBillerRow {
   hasPosPasscode?: boolean;
 }
 
+export type PosOrderItemScaleMeta = {
+  rawBarcode: string;
+  profile: number;
+  itemCode: string;
+  netWeightGrams: number;
+  /** Unique per cart add — identical weight labels stay separate lines. */
+  lineInstanceId?: string;
+  unitPriceMinorPerKg?: number;
+  lineTotalMinor?: number;
+  priceSource?: "inflero_current";
+  productSyncVersion?: number;
+  scaleSyncedVersion?: number | null;
+  warnings?: string[];
+};
+
 export interface PosOrderLineItem {
   id: string;
   productId: string;
@@ -74,6 +89,8 @@ export interface PosOrderLineItem {
   isLoyaltyFree?: boolean;
   loyaltyOfferId?: string | null;
   loyaltyOfferName?: string | null;
+  /** Rongta scale label audit when line came from a printed weight label. */
+  scaleMeta?: PosOrderItemScaleMeta | null;
   /** Units already returned for this product on the order (product-level). */
   returnedQty?: number;
   /** quantity - returnedQty, floored at 0. */
@@ -336,6 +353,8 @@ export type PosOrderItemInput = {
   /** Loyalty Buy-X-Get-X-Free redeemed line. */
   isLoyaltyFree?: boolean;
   loyaltyOfferId?: string | null;
+  /** Rongta scale label audit (omit for normal lines). */
+  scaleMeta?: PosOrderItemScaleMeta | null;
 };
 
 export type CreatePosOrderBody = {

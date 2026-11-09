@@ -18,6 +18,7 @@ import {
   uploadProductImage,
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
+import { normalizeScaleItemCodeInput } from "../../lib/scaleBarcode/buildLabel";
 import { resolveProductsListReturn, PRODUCTS_LIST_PATH } from "../../lib/productsNavigation";
 import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
@@ -146,6 +147,9 @@ export function EditProduct() {
   const [brand, setBrand] = useState("");
   const [unit, setUnit] = useState("");
   const [itemBarcode, setItemBarcode] = useState("");
+  const [scaleSaleMode, setScaleSaleMode] = useState<"NONE" | "WEIGHT">("NONE");
+  const [scaleItemCode, setScaleItemCode] = useState("");
+  const [scaleLfCode, setScaleLfCode] = useState("");
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
@@ -244,6 +248,9 @@ export function EditProduct() {
       setBrand(product.brandId ?? "");
       setUnit(product.unitId ?? "");
       setItemBarcode(product.itemBarcode ?? "");
+      setScaleSaleMode(product.scaleSaleMode === "WEIGHT" ? "WEIGHT" : "NONE");
+      setScaleItemCode(product.scaleItemCode ?? "");
+      setScaleLfCode(product.scaleLfCode ?? "");
       setDescription(product.description ?? "");
       setQuantity(String(product.quantity ?? 0));
       setPrice(product.price ?? "");
@@ -450,6 +457,17 @@ export function EditProduct() {
       notifyFromError(new Error(tr("Qiymət tələb olunur", "Price is required")));
       return;
     }
+    if (scaleSaleMode === "WEIGHT" && !normalizeScaleItemCodeInput(scaleItemCode)) {
+      notifyFromError(
+        new Error(
+          tr(
+            "Tərəzi məhsul kodu 5 rəqəm olmalıdır",
+            "Scale item code must be exactly 5 digits",
+          ),
+        ),
+      );
+      return;
+    }
 
     setSaving(true);
     try {
@@ -473,6 +491,11 @@ export function EditProduct() {
         brandId: brand || null,
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
+        scaleSaleMode,
+        scaleItemCode:
+          scaleSaleMode === "WEIGHT" ? normalizeScaleItemCodeInput(scaleItemCode) : null,
+        scaleLfCode: scaleLfCode.trim() || null,
+        scaleUnit: "KG",
         price: String(roundToMaxDp(parsePrice(price), 3)),
         ...(productsCogsEnabled
           ? {
@@ -792,6 +815,60 @@ export function EditProduct() {
                     >
                       {tr("POS-da göstər", "Show on POS")}
                     </label>
+                  </div>
+                  <div className="col-span-2 md:col-span-3 xl:col-span-4 pt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="edit-scale-weight"
+                        type="checkbox"
+                        checked={scaleSaleMode === "WEIGHT"}
+                        onChange={(e) =>
+                          setScaleSaleMode(e.target.checked ? "WEIGHT" : "NONE")
+                        }
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                      />
+                      <label
+                        htmlFor="edit-scale-weight"
+                        className="text-xs font-medium text-gray-700 dark:text-gray-300"
+                      >
+                        {tr("Etiket tərəzisində satılır", "Sold on label scale")}
+                      </label>
+                    </div>
+                    {scaleSaleMode === "WEIGHT" && (
+                      <div className="grid grid-cols-2 gap-2 max-w-md">
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                            {tr("Tərəzi məhsul kodu (5 rəqəm)", "Scale item code (5 digits)")}
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={5}
+                            value={scaleItemCode}
+                            onChange={(e) =>
+                              setScaleItemCode(e.target.value.replace(/\D/g, "").slice(0, 5))
+                            }
+                            placeholder="00123"
+                            className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                            {tr("LF kodu (ixtiyari)", "LF code (optional)")}
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={scaleLfCode}
+                            onChange={(e) =>
+                              setScaleLfCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                            }
+                            className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

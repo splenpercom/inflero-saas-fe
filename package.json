@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "test": "npx --yes tsx --test src/app/lib/permissions.test.ts src/app/lib/scaleBarcode/decode.test.ts src/app/lib/scaleBarcode/buildLabel.test.ts",
     "omni:bridge": "node scripts/omni-lan-bridge.mjs",
     "omni:bridge:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/omni-bridge/build-exe.ps1"
   },

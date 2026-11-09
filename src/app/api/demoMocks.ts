@@ -1010,6 +1010,7 @@ const DEMO_TENANT_SETTINGS = {
   birmarketCommissionEnabled: false,
   birmarketCommissionPercent: null,
   posServiceFeeEnabled: false,
+  scaleLabelScanEnabled: false,
   posSendToProductionEnabled: false,
   posSendToBarEnabled: false,
   posBarBillShowPricesEnabled: false,
