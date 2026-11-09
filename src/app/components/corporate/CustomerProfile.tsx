@@ -38,6 +38,10 @@ import { notifyFromError, notifySuccess } from "../../lib/toast";
 import { AddCustomerModal, type CustomerFormData } from "./people/AddCustomerModal";
 import { CustomerVehiclesModal } from "./people/CustomerVehiclesModal";
 import { CustomerLoyaltyPanel } from "../../../modules/loyalty";
+import {
+  fetchLoyaltySettings,
+  type LoyaltyProgramType,
+} from "../../api/loyalty";
 import { CustomerTravelPanels } from "../../../modules/travel";
 import { cn } from "../ui/utils";
 
@@ -104,6 +108,28 @@ export function CustomerProfile() {
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
   const [vehiclesOpen, setVehiclesOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
+  const [loyaltyProgramType, setLoyaltyProgramType] =
+    useState<LoyaltyProgramType>("DISCOUNT");
+  const showDiscountLoyalty =
+    loyaltyEnabled && loyaltyProgramType === "DISCOUNT";
+
+  useEffect(() => {
+    if (!loyaltyEnabled || isDemo || !(isAuthenticated || isDemo)) {
+      setLoyaltyProgramType("DISCOUNT");
+      return;
+    }
+    let cancelled = false;
+    void fetchLoyaltySettings()
+      .then((s) => {
+        if (!cancelled) setLoyaltyProgramType(s.loyaltyProgramType);
+      })
+      .catch(() => {
+        if (!cancelled) setLoyaltyProgramType("DISCOUNT");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loyaltyEnabled, isDemo, isAuthenticated, branchRevision]);
 
   const tabs = useMemo(() => {
     const list: { id: ProfileTab; label: string; icon: typeof User }[] = [
@@ -127,7 +153,7 @@ export function CustomerProfile() {
         icon: BedDouble,
       });
     }
-    if (loyaltyEnabled && !travelEnabled && !hotelsEnabled) {
+    if (showDiscountLoyalty && !travelEnabled && !hotelsEnabled) {
       list.push({ id: "loyalty", label: tr("Loyalty", "Loyalty"), icon: CreditCard });
     }
     if (autoEnabled && !travelEnabled && !hotelsEnabled) {
@@ -141,7 +167,7 @@ export function CustomerProfile() {
       );
     }
     return list;
-  }, [loyaltyEnabled, autoEnabled, travelEnabled, hotelsEnabled, clinicEnabled, language]);
+  }, [showDiscountLoyalty, autoEnabled, travelEnabled, hotelsEnabled, clinicEnabled, language]);
 
   useEffect(() => {
     if (!tabs.some((t) => t.id === activeTab)) {
@@ -437,7 +463,7 @@ export function CustomerProfile() {
                     </p>
                     <p className="text-[10px] text-gray-400">{tr("Cəmi xərclənib", "Total spent")}</p>
                   </div>
-                  {loyaltyEnabled && (
+                  {showDiscountLoyalty && (
                     <button
                       type="button"
                       onClick={() => setActiveTab("loyalty")}
@@ -635,7 +661,7 @@ export function CustomerProfile() {
           </section>
         )}
 
-        {activeTab === "loyalty" && loyaltyEnabled && !travelEnabled && !hotelsEnabled && (
+        {activeTab === "loyalty" && showDiscountLoyalty && !travelEnabled && !hotelsEnabled && (
           <CustomerLoyaltyPanel
             customerId={customer.id}
             onChanged={(summary) =>

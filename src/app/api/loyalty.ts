@@ -111,3 +111,108 @@ export async function unassignLoyaltyCard(customerId: string): Promise<LoyaltyCu
   );
   return res.data;
 }
+
+export type LoyaltyProgramType = "DISCOUNT" | "BUY_GET_FREE";
+
+export type LoyaltySettings = {
+  loyaltyProgramType: LoyaltyProgramType;
+  storeId: string | null;
+};
+
+export type LoyaltyBuyGetOffer = {
+  id: string;
+  storeId: string | null;
+  name: string;
+  active: boolean;
+  buyMetric: "QUANTITY" | "MONEY";
+  buyThreshold: string;
+  buyTargetType: "PRODUCT" | "CATEGORY";
+  buyProductId: string | null;
+  buyCategoryId: string | null;
+  buyProductName: string | null;
+  buyCategoryName: string | null;
+  getQty: string;
+  getTargetType: "PRODUCT" | "CATEGORY";
+  getProductId: string | null;
+  getCategoryId: string | null;
+  getProductName: string | null;
+  getCategoryName: string | null;
+  progressMode: "SAME_VISIT" | "ACCUMULATE";
+  audience: "ALL" | "SELECTED";
+  customerIds: string[];
+  customers: Array<{ id: string; name: string; code: string }>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LoyaltyBuyGetPreviewOffer = {
+  offerId: string;
+  name: string;
+  progressMode: "SAME_VISIT" | "ACCUMULATE";
+  buyMetric: "QUANTITY" | "MONEY";
+  buyThreshold: string;
+  getQty: string;
+  progressValue: string;
+  redeemableFreeQty: string;
+  getTargetType: "PRODUCT" | "CATEGORY";
+  getProductId: string | null;
+  getCategoryId: string | null;
+  allowedProductIds: string[];
+};
+
+export type LoyaltyBuyGetPreviewLine = {
+  productId: string;
+  categoryId?: string | null;
+  quantity: number;
+  lineTotal: number;
+  isLoyaltyFree?: boolean;
+  loyaltyOfferId?: string | null;
+};
+
+export async function fetchLoyaltySettings(): Promise<LoyaltySettings> {
+  const res = await apiGet<Envelope<LoyaltySettings>>("/tenant/loyalty/settings");
+  return res.data;
+}
+
+export async function updateLoyaltySettings(body: {
+  loyaltyProgramType: LoyaltyProgramType;
+}): Promise<LoyaltySettings> {
+  const res = await apiPatch<Envelope<LoyaltySettings>>("/tenant/loyalty/settings", body);
+  return res.data;
+}
+
+export async function fetchBuyGetOffers(): Promise<LoyaltyBuyGetOffer[]> {
+  const res = await apiGet<Envelope<LoyaltyBuyGetOffer[]>>("/tenant/loyalty/buy-get-offers");
+  return res.data;
+}
+
+export async function createBuyGetOffer(body: Record<string, unknown>): Promise<LoyaltyBuyGetOffer> {
+  const res = await apiPost<Envelope<LoyaltyBuyGetOffer>>("/tenant/loyalty/buy-get-offers", body);
+  return res.data;
+}
+
+export async function updateBuyGetOffer(
+  id: string,
+  body: Record<string, unknown>,
+): Promise<LoyaltyBuyGetOffer> {
+  const res = await apiPatch<Envelope<LoyaltyBuyGetOffer>>(
+    `/tenant/loyalty/buy-get-offers/${id}`,
+    body,
+  );
+  return res.data;
+}
+
+export async function deleteBuyGetOffer(id: string): Promise<void> {
+  await apiDelete(`/tenant/loyalty/buy-get-offers/${id}`);
+}
+
+export async function previewBuyGetOffers(body: {
+  customerId?: string | null;
+  lines: LoyaltyBuyGetPreviewLine[];
+}): Promise<{ offers: LoyaltyBuyGetPreviewOffer[] }> {
+  const res = await apiPost<Envelope<{ offers: LoyaltyBuyGetPreviewOffer[] }>>(
+    "/tenant/loyalty/buy-get/preview",
+    body,
+  );
+  return res.data;
+}

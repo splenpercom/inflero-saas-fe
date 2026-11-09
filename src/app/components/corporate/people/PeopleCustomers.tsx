@@ -29,6 +29,10 @@ import { useConfirm } from "../../../context/ConfirmContext";
 import { AddCustomerModal, type CustomerFormData } from "./AddCustomerModal";
 import { CustomerVehiclesModal } from "./CustomerVehiclesModal";
 import { CustomerLoyaltyModal } from "../../../../modules/loyalty";
+import {
+  fetchLoyaltySettings,
+  type LoyaltyProgramType,
+} from "../../../api/loyalty";
 import { DataPagination } from "../../ui/DataPagination";
 import { usePagination, DEFAULT_LIST_PAGE_SIZE } from "../../../hooks/usePagination";
 import { ModernSelect } from "../../ui/ModernSelect";
@@ -59,14 +63,39 @@ export function PeopleCustomers() {
   const [saving, setSaving] = useState(false);
   const [vehicleCustomer, setVehicleCustomer] = useState<PeopleCustomer | null>(null);
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<PeopleCustomer | null>(null);
+  const [loyaltyProgramType, setLoyaltyProgramType] =
+    useState<LoyaltyProgramType>("DISCOUNT");
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
-  const showLoyaltyCol = loyaltyEnabled && canViewLoyalty;
+  // Card/wallet UI is Discount-only; Buy-Get Free uses offers, not loyalty cards.
+  const showLoyaltyCol =
+    loyaltyEnabled && canViewLoyalty && loyaltyProgramType === "DISCOUNT";
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!loyaltyEnabled || isDemo || !(isAuthenticated || isDemo)) {
+      setLoyaltyProgramType("DISCOUNT");
+      return;
+    }
+    let cancelled = false;
+    void fetchLoyaltySettings()
+      .then((s) => {
+        if (!cancelled) {
+          setLoyaltyProgramType(s.loyaltyProgramType);
+          if (s.loyaltyProgramType === "BUY_GET_FREE") setLoyaltyCustomer(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoyaltyProgramType("DISCOUNT");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loyaltyEnabled, isDemo, isAuthenticated, branchRevision]);
 
   const loadCustomers = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
