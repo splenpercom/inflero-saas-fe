@@ -165,7 +165,7 @@ function formatCartPriceInput(raw: string | number): string {
   return sanitizeNumericTyping(String(raw), { allowDecimal: true });
 }
 
-/** Weight / scale units — POS opens price numpad on select/scan. */
+/** Weight / scale units — POS opens quantity (weight) numpad on select/scan. */
 function isWeightUnit(unit?: string | null): boolean {
   if (!unit) return false;
   const u = unit.trim().toLowerCase();
@@ -189,7 +189,8 @@ type TouchKbField =
   | "serviceFee"
   | "mileage"
   | "discount"
-  | "cartPrice";
+  | "cartPrice"
+  | "cartQty";
 
 type PaymentMethod = "cash" | "card";
 type PaymentStatusChoice = "paid" | "pending";
@@ -234,12 +235,16 @@ function PosQtyInput({
   onCommit,
   className,
   ariaLabel,
+  onFocusPad,
+  onClickPad,
 }: {
   value: number;
   disabled?: boolean;
   onCommit: (qty: number) => void;
   className?: string;
   ariaLabel?: string;
+  onFocusPad?: () => void;
+  onClickPad?: () => void;
 }) {
   const [text, setText] = useState(String(value));
 
@@ -264,8 +269,14 @@ function PosQtyInput({
       disabled={disabled}
       value={text}
       aria-label={ariaLabel}
-      onClick={(e) => e.stopPropagation()}
-      onFocus={(e) => e.currentTarget.select()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClickPad?.();
+      }}
+      onFocus={(e) => {
+        e.currentTarget.select();
+        onFocusPad?.();
+      }}
       onChange={(e) =>
         setText(sanitizeNumericTypingMaxDp(e.target.value, 3, { allowDecimal: true }))
       }
@@ -1308,6 +1319,8 @@ export function CorporatePOS() {
     mode: "full" | "numpad";
     field: TouchKbField;
     productId?: string;
+    /** Draft for cartQty while typing (allows empty mid-edit). */
+    buffer?: string;
   }>(null);
   const openWeightPricePadRef = useRef<(productId: string) => void>(() => {});
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
@@ -3092,7 +3105,9 @@ export function CorporatePOS() {
         setTouchKb({
           mode,
           field,
-          ...(field === "cartPrice" && productId ? { productId } : {}),
+          ...((field === "cartPrice" || field === "cartQty") && productId
+            ? { productId }
+            : {}),
         });
       }
     },
@@ -3100,7 +3115,13 @@ export function CorporatePOS() {
   );
   openWeightPricePadRef.current = (productId: string) => {
     // Force: barcode scan has no touch pointer, but weight lines need the pad on POS.
-    openTouchKb("numpad", "cartPrice", true, productId);
+    // Enter weight (qty); catalog unit price stays unless cashier edits price separately.
+    setTouchKb({
+      mode: "numpad",
+      field: "cartQty",
+      productId,
+      buffer: "",
+    });
   };
 
   const removeFromCart = (lineKeyOrId: string) => {
@@ -3218,7 +3239,17 @@ export function CorporatePOS() {
               ? discountValue
               : touchKb?.field === "cartPrice" && touchKb.productId
                 ? (cart.find((i) => i.id === touchKb.productId)?.price ?? "")
-                : "";
+                : touchKb?.field === "cartQty" && touchKb.productId
+                  ? touchKb.buffer !== undefined
+                    ? touchKb.buffer
+                    : String(
+                        (
+                          cart.find(
+                            (i) => !i.isLoyaltyFree && i.id === touchKb.productId,
+                          ) ?? cart.find((i) => i.id === touchKb.productId)
+                        )?.quantity ?? "",
+                      )
+                  : "";
 
   const handleTouchKbChange = (next: string) => {
     if (!touchKb) return;
@@ -3248,6 +3279,25 @@ export function CorporatePOS() {
             i.id === touchKb.productId ? { ...i, price: sanitized } : i,
           ),
         );
+        break;
+      }
+      case "cartQty": {
+        if (!touchKb.productId || !canMutateCart) return;
+        const sanitized = sanitizeNumericTypingMaxDp(next, 3, {
+          allowDecimal: true,
+        });
+        setTouchKb((kb) => (kb ? { ...kb, buffer: sanitized } : kb));
+        const n = roundToMaxDp(parseNumericInput(sanitized, NaN), 3);
+        if (!Number.isFinite(n) || n <= 0) return;
+        const item =
+          cart.find((i) => !i.isLoyaltyFree && i.id === touchKb.productId) ??
+          cart.find((i) => i.id === touchKb.productId);
+        if (!item) return;
+        const product = products.find((p) => p.id === item.id);
+        const available = product
+          ? getAvailableStock(product.id, product.stock)
+          : undefined;
+        setQuantity(cartLineKey(item), n, available);
         break;
       }
     }
@@ -5536,6 +5586,10 @@ export function CorporatePOS() {
                       product != null &&
                       available > 0 &&
                       item.quantity > available;
+                    const unitAmt = Number.isFinite(cartUnitPrice(item.price))
+                      ? cartUnitPrice(item.price)
+                      : 0;
+                    const lineTotalAmt = unitAmt * item.quantity;
 
                     return (
                     <div key={cartLineKey(item)} className={`bg-gray-50 dark:bg-gray-800/50 rounded-md px-2 py-1.5 border ${
@@ -5593,9 +5647,7 @@ export function CorporatePOS() {
                               <span className="text-[9px] text-gray-400 tabular-nums">
                                 ₼
                                 {(
-                                  (Number.isFinite(cartUnitPrice(item.price))
-                                    ? cartUnitPrice(item.price)
-                                    : 0) *
+                                  unitAmt *
                                   item.quantity *
                                   ((item.birmarketCommissionPercent != null &&
                                   Number.isFinite(item.birmarketCommissionPercent)
@@ -5607,7 +5659,7 @@ export function CorporatePOS() {
                             </div>
                           )}
                           {canEditLinePrice ? (
-                            <div className="flex items-center gap-1 mt-0.5">
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                               <input
                                 type="text"
                                 inputMode="decimal"
@@ -5632,21 +5684,23 @@ export function CorporatePOS() {
                                 className="w-20 px-1.5 py-0.5 text-[11px] font-semibold text-[#14b8a6] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-40"
                                 aria-label={
                                   weightLine
-                                    ? tr("Çəki qiyməti", "Weight price")
+                                    ? tr("Vahid qiymət", "Unit price")
                                     : tr("Qiymət", "Price")
                                 }
                               />
                               <span className="text-[9px] text-gray-400">
                                 ₼{weightLine && lineUnit ? `/${lineUnit}` : ""}
                               </span>
+                              <span className="text-[9px] text-gray-500 tabular-nums">
+                                = {formatCurrency(lineTotalAmt)}
+                              </span>
                             </div>
                           ) : (
                             <p className="text-[11px] font-semibold text-[#14b8a6] dark:text-[#14b8a6] leading-tight">
-                              {formatCurrency(
-                                Number.isFinite(cartUnitPrice(item.price))
-                                  ? cartUnitPrice(item.price)
-                                  : 0,
-                              )}
+                              {formatCurrency(unitAmt)}
+                              <span className="ml-1 text-[9px] font-medium text-gray-500 tabular-nums">
+                                = {formatCurrency(lineTotalAmt)}
+                              </span>
                             </p>
                           )}
                           {(itemOutOfStock || itemExceedsStock) && (
@@ -5675,8 +5729,20 @@ export function CorporatePOS() {
                               value={item.quantity}
                               disabled={!canMutateCart}
                               onCommit={(qty) => setQuantity(cartLineKey(item), qty, available)}
-                              ariaLabel={tr("Miqdar", "Quantity")}
-                              className="text-[11px] font-medium text-gray-900 dark:text-white px-0.5 w-8 min-w-[1.5rem] text-center bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-[#14b8a6] rounded disabled:opacity-40"
+                              onFocusPad={() =>
+                                openTouchKb("numpad", "cartQty", false, item.id)
+                              }
+                              onClickPad={() =>
+                                openTouchKb("numpad", "cartQty", true, item.id)
+                              }
+                              ariaLabel={
+                                weightLine
+                                  ? tr("Çəki / Miqdar", "Weight / Qty")
+                                  : tr("Miqdar", "Quantity")
+                              }
+                              className={`text-[11px] font-medium text-gray-900 dark:text-white px-0.5 text-center bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-[#14b8a6] rounded disabled:opacity-40 ${
+                                weightLine ? "w-12 min-w-[2.5rem]" : "w-8 min-w-[1.5rem]"
+                              }`}
                             />
                             <button
                               type="button"
@@ -6488,7 +6554,9 @@ export function CorporatePOS() {
                     ? tr("Km göstərici", "Mileage")
                     : touchKb.field === "cartPrice"
                       ? tr("Qiymət", "Price")
-                      : tr("Endirim", "Discount")
+                      : touchKb.field === "cartQty"
+                        ? tr("Çəki / Miqdar", "Weight / Qty")
+                        : tr("Endirim", "Discount")
           }
         />
       )}
