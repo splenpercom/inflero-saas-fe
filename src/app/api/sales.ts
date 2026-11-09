@@ -70,6 +70,10 @@ export interface PosOrderLineItem {
   birmarketCommissionPercent?: string | null;
   /** Birmarket track-only line amount snapshot. */
   birmarketCommissionAmount?: string | null;
+  /** Buy-get-free complimentary line. */
+  isLoyaltyFree?: boolean;
+  loyaltyOfferId?: string | null;
+  loyaltyOfferName?: string | null;
   /** Units already returned for this product on the order (product-level). */
   returnedQty?: number;
   /** quantity - returnedQty, floored at 0. */
@@ -329,6 +333,9 @@ export type PosOrderItemInput = {
   price?: number;
   /** Birmarket track-only percent for this line (0–100). */
   birmarketCommissionPercent?: number;
+  /** Loyalty Buy-X-Get-X-Free redeemed line. */
+  isLoyaltyFree?: boolean;
+  loyaltyOfferId?: string | null;
 };
 
 export type CreatePosOrderBody = {

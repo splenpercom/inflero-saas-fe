@@ -148,6 +148,31 @@ export function SaleDetailModal({
   const due = order ? parseFloat(order.due) : 0;
   const refunded = order?.refunded ? parseFloat(order.refunded) : 0;
   const discount = order?.discount ? parseFloat(order.discount) : 0;
+  const loyaltyRedeemAmount = order?.loyaltyRedeemAmount
+    ? parseFloat(order.loyaltyRedeemAmount)
+    : 0;
+  const loyaltyCashbackEarned = order?.loyaltyCashbackEarned
+    ? parseFloat(order.loyaltyCashbackEarned)
+    : 0;
+  const loyaltyFreeOfferNames = Array.from(
+    new Set(
+      (order?.items ?? [])
+        .filter((i) => i.isLoyaltyFree)
+        .map((i) => i.loyaltyOfferName?.trim() || null)
+        .filter((n): n is string => Boolean(n)),
+    ),
+  );
+  const hasLoyaltyFreeLines = (order?.items ?? []).some((i) => i.isLoyaltyFree);
+  const hasLoyaltyApplied =
+    loyaltyRedeemAmount > 0.009 ||
+    loyaltyCashbackEarned > 0.009 ||
+    hasLoyaltyFreeLines;
+  const discountLabel =
+    loyaltyRedeemAmount > 0.009 && discount <= loyaltyRedeemAmount + 0.009
+      ? tr("Loyalty endirim", "Loyalty discount")
+      : loyaltyRedeemAmount > 0.009
+        ? tr("Endirim (loyalty daxil)", "Discount (incl. loyalty)")
+        : tr("Endirim", "Discount");
   const shippingCost = order?.shipping ? parseFloat(order.shipping) : 0;
   const serviceFee = order?.serviceFee ? parseFloat(order.serviceFee) : 0;
   const tableHourlyCharge = (() => {
@@ -782,7 +807,17 @@ export function SaleDetailModal({
                             >
                               <td className="py-2 px-3 text-xs text-gray-900 dark:text-white">
                                 <div className="flex flex-col gap-0.5">
-                                  <span>{item.productName}</span>
+                                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                                    <span>{item.productName}</span>
+                                    {item.isLoyaltyFree && (
+                                      <span className="inline-flex w-fit px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                        {tr("Pulsuz", "Free")}
+                                        {item.loyaltyOfferName
+                                          ? ` · ${item.loyaltyOfferName}`
+                                          : ""}
+                                      </span>
+                                    )}
+                                  </span>
                                   {fullyRefunded ? (
                                     <span className="inline-flex w-fit px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                                       {tr("Qaytarılıb", "Refunded")}
@@ -841,8 +876,45 @@ export function SaleDetailModal({
                     </div>
                     {discount > 0 && (
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-600 dark:text-gray-400">{tr("Endirim", "Discount")}:</span>
+                        <span className="text-gray-600 dark:text-gray-400">{discountLabel}:</span>
                         <span className="font-medium text-red-600 dark:text-red-400">-₼{discount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {hasLoyaltyApplied && (
+                      <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-900/20 px-2.5 py-2 space-y-1.5">
+                        <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                          {tr("Loyalty tətbiq olunub", "Loyalty applied")}
+                        </p>
+                        {loyaltyRedeemAmount > 0.009 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-emerald-700/80 dark:text-emerald-300/80">
+                              {tr("Balansdan endirim", "Redeemed from wallet")}:
+                            </span>
+                            <span className="font-medium text-emerald-800 dark:text-emerald-200">
+                              -₼{loyaltyRedeemAmount.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {loyaltyCashbackEarned > 0.009 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-emerald-700/80 dark:text-emerald-300/80">
+                              {tr("Qazanılan keşbek", "Cashback earned")}:
+                            </span>
+                            <span className="font-medium text-emerald-800 dark:text-emerald-200">
+                              +₼{loyaltyCashbackEarned.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {hasLoyaltyFreeLines && (
+                          <div className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                            {loyaltyFreeOfferNames.length > 0
+                              ? tr(
+                                  `Al-götür pulsuz: ${loyaltyFreeOfferNames.join(", ")}`,
+                                  `Buy-get free: ${loyaltyFreeOfferNames.join(", ")}`,
+                                )
+                              : tr("Al-götür pulsuz sətirlər", "Buy-get free lines")}
+                          </div>
+                        )}
                       </div>
                     )}
                     {taxPercent > 0 && (

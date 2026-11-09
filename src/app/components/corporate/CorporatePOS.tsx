@@ -76,11 +76,18 @@ import {
   isCardPaymentMethod,
 } from "../../lib/omnicashier/fiscalize";
 import { isOmnicashierConfigured } from "../../lib/omnicashierSettings";
-import { lookupLoyaltyCard } from "../../api/loyalty";
+import {
+  fetchLoyaltySettings,
+  lookupLoyaltyCard,
+  previewBuyGetOffers,
+  type LoyaltyBuyGetPreviewOffer,
+  type LoyaltyProgramType,
+} from "../../api/loyalty";
 import {
   LoyaltyEarnRedeemDialog,
   type LoyaltyDialogInfo,
 } from "../../../modules/loyalty/LoyaltyEarnRedeemDialog";
+import { LoyaltyFreePickerDialog } from "../../../modules/loyalty/LoyaltyFreePickerDialog";
 import { OpticsPrescriptionDialog } from "../../../modules/optics/OpticsPrescriptionDialog";
 import {
   normalizeOpticsMeta,
@@ -143,6 +150,11 @@ interface CartItem {
   trackStock?: boolean;
   /** Birmarket track-only percent for this line (0–100); used only when order Birmarket is on. */
   birmarketCommissionPercent?: number;
+  /** Loyalty BXGX free line (price 0). */
+  isLoyaltyFree?: boolean;
+  loyaltyOfferId?: string | null;
+  /** Stable key so paid + free of same product can coexist. */
+  lineKey?: string;
 }
 
 function cartUnitPrice(price: string): number {
@@ -1250,6 +1262,11 @@ export function CorporatePOS() {
   const [appliedDiscount, setAppliedDiscount] = useState<{ type: "percent" | "fixed"; value: number } | null>(null);
   const [loyaltyMode, setLoyaltyMode] = useState<"earn" | "redeem" | null>(null);
   const [loyaltyWalletBalance, setLoyaltyWalletBalance] = useState(0);
+  const [loyaltyProgramType, setLoyaltyProgramType] = useState<LoyaltyProgramType>("DISCOUNT");
+  const [bxgxOffers, setBxgxOffers] = useState<LoyaltyBuyGetPreviewOffer[]>([]);
+  const [bxgxPickerOpen, setBxgxPickerOpen] = useState(false);
+  /** Prevents reopening free picker on every cart preview tick after cashier dismisses. */
+  const bxgxPromptedKeyRef = useRef<string>("");
   const [loyaltyHasRate, setLoyaltyHasRate] = useState(false);
   const [loyaltyRatePercent, setLoyaltyRatePercent] = useState<number | null>(null);
   const [loyaltyDialogOpen, setLoyaltyDialogOpen] = useState(false);
@@ -1572,6 +1589,27 @@ export function CorporatePOS() {
           }
           setInventoryServicesEnabled(s.inventoryServicesEnabled === true);
         }
+        if (!cancelled && loyaltyEnabled && !isDemo) {
+          void fetchLoyaltySettings()
+            .then((ls) => {
+              if (cancelled) return;
+              setLoyaltyProgramType(ls.loyaltyProgramType);
+              // Switching / loading Buy-Get must not leave Discount earn/redeem state active.
+              if (ls.loyaltyProgramType === "BUY_GET_FREE") {
+                setLoyaltyMode(null);
+                setLoyaltyDialogOpen(false);
+                setLoyaltyDialogInfo(null);
+              } else {
+                setBxgxPickerOpen(false);
+                setBxgxOffers([]);
+                // Program flipped to Discount — strip free lines left from BXGX cart.
+                setCart((prev) => prev.filter((i) => !i.isLoyaltyFree));
+              }
+            })
+            .catch(() => {
+              if (!cancelled) setLoyaltyProgramType("DISCOUNT");
+            });
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -1594,7 +1632,7 @@ export function CorporatePOS() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, isDemo, branchRevision, diningEnabled, opticsEnabled]);
+  }, [isAuthenticated, isDemo, branchRevision, diningEnabled, opticsEnabled, loyaltyEnabled]);
 
   useEffect(() => {
     posQrOrderAlarmEnabledRef.current = posQrOrderAlarmEnabled;
@@ -2673,11 +2711,16 @@ export function CorporatePOS() {
 
   const canMutateCart = canCreate || (!!editingOrderId && canEdit && !editingStockLocked);
 
+  const cartLineKey = (item: CartItem) => item.lineKey ?? item.id;
+
   const addToCart = (product: Product): boolean => {
     if (!canMutateCart) return false;
     const isService = !product.trackStock || product.productType === "SERVICE";
-    const existing = cart.find((i) => i.id === product.id);
-    const nextQty = existing ? existing.quantity + 1 : 1;
+    const existing = cart.find((i) => !i.isLoyaltyFree && i.id === product.id);
+    const freeQty = cart
+      .filter((i) => i.isLoyaltyFree && i.id === product.id)
+      .reduce((s, i) => s + i.quantity, 0);
+    const nextQty = (existing ? existing.quantity : 0) + 1 + freeQty;
     const available = getAvailableStock(product.id, product.stock);
 
     if (!isService && stockEnabled && available <= 0) {
@@ -2691,10 +2734,10 @@ export function CorporatePOS() {
 
     playBeep();
     setCart((prev) => {
-      const inCart = prev.find((i) => i.id === product.id);
+      const inCart = prev.find((i) => !i.isLoyaltyFree && i.id === product.id);
       if (inCart) {
         return prev.map((i) =>
-          i.id === product.id
+          !i.isLoyaltyFree && i.id === product.id
             ? {
                 ...i,
                 quantity: i.quantity + 1,
@@ -2723,6 +2766,54 @@ export function CorporatePOS() {
     if (isWeightUnit(product.unit)) {
       openWeightPricePadRef.current(product.id);
     }
+    return true;
+  };
+
+  const addLoyaltyFreeToCart = (offerId: string, product: Product): boolean => {
+    if (!canMutateCart) return false;
+    const isService = !product.trackStock || product.productType === "SERVICE";
+    const lineKey = `free:${offerId}:${product.id}`;
+    const paidQty = cart
+      .filter((i) => !i.isLoyaltyFree && i.id === product.id)
+      .reduce((s, i) => s + i.quantity, 0);
+    const freeQty = cart
+      .filter((i) => i.isLoyaltyFree && i.id === product.id)
+      .reduce((s, i) => s + i.quantity, 0);
+    const nextQty = paidQty + freeQty + 1;
+    const available = getAvailableStock(product.id, product.stock);
+    if (!isService && stockEnabled && available <= 0) {
+      warnOutOfStock(product);
+      return false;
+    }
+    if (!isService && stockEnabled && nextQty > available) {
+      warnInsufficientStock(product, available);
+      return false;
+    }
+    playBeep();
+    setCart((prev) => {
+      const existing = prev.find((i) => i.lineKey === lineKey);
+      if (existing) {
+        return prev.map((i) =>
+          i.lineKey === lineKey ? { ...i, quantity: i.quantity + 1 } : i,
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: product.id,
+          lineKey,
+          name: product.name,
+          price: "0",
+          quantity: 1,
+          image: product.image,
+          unit: product.unit,
+          productType: product.productType,
+          trackStock: product.trackStock,
+          isLoyaltyFree: true,
+          loyaltyOfferId: offerId,
+        },
+      ];
+    });
     return true;
   };
 
@@ -2824,6 +2915,15 @@ export function CorporatePOS() {
               setLoyaltyHasRate(card.hasAssignedRate);
               setLoyaltyRatePercent(ratePct);
               setSearchQuery("");
+              if (loyaltyProgramType === "BUY_GET_FREE") {
+                // BXGX: attaching customer is enough; preview effect handles free entitlements.
+                if (loyaltyMode) setLoyaltyMode(null);
+                lastLookupCodeRef.current = { code: trimmed, at: Date.now() };
+                notifySuccess(
+                  tr(`Loyalty müştəri: ${card.name}`, `Loyalty customer: ${card.name}`),
+                );
+                return true;
+              }
               // Dialog previews use current cart; open after state flush via functional read below.
               const merch = cart.reduce(
                 (s, i) =>
@@ -2900,8 +3000,66 @@ export function CorporatePOS() {
       cart,
       appliedDiscount,
       loyaltyMode,
+      loyaltyProgramType,
     ],
   );
+
+  // BXGX preview: when program is Buy-Get and cart/customer changes, evaluate redeemable free qty.
+  useEffect(() => {
+    if (
+      !loyaltyEnabled ||
+      isDemo ||
+      loyaltyProgramType !== "BUY_GET_FREE" ||
+      !canMutateCart ||
+      cart.length === 0
+    ) {
+      setBxgxOffers([]);
+      bxgxPromptedKeyRef.current = "";
+      return;
+    }
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void previewBuyGetOffers({
+        customerId: selectedCustomerId || null,
+        lines: cart.map((i) => ({
+          productId: i.id,
+          quantity: i.quantity,
+          lineTotal:
+            (Number.isFinite(cartUnitPrice(i.price)) ? cartUnitPrice(i.price) : 0) * i.quantity,
+          isLoyaltyFree: i.isLoyaltyFree === true,
+          loyaltyOfferId: i.loyaltyOfferId ?? null,
+        })),
+      })
+        .then((res) => {
+          if (cancelled) return;
+          const offers = res.offers ?? [];
+          setBxgxOffers(offers);
+          const redeemableKey = offers
+            .filter((o) => Number(o.redeemableFreeQty) > 0)
+            .map((o) => `${o.offerId}:${o.redeemableFreeQty}`)
+            .sort()
+            .join("|");
+          if (redeemableKey && redeemableKey !== bxgxPromptedKeyRef.current) {
+            bxgxPromptedKeyRef.current = redeemableKey;
+            setBxgxPickerOpen(true);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setBxgxOffers([]);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [
+    loyaltyEnabled,
+    isDemo,
+    loyaltyProgramType,
+    canMutateCart,
+    cart,
+    selectedCustomerId,
+  ]);
 
   const { handleKeyDown: handleSearchBarcodeKeyDown } = useBarcodeWedge(handleBarcodeScan);
 
@@ -2945,16 +3103,16 @@ export function CorporatePOS() {
     openTouchKb("numpad", "cartPrice", true, productId);
   };
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = (lineKeyOrId: string) => {
     if (!canMutateCart) return;
-    setCart((p) => p.filter((i) => i.id !== id));
+    setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
   };
 
-  const setQuantity = (id: string, quantity: number, maxStock?: number) => {
+  const setQuantity = (lineKeyOrId: string, quantity: number, maxStock?: number) => {
     if (!canMutateCart) return;
-    const product = products.find((p) => p.id === id);
-    const item = cart.find((i) => i.id === id);
+    const item = cart.find((i) => cartLineKey(i) === lineKeyOrId);
     if (!item) return;
+    const product = products.find((p) => p.id === item.id);
     const isService =
       !item.trackStock ||
       item.productType === "SERVICE" ||
@@ -2963,40 +3121,46 @@ export function CorporatePOS() {
 
     let next = roundToMaxDp(quantity, 3);
     if (!Number.isFinite(next) || next <= 0) {
-      setCart((p) => p.filter((i) => i.id !== id));
+      setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
       return;
     }
 
-    const available =
+    const otherSameProductQty = cart
+      .filter((i) => i.id === item.id && cartLineKey(i) !== lineKeyOrId)
+      .reduce((s, i) => s + i.quantity, 0);
+    const listedAvailable =
       maxStock != null
         ? maxStock
         : product
           ? getAvailableStock(product.id, product.stock)
           : 0;
+    const availableForLine = Math.max(0, listedAvailable - otherSameProductQty);
     if (!isService && stockEnabled) {
-      if (available <= 0) {
+      if (listedAvailable <= 0) {
         if (product) warnOutOfStock(product);
         return;
       }
-      if (available > 0 && next > available) {
-        if (product) warnInsufficientStock(product, available);
-        next = available;
+      if (availableForLine > 0 && next > availableForLine) {
+        if (product) warnInsufficientStock(product, availableForLine);
+        next = availableForLine;
       }
     }
 
     if (next === item.quantity) return;
-    setCart((p) => p.map((i) => (i.id === id ? { ...i, quantity: next } : i)));
+    setCart((p) =>
+      p.map((i) => (cartLineKey(i) === lineKeyOrId ? { ...i, quantity: next } : i)),
+    );
   };
 
-  const updateQuantity = (id: string, delta: number, maxStock?: number) => {
+  const updateQuantity = (lineKeyOrId: string, delta: number, maxStock?: number) => {
     if (!canMutateCart) return;
-    const item = cart.find((i) => i.id === id);
+    const item = cart.find((i) => cartLineKey(i) === lineKeyOrId);
     if (!item) return;
-    setQuantity(id, item.quantity + delta, maxStock);
+    setQuantity(lineKeyOrId, item.quantity + delta, maxStock);
   };
 
   const getCartQuantity = (productId: string) =>
-    cart.find((i) => i.id === productId)?.quantity ?? 0;
+    cart.filter((i) => i.id === productId).reduce((s, i) => s + i.quantity, 0);
 
   const subtotal = cart.reduce(
     (s, i) => s + (Number.isFinite(cartUnitPrice(i.price)) ? cartUnitPrice(i.price) : 0) * i.quantity,
@@ -3158,6 +3322,7 @@ export function CorporatePOS() {
     }
     if (cart.length > 0) {
       const timerBadPrice = cart.find((i) => {
+        if (i.isLoyaltyFree) return false;
         const p = cartUnitPrice(i.price);
         return !Number.isFinite(p) || p <= 0;
       });
@@ -3372,6 +3537,7 @@ export function CorporatePOS() {
     }
     if (cart.length > 0) {
       const badPrice = cart.find((i) => {
+        if (i.isLoyaltyFree) return false;
         const p = cartUnitPrice(i.price);
         return !Number.isFinite(p) || p <= 0;
       });
@@ -3502,7 +3668,7 @@ export function CorporatePOS() {
     ...(serviceFee > 0 ? { serviceFee } : {}),
     // Manual discount only; server adds loyalty redeem when loyaltyMode=redeem.
     discount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
-    ...(loyaltyMode ? { loyaltyMode } : {}),
+    ...(loyaltyProgramType === "DISCOUNT" && loyaltyMode ? { loyaltyMode } : {}),
     ...(opticsEnabled && opticsMeta && opticsMetaHasContent(opticsMeta)
       ? { opticsMeta }
       : {}),
@@ -3513,8 +3679,11 @@ export function CorporatePOS() {
     items: cart.map((i) => ({
       productId: i.id,
       quantity: i.quantity,
-      price: cartUnitPrice(i.price),
-      ...(birmarketActive
+      price: i.isLoyaltyFree ? 0 : cartUnitPrice(i.price),
+      ...(i.isLoyaltyFree
+        ? { isLoyaltyFree: true, loyaltyOfferId: i.loyaltyOfferId ?? null }
+        : {}),
+      ...(birmarketActive && !i.isLoyaltyFree
         ? {
             birmarketCommissionPercent:
               i.birmarketCommissionPercent != null && Number.isFinite(i.birmarketCommissionPercent)
@@ -3642,6 +3811,7 @@ export function CorporatePOS() {
       return;
     }
     const draftBadPrice = cart.find((i) => {
+      if (i.isLoyaltyFree) return false;
       const p = cartUnitPrice(i.price);
       return !Number.isFinite(p) || p <= 0;
     });
@@ -5353,7 +5523,8 @@ export function CorporatePOS() {
                     const lineUnit = item.unit ?? product?.unit;
                     const weightLine = isWeightUnit(lineUnit);
                     const canEditLinePrice =
-                      isService || posEditableProductPricesEnabled || weightLine;
+                      !item.isLoyaltyFree &&
+                      (isService || posEditableProductPricesEnabled || weightLine);
                     const available = product
                       ? getAvailableStock(product.id, product.stock)
                       : 0;
@@ -5367,7 +5538,7 @@ export function CorporatePOS() {
                       item.quantity > available;
 
                     return (
-                    <div key={item.id} className={`bg-gray-50 dark:bg-gray-800/50 rounded-md px-2 py-1.5 border ${
+                    <div key={cartLineKey(item)} className={`bg-gray-50 dark:bg-gray-800/50 rounded-md px-2 py-1.5 border ${
                       itemOutOfStock || itemExceedsStock
                         ? "border-red-300 dark:border-red-900/60"
                         : "border-gray-200 dark:border-gray-700"
@@ -5379,6 +5550,11 @@ export function CorporatePOS() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <h3 className="text-[11px] font-medium text-gray-900 dark:text-white truncate">{item.name}</h3>
+                            {item.isLoyaltyFree && (
+                              <span className="shrink-0 px-1 py-px text-[8px] font-semibold uppercase tracking-wide rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                {tr("Pulsuz", "Free")}
+                              </span>
+                            )}
                             {isService && (
                               <span className="shrink-0 px-1 py-px text-[8px] font-semibold uppercase tracking-wide rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                                 {tr("Xidmət", "Service")}
@@ -5488,7 +5664,7 @@ export function CorporatePOS() {
                           <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md">
                             <button
                               type="button"
-                              onClick={() => updateQuantity(item.id, -1, available)}
+                              onClick={() => updateQuantity(cartLineKey(item), -1, available)}
                               disabled={!canMutateCart}
                               className="p-0.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-md transition-colors disabled:opacity-40"
                               aria-label={tr("Azalt", "Decrease quantity")}
@@ -5498,13 +5674,13 @@ export function CorporatePOS() {
                             <PosQtyInput
                               value={item.quantity}
                               disabled={!canMutateCart}
-                              onCommit={(qty) => setQuantity(item.id, qty, available)}
+                              onCommit={(qty) => setQuantity(cartLineKey(item), qty, available)}
                               ariaLabel={tr("Miqdar", "Quantity")}
                               className="text-[11px] font-medium text-gray-900 dark:text-white px-0.5 w-8 min-w-[1.5rem] text-center bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-[#14b8a6] rounded disabled:opacity-40"
                             />
                             <button
                               type="button"
-                              onClick={() => updateQuantity(item.id, 1, available)}
+                              onClick={() => updateQuantity(cartLineKey(item), 1, available)}
                               disabled={!canMutateCart || (!isService && stockEnabled && available > 0 && item.quantity >= available)}
                               className="p-0.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               aria-label={tr("Artır", "Increase quantity")}
@@ -5514,7 +5690,7 @@ export function CorporatePOS() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => removeFromCart(item.id)}
+                            onClick={() => removeFromCart(cartLineKey(item))}
                             disabled={!canMutateCart}
                             className="p-0.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-40"
                             aria-label={tr("Sil", "Remove")}
@@ -6065,7 +6241,7 @@ export function CorporatePOS() {
 
       {/* Thermal Receipt Modal */}
       <LoyaltyEarnRedeemDialog
-        open={loyaltyDialogOpen}
+        open={loyaltyDialogOpen && loyaltyProgramType === "DISCOUNT"}
         info={loyaltyDialogInfo}
         tr={tr}
         onEarn={() => {
@@ -6081,6 +6257,22 @@ export function CorporatePOS() {
           setLoyaltyDialogOpen(false);
         }}
         onClose={() => setLoyaltyDialogOpen(false)}
+      />
+
+      <LoyaltyFreePickerDialog
+        open={bxgxPickerOpen && loyaltyProgramType === "BUY_GET_FREE"}
+        offers={bxgxOffers}
+        productsById={new Map(products.map((p) => [p.id, { id: p.id, name: p.name, image: p.image }]))}
+        tr={tr}
+        onClose={() => setBxgxPickerOpen(false)}
+        onPick={(offerId, productId) => {
+          const product = products.find((p) => p.id === productId);
+          if (!product) return;
+          if (addLoyaltyFreeToCart(offerId, product)) {
+            setBxgxPickerOpen(false);
+            notifySuccess(tr(`Pulsuz əlavə olundu: ${product.name}`, `Free added: ${product.name}`));
+          }
+        }}
       />
 
       {opticsEnabled && (
