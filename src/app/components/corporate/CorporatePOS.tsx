@@ -136,6 +136,16 @@ interface Product {
   unit?: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
+  /** From product create/edit; null/omit → POS low-stock threshold defaults to 1. */
+  quantityAlert?: number | null;
+}
+
+/** POS low-stock threshold: product alert, or 1 when none was set. */
+function posLowStockThreshold(quantityAlert?: number | null): number {
+  if (quantityAlert != null && Number.isFinite(quantityAlert) && quantityAlert >= 0) {
+    return quantityAlert;
+  }
+  return 1;
 }
 
 interface CartItem {
@@ -1385,6 +1395,7 @@ export function CorporatePOS() {
       unit: (item.unit ?? "").trim() || undefined,
       productType: item.productType,
       trackStock: !isService,
+      quantityAlert: isService ? null : (item.quantityAlert ?? null),
     };
   }, []);
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
@@ -4929,6 +4940,12 @@ export function CorporatePOS() {
                   const qtyInCart = getCartQuantity(product.id);
                   const available = getAvailableStock(product.id, product.stock);
                   const outOfStock = !isService && stockEnabled && available <= 0;
+                  const lowStockThreshold = posLowStockThreshold(product.quantityAlert);
+                  const lowStock =
+                    !isService &&
+                    stockEnabled &&
+                    !outOfStock &&
+                    available <= lowStockThreshold;
                   const atStockLimit =
                     !isService && stockEnabled && available > 0 && qtyInCart >= available;
                   const allowAdd = canMutateCart && !outOfStock && !productReorderMode;
@@ -4983,7 +5000,9 @@ export function CorporatePOS() {
                         ? "cursor-grab active:cursor-grabbing border-dashed border-gray-300 dark:border-gray-600 hover:border-[#14b8a6]"
                         : outOfStock || !canMutateCart
                           ? "border-red-300 dark:border-red-900/60 opacity-80 cursor-not-allowed"
-                          : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer hover:shadow-lg active:scale-95"
+                          : lowStock
+                            ? "border-amber-300 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-700 cursor-pointer hover:shadow-lg active:scale-95"
+                            : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer hover:shadow-lg active:scale-95"
                     }`}
                   >
                     {productReorderMode && (
@@ -5051,6 +5070,15 @@ export function CorporatePOS() {
                         {tr("Stokda yoxdur", "Out of stock")}
                       </span>
                     )}
+                    {!productReorderMode &&
+                      !isService &&
+                      stockEnabled &&
+                      lowStock &&
+                      !isListRow && (
+                      <span className="absolute top-1 right-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                        {tr("Az stok", "Low stock")}
+                      </span>
+                    )}
                     <div
                       className={`${
                         isListRow
@@ -5083,7 +5111,9 @@ export function CorporatePOS() {
                             className={`text-[9px] px-1 py-0.5 rounded ${
                               outOfStock
                                 ? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
-                                : "text-gray-400 bg-gray-100 dark:bg-gray-800"
+                                : lowStock
+                                  ? "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20"
+                                  : "text-gray-400 bg-gray-100 dark:bg-gray-800"
                             }`}
                           >
                             {available < 1000 ? `${available}` : "∞"}

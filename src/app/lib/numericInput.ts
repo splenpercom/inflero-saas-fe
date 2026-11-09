@@ -29,7 +29,8 @@ export function sanitizeNumericTyping(
     const c = raw[i];
     if (c >= "0" && c <= "9") {
       out += c;
-    } else if (allowDecimal && c === "." && !hasDot) {
+    } else if (allowDecimal && (c === "." || c === ",") && !hasDot) {
+      // Accept AZ/EU decimal comma as well as dot.
       out += ".";
       hasDot = true;
     }
@@ -58,6 +59,36 @@ export function parseNumericInput(raw: string, fallback = 0): number {
   if (t === "" || t === "-" || t === "." || t === "-.") return fallback;
   const n = Number(t);
   return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Parse spreadsheet/locale numbers.
+ * - `14,554` or `14.554` → 14.554 (single separator = decimal)
+ * - `1.234,56` / `1,234.56` → last separator is decimal, the other thousands
+ */
+export function parseLocaleNumber(raw: string): number | null {
+  let s = raw.trim().replace(/[\s\u00A0]/g, "");
+  if (!s) return null;
+
+  const neg = s.startsWith("-");
+  if (neg) s = s.slice(1);
+  if (!s) return null;
+
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+  if (lastComma >= 0 && lastDot >= 0) {
+    if (lastComma > lastDot) {
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      s = s.replace(/,/g, "");
+    }
+  } else if (lastComma >= 0) {
+    s = s.replace(",", ".");
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(s)) return null;
+  const n = Number(`${neg ? "-" : ""}${s}`);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Cap fractional digits while typing (e.g. product price/qty → 3). */
