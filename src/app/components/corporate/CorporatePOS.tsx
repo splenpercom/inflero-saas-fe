@@ -2784,14 +2784,23 @@ export function CorporatePOS() {
     const freeQty = cart
       .filter((i) => i.isLoyaltyFree && i.id === product.id)
       .reduce((s, i) => s + i.quantity, 0);
-    const nextQty = (existing ? existing.quantity : 0) + 1 + freeQty;
+    const inCartQty = existing ? existing.quantity : 0;
     const available = getAvailableStock(product.id, product.stock);
+    // Weight units (kg/g) can have on-hand < 1; clamp default +1 to remaining stock.
+    const remaining =
+      !isService && stockEnabled
+        ? roundToMaxDp(available - inCartQty - freeQty, 3)
+        : 1;
+    const addQty =
+      !isService && stockEnabled
+        ? roundToMaxDp(Math.min(1, Math.max(0, remaining)), 3)
+        : 1;
 
     if (!isService && stockEnabled && available <= 0) {
       warnOutOfStock(product);
       return false;
     }
-    if (!isService && stockEnabled && nextQty > available) {
+    if (!isService && stockEnabled && addQty <= 0) {
       warnInsufficientStock(product, available);
       return false;
     }
@@ -2804,7 +2813,7 @@ export function CorporatePOS() {
           !i.isLoyaltyFree && i.id === product.id
             ? {
                 ...i,
-                quantity: i.quantity + 1,
+                quantity: roundToMaxDp(i.quantity + addQty, 3),
                 unit: i.unit ?? product.unit,
               }
             : i,
@@ -2816,7 +2825,7 @@ export function CorporatePOS() {
           id: product.id,
           name: product.name,
           price: formatCartPriceInput(product.price),
-          quantity: 1,
+          quantity: addQty,
           image: product.image,
           unit: product.unit,
           productType: product.productType,
@@ -2843,13 +2852,20 @@ export function CorporatePOS() {
     const freeQty = cart
       .filter((i) => i.isLoyaltyFree && i.id === product.id)
       .reduce((s, i) => s + i.quantity, 0);
-    const nextQty = paidQty + freeQty + 1;
     const available = getAvailableStock(product.id, product.stock);
+    const remaining =
+      !isService && stockEnabled
+        ? roundToMaxDp(available - paidQty - freeQty, 3)
+        : 1;
+    const addQty =
+      !isService && stockEnabled
+        ? roundToMaxDp(Math.min(1, Math.max(0, remaining)), 3)
+        : 1;
     if (!isService && stockEnabled && available <= 0) {
       warnOutOfStock(product);
       return false;
     }
-    if (!isService && stockEnabled && nextQty > available) {
+    if (!isService && stockEnabled && addQty <= 0) {
       warnInsufficientStock(product, available);
       return false;
     }
@@ -2858,7 +2874,9 @@ export function CorporatePOS() {
       const existing = prev.find((i) => i.lineKey === lineKey);
       if (existing) {
         return prev.map((i) =>
-          i.lineKey === lineKey ? { ...i, quantity: i.quantity + 1 } : i,
+          i.lineKey === lineKey
+            ? { ...i, quantity: roundToMaxDp(i.quantity + addQty, 3) }
+            : i,
         );
       }
       return [
@@ -2868,7 +2886,7 @@ export function CorporatePOS() {
           lineKey,
           name: product.name,
           price: "0",
-          quantity: 1,
+          quantity: addQty,
           image: product.image,
           unit: product.unit,
           productType: product.productType,
