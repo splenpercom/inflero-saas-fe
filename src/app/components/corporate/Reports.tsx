@@ -51,11 +51,16 @@ import { ModernSelect } from "../ui/ModernSelect";
 import {
   buildHeatmapGrid,
   heatColor,
-  mapTopCategoriesPie,
   parseMoney,
 } from "../../lib/dashboardMappers";
-import { formatReportCurrency, type DateRangePreset } from "../../lib/reportMappers";
+import {
+  aggregateCategoriesFromSalesItems,
+  formatReportCurrency,
+  type DateRangePreset,
+} from "../../lib/reportMappers";
 import { notifyFromError } from "../../lib/toast";
+
+const CATEGORY_PIE_COLORS = ["#14b8a6", "#0d9488", "#5c85ff", "#85a3ff", "#adc2ff", "#94a3b8", "#64748b"];
 
 const EMPTY_OVERVIEW: ReportsOverview = {
   dateFrom: "",
@@ -121,10 +126,20 @@ function MetricCards({ cards, cols }: { cards: MetricCardItem[]; cols?: string }
   );
 }
 
-function PaymentTypePie({ cash, card }: { cash: number; card: number }) {
+function PaymentTypePie({
+  cash,
+  card,
+  cashLabel,
+  cardLabel,
+}: {
+  cash: number;
+  card: number;
+  cashLabel: string;
+  cardLabel: string;
+}) {
   const data = [
-    { name: "Cash", value: cash || 0, color: "#14b8a6" },
-    { name: "Card", value: card || 0, color: "#f97316" },
+    { name: cashLabel, value: cash || 0, color: "#14b8a6" },
+    { name: cardLabel, value: card || 0, color: "#f97316" },
   ].filter((d) => d.value > 0);
   const chartData = data.length ? data : [{ name: "—", value: 1, color: "#e5e7eb" }];
   return (
@@ -140,9 +155,13 @@ function PaymentTypePie({ cash, card }: { cash: number; card: number }) {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="text-[10px] text-gray-500 space-y-0.5">
-        <p>Cash {cash}%</p>
-        <p>Card {card}%</p>
+      <div className="text-[10px] text-gray-500 dark:text-gray-400 space-y-0.5">
+        <p>
+          {cashLabel} {cash}%
+        </p>
+        <p>
+          {cardLabel} {card}%
+        </p>
       </div>
     </div>
   );
@@ -192,7 +211,7 @@ export function Reports() {
         fetchReportsOverview({ dateFrom, dateTo }),
         fetchSalesReport({ dateFrom, dateTo, limit: 200 }),
         fetchBillerReport({ dateFrom, dateTo, limit: 100 }),
-        fetchDashboardSummary(dashPeriod),
+        fetchDashboardSummary(dashPeriod, { dateFrom, dateTo }),
         fetchCategories().catch(() => []),
       ]);
       setOverview(ov);
@@ -241,13 +260,20 @@ export function Reports() {
     return { map: built.map, days, hours, max: built.max };
   }, [summary]);
 
-  const categoryPie = useMemo(
-    () => (summary ? mapTopCategoriesPie(summary.widgets.topCategories) : []),
-    [summary],
-  );
+  // Category pie uses the same date-filtered sales report as the Products table.
+  const categoryPie = useMemo(() => {
+    const rows = aggregateCategoriesFromSalesItems(products).slice(0, 8);
+    const total = rows.reduce((s, r) => s + r.value, 0);
+    if (total <= 0) return [] as Array<{ name: string; value: number; color: string }>;
+    return rows.map((r, i) => ({
+      name: r.category,
+      value: Math.round((r.value / total) * 100),
+      color: CATEGORY_PIE_COLORS[i % CATEGORY_PIE_COLORS.length],
+    }));
+  }, [products]);
   const categoryUnits = useMemo(
-    () => (summary?.widgets.topCategories ?? []).reduce((s, c) => s + c.value, 0),
-    [summary],
+    () => products.reduce((s, p) => s + (Number(p.soldQty) || 0), 0),
+    [products],
   );
   const lowStock = summary?.widgets.lowStock ?? [];
 
@@ -418,7 +444,7 @@ export function Reports() {
             cards={[
               {
                 label: pt("Total Orders", "Ümumi Sifarişlər"),
-                value: moneyLabel(overview.totalOrders),
+                value: String(Math.max(0, Math.round(Number(overview.totalOrders) || 0))),
                 icon: Package,
                 color: "text-teal-600 dark:text-teal-400",
                 bgColor: "bg-teal-50 dark:bg-teal-900/20",
@@ -443,7 +469,12 @@ export function Reports() {
                 color: "text-sky-600 dark:text-sky-400",
                 bgColor: "bg-sky-50 dark:bg-sky-900/20",
                 content: (
-                  <PaymentTypePie cash={overview.paymentType.cash} card={overview.paymentType.card} />
+                  <PaymentTypePie
+                    cash={overview.paymentType.cash}
+                    card={overview.paymentType.card}
+                    cashLabel={pt("Cash", "Nağd")}
+                    cardLabel={pt("Card", "Kart")}
+                  />
                 ),
               },
             ]}
@@ -640,7 +671,7 @@ export function Reports() {
                 {pt("Order Activity Heatmap", "Sifariş Aktivliyi")}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 mb-5">
-                {pt("Busiest time slots this week.", "Bu həftə ən məşğul slotlar.")}
+                {pt("Busiest time slots in the selected period.", "Seçilmiş dövrdə ən məşğul slotlar.")}
               </p>
               <div className="overflow-x-auto">
                 <div className="min-w-[520px]">

@@ -122,9 +122,16 @@ const EMPTY_SUMMARY: DashboardSummary = {
   },
 };
 
-export async function fetchDashboardSummary(period: DashboardPeriod = "1D"): Promise<DashboardSummary> {
+export async function fetchDashboardSummary(
+  period: DashboardPeriod = "1D",
+  range?: { dateFrom?: string; dateTo?: string },
+): Promise<DashboardSummary> {
+  const sp = new URLSearchParams();
+  sp.set("period", period);
+  if (range?.dateFrom) sp.set("dateFrom", range.dateFrom);
+  if (range?.dateTo) sp.set("dateTo", range.dateTo);
   const res = await apiGet<ApiEnvelope<DashboardSummary>>(
-    `/tenant/dashboard/summary?period=${encodeURIComponent(period)}`,
+    `/tenant/dashboard/summary?${sp.toString()}`,
   );
   if (!res.data) return { ...EMPTY_SUMMARY, period };
   return {

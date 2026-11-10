@@ -88,6 +88,7 @@ import {
   type LoyaltyDialogInfo,
 } from "../../../modules/loyalty/LoyaltyEarnRedeemDialog";
 import { LoyaltyFreePickerDialog } from "../../../modules/loyalty/LoyaltyFreePickerDialog";
+import { formatBxgxQty } from "../../../modules/loyalty/bxgxFormat";
 import { OpticsPrescriptionDialog } from "../../../modules/optics/OpticsPrescriptionDialog";
 import {
   normalizeOpticsMeta,
@@ -1849,16 +1850,29 @@ export function CorporatePOS() {
       setEditingOriginalQtyByProduct({});
       setSuppressEditOrderUi(false);
       setPendingQrOrderId(detail.id);
+      setBxgxPickerOpen(false);
+      setBxgxOffers([]);
+      bxgxPromptedKeyRef.current = "";
       setCart(
-        detail.items.map((i) => ({
-          id: i.productId,
-          name: i.productName,
-          price: formatCartPriceInput(i.price),
-          quantity: i.quantity,
-          image: "📦",
-          productType: (i as { productType?: CartItem["productType"] }).productType,
-          trackStock: (i as { trackStock?: boolean }).trackStock !== false,
-        })),
+        detail.items.map((i) => {
+          const isFree = i.isLoyaltyFree === true;
+          return {
+            id: i.productId,
+            name: i.productName,
+            price: formatCartPriceInput(i.price),
+            quantity: i.quantity,
+            image: "📦",
+            productType: (i as { productType?: CartItem["productType"] }).productType,
+            trackStock: (i as { trackStock?: boolean }).trackStock !== false,
+            ...(isFree
+              ? {
+                  lineKey: `free:${i.loyaltyOfferId ?? ""}:${i.productId}`,
+                  isLoyaltyFree: true,
+                  loyaltyOfferId: i.loyaltyOfferId ?? null,
+                }
+              : {}),
+          };
+        }),
       );
       setSelectedTableId(detail.table?.id ?? "");
       setSelectedCustomerId(detail.customerId ?? "");
@@ -1907,6 +1921,9 @@ export function CorporatePOS() {
   const hydrateCartFromExistingOrder = useCallback(
     (detail: PosOrderDetail, opts?: { suppressEditUi?: boolean; preserveCart?: boolean }) => {
     setPendingQrOrderId(null);
+    setBxgxPickerOpen(false);
+    setBxgxOffers([]);
+    bxgxPromptedKeyRef.current = "";
     setEditingOrderId(detail.id);
     // Quiet timer sessions must not sticky-restore as "Edit Order" on next POS open.
     if (opts?.suppressEditUi) writePosEditOrderId(null);
@@ -1948,6 +1965,7 @@ export function CorporatePOS() {
     setCart(
       detail.items.map((i) => {
         const pctRaw = i.birmarketCommissionPercent != null ? Number(i.birmarketCommissionPercent) : NaN;
+        const isFree = i.isLoyaltyFree === true;
         return {
           id: i.productId,
           name: i.productName,
@@ -1956,7 +1974,14 @@ export function CorporatePOS() {
           image: "📦",
           productType: (i as { productType?: CartItem["productType"] }).productType,
           trackStock: (i as { trackStock?: boolean }).trackStock !== false,
-          ...(orderBirmarketOn && Number.isFinite(pctRaw)
+          ...(isFree
+            ? {
+                lineKey: `free:${i.loyaltyOfferId ?? ""}:${i.productId}`,
+                isLoyaltyFree: true,
+                loyaltyOfferId: i.loyaltyOfferId ?? null,
+              }
+            : {}),
+          ...(orderBirmarketOn && !isFree && Number.isFinite(pctRaw)
             ? { birmarketCommissionPercent: Math.min(100, Math.max(0, pctRaw)) }
             : {}),
         };
@@ -3103,6 +3128,7 @@ export function CorporatePOS() {
     const t = window.setTimeout(() => {
       void previewBuyGetOffers({
         customerId: selectedCustomerId || null,
+        excludePosOrderId: editingOrderId || null,
         lines: cart.map((i) => ({
           productId: i.id,
           quantity: i.quantity,
@@ -3124,10 +3150,16 @@ export function CorporatePOS() {
           if (redeemableKey && redeemableKey !== bxgxPromptedKeyRef.current) {
             bxgxPromptedKeyRef.current = redeemableKey;
             setBxgxPickerOpen(true);
+          } else if (!redeemableKey) {
+            bxgxPromptedKeyRef.current = "";
+            setBxgxPickerOpen(false);
           }
         })
         .catch(() => {
-          if (!cancelled) setBxgxOffers([]);
+          if (!cancelled) {
+            setBxgxOffers([]);
+            setBxgxPickerOpen(false);
+          }
         });
     }, 350);
     return () => {
@@ -3141,6 +3173,7 @@ export function CorporatePOS() {
     canMutateCart,
     cart,
     selectedCustomerId,
+    editingOrderId,
   ]);
 
   const { handleKeyDown: handleSearchBarcodeKeyDown } = useBarcodeWedge(handleBarcodeScan);
@@ -3245,6 +3278,22 @@ export function CorporatePOS() {
     if (!Number.isFinite(next) || next <= 0) {
       setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
       return;
+    }
+
+    // Loyalty free lines: cannot exceed remaining redeemable for that offer.
+    if (item.isLoyaltyFree && item.loyaltyOfferId) {
+      const offer = bxgxOffers.find((o) => o.offerId === item.loyaltyOfferId);
+      const remaining = offer ? Math.max(0, Number(offer.redeemableFreeQty) || 0) : 0;
+      const maxFree = roundToMaxDp(item.quantity + remaining, 3);
+      if (next > maxFree) {
+        notifyWarning(
+          tr(
+            `"${item.name}" üçün yalnız ${formatBxgxQty(maxFree)} pulsuz hüquq var`,
+            `Only ${formatBxgxQty(maxFree)} free available for "${item.name}"`,
+          ),
+        );
+        next = maxFree;
+      }
     }
 
     const otherSameProductQty = cart
@@ -5418,7 +5467,6 @@ export function CorporatePOS() {
                       )}
                 </div>
               )}
-
               {/* Scrollable: customer fields, cart, checkout */}
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 pb-2">
                 <div className="mb-3 space-y-1.5">
@@ -5721,16 +5769,32 @@ export function CorporatePOS() {
                       product != null &&
                       available > 0 &&
                       item.quantity > available;
-                    const unitAmt = Number.isFinite(cartUnitPrice(item.price))
-                      ? cartUnitPrice(item.price)
-                      : 0;
+                    const unitAmt = item.isLoyaltyFree
+                      ? 0
+                      : Number.isFinite(cartUnitPrice(item.price))
+                        ? cartUnitPrice(item.price)
+                        : 0;
                     const lineTotalAmt = unitAmt * item.quantity;
+                    const freeOfferRemaining =
+                      item.isLoyaltyFree && item.loyaltyOfferId
+                        ? Math.max(
+                            0,
+                            Number(
+                              bxgxOffers.find((o) => o.offerId === item.loyaltyOfferId)
+                                ?.redeemableFreeQty,
+                            ) || 0,
+                          )
+                        : 0;
+                    const freeQtyAtCap =
+                      Boolean(item.isLoyaltyFree) && freeOfferRemaining <= 0;
 
                     return (
                     <div key={cartLineKey(item)} className={`bg-gray-50 dark:bg-gray-800/50 rounded-md px-2 py-1.5 border ${
-                      itemOutOfStock || itemExceedsStock
-                        ? "border-red-300 dark:border-red-900/60"
-                        : "border-gray-200 dark:border-gray-700"
+                      item.isLoyaltyFree
+                        ? "border-emerald-200 dark:border-emerald-900/50"
+                        : itemOutOfStock || itemExceedsStock
+                          ? "border-red-300 dark:border-red-900/60"
+                          : "border-gray-200 dark:border-gray-700"
                     }`}>
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-md bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center border border-gray-300 dark:border-gray-600 flex-shrink-0 overflow-hidden">
@@ -5831,11 +5895,21 @@ export function CorporatePOS() {
                               </span>
                             </div>
                           ) : (
-                            <p className="text-[11px] font-semibold text-[#14b8a6] dark:text-[#14b8a6] leading-tight">
-                              {formatCurrency(unitAmt)}
-                              <span className="ml-1 text-[9px] font-medium text-gray-500 tabular-nums">
-                                = {formatCurrency(lineTotalAmt)}
-                              </span>
+                            <p
+                              className={`text-[11px] font-semibold leading-tight ${
+                                item.isLoyaltyFree
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-[#14b8a6] dark:text-[#14b8a6]"
+                              }`}
+                            >
+                              {item.isLoyaltyFree
+                                ? tr("₼0 (pulsuz)", "₼0 (free)")
+                                : formatCurrency(unitAmt)}
+                              {!item.isLoyaltyFree && (
+                                <span className="ml-1 text-[9px] font-medium text-gray-500 tabular-nums">
+                                  = {formatCurrency(lineTotalAmt)}
+                                </span>
+                              )}
                             </p>
                           )}
                           {(itemOutOfStock || itemExceedsStock) && (
@@ -5899,7 +5973,14 @@ export function CorporatePOS() {
                             <button
                               type="button"
                               onClick={() => updateQuantity(cartLineKey(item), 1, available)}
-                              disabled={!canMutateCart || (!isService && stockEnabled && available > 0 && item.quantity >= available)}
+                              disabled={
+                                !canMutateCart ||
+                                freeQtyAtCap ||
+                                (!isService &&
+                                  stockEnabled &&
+                                  available > 0 &&
+                                  item.quantity >= available)
+                              }
                               className="p-0.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               aria-label={tr("Artır", "Increase quantity")}
                             >

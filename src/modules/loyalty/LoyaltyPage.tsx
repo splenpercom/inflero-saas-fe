@@ -485,10 +485,12 @@ function LoyaltyPageInner() {
                         {offer.name}
                       </p>
                       <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        {tr("Al", "Buy")} {offer.buyThreshold}
-                        {offer.buyMetric === "MONEY" ? "₼" : "×"}{" "}
+                        {tr("Al", "Buy")}{" "}
+                        {offer.buyMetric === "MONEY"
+                          ? `${Number(offer.buyThreshold).toFixed(2)}₼`
+                          : String(Number(offer.buyThreshold))}{" "}
                         {offer.buyProductName || offer.buyCategoryName} →{" "}
-                        {tr("pulsuz", "free")} {offer.getQty}×{" "}
+                        {tr("pulsuz", "free")} {String(Number(offer.getQty))}×{" "}
                         {offer.getProductName || offer.getCategoryName}
                         {" · "}
                         {offer.progressMode === "ACCUMULATE"

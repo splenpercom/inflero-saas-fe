@@ -208,6 +208,8 @@ export async function deleteBuyGetOffer(id: string): Promise<void> {
 
 export async function previewBuyGetOffers(body: {
   customerId?: string | null;
+  /** When editing a POS order — prevents accumulate progress double-count. */
+  excludePosOrderId?: string | null;
   lines: LoyaltyBuyGetPreviewLine[];
 }): Promise<{ offers: LoyaltyBuyGetPreviewOffer[] }> {
   const res = await apiPost<Envelope<{ offers: LoyaltyBuyGetPreviewOffer[] }>>(
