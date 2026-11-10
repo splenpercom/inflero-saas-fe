@@ -247,6 +247,10 @@ function PosQtyInput({
   ariaLabel,
   onFocusPad,
   onClickPad,
+  /** When set (e.g. on-screen qty pad draft), shown instead of local/committed text. */
+  draftText,
+  /** Physical keyboard while pad is open — keep draft in sync. */
+  onDraftChange,
 }: {
   value: number;
   disabled?: boolean;
@@ -255,14 +259,19 @@ function PosQtyInput({
   ariaLabel?: string;
   onFocusPad?: () => void;
   onClickPad?: () => void;
+  draftText?: string;
+  onDraftChange?: (next: string) => void;
 }) {
   const [text, setText] = useState(String(value));
+  const padDriven = draftText !== undefined;
 
   useEffect(() => {
+    if (padDriven) return;
     setText(String(value));
-  }, [value]);
+  }, [value, padDriven]);
 
   const commit = () => {
+    if (padDriven) return;
     const n = roundToMaxDp(parseNumericInput(text, NaN), 3);
     if (!Number.isFinite(n) || n <= 0) {
       setText(String(value));
@@ -277,7 +286,7 @@ function PosQtyInput({
       type="text"
       inputMode="decimal"
       disabled={disabled}
-      value={text}
+      value={padDriven ? draftText : text}
       aria-label={ariaLabel}
       onClick={(e) => {
         e.stopPropagation();
@@ -287,11 +296,19 @@ function PosQtyInput({
         e.currentTarget.select();
         onFocusPad?.();
       }}
-      onChange={(e) =>
-        setText(sanitizeNumericTypingMaxDp(e.target.value, 3, { allowDecimal: true }))
-      }
+      onChange={(e) => {
+        const next = sanitizeNumericTypingMaxDp(e.target.value, 3, {
+          allowDecimal: true,
+        });
+        if (padDriven) {
+          onDraftChange?.(next);
+          return;
+        }
+        setText(next);
+      }}
       onBlur={commit}
       onKeyDown={(e) => {
+        if (padDriven) return;
         if (e.key === "Enter") {
           e.preventDefault();
           (e.target as HTMLInputElement).blur();
@@ -1256,6 +1273,8 @@ export function CorporatePOS() {
     pendingY: number;
   } | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
   const [savingCustomer, setSavingCustomer] = useState(false);
@@ -1331,6 +1350,8 @@ export function CorporatePOS() {
     productId?: string;
     /** Draft for cartQty while typing (allows empty mid-edit). */
     buffer?: string;
+    /** Mimic input select-all: first numpad key replaces instead of appending. */
+    replaceNext?: boolean;
   }>(null);
   const openWeightPricePadRef = useRef<(productId: string) => void>(() => {});
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
@@ -3112,15 +3133,46 @@ export function CorporatePOS() {
     ) => {
       const fromTouch =
         lastPointerType.current === "touch" || lastPointerType.current === "pen";
-      if (force || prefersTouchKeyboard || fromTouch) {
-        setTouchKb({
+      if (!(force || prefersTouchKeyboard || fromTouch)) return;
+
+      setTouchKb((prev) => {
+        // Keep in-progress draft (e.g. backspaced empty qty) if same pad is already open.
+        if (
+          prev &&
+          prev.mode === mode &&
+          prev.field === field &&
+          (field === "cartQty" || field === "cartPrice"
+            ? prev.productId === productId
+            : true)
+        ) {
+          return prev;
+        }
+
+        // cartQty must use a string buffer so backspace can clear "1" → "".
+        let buffer: string | undefined;
+        let replaceNext = false;
+        if (field === "cartQty" && productId) {
+          const item =
+            cartRef.current.find((i) => !i.isLoyaltyFree && i.id === productId) ??
+            cartRef.current.find((i) => i.id === productId);
+          buffer = item != null ? String(item.quantity) : "";
+          // Match physical keyboard select-all on focus: first pad key replaces.
+          replaceNext = buffer.length > 0;
+        } else if (field === "cartPrice" && productId) {
+          const item = cartRef.current.find((i) => i.id === productId);
+          replaceNext = Boolean(item?.price);
+        }
+
+        return {
           mode,
           field,
           ...((field === "cartPrice" || field === "cartQty") && productId
             ? { productId }
             : {}),
-        });
-      }
+          ...(buffer !== undefined ? { buffer } : {}),
+          ...(replaceNext ? { replaceNext: true } : {}),
+        };
+      });
     },
     [prefersTouchKeyboard, lastPointerType],
   );
@@ -3132,6 +3184,7 @@ export function CorporatePOS() {
       field: "cartQty",
       productId,
       buffer: "",
+      replaceNext: false,
     });
   };
 
@@ -3297,7 +3350,9 @@ export function CorporatePOS() {
         const sanitized = sanitizeNumericTypingMaxDp(next, 3, {
           allowDecimal: true,
         });
-        setTouchKb((kb) => (kb ? { ...kb, buffer: sanitized } : kb));
+        setTouchKb((kb) =>
+          kb ? { ...kb, buffer: sanitized, replaceNext: false } : kb,
+        );
         const n = roundToMaxDp(parseNumericInput(sanitized, NaN), 3);
         if (!Number.isFinite(n) || n <= 0) return;
         const item =
@@ -5765,6 +5820,23 @@ export function CorporatePOS() {
                               onClickPad={() =>
                                 openTouchKb("numpad", "cartQty", true, item.id)
                               }
+                              draftText={
+                                touchKb?.field === "cartQty" &&
+                                touchKb.productId === item.id &&
+                                touchKb.buffer !== undefined
+                                  ? touchKb.buffer
+                                  : undefined
+                              }
+                              onDraftChange={(next) => {
+                                if (
+                                  !touchKb ||
+                                  touchKb.field !== "cartQty" ||
+                                  touchKb.productId !== item.id
+                                ) {
+                                  return;
+                                }
+                                handleTouchKbChange(next);
+                              }}
                               ariaLabel={
                                 weightLine
                                   ? tr("Çəki / Miqdar", "Weight / Qty")
@@ -6573,6 +6645,10 @@ export function CorporatePOS() {
           value={touchKbValue}
           onChange={handleTouchKbChange}
           onClose={() => setTouchKb(null)}
+          replaceNext={Boolean(touchKb.replaceNext)}
+          onReplaceNextConsumed={() =>
+            setTouchKb((kb) => (kb ? { ...kb, replaceNext: false } : kb))
+          }
           title={
             touchKb.field === "search"
               ? tr("Axtarış", "Search")
