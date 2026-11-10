@@ -1,6 +1,6 @@
 /**
  * Map SalesReturn + parent fiscal sale ids → OmniCashier money_back (check_type 100).
- * Same catalog-price + discount allocation as sales so refund slips stay consistent.
+ * Same baked unit-price allocation as sales so refund slips stay Omni-614-safe.
  */
 
 import {
@@ -31,8 +31,15 @@ export type MapCardReturnInput = {
   vatPercent?: number | null;
   parent: ParentFiscalIds;
   prevDocNumber?: number | null;
-  /** Original order grand total when known (helps fee/shipping lines). */
+  /**
+   * Sales-return total (returned lines), NOT parent POS grandTotal.
+   * Passing parent GT when merch < GT invents a phantom Omni fee line.
+   */
   orderGrandTotal?: number | null;
+  orderDiscount?: number | null;
+  shipping?: number | null;
+  /** CASH → cashSum; CARD-like → cashlessSum. */
+  tender?: "CASH" | "CARD";
 };
 
 export function mapCardReturnToOmni(input: MapCardReturnInput): {
@@ -53,13 +60,17 @@ export function mapCardReturnToOmni(input: MapCardReturnInput): {
   const items = allocateCatalogLinesToPayment({
     paymentAmount: pay,
     orderGrandTotal: input.orderGrandTotal,
+    orderDiscount: input.orderDiscount,
+    shipping: input.shipping,
     vatPercent,
-    items: (input.items ?? []).map((it) => ({
-      productName: it.productName,
-      sku: it.sku,
-      quantity: it.quantity,
-      unitPrice: it.unitPrice,
-    })),
+    items: (input.items ?? [])
+      .filter((it) => Number(it.quantity) > 0 && Number(it.unitPrice) > 0)
+      .map((it) => ({
+        productName: it.productName,
+        sku: it.sku,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+      })),
     emptyLabel: "Refund",
     emptyCode: "REF",
     feeLabel: "Service",
@@ -67,6 +78,7 @@ export function mapCardReturnToOmni(input: MapCardReturnInput): {
   });
 
   const sum = sumOmniItemNets(items);
+  const isCash = input.tender === "CASH";
 
   return {
     ...(input.prevDocNumber != null ? { prev_doc_number: input.prevDocNumber } : {}),
@@ -78,8 +90,8 @@ export function mapCardReturnToOmni(input: MapCardReturnInput): {
       refund_short_document_id: input.parent.shortId,
       items,
       sum,
-      cashSum: 0,
-      cashlessSum: sum,
+      cashSum: isCash ? sum : 0,
+      cashlessSum: isCash ? 0 : sum,
       prepaymentSum: 0,
       creditSum: 0,
       bonusSum: 0,

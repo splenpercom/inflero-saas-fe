@@ -72,8 +72,8 @@ import {
 import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, startPosOrderHourlyTimer, updatePosOrder, type OpticsPrescriptionMeta, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import {
   fiscalizeCardPaymentsOnOrder,
-  findUnfiscalizedCardPayments,
-  isCardPaymentMethod,
+  findUnfiscalizedOmniPayments,
+  isOmniFiscalPaymentMethod,
 } from "../../lib/omnicashier/fiscalize";
 import { isOmnicashierConfigured } from "../../lib/omnicashierSettings";
 import {
@@ -3797,7 +3797,7 @@ export function CorporatePOS() {
     });
   };
 
-  /** OmniCashier Card fiscalization — never blocks / never rolls back Inflero payment. */
+  /** OmniCashier CASH/CARD fiscalization — never blocks / never rolls back Inflero payment. */
   const maybeFiscalizeCardPayments = (detail: PosOrderDetail) => {
     void (async () => {
       if (!isOmnicashierConfigured()) return;
@@ -3810,32 +3810,35 @@ export function CorporatePOS() {
           /* use original detail */
         }
       }
-      const cardPays = (order.payments ?? []).filter((p) => isCardPaymentMethod(p.method));
-      const wantedCard =
+      const fiscalPays = (order.payments ?? []).filter((p) =>
+        isOmniFiscalPaymentMethod(p.method),
+      );
+      const wantedFiscal =
         selectedPaymentMethod === "card" ||
-        cardPays.length > 0 ||
-        isCardPaymentMethod(order.paymentMethod);
-      if (!wantedCard) return;
+        selectedPaymentMethod === "cash" ||
+        fiscalPays.length > 0 ||
+        isOmniFiscalPaymentMethod(order.paymentMethod);
+      if (!wantedFiscal) return;
 
-      if (paymentStatusChoice !== "paid" && cardPays.length === 0) {
+      if (paymentStatusChoice !== "paid" && fiscalPays.length === 0) {
         notifyWarning(
           tr(
-            "OmniCashier fiskal çap yalnız Paid + Card üçün işləyir. Statusu Paid seçin.",
-            "OmniCashier fiscal print runs only for Paid + Card. Select Paid status.",
+            "OmniCashier fiskal çap yalnız Paid + Nağd/Kart üçün işləyir. Statusu Paid seçin.",
+            "OmniCashier fiscal print runs only for Paid + Cash/Card. Select Paid status.",
           ),
         );
         return;
       }
-      if (cardPays.length === 0) {
+      if (fiscalPays.length === 0) {
         notifyWarning(
           tr(
-            "Kart ödənişi tapılmadı — OmniCashier çapı atlandı. Ödəniş metodunu Card seçin.",
-            "No card payment found — OmniCashier print skipped. Select Card as payment method.",
+            "Nağd/Kart ödənişi tapılmadı — OmniCashier çapı atlandı. Ödəniş metodunu Nağd və ya Kart seçin.",
+            "No cash/card payment found — OmniCashier print skipped. Select Cash or Card.",
           ),
         );
         return;
       }
-      if (findUnfiscalizedCardPayments(order.payments).length === 0) return;
+      if (findUnfiscalizedOmniPayments(order.payments).length === 0) return;
 
       await fiscalizeCardPaymentsOnOrder(order);
     })().catch(() => {

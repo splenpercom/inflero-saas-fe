@@ -108,6 +108,10 @@ export type PaymentFiscalPatchBody = {
   fiscalDocumentNumber?: string | null;
   fiscalShiftDocNumber?: string | null;
   fiscalError?: string | null;
+  /** Atomic PENDING claim (NONE/FAILED → PENDING). */
+  claim?: boolean;
+  /** Allow reclaim when status is already PENDING (UI retry). */
+  forceClaim?: boolean;
 };
 
 export type OpticsEyeValues = {
@@ -671,6 +675,8 @@ export async function patchPaymentFiscal(paymentId: string, body: PaymentFiscalP
       fiscalShiftDocNumber: string | null;
       fiscalError: string | null;
       fiscalAt: string | null;
+      claimed?: boolean;
+      claimReason?: string;
     };
   }>(`/tenant/sales/payments/${paymentId}/fiscal`, body);
   return res.data;
