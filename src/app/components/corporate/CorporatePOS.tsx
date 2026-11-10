@@ -138,6 +138,8 @@ interface Product {
   trackStock?: boolean;
   /** From product create/edit; null/omit → POS low-stock threshold defaults to 1. */
   quantityAlert?: number | null;
+  /** ISO date string from product create/edit; used for Expired tag. */
+  expiryDate?: string | null;
 }
 
 /** POS low-stock threshold: product alert, or 1 when none was set. */
@@ -146,6 +148,22 @@ function posLowStockThreshold(quantityAlert?: number | null): number {
     return quantityAlert;
   }
   return 1;
+}
+
+/** Matches Expired Products page: expiry calendar day on/before local today. */
+function isPosProductExpired(expiryDate?: string | null): boolean {
+  if (!expiryDate) return false;
+  const ymd = expiryDate.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+    const now = new Date();
+    const todayYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return ymd <= todayYmd;
+  }
+  const d = new Date(expiryDate);
+  if (Number.isNaN(d.getTime())) return false;
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  return d.getTime() <= endOfToday.getTime();
 }
 
 interface CartItem {
@@ -1417,6 +1435,7 @@ export function CorporatePOS() {
       productType: item.productType,
       trackStock: !isService,
       quantityAlert: isService ? null : (item.quantityAlert ?? null),
+      expiryDate: isService ? null : (item.expiryDate ?? null),
     };
   }, []);
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
@@ -5001,6 +5020,7 @@ export function CorporatePOS() {
                     stockEnabled &&
                     !outOfStock &&
                     available <= lowStockThreshold;
+                  const expired = !isService && isPosProductExpired(product.expiryDate);
                   const atStockLimit =
                     !isService && stockEnabled && available > 0 && qtyInCart >= available;
                   const allowAdd = canMutateCart && !outOfStock && !productReorderMode;
@@ -5055,9 +5075,11 @@ export function CorporatePOS() {
                         ? "cursor-grab active:cursor-grabbing border-dashed border-gray-300 dark:border-gray-600 hover:border-[#14b8a6]"
                         : outOfStock || !canMutateCart
                           ? "border-red-300 dark:border-red-900/60 opacity-80 cursor-not-allowed"
-                          : lowStock
-                            ? "border-amber-300 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-700 cursor-pointer hover:shadow-lg active:scale-95"
-                            : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer hover:shadow-lg active:scale-95"
+                          : expired
+                            ? "border-rose-300 dark:border-rose-800 hover:border-rose-400 dark:hover:border-rose-700 cursor-pointer hover:shadow-lg active:scale-95"
+                            : lowStock
+                              ? "border-amber-300 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-700 cursor-pointer hover:shadow-lg active:scale-95"
+                              : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer hover:shadow-lg active:scale-95"
                     }`}
                   >
                     {productReorderMode && (
@@ -5120,6 +5142,11 @@ export function CorporatePOS() {
                         {tr("Xidmət", "Service")}
                       </span>
                     )}
+                    {!productReorderMode && !isService && expired && !isListRow && (
+                      <span className="absolute top-1 left-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200 border border-rose-200 dark:border-rose-800">
+                        {tr("Vaxtı keçmiş", "Expired")}
+                      </span>
+                    )}
                     {!productReorderMode && !isService && stockEnabled && outOfStock && !isListRow && (
                       <span className="absolute top-1 right-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
                         {tr("Stokda yoxdur", "Out of stock")}
@@ -5161,6 +5188,11 @@ export function CorporatePOS() {
                         <span className="text-xs font-bold text-[#14b8a6] dark:text-[#14b8a6] whitespace-nowrap">
                           {formatCurrency(product.price)}
                         </span>
+                        {!isService && expired && isListRow && (
+                          <span className="text-[8px] px-1 py-0.5 font-semibold uppercase tracking-wide rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200 border border-rose-200 dark:border-rose-800">
+                            {tr("Vaxtı keçmiş", "Expired")}
+                          </span>
+                        )}
                         {!isService && stockEnabled && (
                           <span
                             className={`text-[9px] px-1 py-0.5 rounded ${
