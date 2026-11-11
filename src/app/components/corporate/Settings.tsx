@@ -1405,12 +1405,15 @@ export function Settings() {
                   <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
                     <div>
                       <p className="text-xs font-medium text-gray-900 dark:text-white">
-                        {pt("Scale label scan", "Tərəzi etiket skanı")}
+                        {pt(
+                          "Rongta weighing scale (POS labels)",
+                          "Rongta çəki tərəzisi (POS etiketləri)",
+                        )}
                       </p>
                       <p className="text-[10px] text-gray-400 mt-0.5">
                         {pt(
-                          "When on, POS accepts Rongta profile-17 weight labels from the barcode scanner (weigh → print → scan). Off by default.",
-                          "Aktiv olduqda POS Rongta profil-17 çəki etiketlərini barkod skanerdən qəbul edir (çəkin → çap → skan). Standart olaraq sönülüdür.",
+                          "For Rongta RLS1000F/1100F label scales: POS reads printed weight barcodes from the scanner (weigh → print → scan). Off by default.",
+                          "Rongta RLS1000F/1100F etiket tərəziləri üçün: POS çap olunmuş çəki barkodlarını skanerdən oxuyur (çəkin → çap → skan). Standart olaraq sönülüdür.",
                         )}
                       </p>
                     </div>

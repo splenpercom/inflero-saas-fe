@@ -3057,35 +3057,49 @@ export function CorporatePOS() {
                 );
                 return false;
               }
-              notifyError(
-                tr(
-                  `Tərəzi məhsulu tapılmadı (${decoded.itemCode})`,
-                  `Scale product not found (${decoded.itemCode})`,
-                ),
-              );
-              return false;
+              // Ambiguous PLU must not fall through (would add wrong product).
+              if (scaleErr instanceof ApiError && scaleErr.statusCode === 409) {
+                notifyError(
+                  tr(
+                    `Tərəzi məhsul kodu təkrarlanır (${decoded.itemCode})`,
+                    `Scale item code is ambiguous (${decoded.itemCode})`,
+                  ),
+                );
+                return false;
+              }
+              // Unknown scale PLU for a profile-17 shape → fall through to SKU/barcode path
+              // so ordinary EANs that happen to start with 27 still work with flag ON.
+              if (!(scaleErr instanceof ApiError && scaleErr.statusCode === 404)) {
+                notifyError(
+                  tr(
+                    `Tərəzi məhsulu tapılmadı (${decoded.itemCode})`,
+                    `Scale product not found (${decoded.itemCode})`,
+                  ),
+                );
+                return false;
+              }
             }
-          }
-          if (
+          } else if (
             decoded.reason === "bad_checksum" ||
             decoded.reason === "zero_weight" ||
             decoded.reason === "profile_disabled" ||
             decoded.reason === "bad_length"
           ) {
-            notifyError(
-              tr(
-                decoded.reason === "bad_checksum"
-                  ? "Etiket barkodu etibarsızdır (yoxlama rəqəmi)"
-                  : decoded.reason === "zero_weight"
-                    ? "Etiketdə çəki sıfırdır"
-                    : "Bu barkod profili aktiv deyil",
-                decoded.reason === "bad_checksum"
-                  ? "Invalid scale barcode (checksum)"
-                  : decoded.reason === "zero_weight"
-                    ? "Scale label has zero weight"
-                    : "This barcode profile is not enabled",
-              ),
-            );
+            const msg =
+              decoded.reason === "bad_checksum"
+                ? tr(
+                    "Etiket barkodu etibarsızdır (yoxlama rəqəmi)",
+                    "Invalid scale barcode (checksum)",
+                  )
+                : decoded.reason === "zero_weight"
+                  ? tr("Etiketdə çəki sıfırdır", "Scale label has zero weight")
+                  : decoded.reason === "bad_length"
+                    ? tr("Etiket barkodu uzunluğu səhvdir", "Invalid scale barcode length")
+                    : tr(
+                        "Bu barkod profili aktiv deyil",
+                        "This barcode profile is not enabled",
+                      );
+            notifyError(msg);
             return false;
           }
           // not_scale_barcode → existing path below
