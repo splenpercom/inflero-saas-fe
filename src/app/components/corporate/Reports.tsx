@@ -59,6 +59,7 @@ import {
   type DateRangePreset,
 } from "../../lib/reportMappers";
 import { notifyFromError } from "../../lib/toast";
+import { formatBxgxQty } from "../../../modules/loyalty/bxgxFormat";
 
 const CATEGORY_PIE_COLORS = ["#14b8a6", "#0d9488", "#5c85ff", "#85a3ff", "#adc2ff", "#94a3b8", "#64748b"];
 
@@ -784,7 +785,7 @@ export function Reports() {
                             <p className="text-[10px] text-gray-400">{p.sku}</p>
                           </div>
                           <span className="text-xs font-bold text-red-600 dark:text-red-400 whitespace-nowrap ml-2">
-                            {p.quantity} {pt("left", "qaldı")}
+                            {formatBxgxQty(p.quantity)} {pt("left", "qaldı")}
                           </span>
                         </div>
                         <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -799,7 +800,7 @@ export function Reports() {
                           />
                         </div>
                         <p className="text-[9px] text-gray-400 mt-1">
-                          {pt("Min", "Min")}: {p.quantityAlert}
+                          {pt("Min", "Min")}: {formatBxgxQty(p.quantityAlert)}
                         </p>
                       </div>
                     ))}

@@ -53,6 +53,7 @@ import {
 } from "../../lib/dashboardMappers";
 
 import { pickLang } from "../../i18n/pickLang";
+import { formatBxgxQty } from "../../../modules/loyalty/bxgxFormat";
 type ChartRange = "1M" | "3M" | "6M";
 
 function chartMonthCount(range: ChartRange): number {
@@ -637,7 +638,7 @@ export function NewDashboard() {
                       <p className="text-[10px] text-gray-400">{p.sku}</p>
                     </div>
                     <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
-                      {p.quantity} {tr("left", "qaldı")}
+                      {formatBxgxQty(p.quantity)} {tr("left", "qaldı")}
                     </span>
                   </div>
                   <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -647,7 +648,7 @@ export function NewDashboard() {
                     />
                   </div>
                   <p className="text-[9px] text-gray-400 mt-1">
-                    {tr("Min", "Min")}: {p.quantityAlert}
+                    {tr("Min", "Min")}: {formatBxgxQty(p.quantityAlert)}
                   </p>
                 </div>
               ))}
