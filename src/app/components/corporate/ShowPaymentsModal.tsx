@@ -7,7 +7,7 @@ import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { fetchPosOrder, type PosOrderDetail } from "../../api/sales";
 import { voidFinancePayment } from "../../api/finance";
 import {
-  isCardPaymentMethod,
+  isOmniFiscalPaymentMethod,
   retryFiscalizeCardSale,
 } from "../../lib/omnicashier/fiscalize";
 import { isOmnicashierConfigured } from "../../lib/omnicashierSettings";
@@ -261,7 +261,7 @@ export function ShowPaymentsModal({
                           const fl = fiscalLabel(payment.fiscalStatus);
                           const canRetryFiscal =
                             omniOn &&
-                            isCardPaymentMethod(payment.method) &&
+                            isOmniFiscalPaymentMethod(payment.method) &&
                             (payment.fiscalStatus === "FAILED" ||
                               payment.fiscalStatus === "NONE" ||
                               payment.fiscalStatus === "PENDING" ||

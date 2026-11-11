@@ -1159,6 +1159,7 @@ export function CreateProduct({
                     <DateInput
                       value={expiryDate}
                       onChange={setExpiryDate}
+                      allowFuture
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       placeholder={pt("datePlaceholder")}
                     />

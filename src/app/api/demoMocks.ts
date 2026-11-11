@@ -718,7 +718,7 @@ function reportsOverviewResult() {
     totalIncome: "4500.00",
     totalExpenses: "1200.00",
     profit: "3300.00",
-    totalOrders: "4500.00",
+    totalOrders: "128",
     paid: "3900.00",
     unpaid: "600.00",
     paymentType: { cash: 55, card: 45 },

@@ -15,6 +15,7 @@ import {
   type SubCategoryRecord,
   type UnitRecord,
 } from "../api/inventory";
+import { parseLocaleNumber, roundToMaxDp } from "./numericInput";
 
 /** Canonical spreadsheet columns matching create/edit product fields (export ↔ import). */
 export const PRODUCT_FILE_COLUMNS = [
@@ -321,16 +322,18 @@ export function downloadProductDemoCsv(options?: { stockEnabled?: boolean }) {
   downloadProductExportCsv(demo, "demo_products.csv", { stockEnabled });
 }
 
-function parseOptionalInt(raw: string): number | null {
-  if (!raw.trim()) return null;
-  const n = Number.parseInt(raw.replace(/[^\d-]/g, ""), 10);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+/** Qty / alert: locale decimals (14,554 → 14.554), max 3 dp. */
+function parseOptionalQty(raw: string): number | null {
+  const n = parseLocaleNumber(raw);
+  if (n == null || n < 0) return null;
+  return roundToMaxDp(n, 3);
 }
 
+/** Money / percent: locale decimals (same comma/dot rules as qty). */
 function parseOptionalNumber(raw: string): number | null {
-  if (!raw.trim()) return null;
-  const n = Number(raw.trim().replace(/,/g, ""));
-  return Number.isFinite(n) ? n : null;
+  const n = parseLocaleNumber(raw);
+  if (n == null) return null;
+  return roundToMaxDp(n, 3);
 }
 
 function mapDiscountType(raw: string): "PERCENTAGE" | "FIXED" | null {
@@ -478,8 +481,8 @@ export async function parseProductImportFile(file: File): Promise<ProductImportR
       discountValue: get("discountValue"),
       taxType: get("taxType"),
       taxPercent: get("taxPercent"),
-      quantity: parseOptionalInt(get("quantity")),
-      quantityAlert: parseOptionalInt(get("quantityAlert")),
+      quantity: parseOptionalQty(get("quantity")),
+      quantityAlert: parseOptionalQty(get("quantityAlert")),
       manufacturer: get("manufacturer"),
       warranty: get("warranty"),
       manufacturedDate: get("manufacturedDate"),

@@ -920,7 +920,7 @@ export function EditProduct() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">{pt("expiryDate")}</label>
-                    <DateInput value={expiryDate} onChange={setExpiryDate} placeholder={pt("datePlaceholder")} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
+                    <DateInput value={expiryDate} onChange={setExpiryDate} allowFuture placeholder={pt("datePlaceholder")} className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white dark:bg-gray-900" />
                   </div>
                 </div>
               </div>

@@ -1,8 +1,8 @@
 /**
- * Map Inflero PosOrder + CARD Payment amount → OmniCashier sale document body.
+ * Map Inflero PosOrder + CASH/CARD Payment amount → OmniCashier sale document body.
  *
- * Catalog unit prices stay on the slip; order discount / partial CARD payments
- * are expressed via per-line `discount` so Σ(itemSum − discount) === paymentAmount.
+ * Order discount / partial payments are baked into unit prices
+ * (discount = 0) so every line satisfies itemSum === price×qty (Omni 614).
  */
 
 import {
@@ -32,6 +32,8 @@ export type MapCardSaleInput = {
   orderTaxPercent?: number | null;
   intRef: string;
   prevDocNumber?: number | null;
+  /** CASH → cashSum; CARD/CREDIT/DEBIT → cashlessSum. */
+  tender?: "CASH" | "CARD";
 };
 
 export type OmnicashierSaleMapped = {
@@ -92,6 +94,7 @@ export function mapCardSaleToOmni(input: MapCardSaleInput): OmnicashierSaleMappe
   });
 
   const sum = sumOmniItemNets(items);
+  const isCash = input.tender === "CASH";
 
   return {
     int_ref: input.intRef.slice(0, 128),
@@ -101,8 +104,8 @@ export function mapCardSaleToOmni(input: MapCardSaleInput): OmnicashierSaleMappe
       currency: "AZN",
       items,
       sum,
-      cashSum: 0,
-      cashlessSum: sum,
+      cashSum: isCash ? sum : 0,
+      cashlessSum: isCash ? 0 : sum,
       prepaymentSum: 0,
       creditSum: 0,
       bonusSum: 0,

@@ -1,10 +1,12 @@
 /**
- * Shared Omni line allocation: keep catalog unit prices on the fiscal slip and
- * put any gap (order discount, partial payment, etc.) into the line `discount`
- * so Σ(itemSum − discount) === paymentAmount.
+ * Shared Omni line allocation for CARD sale/refund documents.
  *
- * Previously we rewrote itemPrice = share/qty which printed nonsense unit prices
- * whenever payment ≠ Σ(price×qty) (discounted orders, split card payments).
+ * OmniCashier (code 614 "invalid total sum in one item") requires
+ *   itemSum === round(itemPrice × itemQuantity)
+ * on every line. Some device firmwares also mishandle non-zero per-line
+ * `discount` on discounted Inflero orders, so we bake order discount /
+ * partial-payment scaling into unit price and keep `discount` at 0 except
+ * for ≤0.02 rounding residuals.
  */
 
 import { sanitizeOmniItemName } from "./charset";
@@ -37,67 +39,134 @@ export function round3(n: number): number {
   return Math.round((n + Number.EPSILON) * 1000) / 1000;
 }
 
+/** Omni-style fixed-point: price cents × qty milli → money (2 dp). */
+export function omniPriceQtySum(price: number, qty: number): number {
+  const cents = Math.round(round2(price) * 100);
+  const milli = Math.round(round3(qty) * 1000);
+  return Math.round((cents * milli) / 1000) / 100;
+}
+
 function lineNet(it: OmniAllocItem): number {
   return round2(it.itemSum - it.discount);
 }
 
 /**
- * OmniCashier rejects lines when itemSum ≠ round(itemPrice × itemQuantity)
- * ("invalid total sum in one item", code 614). Always keep that identity and
- * express the desired net via discount (sum − discount).
+ * Force a line to a target net while keeping itemSum === price×qty.
+ * Prefer adjusting unit price (discount ≈ 0) — avoids Omni 614 on discounted slips.
  */
 export function setLineToNet(it: OmniAllocItem, targetNet: number): void {
   const want = round2(Math.max(0, targetNet));
-  const qty = it.itemQuantity;
+  const qty = round3(it.itemQuantity);
 
   if (!(qty > 0)) {
+    it.itemQuantity = 1;
     it.itemPrice = want;
     it.itemSum = want;
     it.discount = 0;
     return;
   }
 
-  let price = round2(it.itemPrice);
-  let sum = round2(price * qty);
+  it.itemQuantity = qty;
 
-  // Need a higher gross than current catalog sum can provide.
-  if (sum + 0.001 < want) {
-    price = round2(want / qty);
-    sum = round2(price * qty);
-    // round2(price×qty) can land below want (e.g. 10/3 → 3.33×3 = 9.99).
-    // Fractional qty may need several 0.01 bumps before round2(price×qty) moves.
-    let guard = 0;
-    while (sum + 0.001 < want && guard++ < 1000) {
-      price = round2(price + 0.01);
-      sum = round2(price * qty);
+  // Derive unit price from desired net so discounted orders don't need line discount.
+  let price = round2(want / qty);
+  let sum = omniPriceQtySum(price, qty);
+
+  // If fixed-point sum undershoots, bump price by 0.01 until sum >= want (or closest).
+  let guard = 0;
+  while (sum + 0.001 < want && guard++ < 1000) {
+    price = round2(price + 0.01);
+    sum = omniPriceQtySum(price, qty);
+  }
+
+  // If we overshot by more than a cent, try one step down when it still covers want.
+  if (sum > want + 0.011) {
+    const lower = round2(price - 0.01);
+    if (lower > 0) {
+      const lowerSum = omniPriceQtySum(lower, qty);
+      if (lowerSum + 0.001 >= want) {
+        price = lower;
+        sum = lowerSum;
+      }
     }
   }
 
   it.itemPrice = price;
   it.itemSum = sum;
+  // Residual only (normally 0). Never leave sum ≠ price×qty.
   it.discount = Math.max(0, round2(sum - want));
+  if (it.discount > it.itemSum) it.discount = it.itemSum;
+}
+
+/** Final repair: every line must satisfy Omni 614 invariant. */
+export function assertOmniLineSums(items: OmniAllocItem[]): void {
+  for (const it of items) {
+    const expect = omniPriceQtySum(it.itemPrice, it.itemQuantity);
+    if (Math.abs(expect - it.itemSum) > 0.001) {
+      it.itemSum = expect;
+    }
+    if (it.discount > it.itemSum) it.discount = it.itemSum;
+    if (it.discount < 0) it.discount = 0;
+  }
 }
 
 /**
- * Adjust discounts (preferred) so Σ(itemSum − discount) === targetNet.
- * Falls back to setLineToNet (keeps Omni itemSum === price×qty invariant).
+ * Eliminate residual per-line `discount` (even ≤¢2) by moving cents to a
+ * neighbor line, or collapsing the line to qty=1 @ net. Keeps 614 invariant.
+ */
+export function zeroLineDiscounts(items: OmniAllocItem[]): void {
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i]!;
+    const residual = round2(it.discount);
+    if (!(residual > 0)) {
+      it.discount = 0;
+      continue;
+    }
+
+    const wantNet = round2(it.itemSum - residual);
+    let moved = false;
+    for (let j = items.length - 1; j >= 0; j--) {
+      if (j === i) continue;
+      const other = items[j]!;
+      const otherNet = lineNet(other);
+      if (otherNet > residual + 0.009) {
+        it.discount = 0; // keep full price×qty on this line
+        setLineToNet(other, round2(otherNet - residual));
+        moved = true;
+        break;
+      }
+    }
+    if (!moved) {
+      // Single-line or neighbors too small — exact net via qty 1.
+      it.itemQuantity = 1;
+      it.itemQuantityType = 0;
+      it.itemPrice = wantNet;
+      it.itemSum = wantNet;
+      it.discount = 0;
+    }
+  }
+
+  // setLineToNet on neighbors can recreate tiny residuals — force clean.
+  for (const it of items) {
+    if (!(it.discount > 0)) {
+      it.discount = 0;
+      continue;
+    }
+    const wantNet = lineNet(it);
+    it.itemQuantity = 1;
+    it.itemQuantityType = 0;
+    it.itemPrice = wantNet;
+    it.itemSum = wantNet;
+    it.discount = 0;
+  }
+}
+
+/**
+ * Adjust nets so Σ(itemSum − discount) === target. Prefer rewriting price
+ * (setLineToNet) over growing line discounts — safer for Omni 614.
  */
 export function absorbNetDrift(items: OmniAllocItem[], drift: number): void {
   if (Math.abs(drift) < 0.01 || items.length === 0) return;
-
-  const tryDiscount = (idx: number, d: number): boolean => {
-    const it = items[idx]!;
-    const nextDisc = round2(it.discount - d);
-    // d>0 → need higher net → lower discount; d<0 → higher discount
-    if (nextDisc < -0.001) return false;
-    if (nextDisc > it.itemSum + 0.001) return false;
-    it.discount = Math.max(0, nextDisc);
-    return true;
-  };
-
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (tryDiscount(i, drift)) return;
-  }
 
   for (let i = items.length - 1; i >= 0; i--) {
     const it = items[i]!;
@@ -143,7 +212,7 @@ type BasisRow = {
  *
  * 1) Build the full-order net basket (catalog prices − order discount + fee lines).
  * 2) Scale that basket so Σ net === this payment (full or partial CARD).
- * Catalog unit prices stay on product lines; gaps go into `discount`.
+ * 3) Emit lines with unit prices baked to those nets (discount≈0) so Omni 614 passes.
  */
 export function allocateCatalogLinesToPayment(opts: {
   paymentAmount: number;
@@ -165,13 +234,17 @@ export function allocateCatalogLinesToPayment(opts: {
   if (!(pay > 0)) return [];
 
   const vatPercent = opts.vatPercent;
-  const raw = (opts.items ?? []).filter((it) => Number(it.quantity) > 0);
+  const raw = (opts.items ?? []).filter((it) => {
+    const qty = Number(it.quantity);
+    const price = Number(it.unitPrice);
+    // Skip free / zero lines — Omni rejects zero-sum items; BXGX free lines are $0.
+    return qty > 0 && Number.isFinite(price) && price > 0;
+  });
   if (raw.length === 0) {
     return singlePaymentLine(pay, vatPercent, opts.emptyLabel || "Payment", opts.emptyCode || "PAY");
   }
 
   const products: BasisRow[] = raw.map((it) => {
-    // Same qty sent to Omni (3 dp) — gross must use it so itemSum === price×qty.
     const qty = round3(Number(it.quantity));
     const unitPrice = round2(Number(it.unitPrice));
     return {
@@ -179,7 +252,7 @@ export function allocateCatalogLinesToPayment(opts: {
       sku: String(it.sku || "").slice(0, 32),
       qty,
       unitPrice,
-      gross: round2(unitPrice * qty),
+      gross: omniPriceQtySum(unitPrice, qty),
       codeType: 0,
     };
   });
@@ -202,7 +275,6 @@ export function allocateCatalogLinesToPayment(opts: {
   const hourly = round2(Math.max(0, Number(opts.hourlyCharge ?? 0) || 0));
   const explicitFees = round2(shipping + serviceFee + hourly);
 
-  // Prefer explicit discount/fees; otherwise infer a single gap from grand total.
   let orderDiscount = explicitDiscount;
   let feeParts: { name: string; code: string; amount: number }[] = [];
   if (explicitFees > 0.009) {
@@ -212,7 +284,6 @@ export function allocateCatalogLinesToPayment(opts: {
   }
   if (orderDiscount == null) {
     if (orderGt > 0 && feeParts.length === 0) {
-      // Infer: gap below merchandise → discount; gap above → one fee line.
       if (orderGt < merchSum - 0.009) orderDiscount = round2(merchSum - orderGt);
       else if (orderGt > merchSum + 0.009) {
         feeParts = [
@@ -225,14 +296,12 @@ export function allocateCatalogLinesToPayment(opts: {
         orderDiscount = 0;
       } else orderDiscount = 0;
     } else if (orderGt > 0 && feeParts.length > 0) {
-      // merch - discount + fees ≈ grandTotal
       orderDiscount = round2(Math.max(0, merchSum + explicitFees - orderGt));
     } else {
       orderDiscount = 0;
     }
   }
 
-  // Full-order product nets after proportional discount allocation.
   const productNets: number[] = [];
   let discAllocated = 0;
   const discTotal = Math.min(orderDiscount ?? 0, merchSum);
@@ -266,7 +335,6 @@ export function allocateCatalogLinesToPayment(opts: {
 
   const fullNetSum = round2(fullRows.reduce((a, r) => a + r.fullNet, 0));
 
-  // Scale full-order nets → this payment (weights follow post-discount basket).
   const nets: number[] = [];
   let allocated = 0;
   for (let i = 0; i < fullRows.length; i++) {
@@ -282,32 +350,22 @@ export function allocateCatalogLinesToPayment(opts: {
   for (let i = 0; i < fullRows.length; i++) {
     const row = fullRows[i]!;
     const net = nets[i]!;
-    if (net <= 0 && row.gross <= 0) continue;
+    if (!(net > 0)) continue;
 
-    const qty = round3(row.qty);
     const draft: OmniAllocItem = {
       itemName: sanitizeOmniItemName(row.name),
       itemCodeType: row.codeType,
       itemCode: row.sku || "0",
       itemQuantityType: 0,
-      itemQuantity: qty,
+      itemQuantity: round3(row.qty),
       itemPrice: row.unitPrice,
       itemSum: row.gross,
       itemVatPercent: vatPercent,
       discount: 0,
     };
-
-    // Catalog path: keep unit price / gross when net ≤ gross; otherwise lift
-    // price×qty via setLineToNet (never leave itemSum ≠ price×qty — Omni 614).
-    if (draft.itemSum > 0 && net <= draft.itemSum + 0.001) {
-      draft.discount = Math.max(0, round2(draft.itemSum - net));
-    } else if (net > 0) {
-      setLineToNet(draft, net);
-    } else {
-      continue;
-    }
-
-    if (draft.itemSum <= 0 && net <= 0) continue;
+    // Always bake net into unit price — avoids Omni 614 on discounted orders.
+    setLineToNet(draft, net);
+    if (draft.itemSum <= 0) continue;
     items.push(draft);
   }
 
@@ -317,6 +375,21 @@ export function allocateCatalogLinesToPayment(opts: {
 
   const netSum = round2(items.reduce((a, it) => a + lineNet(it), 0));
   absorbNetDrift(items, round2(pay - netSum));
+  assertOmniLineSums(items);
+
+  // Eliminate residual line discounts (including ≤¢2), then re-pin payment total.
+  for (let pass = 0; pass < 3; pass++) {
+    zeroLineDiscounts(items);
+    assertOmniLineSums(items);
+    const nets = round2(items.reduce((a, it) => a + lineNet(it), 0));
+    const drift = round2(pay - nets);
+    if (Math.abs(drift) < 0.01) break;
+    absorbNetDrift(items, drift);
+    assertOmniLineSums(items);
+  }
+  zeroLineDiscounts(items);
+  assertOmniLineSums(items);
+
   return items;
 }
 

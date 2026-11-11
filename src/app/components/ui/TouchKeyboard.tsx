@@ -14,6 +14,12 @@ export type TouchKeyboardProps = {
   title?: string;
   /** When mode is numpad, allow leading "-" (e.g. optics SPH/CYL). */
   allowNegative?: boolean;
+  /**
+   * Mimic select-all: next digit/decimal replaces `value` instead of appending.
+   * Cleared after the first input (parent should set replaceNext false via callback).
+   */
+  replaceNext?: boolean;
+  onReplaceNextConsumed?: () => void;
   /** Overlay z-index class; raise above modals (default z-[70]). */
   zClassName?: string;
 };
@@ -64,6 +70,8 @@ function TouchKeyboard({
   onClose,
   title,
   allowNegative = false,
+  replaceNext = false,
+  onReplaceNextConsumed,
   zClassName = "z-[70]",
 }: TouchKeyboardProps) {
   const { language } = useLanguage();
@@ -77,6 +85,10 @@ function TouchKeyboard({
   } | null>(null);
   const [pos, setPos] = useState<Pos | null>(null);
   const [shift, setShift] = useState(false);
+  const replaceNextRef = useRef(replaceNext);
+  replaceNextRef.current = replaceNext;
+  const onReplaceNextConsumedRef = useRef(onReplaceNextConsumed);
+  onReplaceNextConsumedRef.current = onReplaceNextConsumed;
 
   useEffect(() => {
     if (!open) {
@@ -111,15 +123,26 @@ function TouchKeyboard({
 
   const applyKey = useCallback(
     (key: string) => {
+      const consumeReplace = () => {
+        if (replaceNextRef.current) onReplaceNextConsumedRef.current?.();
+      };
+
       if (key === "Done") {
         onClose();
         return;
       }
       if (key === "Clear") {
         onChange("");
+        consumeReplace();
         return;
       }
       if (key === "backspace") {
+        // Select-all style: first backspace clears the whole value.
+        if (replaceNextRef.current) {
+          onChange("");
+          consumeReplace();
+          return;
+        }
         const next = value.slice(0, -1);
         onChange(
           mode === "numpad"
@@ -136,10 +159,22 @@ function TouchKeyboard({
         return;
       }
       if (key === "space") {
+        if (replaceNextRef.current) {
+          onChange(" ");
+          consumeReplace();
+          return;
+        }
         onChange(`${value} `);
         return;
       }
       if (key === "+/-" && mode === "numpad" && allowNegative) {
+        if (replaceNextRef.current) {
+          onChange(
+            sanitizeNumericTyping("-", { allowDecimal: true, allowNegative: true }),
+          );
+          consumeReplace();
+          return;
+        }
         const next = value.startsWith("-") ? value.slice(1) : `-${value}`;
         onChange(
           sanitizeNumericTyping(next, { allowDecimal: true, allowNegative: true }),
@@ -152,7 +187,9 @@ function TouchKeyboard({
         ch = letterLabel(key, shift);
       }
 
-      const next = `${value}${ch}`;
+      // Select-all style: first character replaces instead of appending.
+      const next = replaceNextRef.current ? ch : `${value}${ch}`;
+      if (replaceNextRef.current) consumeReplace();
       onChange(
         mode === "numpad"
           ? sanitizeNumericTyping(next, {

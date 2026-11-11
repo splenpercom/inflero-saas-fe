@@ -53,7 +53,7 @@ function mapProduct(row: ProductListItem): StockItem {
     category: row.category,
     sku: row.sku,
     qty: row.quantity,
-    qtyAlert: row.quantityAlert ?? 0,
+    qtyAlert: row.quantityAlert ?? 1,
   };
 }
 

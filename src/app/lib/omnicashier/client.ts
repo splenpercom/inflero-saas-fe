@@ -17,6 +17,8 @@ export type OmnicashierFiscalResult = {
   long_id: string;
   short_id: string;
   shift_document_number: number;
+  /** Present on some firmwares / get-last responses. */
+  int_ref?: string;
 };
 
 export type OmnicashierGetInfoData = {
@@ -107,11 +109,18 @@ async function postOmni(
 }
 
 function asFiscalResult(json: Json): OmnicashierFiscalResult {
+  const intRef =
+    typeof json.int_ref === "string"
+      ? json.int_ref
+      : typeof (json.data as Json | undefined)?.int_ref === "string"
+        ? String((json.data as Json).int_ref)
+        : undefined;
   return {
     document_number: Number(json.document_number ?? 0),
     long_id: String(json.long_id ?? ""),
     short_id: String(json.short_id ?? ""),
     shift_document_number: Number(json.shift_document_number ?? 0),
+    ...(intRef ? { int_ref: intRef } : {}),
   };
 }
 

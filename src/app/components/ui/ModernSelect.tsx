@@ -110,6 +110,7 @@ export function ModernSelect({
         createPortal(
           <div
             ref={portalRef}
+            data-modern-select-portal=""
             className="fixed z-[9999] bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden"
             style={{
               top: position.top,

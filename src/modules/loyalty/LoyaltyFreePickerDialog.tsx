@@ -1,5 +1,6 @@
 import { Gift, X } from "lucide-react";
 import type { LoyaltyBuyGetPreviewOffer } from "../../app/api/loyalty";
+import { bxgxProgressLabel, formatBxgxQty } from "./bxgxFormat";
 
 type ProductOption = { id: string; name: string; image?: string };
 
@@ -48,16 +49,27 @@ export function LoyaltyFreePickerDialog({
             const options = offer.allowedProductIds
               .map((id) => productsById.get(id))
               .filter((p): p is ProductOption => Boolean(p));
+            const freeLeft = formatBxgxQty(offer.redeemableFreeQty);
             return (
               <div key={offer.offerId}>
                 <p className="mb-1 text-xs font-semibold text-gray-900 dark:text-white">
                   {offer.name}
                 </p>
-                <p className="mb-2 text-[11px] text-gray-500">
-                  {tr("Pulsuz hüquq", "Free available")}: {offer.redeemableFreeQty}
+                <p className="mb-1 text-[11px] text-gray-500 dark:text-gray-400">
+                  {tr("Pulsuz hüquq", "Free available")}: {freeLeft}
+                  {" · "}
+                  {bxgxProgressLabel(offer.progressValue, offer.buyThreshold, offer.buyMetric)}
+                </p>
+                <p className="mb-2 text-[10px] text-gray-400 dark:text-gray-500">
                   {offer.progressMode === "ACCUMULATE"
-                    ? ` · ${tr("Progress", "Progress")}: ${offer.progressValue}/${offer.buyThreshold}`
-                    : ""}
+                    ? tr(
+                        "Yığılma: əvvəlki ziyarətlər + bu səbət (redaktədə cari sifariş iki dəfə sayılmır)",
+                        "Accumulate: prior visits + this cart (editing does not double-count this order)",
+                      )
+                    : tr(
+                        "Eyni satış: yalnız bu səbətdəki alış sayılır",
+                        "Same visit: only purchases in this cart count",
+                      )}
                 </p>
                 {options.length === 0 ? (
                   <p className="text-[11px] text-amber-600">

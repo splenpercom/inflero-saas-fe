@@ -89,8 +89,8 @@ import {
 import { createPosOrder, posCheckout, sendPosOrderToBar, sendPosOrderToKot, sendPosOrderToProduction, acceptQrPosOrder, approveQrAndSendToKot, fetchPendingQrPosOrderCount, fetchPendingQrPosOrders, fetchPosOrder, fetchActivePosOrderByTable, finishTableActiveOrders, recordPosOrderPayment, releaseQrPosOrder, rejectQrPosOrder, startPosOrderHourlyTimer, updatePosOrder, type OpticsPrescriptionMeta, type PendingQrPosOrderRow, type PosOrderDetail } from "../../api/sales";
 import {
   fiscalizeCardPaymentsOnOrder,
-  findUnfiscalizedCardPayments,
-  isCardPaymentMethod,
+  findUnfiscalizedOmniPayments,
+  isOmniFiscalPaymentMethod,
 } from "../../lib/omnicashier/fiscalize";
 import { isOmnicashierConfigured } from "../../lib/omnicashierSettings";
 import {
@@ -105,6 +105,7 @@ import {
   type LoyaltyDialogInfo,
 } from "../../../modules/loyalty/LoyaltyEarnRedeemDialog";
 import { LoyaltyFreePickerDialog } from "../../../modules/loyalty/LoyaltyFreePickerDialog";
+import { formatBxgxQty } from "../../../modules/loyalty/bxgxFormat";
 import { OpticsPrescriptionDialog } from "../../../modules/optics/OpticsPrescriptionDialog";
 import {
   normalizeOpticsMeta,
@@ -153,6 +154,34 @@ interface Product {
   unit?: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
+  /** From product create/edit; null/omit → POS low-stock threshold defaults to 1. */
+  quantityAlert?: number | null;
+  /** ISO date string from product create/edit; used for Expired tag. */
+  expiryDate?: string | null;
+}
+
+/** POS low-stock threshold: product alert, or 1 when none was set. */
+function posLowStockThreshold(quantityAlert?: number | null): number {
+  if (quantityAlert != null && Number.isFinite(quantityAlert) && quantityAlert >= 0) {
+    return quantityAlert;
+  }
+  return 1;
+}
+
+/** Matches Expired Products page: expiry calendar day on/before local today. */
+function isPosProductExpired(expiryDate?: string | null): boolean {
+  if (!expiryDate) return false;
+  const ymd = expiryDate.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+    const now = new Date();
+    const todayYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return ymd <= todayYmd;
+  }
+  const d = new Date(expiryDate);
+  if (Number.isNaN(d.getTime())) return false;
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  return d.getTime() <= endOfToday.getTime();
 }
 
 interface CartItem {
@@ -184,7 +213,7 @@ function formatCartPriceInput(raw: string | number): string {
   return sanitizeNumericTyping(String(raw), { allowDecimal: true });
 }
 
-/** Weight / scale units — POS opens price numpad on select/scan. */
+/** Weight / scale units — POS opens quantity (weight) numpad on select/scan. */
 function isWeightUnit(unit?: string | null): boolean {
   if (!unit) return false;
   const u = unit.trim().toLowerCase();
@@ -208,7 +237,8 @@ type TouchKbField =
   | "serviceFee"
   | "mileage"
   | "discount"
-  | "cartPrice";
+  | "cartPrice"
+  | "cartQty";
 
 type PaymentMethod = "cash" | "card";
 type PaymentStatusChoice = "paid" | "pending";
@@ -253,20 +283,33 @@ function PosQtyInput({
   onCommit,
   className,
   ariaLabel,
+  onFocusPad,
+  onClickPad,
+  /** When set (e.g. on-screen qty pad draft), shown instead of local/committed text. */
+  draftText,
+  /** Physical keyboard while pad is open — keep draft in sync. */
+  onDraftChange,
 }: {
   value: number;
   disabled?: boolean;
   onCommit: (qty: number) => void;
   className?: string;
   ariaLabel?: string;
+  onFocusPad?: () => void;
+  onClickPad?: () => void;
+  draftText?: string;
+  onDraftChange?: (next: string) => void;
 }) {
   const [text, setText] = useState(String(value));
+  const padDriven = draftText !== undefined;
 
   useEffect(() => {
+    if (padDriven) return;
     setText(String(value));
-  }, [value]);
+  }, [value, padDriven]);
 
   const commit = () => {
+    if (padDriven) return;
     const n = roundToMaxDp(parseNumericInput(text, NaN), 3);
     if (!Number.isFinite(n) || n <= 0) {
       setText(String(value));
@@ -281,15 +324,29 @@ function PosQtyInput({
       type="text"
       inputMode="decimal"
       disabled={disabled}
-      value={text}
+      value={padDriven ? draftText : text}
       aria-label={ariaLabel}
-      onClick={(e) => e.stopPropagation()}
-      onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) =>
-        setText(sanitizeNumericTypingMaxDp(e.target.value, 3, { allowDecimal: true }))
-      }
+      onClick={(e) => {
+        e.stopPropagation();
+        onClickPad?.();
+      }}
+      onFocus={(e) => {
+        e.currentTarget.select();
+        onFocusPad?.();
+      }}
+      onChange={(e) => {
+        const next = sanitizeNumericTypingMaxDp(e.target.value, 3, {
+          allowDecimal: true,
+        });
+        if (padDriven) {
+          onDraftChange?.(next);
+          return;
+        }
+        setText(next);
+      }}
       onBlur={commit}
       onKeyDown={(e) => {
+        if (padDriven) return;
         if (e.key === "Enter") {
           e.preventDefault();
           (e.target as HTMLInputElement).blur();
@@ -1254,6 +1311,8 @@ export function CorporatePOS() {
     pendingY: number;
   } | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
   const [savingCustomer, setSavingCustomer] = useState(false);
@@ -1328,6 +1387,10 @@ export function CorporatePOS() {
     mode: "full" | "numpad";
     field: TouchKbField;
     productId?: string;
+    /** Draft for cartQty while typing (allows empty mid-edit). */
+    buffer?: string;
+    /** Mimic input select-all: first numpad key replaces instead of appending. */
+    replaceNext?: boolean;
   }>(null);
   const openWeightPricePadRef = useRef<(productId: string) => void>(() => {});
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
@@ -1392,6 +1455,8 @@ export function CorporatePOS() {
       unit: (item.unit ?? "").trim() || undefined,
       productType: item.productType,
       trackStock: !isService,
+      quantityAlert: isService ? null : (item.quantityAlert ?? null),
+      expiryDate: isService ? null : (item.expiryDate ?? null),
     };
   }, []);
   const [customers, setCustomers] = useState<PeopleCustomer[]>([]);
@@ -1806,16 +1871,29 @@ export function CorporatePOS() {
       setEditingOriginalQtyByProduct({});
       setSuppressEditOrderUi(false);
       setPendingQrOrderId(detail.id);
+      setBxgxPickerOpen(false);
+      setBxgxOffers([]);
+      bxgxPromptedKeyRef.current = "";
       setCart(
-        detail.items.map((i) => ({
-          id: i.productId,
-          name: i.productName,
-          price: formatCartPriceInput(i.price),
-          quantity: i.quantity,
-          image: "📦",
-          productType: (i as { productType?: CartItem["productType"] }).productType,
-          trackStock: (i as { trackStock?: boolean }).trackStock !== false,
-        })),
+        detail.items.map((i) => {
+          const isFree = i.isLoyaltyFree === true;
+          return {
+            id: i.productId,
+            name: i.productName,
+            price: formatCartPriceInput(i.price),
+            quantity: i.quantity,
+            image: "📦",
+            productType: (i as { productType?: CartItem["productType"] }).productType,
+            trackStock: (i as { trackStock?: boolean }).trackStock !== false,
+            ...(isFree
+              ? {
+                  lineKey: `free:${i.loyaltyOfferId ?? ""}:${i.productId}`,
+                  isLoyaltyFree: true,
+                  loyaltyOfferId: i.loyaltyOfferId ?? null,
+                }
+              : {}),
+          };
+        }),
       );
       setSelectedTableId(detail.table?.id ?? "");
       setSelectedCustomerId(detail.customerId ?? "");
@@ -1864,6 +1942,9 @@ export function CorporatePOS() {
   const hydrateCartFromExistingOrder = useCallback(
     (detail: PosOrderDetail, opts?: { suppressEditUi?: boolean; preserveCart?: boolean }) => {
     setPendingQrOrderId(null);
+    setBxgxPickerOpen(false);
+    setBxgxOffers([]);
+    bxgxPromptedKeyRef.current = "";
     setEditingOrderId(detail.id);
     // Quiet timer sessions must not sticky-restore as "Edit Order" on next POS open.
     if (opts?.suppressEditUi) writePosEditOrderId(null);
@@ -1929,7 +2010,7 @@ export function CorporatePOS() {
                 unit: "kg",
               }
             : {}),
-          ...(orderBirmarketOn && Number.isFinite(pctRaw) && !isFree
+          ...(orderBirmarketOn && !isFree && Number.isFinite(pctRaw)
             ? { birmarketCommissionPercent: Math.min(100, Math.max(0, pctRaw)) }
             : {}),
         };
@@ -2817,13 +2898,22 @@ export function CorporatePOS() {
     const freeQty = cart
       .filter((i) => i.isLoyaltyFree && i.id === product.id)
       .reduce((s, i) => s + i.quantity, 0);
-    const nextQty = (existing ? existing.quantity : 0) + 1 + freeQty;
+    const inCartQty = existing ? existing.quantity : 0;
+    // Weight units (kg/g) can have on-hand < 1; clamp default +1 to remaining stock.
+    const remaining =
+      !isService && stockEnabled
+        ? roundToMaxDp(available - inCartQty - freeQty, 3)
+        : 1;
+    const addQty =
+      !isService && stockEnabled
+        ? roundToMaxDp(Math.min(1, Math.max(0, remaining)), 3)
+        : 1;
 
     if (!isService && stockEnabled && available <= 0) {
       warnOutOfStock(product);
       return false;
     }
-    if (!isService && stockEnabled && nextQty > available) {
+    if (!isService && stockEnabled && addQty <= 0) {
       warnInsufficientStock(product, available);
       return false;
     }
@@ -2836,7 +2926,7 @@ export function CorporatePOS() {
           !i.isLoyaltyFree && !i.scaleMeta && i.id === product.id
             ? {
                 ...i,
-                quantity: i.quantity + 1,
+                quantity: roundToMaxDp(i.quantity + addQty, 3),
                 unit: i.unit ?? product.unit,
               }
             : i,
@@ -2848,7 +2938,7 @@ export function CorporatePOS() {
           id: product.id,
           name: product.name,
           price: formatCartPriceInput(product.price),
-          quantity: 1,
+          quantity: addQty,
           image: product.image,
           unit: product.unit,
           productType: product.productType,
@@ -2875,13 +2965,20 @@ export function CorporatePOS() {
     const freeQty = cart
       .filter((i) => i.isLoyaltyFree && i.id === product.id)
       .reduce((s, i) => s + i.quantity, 0);
-    const nextQty = paidQty + freeQty + 1;
     const available = getAvailableStock(product.id, product.stock);
+    const remaining =
+      !isService && stockEnabled
+        ? roundToMaxDp(available - paidQty - freeQty, 3)
+        : 1;
+    const addQty =
+      !isService && stockEnabled
+        ? roundToMaxDp(Math.min(1, Math.max(0, remaining)), 3)
+        : 1;
     if (!isService && stockEnabled && available <= 0) {
       warnOutOfStock(product);
       return false;
     }
-    if (!isService && stockEnabled && nextQty > available) {
+    if (!isService && stockEnabled && addQty <= 0) {
       warnInsufficientStock(product, available);
       return false;
     }
@@ -2890,7 +2987,9 @@ export function CorporatePOS() {
       const existing = prev.find((i) => i.lineKey === lineKey);
       if (existing) {
         return prev.map((i) =>
-          i.lineKey === lineKey ? { ...i, quantity: i.quantity + 1 } : i,
+          i.lineKey === lineKey
+            ? { ...i, quantity: roundToMaxDp(i.quantity + addQty, 3) }
+            : i,
         );
       }
       return [
@@ -2900,7 +2999,7 @@ export function CorporatePOS() {
           lineKey,
           name: product.name,
           price: "0",
-          quantity: 1,
+          quantity: addQty,
           image: product.image,
           unit: product.unit,
           productType: product.productType,
@@ -3266,6 +3365,7 @@ export function CorporatePOS() {
     const t = window.setTimeout(() => {
       void previewBuyGetOffers({
         customerId: selectedCustomerId || null,
+        excludePosOrderId: editingOrderId || null,
         lines: cart.map((i) => ({
           productId: i.id,
           quantity: i.quantity,
@@ -3287,10 +3387,16 @@ export function CorporatePOS() {
           if (redeemableKey && redeemableKey !== bxgxPromptedKeyRef.current) {
             bxgxPromptedKeyRef.current = redeemableKey;
             setBxgxPickerOpen(true);
+          } else if (!redeemableKey) {
+            bxgxPromptedKeyRef.current = "";
+            setBxgxPickerOpen(false);
           }
         })
         .catch(() => {
-          if (!cancelled) setBxgxOffers([]);
+          if (!cancelled) {
+            setBxgxOffers([]);
+            setBxgxPickerOpen(false);
+          }
         });
     }, 350);
     return () => {
@@ -3304,6 +3410,7 @@ export function CorporatePOS() {
     canMutateCart,
     cart,
     selectedCustomerId,
+    editingOrderId,
   ]);
 
   const { handleKeyDown: handleSearchBarcodeKeyDown } = useBarcodeWedge(handleBarcodeScan);
@@ -3333,19 +3440,59 @@ export function CorporatePOS() {
     ) => {
       const fromTouch =
         lastPointerType.current === "touch" || lastPointerType.current === "pen";
-      if (force || prefersTouchKeyboard || fromTouch) {
-        setTouchKb({
+      if (!(force || prefersTouchKeyboard || fromTouch)) return;
+
+      setTouchKb((prev) => {
+        // Keep in-progress draft (e.g. backspaced empty qty) if same pad is already open.
+        if (
+          prev &&
+          prev.mode === mode &&
+          prev.field === field &&
+          (field === "cartQty" || field === "cartPrice"
+            ? prev.productId === productId
+            : true)
+        ) {
+          return prev;
+        }
+
+        // cartQty must use a string buffer so backspace can clear "1" → "".
+        let buffer: string | undefined;
+        let replaceNext = false;
+        if (field === "cartQty" && productId) {
+          const item =
+            cartRef.current.find((i) => !i.isLoyaltyFree && i.id === productId) ??
+            cartRef.current.find((i) => i.id === productId);
+          buffer = item != null ? String(item.quantity) : "";
+          // Match physical keyboard select-all on focus: first pad key replaces.
+          replaceNext = buffer.length > 0;
+        } else if (field === "cartPrice" && productId) {
+          const item = cartRef.current.find((i) => i.id === productId);
+          replaceNext = Boolean(item?.price);
+        }
+
+        return {
           mode,
           field,
-          ...(field === "cartPrice" && productId ? { productId } : {}),
-        });
-      }
+          ...((field === "cartPrice" || field === "cartQty") && productId
+            ? { productId }
+            : {}),
+          ...(buffer !== undefined ? { buffer } : {}),
+          ...(replaceNext ? { replaceNext: true } : {}),
+        };
+      });
     },
     [prefersTouchKeyboard, lastPointerType],
   );
   openWeightPricePadRef.current = (productId: string) => {
     // Force: barcode scan has no touch pointer, but weight lines need the pad on POS.
-    openTouchKb("numpad", "cartPrice", true, productId);
+    // Enter weight (qty); catalog unit price stays unless cashier edits price separately.
+    setTouchKb({
+      mode: "numpad",
+      field: "cartQty",
+      productId,
+      buffer: "",
+      replaceNext: false,
+    });
   };
 
   const removeFromCart = (lineKeyOrId: string) => {
@@ -3368,6 +3515,22 @@ export function CorporatePOS() {
     if (!Number.isFinite(next) || next <= 0) {
       setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
       return;
+    }
+
+    // Loyalty free lines: cannot exceed remaining redeemable for that offer.
+    if (item.isLoyaltyFree && item.loyaltyOfferId) {
+      const offer = bxgxOffers.find((o) => o.offerId === item.loyaltyOfferId);
+      const remaining = offer ? Math.max(0, Number(offer.redeemableFreeQty) || 0) : 0;
+      const maxFree = roundToMaxDp(item.quantity + remaining, 3);
+      if (next > maxFree) {
+        notifyWarning(
+          tr(
+            `"${item.name}" üçün yalnız ${formatBxgxQty(maxFree)} pulsuz hüquq var`,
+            `Only ${formatBxgxQty(maxFree)} free available for "${item.name}"`,
+          ),
+        );
+        next = maxFree;
+      }
     }
 
     const otherSameProductQty = cart
@@ -3480,7 +3643,17 @@ export function CorporatePOS() {
               ? discountValue
               : touchKb?.field === "cartPrice" && touchKb.productId
                 ? (cart.find((i) => i.id === touchKb.productId)?.price ?? "")
-                : "";
+                : touchKb?.field === "cartQty" && touchKb.productId
+                  ? touchKb.buffer !== undefined
+                    ? touchKb.buffer
+                    : String(
+                        (
+                          cart.find(
+                            (i) => !i.isLoyaltyFree && i.id === touchKb.productId,
+                          ) ?? cart.find((i) => i.id === touchKb.productId)
+                        )?.quantity ?? "",
+                      )
+                  : "";
 
   const handleTouchKbChange = (next: string) => {
     if (!touchKb) return;
@@ -3510,6 +3683,27 @@ export function CorporatePOS() {
             i.id === touchKb.productId ? { ...i, price: sanitized } : i,
           ),
         );
+        break;
+      }
+      case "cartQty": {
+        if (!touchKb.productId || !canMutateCart) return;
+        const sanitized = sanitizeNumericTypingMaxDp(next, 3, {
+          allowDecimal: true,
+        });
+        setTouchKb((kb) =>
+          kb ? { ...kb, buffer: sanitized, replaceNext: false } : kb,
+        );
+        const n = roundToMaxDp(parseNumericInput(sanitized, NaN), 3);
+        if (!Number.isFinite(n) || n <= 0) return;
+        const item =
+          cart.find((i) => !i.isLoyaltyFree && i.id === touchKb.productId) ??
+          cart.find((i) => i.id === touchKb.productId);
+        if (!item) return;
+        const product = products.find((p) => p.id === item.id);
+        const available = product
+          ? getAvailableStock(product.id, product.stock)
+          : undefined;
+        setQuantity(cartLineKey(item), n, available);
         break;
       }
     }
@@ -3857,7 +4051,7 @@ export function CorporatePOS() {
     });
   };
 
-  /** OmniCashier Card fiscalization — never blocks / never rolls back Inflero payment. */
+  /** OmniCashier CASH/CARD fiscalization — never blocks / never rolls back Inflero payment. */
   const maybeFiscalizeCardPayments = (detail: PosOrderDetail) => {
     void (async () => {
       if (!isOmnicashierConfigured()) return;
@@ -3870,32 +4064,35 @@ export function CorporatePOS() {
           /* use original detail */
         }
       }
-      const cardPays = (order.payments ?? []).filter((p) => isCardPaymentMethod(p.method));
-      const wantedCard =
+      const fiscalPays = (order.payments ?? []).filter((p) =>
+        isOmniFiscalPaymentMethod(p.method),
+      );
+      const wantedFiscal =
         selectedPaymentMethod === "card" ||
-        cardPays.length > 0 ||
-        isCardPaymentMethod(order.paymentMethod);
-      if (!wantedCard) return;
+        selectedPaymentMethod === "cash" ||
+        fiscalPays.length > 0 ||
+        isOmniFiscalPaymentMethod(order.paymentMethod);
+      if (!wantedFiscal) return;
 
-      if (paymentStatusChoice !== "paid" && cardPays.length === 0) {
+      if (paymentStatusChoice !== "paid" && fiscalPays.length === 0) {
         notifyWarning(
           tr(
-            "OmniCashier fiskal çap yalnız Paid + Card üçün işləyir. Statusu Paid seçin.",
-            "OmniCashier fiscal print runs only for Paid + Card. Select Paid status.",
+            "OmniCashier fiskal çap yalnız Paid + Nağd/Kart üçün işləyir. Statusu Paid seçin.",
+            "OmniCashier fiscal print runs only for Paid + Cash/Card. Select Paid status.",
           ),
         );
         return;
       }
-      if (cardPays.length === 0) {
+      if (fiscalPays.length === 0) {
         notifyWarning(
           tr(
-            "Kart ödənişi tapılmadı — OmniCashier çapı atlandı. Ödəniş metodunu Card seçin.",
-            "No card payment found — OmniCashier print skipped. Select Card as payment method.",
+            "Nağd/Kart ödənişi tapılmadı — OmniCashier çapı atlandı. Ödəniş metodunu Nağd və ya Kart seçin.",
+            "No cash/card payment found — OmniCashier print skipped. Select Cash or Card.",
           ),
         );
         return;
       }
-      if (findUnfiscalizedCardPayments(order.payments).length === 0) return;
+      if (findUnfiscalizedOmniPayments(order.payments).length === 0) return;
 
       await fiscalizeCardPaymentsOnOrder(order);
     })().catch(() => {
@@ -5142,6 +5339,13 @@ export function CorporatePOS() {
                   const qtyInCart = getCartQuantity(product.id);
                   const available = getAvailableStock(product.id, product.stock);
                   const outOfStock = !isService && stockEnabled && available <= 0;
+                  const lowStockThreshold = posLowStockThreshold(product.quantityAlert);
+                  const lowStock =
+                    !isService &&
+                    stockEnabled &&
+                    !outOfStock &&
+                    available <= lowStockThreshold;
+                  const expired = !isService && isPosProductExpired(product.expiryDate);
                   const atStockLimit =
                     !isService && stockEnabled && available > 0 && qtyInCart >= available;
                   const allowAdd = canMutateCart && !outOfStock && !productReorderMode;
@@ -5196,7 +5400,11 @@ export function CorporatePOS() {
                         ? "cursor-grab active:cursor-grabbing border-dashed border-gray-300 dark:border-gray-600 hover:border-[#14b8a6]"
                         : outOfStock || !canMutateCart
                           ? "border-red-300 dark:border-red-900/60 opacity-80 cursor-not-allowed"
-                          : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer hover:shadow-lg active:scale-95"
+                          : expired
+                            ? "border-rose-300 dark:border-rose-800 hover:border-rose-400 dark:hover:border-rose-700 cursor-pointer hover:shadow-lg active:scale-95"
+                            : lowStock
+                              ? "border-amber-300 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-700 cursor-pointer hover:shadow-lg active:scale-95"
+                              : "border-gray-200 dark:border-gray-800 hover:border-[#14b8a6] dark:hover:border-[#0f766e] cursor-pointer hover:shadow-lg active:scale-95"
                     }`}
                   >
                     {productReorderMode && (
@@ -5259,9 +5467,23 @@ export function CorporatePOS() {
                         {tr("Xidmət", "Service")}
                       </span>
                     )}
+                    {!productReorderMode && !isService && expired && !isListRow && (
+                      <span className="absolute top-1 left-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200 border border-rose-200 dark:border-rose-800">
+                        {tr("Vaxtı keçmiş", "Expired")}
+                      </span>
+                    )}
                     {!productReorderMode && !isService && stockEnabled && outOfStock && !isListRow && (
                       <span className="absolute top-1 right-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
                         {tr("Stokda yoxdur", "Out of stock")}
+                      </span>
+                    )}
+                    {!productReorderMode &&
+                      !isService &&
+                      stockEnabled &&
+                      lowStock &&
+                      !isListRow && (
+                      <span className="absolute top-1 right-1 z-10 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                        {tr("Az stok", "Low stock")}
                       </span>
                     )}
                     <div
@@ -5291,12 +5513,19 @@ export function CorporatePOS() {
                         <span className="text-xs font-bold text-[#14b8a6] dark:text-[#14b8a6] whitespace-nowrap">
                           {formatCurrency(product.price)}
                         </span>
+                        {!isService && expired && isListRow && (
+                          <span className="text-[8px] px-1 py-0.5 font-semibold uppercase tracking-wide rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200 border border-rose-200 dark:border-rose-800">
+                            {tr("Vaxtı keçmiş", "Expired")}
+                          </span>
+                        )}
                         {!isService && stockEnabled && (
                           <span
                             className={`text-[9px] px-1 py-0.5 rounded ${
                               outOfStock
                                 ? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
-                                : "text-gray-400 bg-gray-100 dark:bg-gray-800"
+                                : lowStock
+                                  ? "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20"
+                                  : "text-gray-400 bg-gray-100 dark:bg-gray-800"
                             }`}
                           >
                             {available < 1000 ? `${available}` : "∞"}
@@ -5496,7 +5725,6 @@ export function CorporatePOS() {
                       )}
                 </div>
               )}
-
               {/* Scrollable: customer fields, cart, checkout */}
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 pb-2">
                 <div className="mb-3 space-y-1.5">
@@ -5799,12 +6027,32 @@ export function CorporatePOS() {
                       product != null &&
                       available > 0 &&
                       item.quantity > available;
+                    const unitAmt = item.isLoyaltyFree
+                      ? 0
+                      : Number.isFinite(cartUnitPrice(item.price))
+                        ? cartUnitPrice(item.price)
+                        : 0;
+                    const lineTotalAmt = unitAmt * item.quantity;
+                    const freeOfferRemaining =
+                      item.isLoyaltyFree && item.loyaltyOfferId
+                        ? Math.max(
+                            0,
+                            Number(
+                              bxgxOffers.find((o) => o.offerId === item.loyaltyOfferId)
+                                ?.redeemableFreeQty,
+                            ) || 0,
+                          )
+                        : 0;
+                    const freeQtyAtCap =
+                      Boolean(item.isLoyaltyFree) && freeOfferRemaining <= 0;
 
                     return (
                     <div key={cartLineKey(item)} className={`bg-gray-50 dark:bg-gray-800/50 rounded-md px-2 py-1.5 border ${
-                      itemOutOfStock || itemExceedsStock
-                        ? "border-red-300 dark:border-red-900/60"
-                        : "border-gray-200 dark:border-gray-700"
+                      item.isLoyaltyFree
+                        ? "border-emerald-200 dark:border-emerald-900/50"
+                        : itemOutOfStock || itemExceedsStock
+                          ? "border-red-300 dark:border-red-900/60"
+                          : "border-gray-200 dark:border-gray-700"
                     }`}>
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-md bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center border border-gray-300 dark:border-gray-600 flex-shrink-0 overflow-hidden">
@@ -5856,9 +6104,7 @@ export function CorporatePOS() {
                               <span className="text-[9px] text-gray-400 tabular-nums">
                                 ₼
                                 {(
-                                  (Number.isFinite(cartUnitPrice(item.price))
-                                    ? cartUnitPrice(item.price)
-                                    : 0) *
+                                  unitAmt *
                                   item.quantity *
                                   ((item.birmarketCommissionPercent != null &&
                                   Number.isFinite(item.birmarketCommissionPercent)
@@ -5870,7 +6116,7 @@ export function CorporatePOS() {
                             </div>
                           )}
                           {canEditLinePrice ? (
-                            <div className="flex items-center gap-1 mt-0.5">
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                               <input
                                 type="text"
                                 inputMode="decimal"
@@ -5895,20 +6141,32 @@ export function CorporatePOS() {
                                 className="w-20 px-1.5 py-0.5 text-[11px] font-semibold text-[#14b8a6] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-40"
                                 aria-label={
                                   weightLine
-                                    ? tr("Çəki qiyməti", "Weight price")
+                                    ? tr("Vahid qiymət", "Unit price")
                                     : tr("Qiymət", "Price")
                                 }
                               />
                               <span className="text-[9px] text-gray-400">
                                 ₼{weightLine && lineUnit ? `/${lineUnit}` : ""}
                               </span>
+                              <span className="text-[9px] text-gray-500 tabular-nums">
+                                = {formatCurrency(lineTotalAmt)}
+                              </span>
                             </div>
                           ) : (
-                            <p className="text-[11px] font-semibold text-[#14b8a6] dark:text-[#14b8a6] leading-tight">
-                              {formatCurrency(
-                                Number.isFinite(cartUnitPrice(item.price))
-                                  ? cartUnitPrice(item.price)
-                                  : 0,
+                            <p
+                              className={`text-[11px] font-semibold leading-tight ${
+                                item.isLoyaltyFree
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-[#14b8a6] dark:text-[#14b8a6]"
+                              }`}
+                            >
+                              {item.isLoyaltyFree
+                                ? tr("₼0 (pulsuz)", "₼0 (free)")
+                                : formatCurrency(unitAmt)}
+                              {!item.isLoyaltyFree && (
+                                <span className="ml-1 text-[9px] font-medium text-gray-500 tabular-nums">
+                                  = {formatCurrency(lineTotalAmt)}
+                                </span>
                               )}
                             </p>
                           )}
@@ -5938,13 +6196,49 @@ export function CorporatePOS() {
                               value={item.quantity}
                               disabled={!canMutateCart}
                               onCommit={(qty) => setQuantity(cartLineKey(item), qty, available)}
-                              ariaLabel={tr("Miqdar", "Quantity")}
-                              className="text-[11px] font-medium text-gray-900 dark:text-white px-0.5 w-8 min-w-[1.5rem] text-center bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-[#14b8a6] rounded disabled:opacity-40"
+                              onFocusPad={() =>
+                                openTouchKb("numpad", "cartQty", false, item.id)
+                              }
+                              onClickPad={() =>
+                                openTouchKb("numpad", "cartQty", true, item.id)
+                              }
+                              draftText={
+                                touchKb?.field === "cartQty" &&
+                                touchKb.productId === item.id &&
+                                touchKb.buffer !== undefined
+                                  ? touchKb.buffer
+                                  : undefined
+                              }
+                              onDraftChange={(next) => {
+                                if (
+                                  !touchKb ||
+                                  touchKb.field !== "cartQty" ||
+                                  touchKb.productId !== item.id
+                                ) {
+                                  return;
+                                }
+                                handleTouchKbChange(next);
+                              }}
+                              ariaLabel={
+                                weightLine
+                                  ? tr("Çəki / Miqdar", "Weight / Qty")
+                                  : tr("Miqdar", "Quantity")
+                              }
+                              className={`text-[11px] font-medium text-gray-900 dark:text-white px-0.5 text-center bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-[#14b8a6] rounded disabled:opacity-40 ${
+                                weightLine ? "w-12 min-w-[2.5rem]" : "w-8 min-w-[1.5rem]"
+                              }`}
                             />
                             <button
                               type="button"
                               onClick={() => updateQuantity(cartLineKey(item), 1, available)}
-                              disabled={!canMutateCart || (!isService && stockEnabled && available > 0 && item.quantity >= available)}
+                              disabled={
+                                !canMutateCart ||
+                                freeQtyAtCap ||
+                                (!isService &&
+                                  stockEnabled &&
+                                  available > 0 &&
+                                  item.quantity >= available)
+                              }
                               className="p-0.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               aria-label={tr("Artır", "Increase quantity")}
                             >
@@ -6740,6 +7034,10 @@ export function CorporatePOS() {
           value={touchKbValue}
           onChange={handleTouchKbChange}
           onClose={() => setTouchKb(null)}
+          replaceNext={Boolean(touchKb.replaceNext)}
+          onReplaceNextConsumed={() =>
+            setTouchKb((kb) => (kb ? { ...kb, replaceNext: false } : kb))
+          }
           title={
             touchKb.field === "search"
               ? tr("Axtarış", "Search")
@@ -6751,7 +7049,9 @@ export function CorporatePOS() {
                     ? tr("Km göstərici", "Mileage")
                     : touchKb.field === "cartPrice"
                       ? tr("Qiymət", "Price")
-                      : tr("Endirim", "Discount")
+                      : touchKb.field === "cartQty"
+                        ? tr("Çəki / Miqdar", "Weight / Qty")
+                        : tr("Endirim", "Discount")
           }
         />
       )}

@@ -221,12 +221,12 @@ export function CreateBuyGetOfferModal({
               <p className="mt-1 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
                 {progressMode === "ACCUMULATE"
                   ? tr(
-                      "Yığılma: müştəri alışları bir neçə ziyarətdə toplanır; həddə çatanda pulsuz məhsul verilir.",
-                      "Accumulate: purchases build across visits until the threshold is met, then free items unlock.",
+                      "Yığılma: müştəri alışları bir neçə ziyarətdə toplanır; həddə çatanda pulsuz məhsul verilir. Sifarişi redaktə edəndə eyni sətirlər iki dəfə sayılmır.",
+                      "Accumulate: purchases build across visits until the threshold unlocks free items. Editing an order does not double-count the same lines.",
                     )
                   : tr(
-                      "Eyni satış: pulsuz məhsul yalnız bu sifarişdə Al X tamamlananda verilir; progress saxlanmır.",
-                      "Same visit: free items unlock only when Buy X is completed in this order; progress is not kept.",
+                      "Eyni satış: pulsuz məhsul yalnız bu səbətdə Al X tamamlananda verilir; digər ziyarətlərdən progress saxlanmır.",
+                      "Same visit: free items unlock only when Buy X is completed in this cart; progress is not kept across visits.",
                     )}
               </p>
             </div>

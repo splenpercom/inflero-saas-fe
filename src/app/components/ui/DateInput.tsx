@@ -26,10 +26,16 @@ interface DateInputProps {
    * Default 0 = today (filters / expense dates). Pass ~25–30 for DOB fields.
    */
   defaultYearsAgo?: number;
+  /**
+   * Allow selecting / typing dates after today (e.g. product expiry).
+   * Default false keeps report/expense/DOB pickers capped at today.
+   */
+  allowFuture?: boolean;
 }
 
 const CALENDAR_ESTIMATED_HEIGHT = 360;
 const MIN_YEAR_OFFSET = 100;
+const MAX_FUTURE_YEAR_OFFSET = 50;
 
 function startOfDay(d: Date) {
   const x = new Date(d);
@@ -44,6 +50,7 @@ export function DateInput({
   required,
   className = "",
   defaultYearsAgo = 0,
+  allowFuture = false,
 }: DateInputProps) {
   const { language } = useLanguage();
   const [showCalendar, setShowCalendar] = useState(false);
@@ -57,6 +64,7 @@ export function DateInput({
   const today = useMemo(() => startOfDay(new Date()), []);
   const currentYear = today.getFullYear();
   const minYear = currentYear - MIN_YEAR_OFFSET;
+  const maxYear = allowFuture ? currentYear + MAX_FUTURE_YEAR_OFFSET : currentYear;
 
   const formatPlaceholder = pickLang(language, "GG/AA/İİİİ", "DD/MM/YYYY");
 
@@ -76,9 +84,9 @@ export function DateInput({
 
   const yearOptions = useMemo(() => {
     const years: number[] = [];
-    for (let y = currentYear; y >= minYear; y--) years.push(y);
+    for (let y = maxYear; y >= minYear; y--) years.push(y);
     return years;
-  }, [currentYear, minYear]);
+  }, [maxYear, minYear]);
 
   const selectedDate = useMemo(() => {
     if (!value) return null;
@@ -119,6 +127,13 @@ export function DateInput({
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
       if (anchorRef.current?.contains(target) || calendarRef.current?.contains(target)) return;
+      // Month/year ModernSelect options are portaled to document.body — don't close calendar.
+      if (
+        target instanceof Element &&
+        target.closest("[data-modern-select-portal]")
+      ) {
+        return;
+      }
       setShowCalendar(false);
     }
     if (showCalendar) {
@@ -151,9 +166,10 @@ export function DateInput({
     if (val.length === 10) {
       try {
         const parsedDate = parse(val, "dd/MM/yyyy", new Date());
-        if (isValid(parsedDate) && startOfDay(parsedDate) <= today) {
-          onChange(format(parsedDate, "yyyy-MM-dd"));
-        }
+        if (!isValid(parsedDate)) return;
+        const picked = startOfDay(parsedDate);
+        if (!allowFuture && picked > today) return;
+        onChange(format(parsedDate, "yyyy-MM-dd"));
       } catch {
         /* invalid */
       }
@@ -172,7 +188,7 @@ export function DateInput({
 
   const handleDayClick = (day: number) => {
     const picked = startOfDay(new Date(viewYear, viewMonth, day));
-    if (picked > today) return;
+    if (!allowFuture && picked > today) return;
     onChange(format(picked, "yyyy-MM-dd"));
     setShowCalendar(false);
   };
@@ -183,7 +199,8 @@ export function DateInput({
     selectedDate.getMonth() === viewMonth &&
     selectedDate.getDate() === day;
 
-  const isDayDisabled = (day: number) => startOfDay(new Date(viewYear, viewMonth, day)) > today;
+  const isDayDisabled = (day: number) =>
+    !allowFuture && startOfDay(new Date(viewYear, viewMonth, day)) > today;
 
   const calendarPanel = showCalendar ? (
     <div
