@@ -229,7 +229,10 @@ export function NewDashboard() {
     {
       label: tr("Total Expenses", "Ümumi Xərclər"),
       value: formatMoney(totals?.approvedExpenses),
-      sub: tr("Approved expenses", "Təsdiqlənmiş xərclər"),
+      sub: tr(
+        "Approved (incl. paid purchases)",
+        "Təsdiqlənmiş (ödənilmiş satınalmalar daxil)",
+      ),
       trend: "up" as const,
       icon: CreditCard,
       color: "from-red-500 to-red-600",
