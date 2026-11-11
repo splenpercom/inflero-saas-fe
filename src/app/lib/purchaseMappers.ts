@@ -19,6 +19,9 @@ export type PurchasesListQuery = {
   status?: string;
   paymentStatus?: string;
   sortBy?: string;
+  /** ISO range; when both set, backend prefers these over sortBy. */
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   pageSize?: number;
   limit?: number;
@@ -32,6 +35,8 @@ export function purchasesListQueryString(q: PurchasesListQuery = {}): string {
   if (q.paymentStatus && q.paymentStatus !== "all") params.set("paymentStatus", q.paymentStatus);
   // Always send sortBy when set — including "all" (backend default used to be last90days).
   if (q.sortBy) params.set("sortBy", q.sortBy);
+  if (q.dateFrom) params.set("dateFrom", q.dateFrom);
+  if (q.dateTo) params.set("dateTo", q.dateTo);
   if (q.page) params.set("page", String(q.page));
   if (q.pageSize) params.set("pageSize", String(q.pageSize));
   if (q.limit) params.set("limit", String(q.limit));

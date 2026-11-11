@@ -21,8 +21,8 @@ interface LineItem {
   key: string;
   productId: string | null;
   description: string;
-  quantity: number | "";
-  unitPrice: number | "";
+  quantity: string;
+  unitPrice: string;
 }
 
 interface CreateInvoiceModalProps {
@@ -36,7 +36,7 @@ function emptyLine(): LineItem {
     key: crypto.randomUUID(),
     productId: null,
     description: "",
-    quantity: 1,
+    quantity: "1",
     unitPrice: "",
   };
 }
@@ -79,10 +79,10 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
 
   const handleSelectProduct = async (productId: string, productName: string) => {
     if (!activeLineKey) return;
-    let unitPrice: number | "" = "";
+    let unitPrice = "";
     try {
       const detail = await fetchProduct(productId);
-      unitPrice = parseFloat(detail.price) || 0;
+      unitPrice = String(parseFloat(detail.price) || 0);
     } catch {
       // keep manual price
     }
@@ -259,14 +259,13 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
                   <div className="col-span-4 sm:col-span-2">
                     <input
                       type="text"
-                      inputMode="numeric"
-                      value={line.quantity === "" ? "" : line.quantity}
-                      onChange={(e) => {
-                        const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
+                      inputMode="decimal"
+                      value={line.quantity}
+                      onChange={(e) =>
                         updateLine(line.key, {
-                          quantity: s === "" ? "" : Number(s),
-                        });
-                      }}
+                          quantity: sanitizeNumericTypingMaxDp(e.target.value, 3),
+                        })
+                      }
                       className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       placeholder={tr("Miqdar", "Qty")}
                     />
@@ -275,15 +274,14 @@ export function CreateInvoiceModal({ isOpen, onClose, onSaved }: CreateInvoiceMo
                     <input
                       type="text"
                       inputMode="decimal"
-                      value={line.unitPrice === "" ? "" : line.unitPrice}
-                      onChange={(e) => {
-                        const s = sanitizeNumericTyping(e.target.value, {
-                          allowDecimal: true,
-                        });
+                      value={line.unitPrice}
+                      onChange={(e) =>
                         updateLine(line.key, {
-                          unitPrice: s === "" ? "" : Number(s),
-                        });
-                      }}
+                          unitPrice: sanitizeNumericTyping(e.target.value, {
+                            allowDecimal: true,
+                          }),
+                        })
+                      }
                       className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       placeholder={tr("Qiymət", "Price")}
                     />

@@ -4,9 +4,12 @@ import { DateInput } from "../../ui/DateInput";
 import { ModernSelect } from "../../ui/ModernSelect";
 
 import { pickLang } from "../../../i18n/pickLang";
+/** Extended preset used by list pages that also need an unbounded “All” window. */
+export type ListDateRangePreset = DateRangePreset | "all";
+
 interface ReportDateRangeFilterProps {
-  preset: DateRangePreset;
-  onPresetChange: (preset: DateRangePreset) => void;
+  preset: ListDateRangePreset;
+  onPresetChange: (preset: ListDateRangePreset) => void;
   customFrom: string;
   customTo: string;
   onCustomFromChange: (value: string) => void;
@@ -15,6 +18,9 @@ interface ReportDateRangeFilterProps {
   includeYear?: boolean;
   /** When false, hides quarter (e.g. Today / Week / Month / Custom only). */
   includeQuarter?: boolean;
+  /** Adds “All” (no date bound) — Purchases list, etc. */
+  includeAll?: boolean;
+  minWidth?: number;
 }
 
 export function ReportDateRangeFilter({
@@ -27,6 +33,8 @@ export function ReportDateRangeFilter({
   className = "",
   includeYear = true,
   includeQuarter = true,
+  includeAll = false,
+  minWidth = 140,
 }: ReportDateRangeFilterProps) {
   const { language } = useLanguage();
   const pt = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
@@ -35,9 +43,12 @@ export function ReportDateRangeFilter({
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
       <ModernSelect
         value={preset}
-        onChange={(value) => onPresetChange(value as DateRangePreset)}
-        minWidth={140}
+        onChange={(value) => onPresetChange(value as ListDateRangePreset)}
+        minWidth={minWidth}
         options={[
+          ...(includeAll
+            ? [{ value: "all", label: pt("Date: All", "Tarix: Hamısı") }]
+            : []),
           { value: "today", label: pt("Today", "Bu Gün") },
           { value: "week", label: pt("This Week", "Bu Həftə") },
           { value: "month", label: pt("This Month", "Bu Ay") },

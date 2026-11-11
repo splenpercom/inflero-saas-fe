@@ -7,7 +7,7 @@ import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
 
 import { pickLang } from "../../i18n/pickLang";
-import { asNumber, sanitizeNumericTyping } from "../../lib/numericInput";
+import { asNumber, roundToMaxDp, sanitizeNumericTyping } from "../../lib/numericInput";
 
 export interface PaymentFormData {
   date: string;
@@ -48,7 +48,7 @@ export function CreatePaymentModal({
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<{
     date: string;
-    amount: number | "";
+    amount: string;
     paymentMethod: string;
     note: string;
   }>({
@@ -203,14 +203,13 @@ export function CreatePaymentModal({
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={formData.amount === "" ? "" : formData.amount}
-                  onChange={(e) => {
-                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
+                  value={formData.amount}
+                  onChange={(e) =>
                     setFormData({
                       ...formData,
-                      amount: s === "" ? "" : Number(s),
-                    });
-                  }}
+                      amount: sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                    })
+                  }
                   className="w-full px-3 py-2 pr-12 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                   placeholder="0.00"
                   required
@@ -225,14 +224,14 @@ export function CreatePaymentModal({
               <div className="flex gap-2 mt-2">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, amount: due / 2 })}
+                  onClick={() => setFormData({ ...formData, amount: String(roundToMaxDp(due / 2, 2)) })}
                   className="px-2 py-1 text-[10px] font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
                   {tr("Yarısı", "Half")}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, amount: due })}
+                  onClick={() => setFormData({ ...formData, amount: String(roundToMaxDp(due, 2)) })}
                   className="px-2 py-1 text-[10px] font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
                   {tr("Tam Borc", "Full Due")}

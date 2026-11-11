@@ -19,6 +19,13 @@ import { useConfirm } from "../../context/ConfirmContext";
 import { cn } from "../ui/utils";
 
 import { pickLang } from "../../i18n/pickLang";
+import {
+  parseNumericInput,
+  roundToMaxDp,
+  sanitizeNumericTyping,
+  sanitizeNumericTypingMaxDp,
+} from "../../lib/numericInput";
+
 interface TransferDetailModalProps {
   transfer: StockTransferRow | null;
   onClose: () => void;
@@ -92,10 +99,16 @@ export function TransferDetailModal({ transfer, onClose, onChanged }: TransferDe
     const items = detail.items
       .map((item) => ({
         transferItemId: item.id,
-        quantity: parseInt(sellQty[item.id] ?? "0", 10),
-        unitPrice: parseFloat(sellPrice[item.id] ?? "0"),
+        quantity: roundToMaxDp(parseNumericInput(sellQty[item.id] ?? "0", NaN), 3),
+        unitPrice: parseNumericInput(sellPrice[item.id] ?? "0", NaN),
       }))
-      .filter((i) => i.quantity > 0 && i.unitPrice > 0);
+      .filter(
+        (i) =>
+          Number.isFinite(i.quantity) &&
+          i.quantity > 0 &&
+          Number.isFinite(i.unitPrice) &&
+          i.unitPrice > 0,
+      );
     if (items.length === 0) return;
     setActionLoading(true);
     try {
@@ -116,9 +129,9 @@ export function TransferDetailModal({ transfer, onClose, onChanged }: TransferDe
     const items = detail.items
       .map((item) => ({
         transferItemId: item.id,
-        quantity: parseInt(returnQty[item.id] ?? "0", 10),
+        quantity: roundToMaxDp(parseNumericInput(returnQty[item.id] ?? "0", NaN), 3),
       }))
-      .filter((i) => i.quantity > 0);
+      .filter((i) => Number.isFinite(i.quantity) && i.quantity > 0);
     if (items.length === 0) return;
     setActionLoading(true);
     try {
@@ -304,24 +317,33 @@ export function TransferDetailModal({ transfer, onClose, onChanged }: TransferDe
                           <div key={item.id} className="flex gap-2 mb-2 items-center">
                             <span className="text-xs flex-1 truncate">{item.productName}</span>
                             <input
-                              type="number"
-                              min={1}
-                              max={item.remainingQty}
+                              type="text"
+                              inputMode="decimal"
                               placeholder={tr("Miqdar", "Qty")}
                               value={sellQty[item.id] ?? ""}
                               onChange={(e) =>
-                                setSellQty((prev) => ({ ...prev, [item.id]: e.target.value }))
+                                setSellQty((prev) => ({
+                                  ...prev,
+                                  [item.id]: sanitizeNumericTypingMaxDp(
+                                    e.target.value,
+                                    3,
+                                  ),
+                                }))
                               }
                               className="w-16 px-2 py-1 text-xs border rounded"
                             />
                             <input
-                              type="number"
-                              min={0}
-                              step="0.01"
+                              type="text"
+                              inputMode="decimal"
                               placeholder={tr("Qiymət", "Price")}
                               value={sellPrice[item.id] ?? ""}
                               onChange={(e) =>
-                                setSellPrice((prev) => ({ ...prev, [item.id]: e.target.value }))
+                                setSellPrice((prev) => ({
+                                  ...prev,
+                                  [item.id]: sanitizeNumericTyping(e.target.value, {
+                                    allowDecimal: true,
+                                  }),
+                                }))
                               }
                               className="w-20 px-2 py-1 text-xs border rounded"
                             />
@@ -346,13 +368,18 @@ export function TransferDetailModal({ transfer, onClose, onChanged }: TransferDe
                         <div key={item.id} className="flex gap-2 mb-2 items-center">
                           <span className="text-xs flex-1 truncate">{item.productName}</span>
                           <input
-                            type="number"
-                            min={1}
-                            max={item.remainingQty}
+                            type="text"
+                            inputMode="decimal"
                             placeholder={tr("Miqdar", "Qty")}
                             value={returnQty[item.id] ?? ""}
                             onChange={(e) =>
-                              setReturnQty((prev) => ({ ...prev, [item.id]: e.target.value }))
+                              setReturnQty((prev) => ({
+                                ...prev,
+                                [item.id]: sanitizeNumericTypingMaxDp(
+                                  e.target.value,
+                                  3,
+                                ),
+                              }))
                             }
                             className="w-16 px-2 py-1 text-xs border rounded"
                           />

@@ -91,10 +91,13 @@ export function parseLocaleNumber(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Product qty / unit price / stock — shared across Create, Edit, POS, import. */
+export const PRODUCT_NUMERIC_MAX_DP = 3;
+
 /** Cap fractional digits while typing (e.g. product price/qty → 3). */
 export function sanitizeNumericTypingMaxDp(
   raw: string,
-  maxDp: number,
+  maxDp: number = PRODUCT_NUMERIC_MAX_DP,
   opts?: SanitizeNumericOpts,
 ): string {
   const cleaned = sanitizeNumericTyping(raw, opts);
@@ -104,13 +107,54 @@ export function sanitizeNumericTypingMaxDp(
 }
 
 /** Round to at most `maxDp` decimal places for API payloads. */
-export function roundToMaxDp(n: number, maxDp: number): number {
+export function roundToMaxDp(n: number, maxDp: number = PRODUCT_NUMERIC_MAX_DP): number {
   if (!Number.isFinite(n)) return n;
   const f = 10 ** maxDp;
   return Math.round((n + Number.EPSILON) * f) / f;
 }
 
-/** For number | "" controlled state: empty → "", else finite number. */
+/** Display/edit string for a product numeric value (≤3 dp, no float noise). */
+export function formatProductNumericInput(raw: string | number | null | undefined): string {
+  if (raw == null || raw === "") return "";
+  const n = typeof raw === "number" ? raw : Number(String(raw).trim().replace(",", "."));
+  if (!Number.isFinite(n)) {
+    return sanitizeNumericTypingMaxDp(String(raw), PRODUCT_NUMERIC_MAX_DP, {
+      allowNegative: true,
+    });
+  }
+  return sanitizeNumericTypingMaxDp(
+    String(roundToMaxDp(n, PRODUCT_NUMERIC_MAX_DP)),
+    PRODUCT_NUMERIC_MAX_DP,
+    { allowNegative: true },
+  );
+}
+
+/**
+ * Bind clearable numeric text — keeps the typing draft as a string so "1." / "1.0"
+ * are not wiped by Number() mid-keystroke. Prefer this over number | "" state.
+ */
+export function bindNumericDraft(
+  value: string,
+  setValue: (v: string) => void,
+  opts?: SanitizeNumericOpts & { maxDp?: number },
+): {
+  value: string;
+  onChange: (e: { target: { value: string } }) => void;
+} {
+  return {
+    value,
+    onChange: (e) => {
+      const maxDp = opts?.maxDp;
+      setValue(
+        maxDp != null
+          ? sanitizeNumericTypingMaxDp(e.target.value, maxDp, opts)
+          : sanitizeNumericTyping(e.target.value, opts),
+      );
+    },
+  };
+}
+
+/** @deprecated Prefer string drafts + asNumber; Number() mid-type wipes decimals. */
 export function numericOrEmptyFromEvent(raw: string): number | "" {
   if (raw.trim() === "") return "";
   const n = Number(raw);
@@ -118,8 +162,7 @@ export function numericOrEmptyFromEvent(raw: string): number | "" {
 }
 
 /**
- * Bind number | "" state to a clearable text input.
- * Prefer NumericInput + string state when building new fields.
+ * @deprecated Prefer bindNumericDraft / string state — Number() mid-type wipes "1." / "1.0".
  */
 export function bindNumericState(
   value: number | "",
@@ -133,16 +176,14 @@ export function bindNumericState(
     value: value === "" ? "" : String(value),
     onChange: (e) => {
       const s = sanitizeNumericTyping(e.target.value, opts);
-      if (s === "" || s === "-" || s === "." || s === "-.") {
-        setValue("");
-        return;
-      }
-      setValue(numericOrEmptyFromEvent(s));
+      setValue(s as unknown as number | "");
     },
   };
 }
 
-/** Coerce number | "" for math/API payloads. */
-export function asNumber(v: number | "", fallback = 0): number {
-  return v === "" || !Number.isFinite(v) ? fallback : v;
+/** Coerce number | "" | typing-draft string for math/API payloads. */
+export function asNumber(v: number | "" | string | null | undefined, fallback = 0): number {
+  if (v == null || v === "") return fallback;
+  if (typeof v === "number") return Number.isFinite(v) ? v : fallback;
+  return parseNumericInput(v, fallback);
 }

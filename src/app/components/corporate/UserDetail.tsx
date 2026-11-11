@@ -703,7 +703,9 @@ export function UserDetail() {
                   {!needsBranch && (
                     <ReportDateRangeFilter
                       preset={commissionPreset}
-                      onPresetChange={setCommissionPreset}
+                      onPresetChange={(p) => {
+                        if (p !== "all") setCommissionPreset(p);
+                      }}
                       customFrom={commissionCustomFrom}
                       customTo={commissionCustomTo}
                       onCustomFromChange={setCommissionCustomFrom}

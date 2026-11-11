@@ -29,7 +29,7 @@ interface ProductItem {
   name: string;
   unitPrice: number;
   stock: number;
-  qty: number | "";
+  qty: string;
 }
 
 interface AddSalesModalProps {
@@ -45,12 +45,6 @@ type TouchKbTarget =
 
 const NUMPAD_KINDS = new Set(["taxPercent", "discount", "shipping", "lineQty"]);
 
-function bufferToNumber(s: string): number | "" {
-  if (s === "") return "";
-  const n = Number(s);
-  return Number.isFinite(n) ? n : "";
-}
-
 export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user } = useAuth();
@@ -63,9 +57,9 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
   const [date, setDate] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [products, setProducts] = useState<ProductItem[]>([]);
-  const [taxPercent, setTaxPercent] = useState<number | "">("");
-  const [discount, setDiscount] = useState<number | "">("");
-  const [shipping, setShipping] = useState<number | "">("");
+  const [taxPercent, setTaxPercent] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [shipping, setShipping] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -111,14 +105,14 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
       case "product":
         return productSearch;
       case "taxPercent":
-        return taxPercent === "" ? "" : String(taxPercent);
+        return taxPercent;
       case "discount":
-        return discount === "" ? "" : String(discount);
+        return discount;
       case "shipping":
-        return shipping === "" ? "" : String(shipping);
+        return shipping;
       case "lineQty": {
         const line = products.find((p) => p.id === target.productId);
-        return line == null || line.qty === "" ? "" : String(line.qty);
+        return line?.qty ?? "";
       }
     }
   };
@@ -134,7 +128,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
     });
   };
 
-  const handleUpdateProduct = (id: string, field: "qty", value: number | "") => {
+  const handleUpdateProduct = (id: string, field: "qty", value: string) => {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
   };
 
@@ -153,19 +147,19 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
         setCustomerMenuOpen(false);
         break;
       case "taxPercent":
-        setTaxPercent(bufferToNumber(next));
+        setTaxPercent(sanitizeNumericTyping(next));
         break;
       case "discount":
-        setDiscount(bufferToNumber(next));
+        setDiscount(sanitizeNumericTyping(next));
         break;
       case "shipping":
-        setShipping(bufferToNumber(next));
+        setShipping(sanitizeNumericTyping(next));
         break;
       case "lineQty":
         handleUpdateProduct(
           touchKb.productId,
           "qty",
-          bufferToNumber(sanitizeNumericTypingMaxDp(next, 3)),
+          sanitizeNumericTypingMaxDp(next, 3),
         );
         break;
     }
@@ -207,7 +201,7 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
           name: detail.name,
           unitPrice: parseFloat(detail.price) || 0,
           stock: detail.quantity,
-          qty: 1,
+          qty: "1",
         },
       ]);
       setProductSearch("");
@@ -516,11 +510,14 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
                         <input
                           type="text"
                           inputMode="none"
-                          value={product.qty === "" ? "" : product.qty}
-                          onChange={(e) => {
-                            const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
-                            handleUpdateProduct(product.id, "qty", s === "" ? "" : Number(s));
-                          }}
+                          value={product.qty}
+                          onChange={(e) =>
+                            handleUpdateProduct(
+                              product.id,
+                              "qty",
+                              sanitizeNumericTypingMaxDp(e.target.value, 3),
+                            )
+                          }
                           onFocus={() => openTouchKb({ kind: "lineQty", productId: product.id })}
                           className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         />
@@ -571,11 +568,10 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               <input
                 type="text"
                 inputMode="none"
-                value={taxPercent === "" ? "" : taxPercent}
-                onChange={(e) => {
-                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                  setTaxPercent(s === "" ? "" : Number(s));
-                }}
+                value={taxPercent}
+                onChange={(e) =>
+                  setTaxPercent(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                }
                 onFocus={() => openTouchKb({ kind: "taxPercent" })}
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
@@ -588,11 +584,10 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               <input
                 type="text"
                 inputMode="none"
-                value={discount === "" ? "" : discount}
-                onChange={(e) => {
-                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                  setDiscount(s === "" ? "" : Number(s));
-                }}
+                value={discount}
+                onChange={(e) =>
+                  setDiscount(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                }
                 onFocus={() => openTouchKb({ kind: "discount" })}
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />
@@ -605,11 +600,10 @@ export function AddSalesModal({ isOpen, onClose, onSaved }: AddSalesModalProps) 
               <input
                 type="text"
                 inputMode="none"
-                value={shipping === "" ? "" : shipping}
-                onChange={(e) => {
-                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                  setShipping(s === "" ? "" : Number(s));
-                }}
+                value={shipping}
+                onChange={(e) =>
+                  setShipping(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                }
                 onFocus={() => openTouchKb({ kind: "shipping" })}
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
               />

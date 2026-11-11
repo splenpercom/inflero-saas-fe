@@ -29,6 +29,7 @@ import { pickLang } from "../../i18n/pickLang";
 import {
   asNumber,
   parseNumericInput,
+  roundToMaxDp,
   sanitizeNumericTyping,
   sanitizeNumericTypingMaxDp,
 } from "../../lib/numericInput";
@@ -106,9 +107,9 @@ function resetFormState(setters: {
   setReference: (v: string) => void;
   setProductSearch: (v: string) => void;
   setProducts: (v: ProductLine[]) => void;
-  setOrderTax: (v: number | "") => void;
-  setDiscount: (v: number | "") => void;
-  setShipping: (v: number | "") => void;
+  setOrderTax: (v: string) => void;
+  setDiscount: (v: string) => void;
+  setShipping: (v: string) => void;
   setStatus: (v: string) => void;
   setDescription: (v: string) => void;
   setStoreId: (v: string) => void;
@@ -165,9 +166,9 @@ export function AddPurchaseModal({
   const [reference, setReference] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [products, setProducts] = useState<ProductLine[]>([]);
-  const [orderTax, setOrderTax] = useState<number | "">("");
-  const [discount, setDiscount] = useState<number | "">("");
-  const [shipping, setShipping] = useState<number | "">("");
+  const [orderTax, setOrderTax] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [shipping, setShipping] = useState("");
   const [status, setStatus] = useState("pending");
   const [description, setDescription] = useState("");
   const [storeId, setStoreId] = useState("");
@@ -243,9 +244,9 @@ export function AddPurchaseModal({
         setDate(detail.date ? detail.date.slice(0, 10) : "");
         setReference(detail.reference ?? "");
         setProducts(mapDetailItemsToLines(detail.items));
-        setOrderTax(parsePurchaseAmount(detail.orderTax));
-        setDiscount(parsePurchaseAmount(detail.discount));
-        setShipping(parsePurchaseAmount(detail.shipping));
+        setOrderTax(String(parsePurchaseAmount(detail.orderTax)));
+        setDiscount(String(parsePurchaseAmount(detail.discount)));
+        setShipping(String(parsePurchaseAmount(detail.shipping)));
         setStatus(nextStatus);
         setInitialStatus(nextStatus);
         setDescription(detail.description ?? "");
@@ -352,9 +353,9 @@ export function AddPurchaseModal({
     try {
       const detail = await fetchPurchase(purchase.id);
       setProducts(mapDetailItemsToLines(detail.items));
-      setOrderTax(parsePurchaseAmount(detail.orderTax));
-      setDiscount(parsePurchaseAmount(detail.discount));
-      setShipping(parsePurchaseAmount(detail.shipping));
+      setOrderTax(String(parsePurchaseAmount(detail.orderTax)));
+      setDiscount(String(parsePurchaseAmount(detail.discount)));
+      setShipping(String(parsePurchaseAmount(detail.shipping)));
       setStatus(detail.status.toLowerCase());
       setDescription(detail.description ?? "");
       if (detail.storeId) {
@@ -458,7 +459,7 @@ export function AddPurchaseModal({
         ? {
             items: products.map((p) => ({
               productId: p.productId,
-              quantity: Math.max(1, Math.round(parseNumericInput(p.qty, 1))),
+              quantity: roundToMaxDp(parseNumericInput(p.qty, NaN), 3),
               purchasePrice: parseNumericInput(p.purchasePrice),
               discount: parseNumericInput(p.discount) || undefined,
               taxPercent: parseNumericInput(p.taxPercent) || undefined,
@@ -802,7 +803,7 @@ export function AddPurchaseModal({
                           ) : (
                             <input
                               type="text"
-                              inputMode="numeric"
+                              inputMode="decimal"
                               value={product.qty}
                               onChange={(e) => {
                                 const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
@@ -916,11 +917,10 @@ export function AddPurchaseModal({
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={orderTax === "" ? "" : orderTax}
-                  onChange={(e) => {
-                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                    setOrderTax(s === "" ? "" : Number(s));
-                  }}
+                  value={orderTax}
+                  onChange={(e) =>
+                    setOrderTax(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                  }
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                 />
               </div>
@@ -931,11 +931,10 @@ export function AddPurchaseModal({
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={discount === "" ? "" : discount}
-                  onChange={(e) => {
-                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                    setDiscount(s === "" ? "" : Number(s));
-                  }}
+                  value={discount}
+                  onChange={(e) =>
+                    setDiscount(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                  }
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                 />
               </div>
@@ -946,11 +945,10 @@ export function AddPurchaseModal({
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={shipping === "" ? "" : shipping}
-                  onChange={(e) => {
-                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                    setShipping(s === "" ? "" : Number(s));
-                  }}
+                  value={shipping}
+                  onChange={(e) =>
+                    setShipping(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                  }
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                 />
               </div>

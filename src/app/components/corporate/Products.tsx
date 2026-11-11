@@ -17,10 +17,10 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Check,
   Columns3,
   Barcode,
   Printer,
+  EllipsisVertical,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { formatNowDate, formatNowDateTime } from "../../lib/dateFormat";
@@ -32,11 +32,14 @@ import {
   fetchProducts,
   fetchCategories,
   fetchBrands,
+  fetchUnits,
   deleteProduct,
   bulkDeleteProducts,
   generateMissingProductBarcodes,
+  prepareProductsForScaleExport,
   type CategoryRecord,
   type BrandRecord,
+  type UnitRecord,
   type ProductListItem,
 } from "../../api/inventory";
 import { parsePrice } from "../../lib/inventoryMappers";
@@ -50,12 +53,14 @@ import {
   runProductImport,
   type ProductImportResult,
 } from "../../lib/productImport";
+import { downloadRongtaPluTxp } from "../../lib/rongtaPluExport";
 import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import { useBranch } from "../../context/BranchContext";
 import { useProductsCogsEnabled } from "../../hooks/useProductsCogsEnabled";
+import { useScaleLabelScanEnabled } from "../../hooks/useScaleLabelScanEnabled";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface Product {
@@ -94,6 +99,32 @@ type ProductsColumnKey =
   | "createdBy";
 
 const PRODUCTS_COLUMNS_STORAGE_KEY = "inflero-products-visible-columns";
+const PRODUCTS_PAGE_SIZE_STORAGE_KEY = "inflero-products-page-size";
+/** Allowed API page sizes for Products only (backend max is 100). */
+const PRODUCTS_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+const PRODUCT_UNIT_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function loadProductsPageSize(): number {
+  try {
+    const raw = localStorage.getItem(PRODUCTS_PAGE_SIZE_STORAGE_KEY);
+    const n = Number.parseInt(raw ?? "", 10);
+    if ((PRODUCTS_PAGE_SIZE_OPTIONS as readonly number[]).includes(n)) return n;
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_LIST_PAGE_SIZE;
+}
+
+/** Keep only valid UUIDs so a bad `units=` URL never 400s the product list. */
+function parseUnitIdsParam(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  const ids = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((id) => PRODUCT_UNIT_ID_RE.test(id));
+  return [...new Set(ids)];
+}
 
 const DEFAULT_PRODUCTS_COLUMNS: Record<ProductsColumnKey, boolean> = {
   sku: true,
@@ -130,6 +161,7 @@ export function Products() {
   const stockEnabled = hasModule("STOCK");
   const clinicEnabled = !isDemo && hasModule("CLINIC");
   const productsCogsEnabled = useProductsCogsEnabled();
+  const scaleLabelScanEnabled = useScaleLabelScanEnabled();
   const { canView, canCreate, canEdit, canDelete } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId, branchManagementEnabled } = useBranch();
@@ -145,6 +177,28 @@ export function Products() {
         : { en: "Search products...", az: "Məhsul axtarın..." },
       allCategories: { en: "All Categories", az: "Bütün Kateqoriyalar" },
       allBrands: { en: "All Brands", az: "Bütün Brendlər" },
+      allUnits: { en: "All Units", az: "Bütün Vahidlər" },
+      unitsFilter: { en: "Units", az: "Vahidlər" },
+      exportRongta: {
+        en: "Export for Rongta",
+        az: "Rongta üçün ixrac",
+      },
+      exportingRongta: {
+        en: "Preparing scale file…",
+        az: "Tərəzi faylı hazırlanır…",
+      },
+      exportRongtaDone: {
+        en: "PLU.txp ready — File → Open in PLU manager, then Upload PLU",
+        az: "PLU.txp hazırdır — PLU manager-də File → Open, sonra Upload PLU",
+      },
+      exportRongtaNeedSelection: {
+        en: "Pick units in the filter, or tick products in the list",
+        az: "Vahid filtrini seçin və ya siyahıdan məhsulları işarələyin",
+      },
+      moreActions: { en: "More", az: "Digər" },
+      exportPdf: { en: "Export PDF", az: "PDF ixrac" },
+      exportExcel: { en: "Export Excel", az: "Excel ixrac" },
+      perPage: { en: "Per page", az: "Səhifədə" },
       addProduct: { en: "Create", az: "Yarat" },
       sku: { en: "SKU", az: "SKU" },
       productName: clinicEnabled
@@ -245,11 +299,17 @@ export function Products() {
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "");
   const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get("category") ?? "all");
   const [selectedBrand, setSelectedBrand] = useState(() => searchParams.get("brand") ?? "all");
+  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>(() =>
+    parseUnitIdsParam(searchParams.get("units")),
+  );
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
+  const [isUnitDropdownOpen, setIsUnitDropdownOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ProductsColumnKey, boolean>>(loadProductsColumns);
   const columnsMenuRef = useRef<HTMLDivElement | null>(null);
+  const moreActionsMenuRef = useRef<HTMLDivElement | null>(null);
   const skipPageResetRef = useRef(true);
 
   // Delete confirmation dialog (single or bulk)
@@ -272,6 +332,7 @@ export function Products() {
   const [importResult, setImportResult] = useState<ProductImportResult | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [generatingBarcodes, setGeneratingBarcodes] = useState(false);
+  const [exportingRongta, setExportingRongta] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sorting functionality
@@ -281,6 +342,7 @@ export function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
+  const [units, setUnits] = useState<UnitRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(() => {
     const p = Number.parseInt(searchParams.get("page") ?? "1", 10);
@@ -289,17 +351,39 @@ export function Products() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("q") ?? "");
-  const itemsPerPage = DEFAULT_LIST_PAGE_SIZE;
+  /** Products-only; persisted locally — not in URL, so search/page links stay stable. */
+  const [itemsPerPage, setItemsPerPage] = useState(loadProductsPageSize);
+
+  const handlePageSizeChange = (nextSize: number) => {
+    if (!(PRODUCTS_PAGE_SIZE_OPTIONS as readonly number[]).includes(nextSize)) return;
+    if (nextSize === itemsPerPage) return;
+    setItemsPerPage(nextSize);
+    try {
+      localStorage.setItem(PRODUCTS_PAGE_SIZE_STORAGE_KEY, String(nextSize));
+    } catch {
+      /* ignore */
+    }
+    // New page size → always start at page 1 (do not touch search/filter URL keys).
+    setCurrentPage(1);
+  };
 
   const listReturnTo = useMemo(() => {
     const next = new URLSearchParams();
     if (debouncedSearch.trim()) next.set("q", debouncedSearch.trim());
     if (selectedCategory !== "all") next.set("category", selectedCategory);
     if (selectedBrand !== "all") next.set("brand", selectedBrand);
+    if (selectedUnitIds.length) next.set("units", selectedUnitIds.join(","));
     if (currentPage > 1) next.set("page", String(currentPage));
     const qs = next.toString();
     return qs ? `${location.pathname}?${qs}` : location.pathname;
-  }, [location.pathname, debouncedSearch, selectedCategory, selectedBrand, currentPage]);
+  }, [
+    location.pathname,
+    debouncedSearch,
+    selectedCategory,
+    selectedBrand,
+    selectedUnitIds,
+    currentPage,
+  ]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -312,19 +396,28 @@ export function Products() {
       return;
     }
     setCurrentPage(1);
-  }, [debouncedSearch, selectedCategory, selectedBrand]);
+  }, [debouncedSearch, selectedCategory, selectedBrand, selectedUnitIds]);
 
   useEffect(() => {
     const next = new URLSearchParams();
     if (debouncedSearch.trim()) next.set("q", debouncedSearch.trim());
     if (selectedCategory !== "all") next.set("category", selectedCategory);
     if (selectedBrand !== "all") next.set("brand", selectedBrand);
+    if (selectedUnitIds.length) next.set("units", selectedUnitIds.join(","));
     if (currentPage > 1) next.set("page", String(currentPage));
     const nextStr = next.toString();
     if (nextStr !== searchParams.toString()) {
       setSearchParams(next, { replace: true });
     }
-  }, [debouncedSearch, selectedCategory, selectedBrand, currentPage, searchParams, setSearchParams]);
+  }, [
+    debouncedSearch,
+    selectedCategory,
+    selectedBrand,
+    selectedUnitIds,
+    currentPage,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const col = (key: ProductsColumnKey) => visibleColumns[key];
 
@@ -355,15 +448,23 @@ export function Products() {
   );
 
   useEffect(() => {
-    if (!columnsOpen) return;
+    if (!columnsOpen && !moreActionsOpen) return;
     const onDoc = (e: MouseEvent) => {
-      if (columnsMenuRef.current && !columnsMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (columnsOpen && columnsMenuRef.current && !columnsMenuRef.current.contains(target)) {
         setColumnsOpen(false);
+      }
+      if (
+        moreActionsOpen &&
+        moreActionsMenuRef.current &&
+        !moreActionsMenuRef.current.contains(target)
+      ) {
+        setMoreActionsOpen(false);
       }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [columnsOpen]);
+  }, [columnsOpen, moreActionsOpen]);
 
   const showRowSelection = canView;
   const showCostCol = productsCogsEnabled && col("cost");
@@ -382,9 +483,14 @@ export function Products() {
   const loadFilterOptions = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) return;
     try {
-      const [catRows, brandRows] = await Promise.all([fetchCategories(), fetchBrands()]);
+      const [catRows, brandRows, unitRows] = await Promise.all([
+        fetchCategories(),
+        fetchBrands(),
+        fetchUnits(),
+      ]);
       setCategories(catRows);
       setBrands(brandRows);
+      setUnits(unitRows);
     } catch (err) {
       notifyFromError(err);
     }
@@ -410,6 +516,7 @@ export function Products() {
         search: debouncedSearch || undefined,
         categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
         brandId: selectedBrand !== "all" ? selectedBrand : undefined,
+        unitIds: selectedUnitIds.length ? selectedUnitIds : undefined,
         sortBy,
         sortOrder: sortDirection || undefined,
       });
@@ -457,10 +564,12 @@ export function Products() {
     debouncedSearch,
     selectedCategory,
     selectedBrand,
+    selectedUnitIds,
     sortField,
     sortDirection,
     language,
     branchRevision,
+    itemsPerPage,
   ]);
 
   useEffect(() => {
@@ -480,6 +589,21 @@ export function Products() {
     selectedBrand === "all"
       ? pt("allBrands")
       : brands.find((b) => b.id === selectedBrand)?.name ?? pt("allBrands");
+
+  const selectedUnitsLabel =
+    selectedUnitIds.length === 0
+      ? pt("allUnits")
+      : selectedUnitIds.length === 1
+        ? units.find((u) => u.id === selectedUnitIds[0])?.shortName ||
+          units.find((u) => u.id === selectedUnitIds[0])?.name ||
+          pt("unitsFilter")
+        : `${pt("unitsFilter")} (${selectedUnitIds.length})`;
+
+  const toggleUnitFilter = (unitId: string) => {
+    setSelectedUnitIds((prev) =>
+      prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId],
+    );
+  };
 
   const handleAddProduct = () => {
     navigate("/dashboard/inventory/products/create");
@@ -518,6 +642,7 @@ export function Products() {
         search: debouncedSearch || undefined,
         categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
         brandId: selectedBrand !== "all" ? selectedBrand : undefined,
+        unitIds: selectedUnitIds.length ? selectedUnitIds : undefined,
         sortBy,
         sortOrder: sortDirection || undefined,
       });
@@ -530,9 +655,61 @@ export function Products() {
     debouncedSearch,
     selectedCategory,
     selectedBrand,
+    selectedUnitIds,
     sortField,
     sortDirection,
   ]);
+
+  const handleExportRongta = async () => {
+    if (exportingRongta || isDemo) return;
+    if (!scaleLabelScanEnabled) {
+      notifyWarning(
+        pickLang(
+          language,
+          "Əvvəlcə Parametrlər → Əlavələr-də Rongta tərəzi skanını aktiv edin",
+          "Enable Rongta weighing scale in Settings → Add-ons first",
+        ),
+      );
+      return;
+    }
+    const productIds = [...selectedIds];
+    if (productIds.length === 0 && selectedUnitIds.length === 0) {
+      notifyWarning(pt("exportRongtaNeedSelection"));
+      return;
+    }
+    setExportingRongta(true);
+    try {
+      const data = await prepareProductsForScaleExport(
+        productIds.length
+          ? { productIds }
+          : { unitIds: selectedUnitIds },
+      );
+      if (!data.rows?.length) {
+        notifyWarning(pickLang(language, "İxrac üçün məhsul yoxdur", "No products to export"));
+        return;
+      }
+      downloadRongtaPluTxp(data.rows, `PLU_${new Date().toISOString().split("T")[0]}.txp`);
+      notifySuccess(
+        pickLang(
+          language,
+          `${pt("exportRongtaDone")} (${data.total}${
+            data.assigned ? `, ${data.assigned} kod` : ""
+          })`,
+          `${pt("exportRongtaDone")} (${data.total}${
+            data.assigned ? `, ${data.assigned} codes assigned` : ""
+          })`,
+        ),
+      );
+      void loadProducts();
+    } catch (err) {
+      notifyFromError(
+        err,
+        pickLang(language, "Rongta ixracı alınmadı", "Failed to export for Rongta"),
+      );
+    } finally {
+      setExportingRongta(false);
+    }
+  };
 
   const handleExportPDF = async () => {
     try {
@@ -977,7 +1154,7 @@ export function Products() {
   useEffect(() => {
     setSelectedIds(new Set());
     setSelectedPrintMeta(new Map());
-  }, [debouncedSearch, selectedCategory, selectedBrand, branchRevision]);
+  }, [debouncedSearch, selectedCategory, selectedBrand, selectedUnitIds, branchRevision]);
 
   const isBulkDelete = bulkDeleteIds.length > 0;
   const deleteCount = isBulkDelete ? bulkDeleteIds.length : productToDelete ? 1 : 0;
@@ -992,148 +1169,225 @@ export function Products() {
           </h1>
         </div>
 
-        {/* Search and Actions Bar */}
+        {/* Search / filters / primary actions */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input
-                type="text"
-                placeholder={pt("searchPlaceholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
-              />
-            </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-1 flex-col gap-2 min-w-0 sm:flex-row sm:items-center">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder={pt("searchPlaceholder")}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                />
+              </div>
 
-            {/* Filters */}
-            <div className="flex gap-2">
-              {/* Category Dropdown */}
-              <div className="relative w-[140px] shrink-0">
-                <button
-                  onClick={() => {
-                    setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                    setIsBrandDropdownOpen(false);
-                  }}
-                  className={cn(
-                    "flex w-full items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
-                    selectedCategory === "all" 
-                      ? "border border-gray-300 dark:border-gray-700" 
-                      : "border-2 border-[#14b8a6] dark:border-[#14b8a6]"
-                  )}
-                  title={selectedCategoryLabel}
-                >
-                  <span className="flex-1 min-w-0 truncate text-left">{selectedCategoryLabel}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                </button>
-                
-                {isCategoryDropdownOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setIsCategoryDropdownOpen(false)}
-                    />
-                    <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[260px] max-h-60 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20">
-                      <button
-                        onClick={() => {
-                          setSelectedCategory("all");
-                          setIsCategoryDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors",
-                          selectedCategory === "all" && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
-                        )}
-                      >
-                        {pt("allCategories")}
-                      </button>
-                      {categories.map((category) => (
+              <div className="flex flex-wrap gap-2 shrink-0">
+                {/* Category */}
+                <div className="relative w-[130px] shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                      setIsBrandDropdownOpen(false);
+                      setIsUnitDropdownOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
+                      selectedCategory === "all"
+                        ? "border border-gray-300 dark:border-gray-700"
+                        : "border-2 border-[#14b8a6] dark:border-[#14b8a6]",
+                    )}
+                    title={selectedCategoryLabel}
+                  >
+                    <span className="flex-1 min-w-0 truncate text-left">{selectedCategoryLabel}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  </button>
+                  {isCategoryDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsCategoryDropdownOpen(false)} />
+                      <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[260px] max-h-60 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20">
                         <button
-                          key={category.id}
+                          type="button"
                           onClick={() => {
-                            setSelectedCategory(category.id);
+                            setSelectedCategory("all");
                             setIsCategoryDropdownOpen(false);
                           }}
                           className={cn(
-                            "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors text-gray-700 dark:text-gray-300",
-                            selectedCategory === category.id && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
+                            "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors",
+                            selectedCategory === "all" &&
+                              "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]",
                           )}
-                          title={category.name}
                         >
-                          <span className="block truncate">{category.name}</span>
+                          {pt("allCategories")}
                         </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Brand Dropdown */}
-              <div className="relative w-[140px] shrink-0">
-                <button
-                  onClick={() => {
-                    setIsBrandDropdownOpen(!isBrandDropdownOpen);
-                    setIsCategoryDropdownOpen(false);
-                  }}
-                  className={cn(
-                    "flex w-full items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
-                    selectedBrand === "all"
-                      ? "border border-gray-300 dark:border-gray-700"
-                      : "border-2 border-[#14b8a6] dark:border-[#14b8a6]",
+                        {categories.map((category) => (
+                          <button
+                            key={category.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategory(category.id);
+                              setIsCategoryDropdownOpen(false);
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors text-gray-700 dark:text-gray-300",
+                              selectedCategory === category.id &&
+                                "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]",
+                            )}
+                            title={category.name}
+                          >
+                            <span className="block truncate">{category.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
-                  title={selectedBrandLabel}
-                >
-                  <span className="flex-1 min-w-0 truncate text-left">{selectedBrandLabel}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                </button>
-                
-                {isBrandDropdownOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setIsBrandDropdownOpen(false)}
-                    />
-                    <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[260px] max-h-60 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20">
-                      <button
-                        onClick={() => {
-                          setSelectedBrand("all");
-                          setIsBrandDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors",
-                          selectedBrand === "all" && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
-                        )}
-                      >
-                        {pt("allBrands")}
-                      </button>
-                      {brands.map((brand) => (
+                </div>
+
+                {/* Brand */}
+                <div className="relative w-[130px] shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBrandDropdownOpen(!isBrandDropdownOpen);
+                      setIsCategoryDropdownOpen(false);
+                      setIsUnitDropdownOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
+                      selectedBrand === "all"
+                        ? "border border-gray-300 dark:border-gray-700"
+                        : "border-2 border-[#14b8a6] dark:border-[#14b8a6]",
+                    )}
+                    title={selectedBrandLabel}
+                  >
+                    <span className="flex-1 min-w-0 truncate text-left">{selectedBrandLabel}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  </button>
+                  {isBrandDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsBrandDropdownOpen(false)} />
+                      <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[260px] max-h-60 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20">
                         <button
-                          key={brand.id}
+                          type="button"
                           onClick={() => {
-                            setSelectedBrand(brand.id);
+                            setSelectedBrand("all");
                             setIsBrandDropdownOpen(false);
                           }}
                           className={cn(
-                            "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors text-gray-700 dark:text-gray-300",
-                            selectedBrand === brand.id && "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]"
+                            "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors",
+                            selectedBrand === "all" &&
+                              "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]",
                           )}
-                          title={brand.name}
                         >
-                          <span className="block truncate">{brand.name}</span>
+                          {pt("allBrands")}
                         </button>
-                      ))}
-                    </div>
-                  </>
-                )}
+                        {brands.map((brand) => (
+                          <button
+                            key={brand.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedBrand(brand.id);
+                              setIsBrandDropdownOpen(false);
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors text-gray-700 dark:text-gray-300",
+                              selectedBrand === brand.id &&
+                                "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]",
+                            )}
+                            title={brand.name}
+                          >
+                            <span className="block truncate">{brand.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Units */}
+                <div className="relative w-[130px] shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUnitDropdownOpen(!isUnitDropdownOpen);
+                      setIsCategoryDropdownOpen(false);
+                      setIsBrandDropdownOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-1.5 text-xs bg-white dark:bg-gray-900 rounded-full text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
+                      selectedUnitIds.length === 0
+                        ? "border border-gray-300 dark:border-gray-700"
+                        : "border-2 border-[#14b8a6] dark:border-[#14b8a6]",
+                    )}
+                    title={selectedUnitsLabel}
+                  >
+                    <span className="flex-1 min-w-0 truncate text-left">{selectedUnitsLabel}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  </button>
+                  {isUnitDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsUnitDropdownOpen(false)} />
+                      <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[280px] max-h-60 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-20">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedUnitIds([]);
+                            setIsUnitDropdownOpen(false);
+                          }}
+                          className={cn(
+                            "w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors",
+                            selectedUnitIds.length === 0 &&
+                              "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]",
+                          )}
+                        >
+                          {pt("allUnits")}
+                        </button>
+                        {units.map((unit) => {
+                          const checked = selectedUnitIds.includes(unit.id);
+                          return (
+                            <label
+                              key={unit.id}
+                              className={cn(
+                                "flex items-center gap-2 w-full px-3 py-2 text-left text-xs hover:bg-[#ccfbf1] dark:hover:bg-[#14b8a6]/20 transition-colors text-gray-700 dark:text-gray-300 cursor-pointer",
+                                checked &&
+                                  "bg-[#ccfbf1] dark:bg-[#14b8a6]/20 text-[#14b8a6] dark:text-[#14b8a6]",
+                              )}
+                              title={unit.name}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleUnitFilter(unit.id)}
+                                className="rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]"
+                              />
+                              <span className="block truncate">
+                                {unit.shortName || unit.name}
+                                {unit.shortName && unit.name !== unit.shortName
+                                  ? ` · ${unit.name}`
+                                  : ""}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2">
+            {/* Primary actions only; secondary live in More */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0 lg:justify-end">
               <div className="relative" ref={columnsMenuRef}>
                 <button
                   type="button"
-                  onClick={() => setColumnsOpen((v) => !v)}
+                  onClick={() => {
+                    setColumnsOpen((v) => !v);
+                    setMoreActionsOpen(false);
+                  }}
                   className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   title={pt("columns")}
                 >
@@ -1165,94 +1419,160 @@ export function Products() {
               </div>
 
               <button
-                onClick={() => void handleExportPDF()}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                <FileText className="w-3.5 h-3.5 text-red-500" />
-              </button>
-
-              <button
                 type="button"
-                onClick={() => void handleExportExcel()}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
-              </button>
-
-              <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                title={pickLang(language, "Yenilə", "Refresh")}
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
               </button>
 
-              {canEdit && !isDemo && selectedIds.size === 0 && (
-              <button
-                type="button"
-                onClick={handleGenerateBarcodesClick}
-                disabled={generatingBarcodes}
-                title={pt("generateBarcodes")}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-              >
-                <Barcode className={cn("w-3.5 h-3.5", generatingBarcodes && "animate-pulse")} />
-                <span className="hidden sm:inline">
-                  {generatingBarcodes ? pt("generatingBarcodes") : pt("generateBarcodes")}
-                </span>
-              </button>
-              )}
+              <div className="relative" ref={moreActionsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreActionsOpen((v) => !v);
+                    setColumnsOpen(false);
+                  }}
+                  className="flex items-center justify-center w-8 h-8 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  title={pt("moreActions")}
+                  aria-expanded={moreActionsOpen}
+                >
+                  <EllipsisVertical className="w-3.5 h-3.5" />
+                </button>
+                {moreActionsOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-30 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMoreActionsOpen(false);
+                        void handleExportPDF();
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                      {pt("exportPdf")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMoreActionsOpen(false);
+                        void handleExportExcel();
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                      {pt("exportExcel")}
+                    </button>
+                    {canEdit && !isDemo && scaleLabelScanEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMoreActionsOpen(false);
+                          void handleExportRongta();
+                        }}
+                        disabled={
+                          exportingRongta ||
+                          (selectedIds.size === 0 && selectedUnitIds.length === 0)
+                        }
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        <Download
+                          className={cn(
+                            "w-3.5 h-3.5 text-[#14b8a6] shrink-0",
+                            exportingRongta && "animate-pulse",
+                          )}
+                        />
+                        {exportingRongta ? pt("exportingRongta") : pt("exportRongta")}
+                        {selectedIds.size > 0
+                          ? ` (${selectedIds.size})`
+                          : selectedUnitIds.length > 0
+                            ? ` · ${selectedUnitsLabel}`
+                            : ""}
+                      </button>
+                    )}
+                    {canEdit && !isDemo && selectedIds.size === 0 && (
+                      <>
+                        <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMoreActionsOpen(false);
+                            handleGenerateBarcodesClick();
+                          }}
+                          disabled={generatingBarcodes}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                        >
+                          <Barcode
+                            className={cn(
+                              "w-3.5 h-3.5 shrink-0",
+                              generatingBarcodes && "animate-pulse",
+                            )}
+                          />
+                          {generatingBarcodes
+                            ? pt("generatingBarcodes")
+                            : pt("generateBarcodes")}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {canCreate && !isDemo && (
-              <button
-                type="button"
-                onClick={handleImportProduct}
-                disabled={needsBranchForImport}
-                title={needsBranchForImport ? pt("importSelectBranch") : undefined}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Import</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleImportProduct}
+                  disabled={needsBranchForImport}
+                  title={needsBranchForImport ? pt("importSelectBranch") : undefined}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Import</span>
+                </button>
               )}
 
               {showRowSelection && selectedIds.size > 0 && (
-              <button
-                type="button"
-                onClick={() => void handlePrintSelectedBarcodes()}
-                disabled={printingBarcodes || deleting}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-                title={pt("printBarcodes")}
-              >
-                <Printer className={cn("w-3.5 h-3.5", printingBarcodes && "animate-pulse")} />
-                <span>
-                  {printingBarcodes ? pt("printingBarcodes") : pt("printBarcodes")} ({selectedIds.size})
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => void handlePrintSelectedBarcodes()}
+                  disabled={printingBarcodes || deleting}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                  title={pt("printBarcodes")}
+                >
+                  <Printer className={cn("w-3.5 h-3.5", printingBarcodes && "animate-pulse")} />
+                  <span>
+                    {printingBarcodes ? pt("printingBarcodes") : pt("printBarcodes")} (
+                    {selectedIds.size})
+                  </span>
+                </button>
               )}
 
               {canDelete && selectedIds.size > 0 && (
-              <button
-                type="button"
-                onClick={handleBulkDeleteClick}
-                disabled={deleting || printingBarcodes}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                title={pickLang(language, "Seçilmişləri sil", "Delete selected")}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>
-                  {pickLang(language, "Sil", "Delete")} ({selectedIds.size})
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDeleteClick}
+                  disabled={deleting || printingBarcodes}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  title={pickLang(language, "Seçilmişləri sil", "Delete selected")}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>
+                    {pickLang(language, "Sil", "Delete")} ({selectedIds.size})
+                  </span>
+                </button>
               )}
 
               {canCreate && (
-              <button
-                onClick={handleAddProduct}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{pt("addProduct")}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleAddProduct}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg font-medium transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{pt("addProduct")}</span>
+                </button>
               )}
             </div>
           </div>
@@ -1550,8 +1870,23 @@ export function Products() {
           </div>
         </div>
 
-        {/* Pagination */}
-        <div className="mt-4">
+        {/* Pagination + Products-only page size (localStorage; not in URL) */}
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 shrink-0">
+            <span>{pt("perPage")}</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => handlePageSizeChange(Number.parseInt(e.target.value, 10))}
+              className="px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+              aria-label={pt("perPage")}
+            >
+              {PRODUCTS_PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
           <DataPagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -1559,6 +1894,7 @@ export function Products() {
             totalItems={totalItems}
             itemsPerPage={itemsPerPage}
             showText={dataPaginationShowText((az, en, ru) => pickLang(language, az, en, ru))}
+            className="flex flex-col sm:flex-row items-center justify-end gap-3 flex-1"
           />
         </div>
 

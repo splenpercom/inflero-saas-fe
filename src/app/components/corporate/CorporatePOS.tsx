@@ -1,4 +1,4 @@
-import { pickLang } from "../../i18n/pickLang";
+﻿import { pickLang } from "../../i18n/pickLang";
 import { anyMatchesAzSearch } from "../../lib/azSearch";
 import { useState, useRef, useEffect, useCallback, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
@@ -47,6 +47,8 @@ import {
 } from "../../hooks/usePrefersTouchKeyboard";
 import {
   parseNumericInput,
+  formatProductNumericInput,
+  PRODUCT_NUMERIC_MAX_DP,
   roundToMaxDp,
   sanitizeNumericTyping,
   sanitizeNumericTypingMaxDp,
@@ -194,8 +196,8 @@ interface CartItem {
   unit?: string;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
   trackStock?: boolean;
-  /** Birmarket track-only percent for this line (0–100); used only when order Birmarket is on. */
-  birmarketCommissionPercent?: number;
+  /** Birmarket track-only percent draft (0–100); string so decimals can be typed. */
+  birmarketCommissionPercent?: string;
   /** Loyalty BXGX free line (price 0). */
   isLoyaltyFree?: boolean;
   loyaltyOfferId?: string | null;
@@ -210,7 +212,18 @@ function cartUnitPrice(price: string): number {
 }
 
 function formatCartPriceInput(raw: string | number): string {
-  return sanitizeNumericTyping(String(raw), { allowDecimal: true });
+  return formatProductNumericInput(raw);
+}
+
+/** Parse Birmarket % draft (string) for math/API; clamp 0–100. */
+function birmarketPctNum(
+  raw: string | number | null | undefined,
+  fallback: number,
+): number {
+  if (raw == null || raw === "") return fallback;
+  const n = typeof raw === "number" ? raw : parseNumericInput(String(raw), NaN);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(100, Math.max(0, n));
 }
 
 /** Weight / scale units — POS opens quantity (weight) numpad on select/scan. */
@@ -300,23 +313,23 @@ function PosQtyInput({
   draftText?: string;
   onDraftChange?: (next: string) => void;
 }) {
-  const [text, setText] = useState(String(value));
+  const [text, setText] = useState(() => formatProductNumericInput(value));
   const padDriven = draftText !== undefined;
 
   useEffect(() => {
     if (padDriven) return;
-    setText(String(value));
+    setText(formatProductNumericInput(value));
   }, [value, padDriven]);
 
   const commit = () => {
     if (padDriven) return;
-    const n = roundToMaxDp(parseNumericInput(text, NaN), 3);
+    const n = roundToMaxDp(parseNumericInput(text, NaN), PRODUCT_NUMERIC_MAX_DP);
     if (!Number.isFinite(n) || n <= 0) {
-      setText(String(value));
+      setText(formatProductNumericInput(value));
       return;
     }
     if (n !== value) onCommit(n);
-    else setText(String(value));
+    else setText(formatProductNumericInput(value));
   };
 
   return (
@@ -335,7 +348,7 @@ function PosQtyInput({
         onFocusPad?.();
       }}
       onChange={(e) => {
-        const next = sanitizeNumericTypingMaxDp(e.target.value, 3, {
+        const next = sanitizeNumericTypingMaxDp(e.target.value, PRODUCT_NUMERIC_MAX_DP, {
           allowDecimal: true,
         });
         if (padDriven) {
@@ -352,7 +365,7 @@ function PosQtyInput({
           (e.target as HTMLInputElement).blur();
         }
         if (e.key === "Escape") {
-          setText(String(value));
+          setText(formatProductNumericInput(value));
           (e.target as HTMLInputElement).blur();
         }
       }}
@@ -1386,6 +1399,7 @@ export function CorporatePOS() {
   const [touchKb, setTouchKb] = useState<null | {
     mode: "full" | "numpad";
     field: TouchKbField;
+    /** Cart line key (`cartLineKey`) for cartQty / cartPrice pads. */
     productId?: string;
     /** Draft for cartQty while typing (allows empty mid-edit). */
     buffer?: string;
@@ -1881,7 +1895,7 @@ export function CorporatePOS() {
             id: i.productId,
             name: i.productName,
             price: formatCartPriceInput(i.price),
-            quantity: i.quantity,
+            quantity: roundToMaxDp(Number(i.quantity) || 0, PRODUCT_NUMERIC_MAX_DP),
             image: "📦",
             productType: (i as { productType?: CartItem["productType"] }).productType,
             trackStock: (i as { trackStock?: boolean }).trackStock !== false,
@@ -1902,17 +1916,20 @@ export function CorporatePOS() {
         detail.paymentMethod === "CARD" ? "card" : detail.paymentMethod === "CASH" ? "cash" : null,
       );
       setPaymentStatusChoice("pending");
-      setShippingInput(detail.shipping ?? "");
-      setServiceFeeInput(detail.serviceFee ?? "");
+      setShippingInput(formatProductNumericInput(detail.shipping ?? ""));
+      setServiceFeeInput(formatProductNumericInput(detail.serviceFee ?? ""));
       setHourlyRateInput(
         detail.tableHourlyRate != null && Number(detail.tableHourlyRate) > 0
-          ? String(detail.tableHourlyRate)
+          ? formatProductNumericInput(detail.tableHourlyRate)
           : "",
       );
       setHourlyStartedAt(detail.tableHourlyStartedAt ?? null);
       setHourlyEndedAt(detail.tableHourlyEndedAt ?? null);
       if (detail.discount && Number(detail.discount) > 0) {
-        setAppliedDiscount({ type: "fixed", value: Number(detail.discount) });
+        setAppliedDiscount({
+          type: "fixed",
+          value: roundToMaxDp(Number(detail.discount), PRODUCT_NUMERIC_MAX_DP),
+        });
       } else {
         setAppliedDiscount(null);
       }
@@ -1968,7 +1985,7 @@ export function CorporatePOS() {
       if (detail.table?.id) setSelectedTableId(detail.table.id);
       setHourlyRateInput(
         detail.tableHourlyRate != null && Number(detail.tableHourlyRate) > 0
-          ? String(detail.tableHourlyRate)
+          ? formatProductNumericInput(detail.tableHourlyRate)
           : "",
       );
       setHourlyStartedAt(detail.tableHourlyStartedAt ?? null);
@@ -1978,7 +1995,9 @@ export function CorporatePOS() {
 
     const originalQty: Record<string, number> = {};
     for (const i of detail.items) {
-      originalQty[i.productId] = (originalQty[i.productId] ?? 0) + i.quantity;
+      originalQty[i.productId] =
+        (originalQty[i.productId] ?? 0) +
+        roundToMaxDp(Number(i.quantity) || 0, PRODUCT_NUMERIC_MAX_DP);
     }
     setEditingOriginalQtyByProduct(originalQty);
     const orderBirmarketOn = detail.birmarketCommissionEnabled === true;
@@ -1992,7 +2011,7 @@ export function CorporatePOS() {
           id: i.productId,
           name: i.productName,
           price: formatCartPriceInput(i.price),
-          quantity: i.quantity,
+          quantity: roundToMaxDp(Number(i.quantity) || 0, PRODUCT_NUMERIC_MAX_DP),
           image: "📦",
           productType: (i as { productType?: CartItem["productType"] }).productType,
           trackStock: (i as { trackStock?: boolean }).trackStock !== false,
@@ -2011,7 +2030,11 @@ export function CorporatePOS() {
               }
             : {}),
           ...(orderBirmarketOn && !isFree && Number.isFinite(pctRaw)
-            ? { birmarketCommissionPercent: Math.min(100, Math.max(0, pctRaw)) }
+            ? {
+                birmarketCommissionPercent: String(
+                  Math.min(100, Math.max(0, pctRaw)),
+                ),
+              }
             : {}),
         };
       }),
@@ -2023,17 +2046,20 @@ export function CorporatePOS() {
       detail.paymentMethod === "CARD" ? "card" : detail.paymentMethod === "CASH" ? "cash" : null,
     );
     setPaymentStatusChoice(payKey === "paid" ? "paid" : "pending");
-    setShippingInput(detail.shipping ?? "");
-    setServiceFeeInput(detail.serviceFee ?? "");
+    setShippingInput(formatProductNumericInput(detail.shipping ?? ""));
+    setServiceFeeInput(formatProductNumericInput(detail.serviceFee ?? ""));
     setHourlyRateInput(
       detail.tableHourlyRate != null && Number(detail.tableHourlyRate) > 0
-        ? String(detail.tableHourlyRate)
+        ? formatProductNumericInput(detail.tableHourlyRate)
         : "",
     );
     setHourlyStartedAt(detail.tableHourlyStartedAt ?? null);
     setHourlyEndedAt(detail.tableHourlyEndedAt ?? null);
     if (detail.discount && Number(detail.discount) > 0) {
-      setAppliedDiscount({ type: "fixed", value: Number(detail.discount) });
+      setAppliedDiscount({
+        type: "fixed",
+        value: roundToMaxDp(Number(detail.discount), PRODUCT_NUMERIC_MAX_DP),
+      });
     } else {
       setAppliedDiscount(null);
     }
@@ -2392,13 +2418,16 @@ export function CorporatePOS() {
       selectedTable?.hourlyRate != null &&
       selectedTable.hourlyRate > 0
     ) {
-      setHourlyRateInput(String(selectedTable.hourlyRate));
+      setHourlyRateInput(formatProductNumericInput(selectedTable.hourlyRate));
     } else {
       setHourlyRateInput("");
     }
   }, [selectedTableId, selectedTable?.hourlyRate, hourlyStartedAt]);
 
-  const hourlyRateValue = Math.max(0, parseFloat(hourlyRateInput) || 0);
+  const hourlyRateValue = Math.max(
+    0,
+    roundToMaxDp(parseNumericInput(hourlyRateInput, 0), PRODUCT_NUMERIC_MAX_DP),
+  );
   const hourlyTimerRunning = !!hourlyStartedAt && !hourlyEndedAt;
 
   useEffect(() => {
@@ -2887,7 +2916,7 @@ export function CorporatePOS() {
           trackStock: product.trackStock,
           scaleMeta,
           ...(birmarketCommissionFeatureOn && birmarketCommissionOn
-            ? { birmarketCommissionPercent: birmarketDefaultPercent }
+            ? { birmarketCommissionPercent: String(birmarketDefaultPercent) }
             : {}),
         },
       ]);
@@ -2902,11 +2931,11 @@ export function CorporatePOS() {
     // Weight units (kg/g) can have on-hand < 1; clamp default +1 to remaining stock.
     const remaining =
       !isService && stockEnabled
-        ? roundToMaxDp(available - inCartQty - freeQty, 3)
+        ? roundToMaxDp(available - inCartQty - freeQty, PRODUCT_NUMERIC_MAX_DP)
         : 1;
     const addQty =
       !isService && stockEnabled
-        ? roundToMaxDp(Math.min(1, Math.max(0, remaining)), 3)
+        ? roundToMaxDp(Math.min(1, Math.max(0, remaining)), PRODUCT_NUMERIC_MAX_DP)
         : 1;
 
     if (!isService && stockEnabled && available <= 0) {
@@ -2926,7 +2955,7 @@ export function CorporatePOS() {
           !i.isLoyaltyFree && !i.scaleMeta && i.id === product.id
             ? {
                 ...i,
-                quantity: roundToMaxDp(i.quantity + addQty, 3),
+                quantity: roundToMaxDp(i.quantity + addQty, PRODUCT_NUMERIC_MAX_DP),
                 unit: i.unit ?? product.unit,
               }
             : i,
@@ -2944,7 +2973,7 @@ export function CorporatePOS() {
           productType: product.productType,
           trackStock: product.trackStock,
           ...(birmarketCommissionFeatureOn && birmarketCommissionOn
-            ? { birmarketCommissionPercent: birmarketDefaultPercent }
+            ? { birmarketCommissionPercent: String(birmarketDefaultPercent) }
             : {}),
         },
       ];
@@ -2968,11 +2997,11 @@ export function CorporatePOS() {
     const available = getAvailableStock(product.id, product.stock);
     const remaining =
       !isService && stockEnabled
-        ? roundToMaxDp(available - paidQty - freeQty, 3)
+        ? roundToMaxDp(available - paidQty - freeQty, PRODUCT_NUMERIC_MAX_DP)
         : 1;
     const addQty =
       !isService && stockEnabled
-        ? roundToMaxDp(Math.min(1, Math.max(0, remaining)), 3)
+        ? roundToMaxDp(Math.min(1, Math.max(0, remaining)), PRODUCT_NUMERIC_MAX_DP)
         : 1;
     if (!isService && stockEnabled && available <= 0) {
       warnOutOfStock(product);
@@ -2988,7 +3017,7 @@ export function CorporatePOS() {
       if (existing) {
         return prev.map((i) =>
           i.lineKey === lineKey
-            ? { ...i, quantity: roundToMaxDp(i.quantity + addQty, 3) }
+            ? { ...i, quantity: roundToMaxDp(i.quantity + addQty, PRODUCT_NUMERIC_MAX_DP) }
             : i,
         );
       }
@@ -3368,9 +3397,13 @@ export function CorporatePOS() {
         excludePosOrderId: editingOrderId || null,
         lines: cart.map((i) => ({
           productId: i.id,
-          quantity: i.quantity,
+          quantity: roundToMaxDp(i.quantity, PRODUCT_NUMERIC_MAX_DP),
           lineTotal:
-            (Number.isFinite(cartUnitPrice(i.price)) ? cartUnitPrice(i.price) : 0) * i.quantity,
+            (i.isLoyaltyFree
+              ? 0
+              : Number.isFinite(cartUnitPrice(i.price))
+                ? cartUnitPrice(i.price)
+                : 0) * i.quantity,
           isLoyaltyFree: i.isLoyaltyFree === true,
           loyaltyOfferId: i.loyaltyOfferId ?? null,
         })),
@@ -3436,7 +3469,8 @@ export function CorporatePOS() {
       mode: "full" | "numpad",
       field: TouchKbField,
       force = false,
-      productId?: string,
+      /** For cartQty/cartPrice: `cartLineKey(item)`. */
+      lineKey?: string,
     ) => {
       const fromTouch =
         lastPointerType.current === "touch" || lastPointerType.current === "pen";
@@ -3449,7 +3483,7 @@ export function CorporatePOS() {
           prev.mode === mode &&
           prev.field === field &&
           (field === "cartQty" || field === "cartPrice"
-            ? prev.productId === productId
+            ? prev.productId === lineKey
             : true)
         ) {
           return prev;
@@ -3458,23 +3492,21 @@ export function CorporatePOS() {
         // cartQty must use a string buffer so backspace can clear "1" → "".
         let buffer: string | undefined;
         let replaceNext = false;
-        if (field === "cartQty" && productId) {
-          const item =
-            cartRef.current.find((i) => !i.isLoyaltyFree && i.id === productId) ??
-            cartRef.current.find((i) => i.id === productId);
-          buffer = item != null ? String(item.quantity) : "";
+        if (field === "cartQty" && lineKey) {
+          const item = cartRef.current.find((i) => cartLineKey(i) === lineKey);
+          buffer = item != null ? formatProductNumericInput(item.quantity) : "";
           // Match physical keyboard select-all on focus: first pad key replaces.
           replaceNext = buffer.length > 0;
-        } else if (field === "cartPrice" && productId) {
-          const item = cartRef.current.find((i) => i.id === productId);
+        } else if (field === "cartPrice" && lineKey) {
+          const item = cartRef.current.find((i) => cartLineKey(i) === lineKey);
           replaceNext = Boolean(item?.price);
         }
 
         return {
           mode,
           field,
-          ...((field === "cartPrice" || field === "cartQty") && productId
-            ? { productId }
+          ...((field === "cartPrice" || field === "cartQty") && lineKey
+            ? { productId: lineKey }
             : {}),
           ...(buffer !== undefined ? { buffer } : {}),
           ...(replaceNext ? { replaceNext: true } : {}),
@@ -3486,10 +3518,14 @@ export function CorporatePOS() {
   openWeightPricePadRef.current = (productId: string) => {
     // Force: barcode scan has no touch pointer, but weight lines need the pad on POS.
     // Enter weight (qty); catalog unit price stays unless cashier edits price separately.
+    const item =
+      cartRef.current.find((i) => !i.isLoyaltyFree && !i.scaleMeta && i.id === productId) ??
+      cartRef.current.find((i) => !i.isLoyaltyFree && i.id === productId) ??
+      cartRef.current.find((i) => i.id === productId);
     setTouchKb({
       mode: "numpad",
       field: "cartQty",
-      productId,
+      productId: item ? cartLineKey(item) : productId,
       buffer: "",
       replaceNext: false,
     });
@@ -3500,10 +3536,15 @@ export function CorporatePOS() {
     setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
   };
 
-  const setQuantity = (lineKeyOrId: string, quantity: number, maxStock?: number) => {
-    if (!canMutateCart) return;
+  /** Returns applied qty, or null if line removed / no-op blocked. */
+  const setQuantity = (
+    lineKeyOrId: string,
+    quantity: number,
+    maxStock?: number,
+  ): number | null => {
+    if (!canMutateCart) return null;
     const item = cart.find((i) => cartLineKey(i) === lineKeyOrId);
-    if (!item) return;
+    if (!item) return null;
     const product = products.find((p) => p.id === item.id);
     const isService =
       !item.trackStock ||
@@ -3511,17 +3552,17 @@ export function CorporatePOS() {
       !product?.trackStock ||
       product?.productType === "SERVICE";
 
-    let next = roundToMaxDp(quantity, 3);
+    let next = roundToMaxDp(quantity, PRODUCT_NUMERIC_MAX_DP);
     if (!Number.isFinite(next) || next <= 0) {
       setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
-      return;
+      return null;
     }
 
     // Loyalty free lines: cannot exceed remaining redeemable for that offer.
     if (item.isLoyaltyFree && item.loyaltyOfferId) {
       const offer = bxgxOffers.find((o) => o.offerId === item.loyaltyOfferId);
       const remaining = offer ? Math.max(0, Number(offer.redeemableFreeQty) || 0) : 0;
-      const maxFree = roundToMaxDp(item.quantity + remaining, 3);
+      const maxFree = roundToMaxDp(item.quantity + remaining, PRODUCT_NUMERIC_MAX_DP);
       if (next > maxFree) {
         notifyWarning(
           tr(
@@ -3546,7 +3587,7 @@ export function CorporatePOS() {
     if (!isService && stockEnabled) {
       if (listedAvailable <= 0) {
         if (product) warnOutOfStock(product);
-        return;
+        return item.quantity;
       }
       if (availableForLine > 0 && next > availableForLine) {
         if (product) warnInsufficientStock(product, availableForLine);
@@ -3554,7 +3595,7 @@ export function CorporatePOS() {
       }
     }
 
-    if (next === item.quantity) return;
+    if (next === item.quantity) return next;
     setCart((p) =>
       p.map((i) => {
         if (cartLineKey(i) !== lineKeyOrId) return i;
@@ -3575,6 +3616,7 @@ export function CorporatePOS() {
         };
       }),
     );
+    return next;
   };
 
   const updateQuantity = (lineKeyOrId: string, delta: number, maxStock?: number) => {
@@ -3587,15 +3629,18 @@ export function CorporatePOS() {
   const getCartQuantity = (productId: string) =>
     cart.filter((i) => i.id === productId).reduce((s, i) => s + i.quantity, 0);
 
-  const subtotal = cart.reduce(
-    (s, i) => s + (Number.isFinite(cartUnitPrice(i.price)) ? cartUnitPrice(i.price) : 0) * i.quantity,
-    0,
-  );
+  const subtotal = cart.reduce((s, i) => {
+    if (i.isLoyaltyFree) return s;
+    const p = cartUnitPrice(i.price);
+    return s + (Number.isFinite(p) ? p : 0) * i.quantity;
+  }, 0);
   const shipping =
-    cart.length > 0 ? Math.max(0, parseFloat(shippingInput) || 0) : 0;
+    cart.length > 0
+      ? Math.max(0, roundToMaxDp(parseNumericInput(shippingInput, 0), PRODUCT_NUMERIC_MAX_DP))
+      : 0;
   const serviceFee =
     cart.length > 0 && posServiceFeeEnabled
-      ? Math.max(0, parseFloat(serviceFeeInput) || 0)
+      ? Math.max(0, roundToMaxDp(parseNumericInput(serviceFeeInput, 0), PRODUCT_NUMERIC_MAX_DP))
       : 0;
   const manualDiscountAmount = appliedDiscount
     ? appliedDiscount.type === "percent"
@@ -3623,8 +3668,13 @@ export function CorporatePOS() {
   }, [loyaltyMode, subtotal, loyaltyRedeemAmount]);
 
   const handleApplyDiscount = () => {
-    const val = parseFloat(discountValue);
-    if (!isNaN(val) && val > 0) setAppliedDiscount({ type: discountType, value: val });
+    const val =
+      discountType === "percent"
+        ? parseNumericInput(discountValue, NaN)
+        : roundToMaxDp(parseNumericInput(discountValue, NaN), PRODUCT_NUMERIC_MAX_DP);
+    if (Number.isFinite(val) && val > 0) {
+      setAppliedDiscount({ type: discountType, value: val });
+    }
     setDiscountModalOpen(false);
     setDiscountValue("");
     setTouchKb(null);
@@ -3642,16 +3692,13 @@ export function CorporatePOS() {
             : touchKb?.field === "discount"
               ? discountValue
               : touchKb?.field === "cartPrice" && touchKb.productId
-                ? (cart.find((i) => i.id === touchKb.productId)?.price ?? "")
+                ? (cart.find((i) => cartLineKey(i) === touchKb.productId)?.price ?? "")
                 : touchKb?.field === "cartQty" && touchKb.productId
                   ? touchKb.buffer !== undefined
                     ? touchKb.buffer
-                    : String(
-                        (
-                          cart.find(
-                            (i) => !i.isLoyaltyFree && i.id === touchKb.productId,
-                          ) ?? cart.find((i) => i.id === touchKb.productId)
-                        )?.quantity ?? "",
+                    : formatProductNumericInput(
+                        cart.find((i) => cartLineKey(i) === touchKb.productId)?.quantity ??
+                          "",
                       )
                   : "";
 
@@ -3662,48 +3709,71 @@ export function CorporatePOS() {
         setSearchQuery(next);
         break;
       case "shipping":
-        setShippingInput(sanitizeNumericTyping(next, { allowDecimal: true }));
+        setShippingInput(
+          sanitizeNumericTypingMaxDp(next, PRODUCT_NUMERIC_MAX_DP, { allowDecimal: true }),
+        );
         break;
       case "serviceFee":
-        setServiceFeeInput(sanitizeNumericTyping(next, { allowDecimal: true }));
+        setServiceFeeInput(
+          sanitizeNumericTypingMaxDp(next, PRODUCT_NUMERIC_MAX_DP, { allowDecimal: true }),
+        );
         break;
       case "mileage":
         setMileageInput(sanitizeNumericTyping(next, { allowDecimal: false }));
         break;
       case "discount":
         setDiscountValue(
-          sanitizeNumericTyping(next, { allowDecimal: discountType !== "percent" }),
+          discountType === "percent"
+            ? sanitizeNumericTyping(next, { allowDecimal: false })
+            : sanitizeNumericTypingMaxDp(next, PRODUCT_NUMERIC_MAX_DP, {
+                allowDecimal: true,
+              }),
         );
         break;
       case "cartPrice": {
         if (!touchKb.productId || !canMutateCart) return;
-        const sanitized = sanitizeNumericTyping(next, { allowDecimal: true });
+        const sanitized = sanitizeNumericTypingMaxDp(next, PRODUCT_NUMERIC_MAX_DP, {
+          allowDecimal: true,
+        });
         setCart((prev) =>
           prev.map((i) =>
-            i.id === touchKb.productId ? { ...i, price: sanitized } : i,
+            cartLineKey(i) === touchKb.productId && !i.isLoyaltyFree
+              ? { ...i, price: sanitized }
+              : i,
           ),
         );
         break;
       }
       case "cartQty": {
         if (!touchKb.productId || !canMutateCart) return;
-        const sanitized = sanitizeNumericTypingMaxDp(next, 3, {
+        const sanitized = sanitizeNumericTypingMaxDp(next, PRODUCT_NUMERIC_MAX_DP, {
           allowDecimal: true,
         });
+        // Keep the typed draft (e.g. "1." / "1.0") — do not reformat on every keystroke.
         setTouchKb((kb) =>
           kb ? { ...kb, buffer: sanitized, replaceNext: false } : kb,
         );
-        const n = roundToMaxDp(parseNumericInput(sanitized, NaN), 3);
+        const n = roundToMaxDp(parseNumericInput(sanitized, NaN), PRODUCT_NUMERIC_MAX_DP);
         if (!Number.isFinite(n) || n <= 0) return;
-        const item =
-          cart.find((i) => !i.isLoyaltyFree && i.id === touchKb.productId) ??
-          cart.find((i) => i.id === touchKb.productId);
+        const item = cart.find((i) => cartLineKey(i) === touchKb.productId);
         if (!item) return;
         const product = products.find((p) => p.id === item.id);
         const available = product
           ? getAvailableStock(product.id, product.stock)
           : undefined;
-        setQuantity(cartLineKey(item), n, available);
+        const applied = setQuantity(cartLineKey(item), n, available);
+        // Only rewrite the draft when stock/loyalty clamp changed the value.
+        if (applied != null && applied !== n) {
+          setTouchKb((kb) =>
+            kb
+              ? {
+                  ...kb,
+                  buffer: formatProductNumericInput(applied),
+                  replaceNext: false,
+                }
+              : kb,
+          );
+        }
         break;
       }
     }
@@ -3837,15 +3907,29 @@ export function CorporatePOS() {
                 : {}),
               items: cart.map((i) => ({
                 productId: i.id,
-                quantity: i.quantity,
-                price: cartUnitPrice(i.price),
-                ...(birmarketCommissionFeatureOn && birmarketCommissionOn
+                quantity: roundToMaxDp(i.quantity, PRODUCT_NUMERIC_MAX_DP),
+                price: i.isLoyaltyFree
+                  ? 0
+                  : roundToMaxDp(
+                      Number.isFinite(cartUnitPrice(i.price))
+                        ? cartUnitPrice(i.price)
+                        : 0,
+                      PRODUCT_NUMERIC_MAX_DP,
+                    ),
+                ...(i.isLoyaltyFree
                   ? {
-                      birmarketCommissionPercent:
-                        i.birmarketCommissionPercent != null &&
-                        Number.isFinite(i.birmarketCommissionPercent)
-                          ? Math.min(100, Math.max(0, i.birmarketCommissionPercent))
-                          : birmarketDefaultPercent,
+                      isLoyaltyFree: true,
+                      loyaltyOfferId: i.loyaltyOfferId ?? null,
+                    }
+                  : {}),
+                ...(birmarketCommissionFeatureOn &&
+                birmarketCommissionOn &&
+                !i.isLoyaltyFree
+                  ? {
+                      birmarketCommissionPercent: birmarketPctNum(
+                        i.birmarketCommissionPercent,
+                        birmarketDefaultPercent,
+                      ),
                     }
                   : {}),
               })),
@@ -4137,18 +4221,23 @@ export function CorporatePOS() {
       : {}),
     items: cart.map((i) => ({
       productId: i.id,
-      quantity: i.quantity,
-      price: i.isLoyaltyFree ? 0 : cartUnitPrice(i.price),
+      quantity: roundToMaxDp(i.quantity, PRODUCT_NUMERIC_MAX_DP),
+      price: i.isLoyaltyFree
+        ? 0
+        : roundToMaxDp(
+            Number.isFinite(cartUnitPrice(i.price)) ? cartUnitPrice(i.price) : 0,
+            PRODUCT_NUMERIC_MAX_DP,
+          ),
       ...(i.isLoyaltyFree
         ? { isLoyaltyFree: true, loyaltyOfferId: i.loyaltyOfferId ?? null }
         : {}),
       ...(i.scaleMeta ? { scaleMeta: i.scaleMeta } : {}),
       ...(birmarketActive && !i.isLoyaltyFree
         ? {
-            birmarketCommissionPercent:
-              i.birmarketCommissionPercent != null && Number.isFinite(i.birmarketCommissionPercent)
-                ? Math.min(100, Math.max(0, i.birmarketCommissionPercent))
-                : birmarketDefaultPercent,
+            birmarketCommissionPercent: birmarketPctNum(
+              i.birmarketCommissionPercent,
+              birmarketDefaultPercent,
+            ),
           }
         : {}),
     })),
@@ -4344,15 +4433,29 @@ export function CorporatePOS() {
             : {}),
           items: cart.map((i) => ({
             productId: i.id,
-            quantity: i.quantity,
-            price: cartUnitPrice(i.price),
-            ...(birmarketCommissionFeatureOn && birmarketCommissionOn
+            quantity: roundToMaxDp(i.quantity, PRODUCT_NUMERIC_MAX_DP),
+            price: i.isLoyaltyFree
+              ? 0
+              : roundToMaxDp(
+                  Number.isFinite(cartUnitPrice(i.price))
+                    ? cartUnitPrice(i.price)
+                    : 0,
+                  PRODUCT_NUMERIC_MAX_DP,
+                ),
+            ...(i.isLoyaltyFree
               ? {
-                  birmarketCommissionPercent:
-                    i.birmarketCommissionPercent != null &&
-                    Number.isFinite(i.birmarketCommissionPercent)
-                      ? Math.min(100, Math.max(0, i.birmarketCommissionPercent))
-                      : birmarketDefaultPercent,
+                  isLoyaltyFree: true,
+                  loyaltyOfferId: i.loyaltyOfferId ?? null,
+                }
+              : {}),
+            ...(birmarketCommissionFeatureOn &&
+            birmarketCommissionOn &&
+            !i.isLoyaltyFree
+              ? {
+                  birmarketCommissionPercent: birmarketPctNum(
+                    i.birmarketCommissionPercent,
+                    birmarketDefaultPercent,
+                  ),
                 }
               : {}),
           })),
@@ -5876,7 +5979,9 @@ export function CorporatePOS() {
                           value={hourlyRateInput}
                           onChange={(e) =>
                             setHourlyRateInput(
-                              sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                              sanitizeNumericTypingMaxDp(e.target.value, PRODUCT_NUMERIC_MAX_DP, {
+                                allowDecimal: true,
+                              }),
                             )
                           }
                           className="w-full pr-7 pl-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6] disabled:opacity-60"
@@ -6080,19 +6185,27 @@ export function CorporatePOS() {
                                 inputMode="decimal"
                                 value={
                                   item.birmarketCommissionPercent != null
-                                    ? String(item.birmarketCommissionPercent)
+                                    ? item.birmarketCommissionPercent
                                     : String(birmarketDefaultPercent)
                                 }
                                 onChange={(e) => {
                                   const raw = sanitizeNumericTyping(e.target.value, {
                                     allowDecimal: true,
                                   });
-                                  const n = parseNumericInput(raw, birmarketDefaultPercent);
-                                  const clamped = Math.min(100, Math.max(0, n));
+                                  // Keep incomplete drafts ("1."); only clamp finished numbers.
+                                  let next = raw;
+                                  if (raw !== "" && raw !== "." && !raw.endsWith(".")) {
+                                    const n = parseNumericInput(raw, NaN);
+                                    if (Number.isFinite(n)) {
+                                      if (n > 100) next = "100";
+                                      else if (n < 0) next = "0";
+                                    }
+                                  }
+                                  const key = cartLineKey(item);
                                   setCart((prev) =>
                                     prev.map((c) =>
-                                      c.id === item.id
-                                        ? { ...c, birmarketCommissionPercent: clamped }
+                                      cartLineKey(c) === key
+                                        ? { ...c, birmarketCommissionPercent: next }
                                         : c,
                                     ),
                                   );
@@ -6106,10 +6219,10 @@ export function CorporatePOS() {
                                 {(
                                   unitAmt *
                                   item.quantity *
-                                  ((item.birmarketCommissionPercent != null &&
-                                  Number.isFinite(item.birmarketCommissionPercent)
-                                    ? item.birmarketCommissionPercent
-                                    : birmarketDefaultPercent) /
+                                  (birmarketPctNum(
+                                    item.birmarketCommissionPercent,
+                                    birmarketDefaultPercent,
+                                  ) /
                                     100)
                                 ).toFixed(2)}
                               </span>
@@ -6122,20 +6235,35 @@ export function CorporatePOS() {
                                 inputMode="decimal"
                                 value={item.price}
                                 onChange={(e) => {
-                                  const next = sanitizeNumericTyping(e.target.value, {
-                                    allowDecimal: true,
-                                  });
+                                  const next = sanitizeNumericTypingMaxDp(
+                                    e.target.value,
+                                    PRODUCT_NUMERIC_MAX_DP,
+                                    { allowDecimal: true },
+                                  );
+                                  const key = cartLineKey(item);
                                   setCart((prev) =>
                                     prev.map((i) =>
-                                      i.id === item.id ? { ...i, price: next } : i,
+                                      cartLineKey(i) === key && !i.isLoyaltyFree
+                                        ? { ...i, price: next }
+                                        : i,
                                     ),
                                   );
                                 }}
                                 onFocus={() =>
-                                  openTouchKb("numpad", "cartPrice", false, item.id)
+                                  openTouchKb(
+                                    "numpad",
+                                    "cartPrice",
+                                    false,
+                                    cartLineKey(item),
+                                  )
                                 }
                                 onClick={() =>
-                                  openTouchKb("numpad", "cartPrice", true, item.id)
+                                  openTouchKb(
+                                    "numpad",
+                                    "cartPrice",
+                                    true,
+                                    cartLineKey(item),
+                                  )
                                 }
                                 disabled={!canMutateCart}
                                 className="w-20 px-1.5 py-0.5 text-[11px] font-semibold text-[#14b8a6] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-40"
@@ -6197,14 +6325,24 @@ export function CorporatePOS() {
                               disabled={!canMutateCart}
                               onCommit={(qty) => setQuantity(cartLineKey(item), qty, available)}
                               onFocusPad={() =>
-                                openTouchKb("numpad", "cartQty", false, item.id)
+                                openTouchKb(
+                                  "numpad",
+                                  "cartQty",
+                                  false,
+                                  cartLineKey(item),
+                                )
                               }
                               onClickPad={() =>
-                                openTouchKb("numpad", "cartQty", true, item.id)
+                                openTouchKb(
+                                  "numpad",
+                                  "cartQty",
+                                  true,
+                                  cartLineKey(item),
+                                )
                               }
                               draftText={
                                 touchKb?.field === "cartQty" &&
-                                touchKb.productId === item.id &&
+                                touchKb.productId === cartLineKey(item) &&
                                 touchKb.buffer !== undefined
                                   ? touchKb.buffer
                                   : undefined
@@ -6213,7 +6351,7 @@ export function CorporatePOS() {
                                 if (
                                   !touchKb ||
                                   touchKb.field !== "cartQty" ||
-                                  touchKb.productId !== item.id
+                                  touchKb.productId !== cartLineKey(item)
                                 ) {
                                   return;
                                 }
@@ -6303,9 +6441,9 @@ export function CorporatePOS() {
                                     ...l,
                                     birmarketCommissionPercent:
                                       l.birmarketCommissionPercent != null &&
-                                      Number.isFinite(l.birmarketCommissionPercent)
+                                      l.birmarketCommissionPercent !== ""
                                         ? l.birmarketCommissionPercent
-                                        : birmarketDefaultPercent,
+                                        : String(birmarketDefaultPercent),
                                   })),
                                 );
                               }
@@ -6339,7 +6477,11 @@ export function CorporatePOS() {
                               value={serviceFeeInput}
                               onChange={(e) =>
                                 setServiceFeeInput(
-                                  sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                                  sanitizeNumericTypingMaxDp(
+                                    e.target.value,
+                                    PRODUCT_NUMERIC_MAX_DP,
+                                    { allowDecimal: true },
+                                  ),
                                 )
                               }
                               onFocus={() => openTouchKb("numpad", "serviceFee")}
@@ -6667,13 +6809,25 @@ export function CorporatePOS() {
             </div>
             <div className="flex gap-2 mb-4">
               <button
-                onClick={() => setDiscountType("percent")}
+                onClick={() => {
+                  setDiscountType("percent");
+                  setDiscountValue((v) =>
+                    sanitizeNumericTyping(v, { allowDecimal: false }),
+                  );
+                }}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${discountType === "percent" ? "bg-[#14b8a6] text-white border-[#14b8a6]" : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-50"}`}
               >
                 {tr("Faiz (%)", "Percent (%)")}
               </button>
               <button
-                onClick={() => setDiscountType("fixed")}
+                onClick={() => {
+                  setDiscountType("fixed");
+                  setDiscountValue((v) =>
+                    sanitizeNumericTypingMaxDp(v, PRODUCT_NUMERIC_MAX_DP, {
+                      allowDecimal: true,
+                    }),
+                  );
+                }}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${discountType === "fixed" ? "bg-[#14b8a6] text-white border-[#14b8a6]" : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-50"}`}
               >
                 {tr("Sabit (₼)", "Fixed (₼)")}
@@ -6687,9 +6841,11 @@ export function CorporatePOS() {
                 value={discountValue}
                 onChange={(e) =>
                   setDiscountValue(
-                    sanitizeNumericTyping(e.target.value, {
-                      allowDecimal: discountType !== "percent",
-                    }),
+                    discountType === "percent"
+                      ? sanitizeNumericTyping(e.target.value, { allowDecimal: false })
+                      : sanitizeNumericTypingMaxDp(e.target.value, PRODUCT_NUMERIC_MAX_DP, {
+                          allowDecimal: true,
+                        }),
                   )
                 }
                 onFocus={() => openTouchKb("numpad", "discount")}
@@ -6747,7 +6903,9 @@ export function CorporatePOS() {
                 value={shippingInput}
                 onChange={(e) =>
                   setShippingInput(
-                    sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                    sanitizeNumericTypingMaxDp(e.target.value, PRODUCT_NUMERIC_MAX_DP, {
+                      allowDecimal: true,
+                    }),
                   )
                 }
                 onFocus={() => openTouchKb("numpad", "shipping")}

@@ -32,9 +32,9 @@ import {
 interface ProductItem {
   id: string;
   name: string;
-  unitPrice: number | "";
+  unitPrice: string;
   stock: number;
-  qty: number | "";
+  qty: string;
   /** Units already returned for this product (locked floor). */
   returnedQty: number;
 }
@@ -61,12 +61,6 @@ const NUMPAD_KINDS = new Set([
   "linePrice",
 ]);
 
-function bufferToNumber(s: string): number | "" {
-  if (s === "") return "";
-  const n = Number(s);
-  return Number.isFinite(n) ? n : "";
-}
-
 export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleModalProps) {
   const { language } = useLanguage();
   const { isDemo, isAuthenticated, user, hasModule } = useAuth();
@@ -90,12 +84,12 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
   const [reference, setReference] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PosUiPaymentMethod>("cash");
   const [status, setStatus] = useState("completed");
-  const [shipping, setShipping] = useState<number | "">("");
-  const [serviceFee, setServiceFee] = useState<number | "">("");
+  const [shipping, setShipping] = useState("");
+  const [serviceFee, setServiceFee] = useState("");
   const [commissionAmount, setCommissionAmount] = useState<number | "">("");
   const [commissionEnabled, setCommissionEnabled] = useState(false);
-  const [discount, setDiscount] = useState<number | "">("");
-  const [taxPercent, setTaxPercent] = useState<number | "">("");
+  const [discount, setDiscount] = useState("");
+  const [taxPercent, setTaxPercent] = useState("");
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [showProductList, setShowProductList] = useState(false);
@@ -137,12 +131,12 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
           return m === "bank" ? "cash" : m;
         })());
         setStatus(data.status.toLowerCase());
-        setShipping(data.shipping ? parseFloat(data.shipping) : 0);
-        setServiceFee(data.serviceFee ? parseFloat(data.serviceFee) : 0);
+        setShipping(String(data.shipping ? parseFloat(data.shipping) || 0 : 0));
+        setServiceFee(String(data.serviceFee ? parseFloat(data.serviceFee) || 0 : 0));
         setCommissionEnabled(Boolean(data.commissionEnabled));
         setCommissionAmount(data.commissionAmount ? parseFloat(data.commissionAmount) : 0);
-        setDiscount(data.discount ? parseFloat(data.discount) : 0);
-        setTaxPercent(data.taxPercent ? parseFloat(data.taxPercent) : 0);
+        setDiscount(String(data.discount ? parseFloat(data.discount) || 0 : 0));
+        setTaxPercent(String(data.taxPercent ? parseFloat(data.taxPercent) || 0 : 0));
         setStockDeducted(Boolean(data.stockDeducted));
         setPaidAmount(parseFloat(data.paid) || 0);
         setRefundedAmount(parseFloat(data.refunded ?? "0") || 0);
@@ -153,15 +147,15 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
           const returnedQty = item.returnedQty ?? 0;
           const prev = byProduct.get(item.productId);
           if (prev) {
-            prev.qty += item.quantity;
+            prev.qty = String(asNumber(prev.qty) + item.quantity);
             prev.returnedQty = Math.max(prev.returnedQty, returnedQty);
           } else {
             byProduct.set(item.productId, {
               id: item.productId,
               name: item.productName,
-              unitPrice: parseFloat(item.price) || 0,
+              unitPrice: String(parseFloat(item.price) || 0),
               stock: 0,
-              qty: item.quantity,
+              qty: String(item.quantity),
               returnedQty,
             });
           }
@@ -224,9 +218,9 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
         {
           id: detail.id,
           name: detail.name,
-          unitPrice: parseFloat(detail.price) || 0,
+          unitPrice: String(parseFloat(detail.price) || 0),
           stock: detail.quantity,
-          qty: 1,
+          qty: "1",
           returnedQty: 0,
         },
       ]);
@@ -237,7 +231,7 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
     }
   };
 
-  const handleUpdateProduct = (id: string, field: "unitPrice" | "qty", value: number | "") => {
+  const handleUpdateProduct = (id: string, field: "unitPrice" | "qty", value: string) => {
     if (!itemsEditable) return;
     setProducts((prev) =>
       prev.map((p) => {
@@ -260,20 +254,20 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
       case "mileage":
         return mileageAtService;
       case "taxPercent":
-        return taxPercent === "" ? "" : String(taxPercent);
+        return taxPercent;
       case "discount":
-        return discount === "" ? "" : String(discount);
+        return discount;
       case "shipping":
-        return shipping === "" ? "" : String(shipping);
+        return shipping;
       case "serviceFee":
-        return serviceFee === "" ? "" : String(serviceFee);
+        return serviceFee;
       case "lineQty": {
         const line = products.find((p) => p.id === target.productId);
-        return line == null || line.qty === "" ? "" : String(line.qty);
+        return line?.qty ?? "";
       }
       case "linePrice": {
         const line = products.find((p) => p.id === target.productId);
-        return line == null || line.unitPrice === "" ? "" : String(line.unitPrice);
+        return line?.unitPrice ?? "";
       }
     }
   };
@@ -307,26 +301,26 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
         setMileageAtService(sanitizeNumericTyping(next, { allowDecimal: false }));
         break;
       case "taxPercent":
-        setTaxPercent(bufferToNumber(next));
+        setTaxPercent(sanitizeNumericTyping(next));
         break;
       case "discount":
-        setDiscount(bufferToNumber(next));
+        setDiscount(sanitizeNumericTyping(next));
         break;
       case "shipping":
-        setShipping(bufferToNumber(next));
+        setShipping(sanitizeNumericTyping(next));
         break;
       case "serviceFee":
-        setServiceFee(bufferToNumber(next));
+        setServiceFee(sanitizeNumericTyping(next));
         break;
       case "lineQty":
         handleUpdateProduct(
           touchKb.productId,
           "qty",
-          bufferToNumber(sanitizeNumericTypingMaxDp(next, 3)),
+          sanitizeNumericTypingMaxDp(next, 3),
         );
         break;
       case "linePrice":
-        handleUpdateProduct(touchKb.productId, "unitPrice", bufferToNumber(next));
+        handleUpdateProduct(touchKb.productId, "unitPrice", sanitizeNumericTyping(next));
         break;
     }
   };
@@ -810,17 +804,16 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                             <input
                               type="text"
                               inputMode="none"
-                              value={product.unitPrice === "" ? "" : product.unitPrice}
-                              onChange={(e) => {
-                                const s = sanitizeNumericTyping(e.target.value, {
-                                  allowDecimal: true,
-                                });
+                              value={product.unitPrice}
+                              onChange={(e) =>
                                 handleUpdateProduct(
                                   product.id,
                                   "unitPrice",
-                                  s === "" ? "" : Number(s),
-                                );
-                              }}
+                                  sanitizeNumericTyping(e.target.value, {
+                                    allowDecimal: true,
+                                  }),
+                                )
+                              }
                               onFocus={() => openTouchKb({ kind: "linePrice", productId: product.id })}
                               className="w-24 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                             />
@@ -836,15 +829,14 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                             <input
                               type="text"
                               inputMode="none"
-                              value={product.qty === "" ? "" : product.qty}
-                              onChange={(e) => {
-                                const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
+                              value={product.qty}
+                              onChange={(e) =>
                                 handleUpdateProduct(
                                   product.id,
                                   "qty",
-                                  s === "" ? "" : Number(s),
-                                );
-                              }}
+                                  sanitizeNumericTypingMaxDp(e.target.value, 3),
+                                )
+                              }
                               onFocus={() => openTouchKb({ kind: "lineQty", productId: product.id })}
                               className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                             />
@@ -880,11 +872,10 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <input
                   type="text"
                   inputMode="none"
-                  value={taxPercent === "" ? "" : taxPercent}
-                  onChange={(e) => {
-                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                    setTaxPercent(s === "" ? "" : Number(s));
-                  }}
+                  value={taxPercent}
+                  onChange={(e) =>
+                    setTaxPercent(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                  }
                   onFocus={() => openTouchKb({ kind: "taxPercent" })}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
@@ -896,11 +887,10 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <input
                   type="text"
                   inputMode="none"
-                  value={discount === "" ? "" : discount}
-                  onChange={(e) => {
-                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                    setDiscount(s === "" ? "" : Number(s));
-                  }}
+                  value={discount}
+                  onChange={(e) =>
+                    setDiscount(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                  }
                   onFocus={() => openTouchKb({ kind: "discount" })}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
@@ -912,11 +902,10 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <input
                   type="text"
                   inputMode="none"
-                  value={shipping === "" ? "" : shipping}
-                  onChange={(e) => {
-                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                    setShipping(s === "" ? "" : Number(s));
-                  }}
+                  value={shipping}
+                  onChange={(e) =>
+                    setShipping(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                  }
                   onFocus={() => openTouchKb({ kind: "shipping" })}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />
@@ -928,11 +917,10 @@ export function EditSaleModal({ orderId, isOpen, onClose, onSaved }: EditSaleMod
                 <input
                   type="text"
                   inputMode="none"
-                  value={serviceFee === "" ? "" : serviceFee}
-                  onChange={(e) => {
-                    const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                    setServiceFee(s === "" ? "" : Number(s));
-                  }}
+                  value={serviceFee}
+                  onChange={(e) =>
+                    setServiceFee(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                  }
                   onFocus={() => openTouchKb({ kind: "serviceFee" })}
                   className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                 />

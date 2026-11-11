@@ -80,14 +80,25 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
   }, [isOpen]);
 
   const handleSave = () => {
-    const qty = parseInt(adjustmentQty);
-    if (adjustment && product && warehouse && store && adjustmentQty && !isNaN(qty) && qty !== 0 && reason && referenceNumber && responsiblePerson) {
+    const qty = Number(String(adjustmentQty).trim().replace(",", "."));
+    if (
+      adjustment &&
+      product &&
+      warehouse &&
+      store &&
+      adjustmentQty &&
+      Number.isFinite(qty) &&
+      qty !== 0 &&
+      reason &&
+      referenceNumber &&
+      responsiblePerson
+    ) {
       onSave({
         id: adjustment.id,
         product,
         warehouse,
         store,
-        adjustmentQty: qty,
+        adjustmentQty: Math.round(qty * 1000) / 1000,
         reason,
         referenceNumber,
         responsiblePerson,
@@ -191,7 +202,8 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
               {tr("Tənzimləmə Miqdarı", "Adjustment Quantity")} <span className="text-red-500">*</span>
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={adjustmentQty}
               onChange={(e) => setAdjustmentQty(e.target.value)}
               placeholder={tr("+50 və ya -30", "+50 or -30")}
@@ -285,7 +297,17 @@ export function EditAdjustmentModal({ isOpen, adjustment, onClose, onSave }: Edi
           </button>
           <button
             onClick={handleSave}
-            disabled={!product || !warehouse || !store || !adjustmentQty || parseInt(adjustmentQty) === 0 || isNaN(parseInt(adjustmentQty)) || !reason || !referenceNumber || !responsiblePerson}
+            disabled={
+              !product ||
+              !warehouse ||
+              !store ||
+              !adjustmentQty ||
+              !Number.isFinite(Number(String(adjustmentQty).trim().replace(",", "."))) ||
+              Number(String(adjustmentQty).trim().replace(",", ".")) === 0 ||
+              !reason ||
+              !referenceNumber ||
+              !responsiblePerson
+            }
             className="px-3 py-1.5 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {tr("Dəyişiklikləri Yadda Saxla", "Save Changes")}

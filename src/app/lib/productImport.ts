@@ -164,18 +164,22 @@ function joinImageUrls(images: string[] | undefined, fallback: string | undefine
   return fallback?.trim() || "";
 }
 
+/** Export qty/alert as clean ≤3 dp strings (avoids JS float noise like 1.2500000002). */
+function formatQtyForExport(value: number | null | undefined): string {
+  if (value == null) return "";
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return "";
+  return String(roundToMaxDp(n, 3));
+}
+
 /** Map a list API product into a full spreadsheet row (create/edit field set). */
 export function productToExportCells(
   product: ProductListItem,
   options?: { stockEnabled?: boolean },
 ): string[] {
   const stockEnabled = options?.stockEnabled !== false;
-  const qty =
-    stockEnabled && product.quantity != null && Number.isFinite(Number(product.quantity))
-      ? String(product.quantity)
-      : "";
-  const qtyAlert =
-    stockEnabled && product.quantityAlert != null ? String(product.quantityAlert) : "";
+  const qty = stockEnabled ? formatQtyForExport(product.quantity) : "";
+  const qtyAlert = stockEnabled ? formatQtyForExport(product.quantityAlert) : "";
 
   const byHeader: Record<ProductFileColumn, string> = {
     SKU: product.sku ?? "",
@@ -226,6 +230,18 @@ export function downloadProductExportXlsx(
 ) {
   const aoa = buildProductExportAoA(products, options);
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  // Keep Quantity / Quantity Alert as text so Excel does not coerce decimals.
+  const qtyCol = PRODUCT_FILE_COLUMNS.indexOf("Quantity");
+  const alertCol = PRODUCT_FILE_COLUMNS.indexOf("Quantity Alert");
+  for (let r = 1; r < aoa.length; r++) {
+    for (const c of [qtyCol, alertCol]) {
+      if (c < 0) continue;
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const cell = sheet[addr];
+      if (!cell || cell.v == null || cell.v === "") continue;
+      sheet[addr] = { t: "s", v: String(cell.v) };
+    }
+  }
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, "Products");
   XLSX.writeFile(book, filename);
@@ -274,8 +290,8 @@ export function downloadProductDemoCsv(options?: { stockEnabled?: boolean }) {
       discountValue: "5",
       taxType: null,
       taxPercent: null,
-      quantity: stockEnabled ? 50 : null,
-      quantityAlert: stockEnabled ? 5 : null,
+      quantity: stockEnabled ? 12.5 : null,
+      quantityAlert: stockEnabled ? 1.25 : null,
       manufacturer: "Demo Mfg",
       warranty: "",
       manufacturedDate: "2026-01-15",

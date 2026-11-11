@@ -21,6 +21,8 @@ import { ModernSelect } from "../ui/ModernSelect";
 import { pickLang } from "../../i18n/pickLang";
 import {
   asNumber,
+  parseNumericInput,
+  roundToMaxDp,
   sanitizeNumericTyping,
   sanitizeNumericTypingMaxDp,
 } from "../../lib/numericInput";
@@ -29,10 +31,10 @@ interface ProductLine {
   productId: string;
   name: string;
   sku: string;
-  qty: number | "";
-  purchasePrice: number | "";
-  discount: number | "";
-  taxPercent: number | "";
+  qty: string;
+  purchasePrice: string;
+  discount: string;
+  taxPercent: string;
 }
 
 interface AddPurchaseReturnModalProps {
@@ -59,9 +61,9 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
   const [reference, setReference] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [products, setProducts] = useState<ProductLine[]>([]);
-  const [orderTax, setOrderTax] = useState<number | "">("");
-  const [discount, setDiscount] = useState<number | "">("");
-  const [shipping, setShipping] = useState<number | "">("");
+  const [orderTax, setOrderTax] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [shipping, setShipping] = useState("");
   const [status, setStatus] = useState("pending");
   const [description, setDescription] = useState("");
   const [storeId, setStoreId] = useState("");
@@ -232,10 +234,10 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
         productId: id,
         name,
         sku,
-        qty: 1,
-        purchasePrice: purchaseLine ? parseFloat(purchaseLine.purchasePrice) || 0 : 0,
-        discount: purchaseLine ? parseFloat(purchaseLine.discount) || 0 : 0,
-        taxPercent: purchaseLine ? parseFloat(purchaseLine.taxPercent) || 0 : 0,
+        qty: "1",
+        purchasePrice: String(purchaseLine ? parseFloat(purchaseLine.purchasePrice) || 0 : 0),
+        discount: String(purchaseLine ? parseFloat(purchaseLine.discount) || 0 : 0),
+        taxPercent: String(purchaseLine ? parseFloat(purchaseLine.taxPercent) || 0 : 0),
       },
     ]);
     setProductSearch("");
@@ -245,16 +247,36 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
   const handleUpdateLine = (
     productId: string,
     field: keyof Pick<ProductLine, "qty" | "purchasePrice" | "discount" | "taxPercent">,
-    value: number | "",
+    value: string,
   ) => {
     setProducts(
       products.map((p) => {
         if (p.productId !== productId) return p;
         if (field !== "qty") return { ...p, [field]: value };
-        if (value === "") return { ...p, qty: "" };
+        // Keep incomplete drafts ("", "1.", ".") untouched so typing is never wiped.
+        if (value === "" || value === "." || value.endsWith(".")) return { ...p, qty: value };
+        const parsed = parseNumericInput(value, NaN);
+        if (!Number.isFinite(parsed)) return { ...p, qty: value };
         const max = getMaxQty(productId);
-        const nextQty = max != null ? Math.min(Math.max(1, value), max) : Math.max(1, value);
-        return { ...p, qty: nextQty };
+        // Only rewrite the draft when it exceeds the max (preserves "1.0", "0.5", etc.).
+        if (max != null && parsed > max) return { ...p, qty: String(max) };
+        return { ...p, qty: value };
+      }),
+    );
+  };
+
+  /** On blur, drop invalid/non-positive drafts; keep fractional qty (≤3 dp). */
+  const handleQtyBlur = (productId: string) => {
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (p.productId !== productId || p.qty === "") return p;
+        const parsed = parseNumericInput(p.qty, NaN);
+        if (!Number.isFinite(parsed) || parsed <= 0) return { ...p, qty: "" };
+        const max = getMaxQty(productId);
+        const rounded = roundToMaxDp(parsed, 3);
+        const clamped =
+          max != null && rounded > max ? roundToMaxDp(max, 3) : rounded;
+        return { ...p, qty: String(clamped) };
       }),
     );
   };
@@ -382,9 +404,10 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
     status &&
     (!(isGlobalMode || status === "received") || !!resolvedStoreId) &&
     products.every((p) => {
-      if (p.qty <= 0 || p.purchasePrice < 0) return false;
+      const qtyNum = asNumber(p.qty);
+      if (qtyNum <= 0 || asNumber(p.purchasePrice) < 0) return false;
       const max = getMaxQty(p.productId);
-      return max == null || p.qty <= max;
+      return max == null || qtyNum <= max;
     });
 
   return (
@@ -578,16 +601,16 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
                       <td className="px-2 py-2">
                         <input
                           type="text"
-                          inputMode="numeric"
-                          value={product.qty === "" ? "" : product.qty}
-                          onChange={(e) => {
-                            const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
+                          inputMode="decimal"
+                          value={product.qty}
+                          onChange={(e) =>
                             handleUpdateLine(
                               product.productId,
                               "qty",
-                              s === "" ? "" : Number(s),
-                            );
-                          }}
+                              sanitizeNumericTypingMaxDp(e.target.value, 3),
+                            )
+                          }
+                          onBlur={() => handleQtyBlur(product.productId)}
                           className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                         />
                         {getQtyHint(product.productId) && (
@@ -600,17 +623,14 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={product.purchasePrice === "" ? "" : product.purchasePrice}
-                          onChange={(e) => {
-                            const s = sanitizeNumericTyping(e.target.value, {
-                              allowDecimal: true,
-                            });
+                          value={product.purchasePrice}
+                          onChange={(e) =>
                             handleUpdateLine(
                               product.productId,
                               "purchasePrice",
-                              s === "" ? "" : Number(s),
-                            );
-                          }}
+                              sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                            )
+                          }
                           className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                         />
                       </td>
@@ -618,17 +638,14 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={product.discount === "" ? "" : product.discount}
-                          onChange={(e) => {
-                            const s = sanitizeNumericTyping(e.target.value, {
-                              allowDecimal: true,
-                            });
+                          value={product.discount}
+                          onChange={(e) =>
                             handleUpdateLine(
                               product.productId,
                               "discount",
-                              s === "" ? "" : Number(s),
-                            );
-                          }}
+                              sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                            )
+                          }
                           className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                         />
                       </td>
@@ -636,17 +653,14 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={product.taxPercent === "" ? "" : product.taxPercent}
-                          onChange={(e) => {
-                            const s = sanitizeNumericTyping(e.target.value, {
-                              allowDecimal: true,
-                            });
+                          value={product.taxPercent}
+                          onChange={(e) =>
                             handleUpdateLine(
                               product.productId,
                               "taxPercent",
-                              s === "" ? "" : Number(s),
-                            );
-                          }}
+                              sanitizeNumericTyping(e.target.value, { allowDecimal: true }),
+                            )
+                          }
                           className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800"
                         />
                       </td>
@@ -683,11 +697,10 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
               <input
                 type="text"
                 inputMode="decimal"
-                value={orderTax === "" ? "" : orderTax}
-                onChange={(e) => {
-                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                  setOrderTax(s === "" ? "" : Number(s));
-                }}
+                value={orderTax}
+                onChange={(e) =>
+                  setOrderTax(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                }
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
               />
             </div>
@@ -698,11 +711,10 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
               <input
                 type="text"
                 inputMode="decimal"
-                value={discount === "" ? "" : discount}
-                onChange={(e) => {
-                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                  setDiscount(s === "" ? "" : Number(s));
-                }}
+                value={discount}
+                onChange={(e) =>
+                  setDiscount(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                }
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
               />
             </div>
@@ -713,11 +725,10 @@ export function AddPurchaseReturnModal({ isOpen, onClose, onSaved }: AddPurchase
               <input
                 type="text"
                 inputMode="decimal"
-                value={shipping === "" ? "" : shipping}
-                onChange={(e) => {
-                  const s = sanitizeNumericTyping(e.target.value, { allowDecimal: true });
-                  setShipping(s === "" ? "" : Number(s));
-                }}
+                value={shipping}
+                onChange={(e) =>
+                  setShipping(sanitizeNumericTyping(e.target.value, { allowDecimal: true }))
+                }
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
               />
             </div>

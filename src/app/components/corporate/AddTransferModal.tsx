@@ -246,8 +246,8 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
                   )}
                 </div>
                 <input
-                  type="number"
-                  min={1}
+                  type="text"
+                  inputMode="decimal"
                   value={line.quantity}
                   onChange={(e) =>
                     updateLine(index, {

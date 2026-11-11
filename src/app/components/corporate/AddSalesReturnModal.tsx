@@ -29,8 +29,11 @@ interface ReturnLineSelection {
   unitPrice: number;
   remainingQty: number;
   selected: boolean;
-  qty: number;
+  /** Typing draft (string) so "1." / "1.0" are not wiped; parse via lineQtyNum for math/submit. */
+  qty: string;
 }
+
+const lineQtyNum = (l: Pick<ReturnLineSelection, "qty">): number => parseNumericInput(l.qty, 0);
 
 interface AddSalesReturnModalProps {
   isOpen: boolean;
@@ -82,7 +85,7 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
         unitPrice: parseFloat(it.unitPrice) || 0,
         remainingQty: it.remainingQty,
         selected: true,
-        qty: it.remainingQty,
+        qty: String(it.remainingQty),
       }));
 
   const loadOrders = useCallback(async () => {
@@ -146,25 +149,25 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
 
   const handleReturnAll = () => {
     setLines((prev) =>
-      prev.map((l) => ({ ...l, selected: true, qty: l.remainingQty })),
+      prev.map((l) => ({ ...l, selected: true, qty: String(l.remainingQty) })),
     );
   };
 
   const handleClearSelection = () => {
-    setLines((prev) => prev.map((l) => ({ ...l, selected: false, qty: 0 })));
+    setLines((prev) => prev.map((l) => ({ ...l, selected: false, qty: "" })));
   };
 
   const selectedLines = useMemo(
-    () => lines.filter((l) => l.selected && l.qty > 0),
+    () => lines.filter((l) => l.selected && lineQtyNum(l) > 0),
     [lines],
   );
 
-  const returnTotal = selectedLines.reduce((sum, l) => sum + l.unitPrice * l.qty, 0);
+  const returnTotal = selectedLines.reduce((sum, l) => sum + l.unitPrice * lineQtyNum(l), 0);
 
   const canSubmit =
     Boolean(selectedOrder) &&
     selectedLines.length > 0 &&
-    selectedLines.every((l) => l.qty > 0 && l.qty <= l.remainingQty) &&
+    selectedLines.every((l) => lineQtyNum(l) > 0 && lineQtyNum(l) <= l.remainingQty) &&
     !saving &&
     !isDemo;
 
@@ -178,7 +181,9 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
       notifyWarning(tr("Qaytarılacaq məhsul seçin", "Select items to return"));
       return;
     }
-    const invalid = selectedLines.some((l) => l.qty <= 0 || l.qty > l.remainingQty);
+    const invalid = selectedLines.some(
+      (l) => lineQtyNum(l) <= 0 || lineQtyNum(l) > l.remainingQty,
+    );
     if (invalid) {
       notifyWarning(tr("Miqdar düzgün deyil", "Invalid return quantity"));
       return;
@@ -192,7 +197,7 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
         storeId: !isGlobalMode && branchId ? branchId : selectedOrder.storeId,
         items: selectedLines.map((l) => ({
           productId: l.productId,
-          quantity: l.qty,
+          quantity: lineQtyNum(l),
           unitPrice: l.unitPrice,
         })),
       });
@@ -454,7 +459,11 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
                                       ? {
                                           ...l,
                                           selected: checked,
-                                          qty: checked ? Math.max(1, l.qty || l.remainingQty) : 0,
+                                          qty: checked
+                                            ? lineQtyNum(l) > 0
+                                              ? l.qty
+                                              : String(l.remainingQty)
+                                            : "",
                                         }
                                       : l,
                                   ),
@@ -478,17 +487,18 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
                           <td className="px-2 py-2 text-right">
                             <input
                               type="text"
-                              inputMode="numeric"
+                              inputMode="decimal"
                               disabled={!line.selected}
-                              value={line.selected ? (line.qty > 0 ? String(line.qty) : "") : ""}
+                              value={line.selected ? line.qty : ""}
                               onChange={(e) => {
-                                // Empty allowed so backspace can clear for retyping; max 3 dp.
+                                // Keep the sanitized string draft; max 3 dp.
                                 const s = sanitizeNumericTypingMaxDp(e.target.value, 3);
-                                if (s === "" || s === ".") {
+                                if (s === "" || s === "." || s.endsWith(".")) {
+                                  // Incomplete draft ("", ".", "1.") — store as typed, clamp later.
                                   setLines((prev) =>
                                     prev.map((l) =>
                                       l.productId === line.productId
-                                        ? { ...l, qty: 0, selected: true }
+                                        ? { ...l, qty: s, selected: true }
                                         : l,
                                     ),
                                   );
@@ -496,7 +506,9 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
                                 }
                                 const raw = roundToMaxDp(parseNumericInput(s, NaN), 3);
                                 if (!Number.isFinite(raw)) return;
-                                const qty = Math.min(line.remainingQty, Math.max(0, raw));
+                                const clamped = Math.min(line.remainingQty, Math.max(0, raw));
+                                // Rewrite only when clamping changed the value; else keep draft ("1.0", "0.50").
+                                const qty = clamped !== raw ? String(clamped) : s;
                                 setLines((prev) =>
                                   prev.map((l) =>
                                     l.productId === line.productId
@@ -511,7 +523,7 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
                           </td>
                           <td className="px-2 py-2 text-right text-gray-900 dark:text-white">
                             {line.selected
-                              ? `₼${(line.unitPrice * line.qty).toFixed(2)}`
+                              ? `₼${(line.unitPrice * lineQtyNum(line)).toFixed(2)}`
                               : "—"}
                           </td>
                         </tr>

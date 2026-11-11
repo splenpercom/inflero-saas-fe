@@ -28,6 +28,11 @@ import { useConfirm } from "../../context/ConfirmContext";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import { ModernSelect } from "../ui/ModernSelect";
+import {
+  ReportDateRangeFilter,
+  type ListDateRangePreset,
+} from "./reports/ReportDateRangeFilter";
+import { resolveReportDateRange, type DateRangePreset } from "../../lib/reportMappers";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -45,7 +50,10 @@ export function Purchase() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [sortBy, setSortBy] = useState("all");
+  /** Default All — same unbounded list as before; Today / Custom available. */
+  const [datePreset, setDatePreset] = useState<ListDateRangePreset>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [isAddPurchaseModalOpen, setIsAddPurchaseModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -77,13 +85,31 @@ export function Purchase() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const dateRange = useMemo(() => {
+    if (datePreset === "all") return { dateFrom: undefined as string | undefined, dateTo: undefined as string | undefined };
+    if (datePreset === "custom" && (!customFrom || !customTo)) {
+      return { dateFrom: undefined as string | undefined, dateTo: undefined as string | undefined };
+    }
+    const r = resolveReportDateRange(datePreset as DateRangePreset, customFrom, customTo);
+    return { dateFrom: r.dateFrom, dateTo: r.dateTo };
+  }, [datePreset, customFrom, customTo]);
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, selectedStatus, selectedPaymentStatus, sortBy]);
+  }, [debouncedSearch, selectedStatus, selectedPaymentStatus, datePreset, customFrom, customTo]);
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [debouncedSearch, selectedStatus, selectedPaymentStatus, sortBy, currentPage, branchRevision]);
+  }, [
+    debouncedSearch,
+    selectedStatus,
+    selectedPaymentStatus,
+    datePreset,
+    customFrom,
+    customTo,
+    currentPage,
+    branchRevision,
+  ]);
 
   const loadPurchases = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !canView) {
@@ -99,7 +125,9 @@ export function Purchase() {
         search: debouncedSearch.trim() || undefined,
         status: selectedStatus,
         paymentStatus: selectedPaymentStatus,
-        sortBy,
+        sortBy: "all",
+        dateFrom: dateRange.dateFrom,
+        dateTo: dateRange.dateTo,
         page: currentPage,
         pageSize: itemsPerPage,
       });
@@ -120,7 +148,8 @@ export function Purchase() {
     debouncedSearch,
     selectedStatus,
     selectedPaymentStatus,
-    sortBy,
+    dateRange.dateFrom,
+    dateRange.dateTo,
     branchRevision,
     currentPage,
     itemsPerPage,
@@ -220,7 +249,9 @@ export function Purchase() {
       search: debouncedSearch.trim() || undefined,
       status: selectedStatus,
       paymentStatus: selectedPaymentStatus,
-      sortBy,
+      sortBy: "all",
+      dateFrom: dateRange.dateFrom,
+      dateTo: dateRange.dateTo,
       page: 1,
       pageSize: 200,
     });
@@ -405,19 +436,16 @@ export function Purchase() {
           </div>
 
           <div className="flex gap-2 flex-wrap items-center">
-            <ModernSelect
-              value={sortBy}
-              onChange={setSortBy}
-              className="w-[140px]"
-              minWidth={140}
-              options={[
-                { value: "all", label: tr("Tarix: Hamısı", "Date: All") },
-                { value: "thisyear", label: tr("Bu il", "This Year") },
-                { value: "last90days", label: tr("Son 90 gün", "Last 90 Days") },
-                { value: "last30days", label: tr("Son 30 gün", "Last 30 Days") },
-                { value: "last7days", label: tr("Son 7 gün", "Last 7 Days") },
-              ]}
-              placeholder={tr("Tarix: Hamısı", "Date: All")}
+            <ReportDateRangeFilter
+              preset={datePreset}
+              onPresetChange={setDatePreset}
+              customFrom={customFrom}
+              customTo={customTo}
+              onCustomFromChange={setCustomFrom}
+              onCustomToChange={setCustomTo}
+              includeAll
+              includeQuarter={false}
+              minWidth={150}
             />
 
             <ModernSelect

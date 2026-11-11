@@ -183,10 +183,39 @@ export function NewDashboard() {
   const expensesNum = parseMoney(totals?.approvedExpenses);
   const profitNum = parseMoney(totals?.profitApprox);
 
+  const todayDateLabel = formatDate(new Date(), language);
+
   const periodSub =
     summaryPeriod === "1D"
       ? tr("Today", "Bu gün", "Сегодня")
-      : tr("Selected period", "Seçilmiş dövr");
+      : summaryPeriod === "1W"
+        ? tr("This week", "Bu həftə")
+        : summaryPeriod === "1Y"
+          ? tr("This year", "Bu il")
+          : tr("This month", "Bu ay");
+
+  /** Reflects the same local range the API used (aligned with Reports). */
+  const periodChipLabel = useMemo(() => {
+    const fromIso = summary?.range?.from;
+    const toIso = summary?.range?.to;
+    if (fromIso && toIso) {
+      try {
+        const from = new Date(fromIso);
+        const to = new Date(toIso);
+        if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
+          const sameDay =
+            from.getFullYear() === to.getFullYear() &&
+            from.getMonth() === to.getMonth() &&
+            from.getDate() === to.getDate();
+          if (sameDay) return formatDate(from, language);
+          return `${formatDate(from, language)} – ${formatDate(to, language)}`;
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+    return todayDateLabel;
+  }, [summary?.range?.from, summary?.range?.to, language, todayDateLabel]);
 
   const financeStats = [
     {
@@ -246,8 +275,6 @@ export function NewDashboard() {
       color: colors[i % colors.length],
     }));
   }, [summary]);
-
-  const todayDateLabel = formatDate(new Date(), language);
 
   if (loading && !summary) {
     return (
@@ -313,7 +340,7 @@ export function NewDashboard() {
             </div>
             <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs">
               <Calendar className="w-3.5 h-3.5 text-white/70" />
-              <span className="text-white/80">{todayDateLabel}</span>
+              <span className="text-white/80">{periodChipLabel}</span>
             </div>
             {reservationsEnabled && <button
               type="button"

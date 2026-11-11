@@ -71,6 +71,8 @@ export interface ProductListItem {
   brand: string;
   price: string;
   purchasePrice: string | null;
+  /** Present on list + detail when product has a unit. */
+  unitId?: string | null;
   unit: string;
   /** Full unit name when available (list export). */
   unitName?: string;
@@ -149,11 +151,57 @@ export type ProductListQuery = {
   search?: string;
   categoryId?: string;
   brandId?: string;
+  /** Multi-select unit filter. */
+  unitIds?: string[];
   status?: "ACTIVE" | "INACTIVE" | "all";
   sortBy?: "createdAt" | "name" | "sku" | "price" | "category" | "brand" | "createdBy";
   sortOrder?: "asc" | "desc";
   forPos?: boolean;
   productType?: "SINGLE" | "VARIABLE" | "SERVICE";
+};
+
+export type PrepareScaleExportBody = {
+  productIds?: string[];
+  unitIds?: string[];
+  department?: number;
+  shelfTime?: number;
+};
+
+export type ScalePluExportRowDto = {
+  hotkey: number;
+  name: string;
+  lfCode: string;
+  code: string;
+  barcodeType: number;
+  unitPrice: number;
+  weightUnit: number;
+  quantityType: number;
+  department: number;
+  tare: number;
+  shelfTime: number;
+  packageType: number;
+  packageWeight: number;
+  tolerance: number;
+  message1: number;
+  message2: number;
+  label: number;
+  discount: number;
+  nutrition: number;
+};
+
+export type PrepareScaleExportResult = {
+  assigned: number;
+  total: number;
+  rows: ScalePluExportRowDto[];
+  products: Array<{
+    id: string;
+    name: string;
+    scaleItemCode: string;
+    scaleLfCode: string;
+    scaleSaleMode: "WEIGHT";
+    scaleUnit: "KG" | "G";
+    price: string;
+  }>;
 };
 
 export type ProductCreateBody = {
@@ -213,6 +261,7 @@ function productQueryString(q: ProductListQuery = {}): string {
   if (q.search) params.set("search", q.search);
   if (q.categoryId) params.set("categoryId", q.categoryId);
   if (q.brandId) params.set("brandId", q.brandId);
+  if (q.unitIds?.length) params.set("unitIds", q.unitIds.join(","));
   if (q.status && q.status !== "all") params.set("status", q.status);
   if (q.sortBy) params.set("sortBy", q.sortBy);
   if (q.sortOrder) params.set("sortOrder", q.sortOrder);
@@ -466,6 +515,18 @@ export async function generateMissingProductBarcodes() {
     success: boolean;
     data: { updated: number; skipped: number };
   }>("/tenant/inventory/products/generate-missing-barcodes", {});
+  return res.data;
+}
+
+/**
+ * Assign missing Rongta scale codes (profile 17), set WEIGHT mode,
+ * return PLU rows for RLS1000 XLS import.
+ */
+export async function prepareProductsForScaleExport(body: PrepareScaleExportBody) {
+  const res = await apiPost<{ success: boolean; data: PrepareScaleExportResult }>(
+    "/tenant/inventory/products/prepare-scale-export",
+    body,
+  );
   return res.data;
 }
 

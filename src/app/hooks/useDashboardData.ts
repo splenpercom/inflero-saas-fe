@@ -2,9 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchDashboardSummary, type DashboardPeriod, type DashboardSummary } from "../api/dashboard";
 import { fetchPendingReservationCount, fetchReservations } from "../api/reservations";
 import type { ReservationRecord } from "../api/reservations";
-import { todayRangeIso } from "../lib/dashboardMappers";
+import { dateRangePreset, type DateRangePreset } from "../lib/reportMappers";
 import { useAuth } from "../context/AuthContext";
 import { useBranchRevision } from "./useBranchRevision";
+
+/** Same local-calendar windows as Reports (not UTC midnight). */
+function dashboardPeriodToReportPreset(period: DashboardPeriod): DateRangePreset {
+  if (period === "1D") return "today";
+  if (period === "1W") return "week";
+  if (period === "1Y") return "year";
+  return "month";
+}
 
 export function useDashboardData(period: DashboardPeriod) {
   const { isAuthenticated, isDemo, hasModule, hasPermission } = useAuth();
@@ -32,11 +40,18 @@ export function useDashboardData(period: DashboardPeriod) {
 
     setLoading(true);
     setError(null);
-    const { dateFrom, dateTo } = todayRangeIso();
+    const periodRange = dateRangePreset(dashboardPeriodToReportPreset(period));
+    const todayRange = dateRangePreset("today");
     const [main, today, reservations, pending] = await Promise.allSettled([
-      fetchDashboardSummary(period),
-      fetchDashboardSummary("1D"),
-      reservationsEnabled ? fetchReservations({ dateFrom, dateTo, limit: 50 }) : Promise.resolve([]),
+      fetchDashboardSummary(period, periodRange),
+      fetchDashboardSummary("1D", todayRange),
+      reservationsEnabled
+        ? fetchReservations({
+            dateFrom: todayRange.dateFrom,
+            dateTo: todayRange.dateTo,
+            limit: 50,
+          })
+        : Promise.resolve([]),
       reservationsEnabled ? fetchPendingReservationCount() : Promise.resolve(0),
     ]);
     setSummary(main.status === "fulfilled" ? main.value : null);

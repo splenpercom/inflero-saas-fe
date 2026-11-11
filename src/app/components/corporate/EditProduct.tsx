@@ -23,6 +23,8 @@ import { resolveProductsListReturn, PRODUCTS_LIST_PATH } from "../../lib/product
 import { formatBarcodePriceLabel, printBarcodeLabel } from "../../lib/posPrint";
 import { notifyFromError, notifySuccess } from "../../lib/toast";
 import {
+  formatProductNumericInput,
+  PRODUCT_NUMERIC_MAX_DP,
   roundToMaxDp,
   sanitizeNumericTypingMaxDp,
 } from "../../lib/numericInput";
@@ -50,6 +52,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import JsBarcode from "jsbarcode";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { useProductsCogsEnabled } from "../../hooks/useProductsCogsEnabled";
+import { useScaleLabelScanEnabled } from "../../hooks/useScaleLabelScanEnabled";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 const LIST_PATH = PRODUCTS_LIST_PATH;
@@ -87,6 +90,7 @@ export function EditProduct() {
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
   const productsCogsEnabled = useProductsCogsEnabled();
+  const scaleLabelScanEnabled = useScaleLabelScanEnabled();
   const { canCreate, canEdit } = useModulePermissions("Products");
   const branchRevision = useBranchRevision();
   const { branchId } = useBranch();
@@ -252,12 +256,16 @@ export function EditProduct() {
       setScaleItemCode(product.scaleItemCode ?? "");
       setScaleLfCode(product.scaleLfCode ?? "");
       setDescription(product.description ?? "");
-      setQuantity(String(product.quantity ?? 0));
-      setPrice(product.price ?? "");
-      setCost(product.purchasePrice ?? "");
+      setQuantity(formatProductNumericInput(product.quantity ?? 0));
+      setPrice(formatProductNumericInput(product.price ?? ""));
+      setCost(formatProductNumericInput(product.purchasePrice ?? ""));
       setDiscountType(mapDiscountToUi(product.discountType));
-      setDiscountValue(product.discountValue ?? "");
-        setQuantityAlert(product.quantityAlert != null ? String(product.quantityAlert) : "");
+      setDiscountValue(formatProductNumericInput(product.discountValue ?? ""));
+      setQuantityAlert(
+        product.quantityAlert != null
+          ? formatProductNumericInput(product.quantityAlert)
+          : "",
+      );
         setShowOnPos(product.showOnPos !== false);
         setManufacturedDate(product.manufacturedDate?.slice(0, 10) ?? "");
         setExpiryDate(product.expiryDate?.slice(0, 10) ?? "");
@@ -457,7 +465,9 @@ export function EditProduct() {
       notifyFromError(new Error(tr("Qiymət tələb olunur", "Price is required")));
       return;
     }
-    if (scaleSaleMode === "WEIGHT" && !normalizeScaleItemCodeInput(scaleItemCode)) {
+    const effectiveScaleMode =
+      scaleLabelScanEnabled && scaleSaleMode === "WEIGHT" ? "WEIGHT" : "NONE";
+    if (effectiveScaleMode === "WEIGHT" && !normalizeScaleItemCodeInput(scaleItemCode)) {
       notifyFromError(
         new Error(
           tr(
@@ -481,7 +491,9 @@ export function EditProduct() {
         }
       }
 
-      const qty = quantity.trim() ? roundToMaxDp(parsePrice(quantity), 3) : 0;
+      const qty = quantity.trim()
+        ? roundToMaxDp(parsePrice(quantity), PRODUCT_NUMERIC_MAX_DP)
+        : 0;
       const payload: Parameters<typeof updateProduct>[1] = {
         name: productName.trim(),
         description: description.trim() || null,
@@ -491,28 +503,35 @@ export function EditProduct() {
         brandId: brand || null,
         unitId: unit || null,
         itemBarcode: itemBarcode.trim() || null,
-        scaleSaleMode,
-        scaleItemCode:
-          scaleSaleMode === "WEIGHT" ? normalizeScaleItemCodeInput(scaleItemCode) : null,
-        scaleLfCode: scaleLfCode.trim() || null,
-        scaleUnit: "KG",
-        price: String(roundToMaxDp(parsePrice(price), 3)),
+        ...(scaleLabelScanEnabled
+          ? {
+              scaleSaleMode: effectiveScaleMode,
+              scaleItemCode:
+                effectiveScaleMode === "WEIGHT"
+                  ? normalizeScaleItemCodeInput(scaleItemCode)
+                  : null,
+              scaleLfCode:
+                effectiveScaleMode === "WEIGHT" ? scaleLfCode.trim() || null : null,
+              scaleUnit: "KG" as const,
+            }
+          : {}),
+        price: String(roundToMaxDp(parsePrice(price), PRODUCT_NUMERIC_MAX_DP)),
         ...(productsCogsEnabled
           ? {
               purchasePrice: cost.trim()
-                ? String(roundToMaxDp(parsePrice(cost), 3))
+                ? String(roundToMaxDp(parsePrice(cost), PRODUCT_NUMERIC_MAX_DP))
                 : null,
             }
           : {}),
         discountType: mapDiscountToApi(discountType),
         discountValue: discountValue.trim()
-          ? String(roundToMaxDp(parsePrice(discountValue), 3))
+          ? String(roundToMaxDp(parsePrice(discountValue), PRODUCT_NUMERIC_MAX_DP))
           : null,
         showOnPos,
         ...(stockEnabled
           ? {
               quantityAlert: quantityAlert.trim()
-                ? roundToMaxDp(parsePrice(quantityAlert), 3)
+                ? roundToMaxDp(parsePrice(quantityAlert), PRODUCT_NUMERIC_MAX_DP)
                 : null,
             }
           : {}),
@@ -715,7 +734,12 @@ export function EditProduct() {
                         inputMode="decimal"
                         value={quantity}
                         onChange={(e) =>
-                          setQuantity(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                          setQuantity(
+                            sanitizeNumericTypingMaxDp(
+                              e.target.value,
+                              PRODUCT_NUMERIC_MAX_DP,
+                            ),
+                          )
                         }
                         className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
@@ -735,7 +759,12 @@ export function EditProduct() {
                       inputMode="decimal"
                       value={price}
                       onChange={(e) =>
-                        setPrice(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                        setPrice(
+                          sanitizeNumericTypingMaxDp(
+                            e.target.value,
+                            PRODUCT_NUMERIC_MAX_DP,
+                          ),
+                        )
                       }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
@@ -750,7 +779,12 @@ export function EditProduct() {
                       inputMode="decimal"
                       value={cost}
                       onChange={(e) =>
-                        setCost(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                        setCost(
+                          sanitizeNumericTypingMaxDp(
+                            e.target.value,
+                            PRODUCT_NUMERIC_MAX_DP,
+                          ),
+                        )
                       }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
@@ -780,7 +814,12 @@ export function EditProduct() {
                       inputMode="decimal"
                       value={discountValue}
                       onChange={(e) =>
-                        setDiscountValue(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                        setDiscountValue(
+                          sanitizeNumericTypingMaxDp(
+                            e.target.value,
+                            PRODUCT_NUMERIC_MAX_DP,
+                          ),
+                        )
                       }
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                     />
@@ -795,7 +834,12 @@ export function EditProduct() {
                         inputMode="decimal"
                         value={quantityAlert}
                         onChange={(e) =>
-                          setQuantityAlert(sanitizeNumericTypingMaxDp(e.target.value, 3))
+                          setQuantityAlert(
+                            sanitizeNumericTypingMaxDp(
+                              e.target.value,
+                              PRODUCT_NUMERIC_MAX_DP,
+                            ),
+                          )
                         }
                         className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
                       />
@@ -816,6 +860,7 @@ export function EditProduct() {
                       {tr("POS-da göstər", "Show on POS")}
                     </label>
                   </div>
+                  {scaleLabelScanEnabled && (
                   <div className="col-span-2 md:col-span-3 xl:col-span-4 pt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">
                     <div className="flex items-center gap-2">
                       <input
@@ -870,6 +915,7 @@ export function EditProduct() {
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
               </div>
             )}
