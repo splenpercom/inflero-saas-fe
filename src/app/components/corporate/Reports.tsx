@@ -282,7 +282,7 @@ export function Reports() {
     return rows.map((r) => ({
       month: r.month,
       revenue: r.revenue ?? 0,
-      // Same basis as Overview: revenue − (sold COGS + approved expenses). Allow negatives.
+      // Chart uses dashboard series; overview Profit = income − expenses − sold COGS.
       profit: Math.round(((r.revenue ?? 0) - (r.expense ?? 0)) * 100) / 100,
     }));
   }, [summary]);
@@ -429,7 +429,7 @@ export function Reports() {
               ...(stockEnabled
                 ? [
                     {
-                      label: pt("COGS", "Maya dəyəri"),
+                      label: pt("COGS (sold)", "Maya dəyəri (satılmış)"),
                       value: moneyLabel(overview.stockCogs),
                       icon: Package,
                       color: "text-violet-600 dark:text-violet-400",

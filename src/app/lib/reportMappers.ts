@@ -4,13 +4,23 @@ import type { ExpenseReportItem } from "../api/reports";
 
 export type DateRangePreset = "today" | "week" | "month" | "quarter" | "year" | "custom";
 
+/** Local calendar day bounds — matches Orders "today" (not UTC midnight). */
+function startOfLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+
+function endOfLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+}
+
+function parseYmdLocal(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
 export function isoDateInputToRange(dateFrom: string, dateTo: string): { dateFrom: string; dateTo: string } {
-  const parseYmd = (ymd: string) => {
-    const [y, m, d] = ymd.split("-").map(Number);
-    return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
-  };
-  const from = dateFrom ? startOfDayUtc(parseYmd(dateFrom)) : startOfDayUtc(new Date());
-  const to = dateTo ? endOfDayUtc(parseYmd(dateTo)) : endOfDayUtc(new Date());
+  const from = dateFrom ? startOfLocalDay(parseYmdLocal(dateFrom)) : startOfLocalDay(new Date());
+  const to = dateTo ? endOfLocalDay(parseYmdLocal(dateTo)) : endOfLocalDay(new Date());
   return { dateFrom: from.toISOString(), dateTo: to.toISOString() };
 }
 
@@ -36,36 +46,28 @@ export function formatReportCurrency(value: number | null | undefined, suffix = 
   return `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${suffix}`;
 }
 
-function startOfDayUtc(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
-}
-
-function endOfDayUtc(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
-}
-
 export function dateRangePreset(preset: DateRangePreset): { dateFrom: string; dateTo: string } {
   const now = new Date();
-  const to = endOfDayUtc(now);
+  const to = endOfLocalDay(now);
   let from: Date;
   switch (preset) {
     case "today":
-      from = startOfDayUtc(now);
+      from = startOfLocalDay(now);
       break;
     case "week":
-      from = startOfDayUtc(new Date(now.getTime() - 6 * 24 * 3600 * 1000));
+      from = startOfLocalDay(new Date(now.getTime() - 6 * 24 * 3600 * 1000));
       break;
     case "quarter": {
-      const qStartMonth = Math.floor(now.getUTCMonth() / 3) * 3;
-      from = new Date(Date.UTC(now.getUTCFullYear(), qStartMonth, 1, 0, 0, 0, 0));
+      const qStartMonth = Math.floor(now.getMonth() / 3) * 3;
+      from = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0, 0);
       break;
     }
     case "year":
-      from = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0));
+      from = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
       break;
     case "month":
     default:
-      from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+      from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
       break;
   }
   return { dateFrom: from.toISOString(), dateTo: to.toISOString() };

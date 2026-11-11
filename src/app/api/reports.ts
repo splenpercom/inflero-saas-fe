@@ -257,7 +257,7 @@ export interface ReportsOverview {
   purchases: string;
   purchasesPaid: string;
   purchasesDebt: string;
-  /** On-hand inventory value at unit COGS (qty × cost). */
+  /** Sold-goods COGS for the range: Σ (line qty × unit cost). */
   stockCogs: string;
   avgMonthlyRevenue: string | null;
   yoyGrowthPercent: number | null;
