@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useStockLocations } from "../../hooks/useStockLocations";
 import { ModernSelect } from "../ui/ModernSelect";
@@ -12,21 +12,53 @@ interface StockLocationFieldsProps {
   value: StockLocationValue;
   onChange: (value: StockLocationValue) => void;
   disabled?: boolean;
+  /**
+   * When a branch is selected in the header, lock this field to that store
+   * (adjustments / transfer "from"). Set false for transfer "to" so another
+   * branch can be chosen.
+   */
+  lockToSelectedBranch?: boolean;
+  /** Hide these store ids from the dropdown (e.g. exclude the transfer source). */
+  excludeStoreIds?: Array<string | null | undefined>;
 }
 
-export function StockLocationFields({ value, onChange, disabled = false }: StockLocationFieldsProps) {
+export function StockLocationFields({
+  value,
+  onChange,
+  disabled = false,
+  lockToSelectedBranch = true,
+  excludeStoreIds,
+}: StockLocationFieldsProps) {
   const { language } = useLanguage();
   const { branches, loading, effectiveStoreId, branchSelected } = useStockLocations();
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
-  useEffect(() => {
-    if (branchSelected && effectiveStoreId) {
-      onChange({ storeId: effectiveStoreId });
-    }
-  }, [branchSelected, effectiveStoreId]);
+  const locked = lockToSelectedBranch && branchSelected && !!effectiveStoreId;
 
-  if (branchSelected) {
+  useEffect(() => {
+    if (!locked || !effectiveStoreId) return;
+    if (value.storeId === effectiveStoreId) return;
+    onChange({ storeId: effectiveStoreId });
+  }, [locked, effectiveStoreId, value.storeId, onChange]);
+
+  const exclude = useMemo(() => {
+    const ids = new Set<string>();
+    for (const id of excludeStoreIds ?? []) {
+      if (id) ids.add(id);
+    }
+    return ids;
+  }, [excludeStoreIds]);
+
+  const options = useMemo(
+    () =>
+      branches
+        .filter((b) => !exclude.has(b.id))
+        .map((b) => ({ value: b.id, label: b.name })),
+    [branches, exclude],
+  );
+
+  if (locked) {
     const branchName =
       branches.find((b) => b.id === effectiveStoreId)?.name ??
       tr("Seçilmiş filial", "Selected branch");
@@ -52,10 +84,10 @@ export function StockLocationFields({ value, onChange, disabled = false }: Stock
         onChange={(id) => onChange({ storeId: id || null })}
         className="w-full"
         placeholder={loading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select")}
-        options={branches.map((b) => ({ value: b.id, label: b.name }))}
+        options={options}
         disabled={disabled || loading}
       />
-      {!loading && branches.length === 0 && (
+      {!loading && options.length === 0 && (
         <p className="text-[10px] text-gray-500 mt-1">
           {tr("Filial tapılmadı", "No branches found")}
         </p>

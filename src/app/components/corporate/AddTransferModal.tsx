@@ -23,6 +23,8 @@ interface LineItem {
   productLabel: string;
   quantity: string;
   search: string;
+  /** Available stock at the From branch when the product was selected. */
+  availableQty: number | null;
 }
 
 interface AddTransferModalProps {
@@ -32,7 +34,13 @@ interface AddTransferModalProps {
 }
 
 function emptyLine(): LineItem {
-  return { productId: "", productLabel: "", quantity: "", search: "" };
+  return { productId: "", productLabel: "", quantity: "", search: "", availableQty: null };
+}
+
+function formatAvailQty(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const rounded = roundToMaxDp(n, 3);
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
 export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalProps) {
@@ -50,7 +58,9 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
   const [saving, setSaving] = useState(false);
 
   const activeSearch = activeLineSearch !== null ? lines[activeLineSearch]?.search ?? "" : "";
-  const { products, loading: productsLoading } = useStockProductSearch(activeSearch, isOpen);
+  const { products, loading: productsLoading } = useStockProductSearch(activeSearch, isOpen, {
+    storeId: fromLoc.storeId,
+  });
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -66,6 +76,20 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
       setActiveLineSearch(null);
     }
   }, [isOpen]);
+
+  // If source changes to match destination, clear destination so user must pick another branch.
+  useEffect(() => {
+    if (fromLoc.storeId && toLoc.storeId && fromLoc.storeId === toLoc.storeId) {
+      setToLoc({ storeId: null });
+    }
+  }, [fromLoc.storeId, toLoc.storeId]);
+
+  // Product stock is branch-scoped — reset lines when From branch changes.
+  useEffect(() => {
+    if (!isOpen) return;
+    setLines([emptyLine()]);
+    setActiveLineSearch(null);
+  }, [fromLoc.storeId, isOpen]);
 
   useEffect(() => {
     if (isDeposited && lines.length > 1) {
@@ -151,6 +175,7 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
             <p className="text-xs font-medium text-gray-900 dark:text-white mb-2">
               {tr("Haradan filial", "From branch")} <span className="text-red-500">*</span>
             </p>
+            {/* Locked to header branch when one is selected (stock leaves this branch). */}
             <StockLocationFields value={fromLoc} onChange={setFromLoc} />
           </div>
 
@@ -158,7 +183,13 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
             <p className="text-xs font-medium text-gray-900 dark:text-white mb-2">
               {tr("Hədəf filial", "To branch")} <span className="text-red-500">*</span>
             </p>
-            <StockLocationFields value={toLoc} onChange={setToLoc} />
+            {/* Always selectable — must be a different branch (stock arrives here). */}
+            <StockLocationFields
+              value={toLoc}
+              onChange={setToLoc}
+              lockToSelectedBranch={false}
+              excludeStoreIds={[fromLoc.storeId]}
+            />
           </div>
 
           {sameLocation && (
@@ -202,8 +233,24 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
               )}
             </div>
 
-            {lines.map((line, index) => (
-              <div key={index} className="flex gap-2 items-start">
+            {!fromLoc.storeId && (
+              <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                {tr(
+                  "Mövcud stok göstərmək üçün əvvəlcə mənbə filialı seçin.",
+                  "Select the From branch first to see available stock.",
+                )}
+              </p>
+            )}
+
+            {lines.map((line, index) => {
+              const enteredQty = roundToMaxDp(parseNumericInput(line.quantity, NaN), 3);
+              const overStock =
+                line.availableQty != null &&
+                Number.isFinite(enteredQty) &&
+                enteredQty > line.availableQty;
+              return (
+              <div key={index} className="space-y-1">
+                <div className="flex gap-2 items-start">
                 <div className="flex-1 relative">
                   <div className="relative">
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
@@ -211,7 +258,12 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
                       type="text"
                       value={line.productLabel || line.search}
                       onChange={(e) => {
-                        updateLine(index, { search: e.target.value, productId: "", productLabel: "" });
+                        updateLine(index, {
+                          search: e.target.value,
+                          productId: "",
+                          productLabel: "",
+                          availableQty: null,
+                        });
                         setActiveLineSearch(index);
                       }}
                       onFocus={() => setActiveLineSearch(index)}
@@ -220,25 +272,42 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
                     />
                   </div>
                   {activeLineSearch === index && line.search && !line.productId && (
-                    <div className="absolute z-20 mt-1 w-full max-h-32 overflow-y-auto bg-white dark:bg-gray-900 border rounded-lg shadow-lg">
+                    <div className="absolute z-20 mt-1 w-full max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border rounded-lg shadow-lg">
                       {productsLoading ? (
                         <p className="px-2 py-1 text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</p>
+                      ) : products.length === 0 ? (
+                        <p className="px-2 py-1 text-xs text-gray-500">
+                          {tr("Məhsul tapılmadı", "No products found")}
+                        </p>
                       ) : (
                         products.map((p) => (
                           <button
                             key={p.id}
                             type="button"
-                            className="w-full text-left px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+                            className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between gap-2"
                             onClick={() => {
                               updateLine(index, {
                                 productId: p.id,
                                 productLabel: `${p.name} (${p.sku})`,
                                 search: p.name,
+                                availableQty: p.quantity,
                               });
                               setActiveLineSearch(null);
                             }}
                           >
-                            {p.name} ({p.sku})
+                            <span className="truncate text-gray-900 dark:text-white">
+                              {p.name}{" "}
+                              <span className="text-gray-400">({p.sku})</span>
+                            </span>
+                            <span
+                              className={`shrink-0 tabular-nums ${
+                                (p.quantity ?? 0) <= 0
+                                  ? "text-red-600"
+                                  : "text-teal-700 dark:text-teal-300"
+                              }`}
+                            >
+                              {tr("Stok", "Stock")}: {formatAvailQty(p.quantity)}
+                            </span>
                           </button>
                         ))
                       )}
@@ -266,8 +335,24 @@ export function AddTransferModal({ isOpen, onClose, onSaved }: AddTransferModalP
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
+                </div>
+                {line.productId && line.availableQty != null && (
+                  <p
+                    className={`text-[10px] pl-1 ${
+                      overStock
+                        ? "text-red-600"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    {tr("Mövcud stok", "Available")}: {formatAvailQty(line.availableQty)}
+                    {overStock
+                      ? ` — ${tr("miqdar stokdan çoxdur", "qty exceeds stock")}`
+                      : ""}
+                  </p>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <div>

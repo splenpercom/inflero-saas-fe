@@ -219,13 +219,36 @@ export function TransferDetailModal({ transfer, onClose, onChanged }: TransferDe
                   <p className="font-medium text-gray-900 dark:text-white">{detail.toWarehouse}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">{tr("Tarix", "Date")}</p>
+                  <p className="text-gray-500">{tr("Köçürmə tarixi", "Transfer date")}</p>
                   <p className="text-gray-900 dark:text-white">{formatStockDate(detail.date)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">{tr("Yaradılma", "Created at")}</p>
+                  <p className="text-gray-900 dark:text-white">
+                    {formatStockDate(detail.createdAt ?? detail.date)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">{tr("Kim tərəfindən", "Created by")}</p>
+                  <p className="text-gray-900 dark:text-white">{detail.createdBy?.name || "—"}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">{tr("İstinad", "Reference")}</p>
                   <p className="text-gray-900 dark:text-white">{detail.referenceNumber || "—"}</p>
                 </div>
+                <div>
+                  <p className="text-gray-500">{tr("Sənəd nömrəsi", "Document no.")}</p>
+                  <p className="text-gray-900 dark:text-white">{detail.documentNo || "—"}</p>
+                </div>
+                {detail.approvedBy && (
+                  <div>
+                    <p className="text-gray-500">{tr("Təsdiqləyən", "Approved by")}</p>
+                    <p className="text-gray-900 dark:text-white">
+                      {detail.approvedBy.name}
+                      {detail.approvedAt ? ` · ${formatStockDate(detail.approvedAt)}` : ""}
+                    </p>
+                  </div>
+                )}
                 {detail.notes && (
                   <div className="col-span-2">
                     <p className="text-gray-500">{tr("Qeydlər", "Notes")}</p>
@@ -254,8 +277,18 @@ export function TransferDetailModal({ transfer, onClose, onChanged }: TransferDe
                   {detail.items.map((item) => (
                     <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800">
                       <td className="py-2 text-gray-900 dark:text-white">
-                        {item.productName}
-                        <span className="text-gray-400 ml-1">({item.sku})</span>
+                        <div>
+                          {item.productName}
+                          <span className="text-gray-400 ml-1">({item.sku})</span>
+                        </div>
+                        {item.destinationProductCreated === true ? (
+                          <p className="text-[10px] text-teal-700 dark:text-teal-300 mt-0.5">
+                            {tr(
+                              "Hədəf filialda məhsul yaradıldı / bərpa olundu",
+                              "Product created/restored at destination",
+                            )}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="text-right py-2">{item.transferredQty}</td>
                       <td className="text-right py-2">{item.soldQty}</td>
