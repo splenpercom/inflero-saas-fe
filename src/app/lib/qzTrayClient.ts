@@ -7,6 +7,10 @@ import { thermalQzPageWidthMm } from "./thermalReceipt";
  *
  * Printer target may be a Windows printer name or `net:192.168.0.21:9100`
  * (Ethernet / Wi‑Fi ESC/POS raw port — typical for kitchen/bar thermals).
+ *
+ * Print modes (do not mix):
+ * - Named Windows printer → pixel HTML (driver/spooler) — existing path, unchanged.
+ * - Network IP:port → raw HTML converted to ESC/POS over TCP (addition for wireless).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type QzApi = any;
@@ -88,6 +92,46 @@ function createQzPrinterConfig(
   return qz.configs.create(target.name, options);
 }
 
+function isNetworkPrinterTarget(printerTarget: string): boolean {
+  return parsePrinterTarget(printerTarget)?.kind === "network";
+}
+
+/** Named Windows / driver path — pixel raster HTML (existing behavior). */
+function pixelHtmlPrintData(html: string, pageWidthMm: number) {
+  return [
+    {
+      type: "pixel" as const,
+      format: "html" as const,
+      flavor: "plain" as const,
+      data: html,
+      options: { pageWidth: pageWidthMm },
+    },
+  ];
+}
+
+/**
+ * Network IP:9100 path — QZ converts HTML → ESC/POS and writes the raw socket.
+ * Does not change named-printer pixel jobs.
+ */
+function networkEscPosHtmlPrintData(
+  html: string,
+  opts: { pageWidthMm: number; pageHeightMm?: number },
+) {
+  return [
+    {
+      type: "raw" as const,
+      format: "html" as const,
+      flavor: "plain" as const,
+      data: html,
+      options: {
+        language: "ESCPOS",
+        pageWidth: opts.pageWidthMm,
+        ...(opts.pageHeightMm != null ? { pageHeight: opts.pageHeightMm } : {}),
+      },
+    },
+  ];
+}
+
 export async function qzPrintHtml(
   printerName: string,
   html: string,
@@ -99,6 +143,15 @@ export async function qzPrintHtml(
   // Match CSS usable width so QZ does not scale a wider page onto a narrow roll.
   const pageWidthMm = thermalQzPageWidthMm(paperWidthMm);
   const qz = await ensureQzConnected();
+  const network = isNetworkPrinterTarget(printerName);
+
+  if (network) {
+    // Addition: wireless / Ethernet raw port — keep options minimal for host:port.
+    const config = createQzPrinterConfig(qz, printerName, {});
+    await qz.print(config, networkEscPosHtmlPrintData(html, { pageWidthMm }));
+    return;
+  }
+
   const config = createQzPrinterConfig(qz, printerName, {
     scaleContent: true,
     rasterize: true,
@@ -108,15 +161,7 @@ export async function qzPrintHtml(
     colorType: "blackwhite",
     interpolation: "bilinear",
   });
-  await qz.print(config, [
-    {
-      type: "pixel",
-      format: "html",
-      flavor: "plain",
-      data: html,
-      options: { pageWidth: pageWidthMm },
-    },
-  ]);
+  await qz.print(config, pixelHtmlPrintData(html, pageWidthMm));
 }
 
 /** Product barcode stickers — 30×20mm landscape (20×30 slip, long edge horizontal). */
@@ -131,6 +176,20 @@ export async function qzPrintBarcodeLabelHtml(
   const widthMm = opts?.widthMm ?? 30;
   const heightMm = opts?.heightMm ?? 20;
   const qz = await ensureQzConnected();
+  const network = isNetworkPrinterTarget(printerName);
+
+  if (network) {
+    const config = createQzPrinterConfig(qz, printerName, {});
+    await qz.print(
+      config,
+      networkEscPosHtmlPrintData(html, {
+        pageWidthMm: widthMm,
+        pageHeightMm: heightMm,
+      }),
+    );
+    return;
+  }
+
   const config = createQzPrinterConfig(qz, printerName, {
     scaleContent: true,
     rasterize: true,
@@ -141,15 +200,7 @@ export async function qzPrintBarcodeLabelHtml(
     colorType: "blackwhite",
     interpolation: "bilinear",
   });
-  await qz.print(config, [
-    {
-      type: "pixel",
-      format: "html",
-      flavor: "plain",
-      data: html,
-      options: { pageWidth: widthMm },
-    },
-  ]);
+  await qz.print(config, pixelHtmlPrintData(html, widthMm));
 }
 
 export function getQzConnectionHint(language: "az" | "en" | "ru" = "en"): string {

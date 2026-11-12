@@ -72,8 +72,8 @@ function NetworkOrNamedPrinterField({
   return (
     <div className="space-y-2">
       <label className="text-xs font-medium text-gray-900 dark:text-white block">{label}</label>
-      <div className="flex flex-wrap gap-3 text-[11px] text-gray-700 dark:text-gray-300">
-        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+      <div className="flex flex-wrap gap-3 text-gray-700 dark:text-gray-300">
+        <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] font-normal leading-tight">
           <input
             type="radio"
             name={`printer-mode-${fieldId}`}
@@ -84,7 +84,7 @@ function NetworkOrNamedPrinterField({
           />
           {tr("Windows printer", "Windows printer")}
         </label>
-        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+        <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] font-normal leading-tight">
           <input
             type="radio"
             name={`printer-mode-${fieldId}`}
@@ -142,8 +142,8 @@ function NetworkOrNamedPrinterField({
       {mode === "network" && (
         <p className="text-[10px] text-gray-500 dark:text-gray-400">
           {tr(
-            "Self-test IP + TCP/IP port 9100 (standart ESC/POS). QZ Tray POS PC-də işləməlidir.",
-            "Use the self-test IP and TCP port 9100 (standard ESC/POS). QZ Tray must run on the POS PC.",
+            "Self-test IP + TCP 9100. QZ ESC/POS raw göndərir (Windows printer yolundan ayrı). QZ Tray POS PC-də işləməlidir.",
+            "Self-test IP + TCP 9100. QZ sends raw ESC/POS (separate from the Windows printer path). QZ Tray must run on the POS PC.",
           )}
         </p>
       )}
