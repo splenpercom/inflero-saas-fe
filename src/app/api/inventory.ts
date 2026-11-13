@@ -94,6 +94,14 @@ export interface ProductListItem {
   itemBarcode?: string | null;
   /** When true (default), product is listed/sold on POS. */
   showOnPos?: boolean;
+  /** When true (INGREDIENTS module), POS deducts linked ingredient stock. */
+  hasIngredients?: boolean;
+  ingredients?: Array<{
+    ingredientProductId: string;
+    quantity: number;
+    name?: string;
+    sku?: string;
+  }>;
   /** Rongta label-scale mode (NONE | WEIGHT). */
   scaleSaleMode?: "NONE" | "WEIGHT";
   /** Profile-17 item code (5 digits, keep leading zeros). */
@@ -231,6 +239,8 @@ export type ProductCreateBody = {
   discountValue?: string | null;
   quantityAlert?: number | null;
   showOnPos?: boolean;
+  hasIngredients?: boolean;
+  ingredients?: Array<{ ingredientProductId: string; quantity: number }>;
   manufacturer?: string | null;
   manufacturedDate?: string | null;
   expiryDate?: string | null;
