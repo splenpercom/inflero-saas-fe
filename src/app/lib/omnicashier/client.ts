@@ -238,6 +238,8 @@ export async function omniMoneyBack(
   },
   settings?: OmnicashierSettings,
 ): Promise<OmnicashierFiscalResult> {
+  // Keep the proven money_back wire shape — do not mirror sale extras
+  // (pos_status / operationId / int_ref) without device confirmation.
   const json = await postOmni(
     {
       requestData: {

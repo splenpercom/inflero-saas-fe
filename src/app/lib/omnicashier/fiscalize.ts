@@ -360,6 +360,8 @@ export async function fiscalizeCardPaymentsOnOrder(
 
 /**
  * Fiscalize CASH/CARD refund payment on a sales return (money_back).
+ * Same proven path as before — keep wire/recovery changes out of production
+ * until confirmed on device. Sale fiscalize is untouched.
  */
 export async function fiscalizeCardReturnPayment(
   ret: SalesReturnDetail,
@@ -548,4 +550,19 @@ export async function retryFiscalizeCardSale(
   const payment = (order.payments ?? []).find((p) => p.paymentId === paymentId);
   if (!payment) return { status: "skipped", reason: "Payment not found" };
   return fiscalizeCardSalePayment(order, payment, { forceClaim: true });
+}
+
+/** Explicit retry for a FAILED/NONE/PENDING CASH or CARD sales-return refund (UI only). */
+export async function retryFiscalizeCardReturn(
+  ret: SalesReturnDetail,
+  paymentId: string,
+  parentOrder: PosOrderDetail | null,
+): Promise<FiscalizeOutcome> {
+  const payment = (ret.payments ?? []).find((p) => p.paymentId === paymentId);
+  if (!payment) return { status: "skipped", reason: "Payment not found" };
+  return fiscalizeCardReturnPayment(ret, payment, parentOrder?.payments, {
+    forceClaim: true,
+    orderGrandTotal: ret.total != null ? Number(ret.total) : null,
+    orderTaxPercent: parentOrder?.taxPercent != null ? Number(parentOrder.taxPercent) : null,
+  });
 }

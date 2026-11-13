@@ -202,7 +202,7 @@ export function AddSalesReturnModal({ isOpen, onClose, onSaved }: AddSalesReturn
         })),
       });
       notifySuccess(tr("Satış qaytarması yaradıldı", "Sales return created"));
-      // OmniCashier money_back for CARD auto-refund — never blocks Inflero return.
+      // OmniCashier money_back for CASH/CARD refund — never blocks Inflero return.
       void (async () => {
         try {
           const parent = created.posOrderId
