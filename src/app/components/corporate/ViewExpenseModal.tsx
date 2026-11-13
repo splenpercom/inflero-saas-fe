@@ -157,7 +157,7 @@ export function ViewExpenseModal({
               {tr("Sil", "Delete")}
             </button>
           )}
-          {!isLinkedMirror && canEdit && expense.status === "PENDING" && onReject && (
+          {!isLinkedMirror && canEdit && expense.status !== "REJECTED" && onReject && (
             <button
               type="button"
               onClick={() => onReject(expense)}
@@ -167,7 +167,7 @@ export function ViewExpenseModal({
               {tr("Rədd et", "Reject")}
             </button>
           )}
-          {!isLinkedMirror && canEdit && expense.status === "PENDING" && onApprove && (
+          {!isLinkedMirror && canEdit && expense.status !== "APPROVED" && onApprove && (
             <button
               type="button"
               onClick={() => onApprove(expense)}
@@ -177,7 +177,7 @@ export function ViewExpenseModal({
               {tr("Təsdiqlə", "Approve")}
             </button>
           )}
-          {!isLinkedMirror && canEdit && expense.status === "PENDING" && onEdit && (
+          {!isLinkedMirror && canEdit && onEdit && (
             <button
               type="button"
               onClick={() => onEdit(expense)}

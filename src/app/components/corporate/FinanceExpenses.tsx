@@ -192,7 +192,18 @@ export function FinanceExpenses() {
       reference: data.reference || null,
     };
     if (editExpense) {
-      await updateExpense(editExpense.id, body);
+      // Leaving APPROVED: unpost/status-change first so field update does not reverse+repost then reverse again.
+      const leavingApproved =
+        editExpense.status === "APPROVED" && data.status !== "APPROVED";
+      if (leavingApproved) {
+        await patchExpenseStatus(editExpense.id, data.status);
+        await updateExpense(editExpense.id, body);
+      } else {
+        await updateExpense(editExpense.id, body);
+        if (data.status && data.status !== editExpense.status) {
+          await patchExpenseStatus(editExpense.id, data.status);
+        }
+      }
       notifySuccess(tr("Xərc yeniləndi", "Expense updated"));
     } else {
       const createStatus = data.status === "APPROVED" ? "PENDING" : data.status;
@@ -449,7 +460,7 @@ export function FinanceExpenses() {
                               <Eye className="w-3 h-3" />
                             </button>
                           )}
-                          {canEdit && !isDemo && expense.status === "PENDING" && !expense.purchaseId && !expense.salesReturnId && (
+                          {canEdit && !isDemo && !expense.purchaseId && !expense.salesReturnId && (
                             <button
                               onClick={() => { setEditExpense(expense); setIsAddExpenseModalOpen(true); }}
                               className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

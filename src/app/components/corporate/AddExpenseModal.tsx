@@ -285,23 +285,17 @@ export function AddExpenseModal({
             </div>
             <div>
               <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">{tr("Status", "Status")} <span className="text-red-500">*</span></label>
-              {isEdit ? (
-                <div className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300">
-                  {mapExpenseStatusLabel(status, tr)}
-                </div>
-              ) : (
-                <ModernSelect
-                  value={status}
-                  onChange={(value) => setStatus(value as ExpenseStatusApi)}
-                  className="w-full"
-                  options={[
-                    { value: "PENDING", label: mapExpenseStatusLabel("PENDING", tr) },
-                    { value: "APPROVED", label: mapExpenseStatusLabel("APPROVED", tr) },
-                    { value: "REJECTED", label: mapExpenseStatusLabel("REJECTED", tr) },
-                  ]}
-                  buttonClassName="px-2.5 py-1.5"
-                />
-              )}
+              <ModernSelect
+                value={status}
+                onChange={(value) => setStatus(value as ExpenseStatusApi)}
+                className="w-full"
+                options={[
+                  { value: "PENDING", label: mapExpenseStatusLabel("PENDING", tr) },
+                  { value: "APPROVED", label: mapExpenseStatusLabel("APPROVED", tr) },
+                  { value: "REJECTED", label: mapExpenseStatusLabel("REJECTED", tr) },
+                ]}
+                buttonClassName="px-2.5 py-1.5"
+              />
             </div>
           </div>
 
