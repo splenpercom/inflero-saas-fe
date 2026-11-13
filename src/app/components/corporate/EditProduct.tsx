@@ -907,6 +907,7 @@ export function EditProduct() {
                     rows={ingredientRows}
                     onRowsChange={setIngredientRows}
                     excludeProductId={id}
+                    storeId={branchId}
                   />
                   {scaleLabelScanEnabled && (
                   <div className="col-span-2 md:col-span-3 xl:col-span-4 pt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">

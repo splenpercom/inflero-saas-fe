@@ -1178,6 +1178,7 @@ export function CreateProduct({
                     onHasIngredientsChange={setHasIngredients}
                     rows={ingredientRows}
                     onRowsChange={setIngredientRows}
+                    storeId={branchId}
                   />
 
                   {scaleLabelScanEnabled && (
