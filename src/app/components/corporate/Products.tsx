@@ -1814,12 +1814,21 @@ export function Products() {
                     )}
                     {col("createdBy") && (
                     <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      <button
-                        onClick={() => navigate("/staff")}
-                        className="text-xs text-gray-600 dark:text-gray-400 hover:text-[#14b8a6] dark:hover:text-[#14b8a6] hover:underline transition-colors"
-                      >
-                        {product.createdBy}
-                      </button>
+                      {product.createdById ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/dashboard/user-management/users/${product.createdById}`)
+                          }
+                          className="text-xs text-gray-600 dark:text-gray-400 hover:text-[#14b8a6] dark:hover:text-[#14b8a6] hover:underline transition-colors"
+                        >
+                          {product.createdBy}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          {product.createdBy || "—"}
+                        </span>
+                      )}
                     </td>
                     )}
                     <td className="px-3 py-2 whitespace-nowrap">

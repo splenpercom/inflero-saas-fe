@@ -53,12 +53,15 @@ export interface StockTransferDetail {
   id: string;
   fromWarehouseId: string | null;
   toWarehouseId: string | null;
+  fromStoreId?: string | null;
+  toStoreId?: string | null;
   fromWarehouse: string;
   toWarehouse: string;
   referenceNumber: string | null;
   documentNo: string | null;
   notes: string | null;
   date: string;
+  createdAt?: string;
   isDeposited: boolean;
   approvalStatus: TransferApprovalStatus;
   approvedAt: string | null;
@@ -72,6 +75,10 @@ export interface StockTransferDetail {
     productId: string;
     productName: string;
     sku: string;
+    destinationProductId?: string | null;
+    destinationProductName?: string | null;
+    destinationProductSku?: string | null;
+    destinationProductCreated?: boolean;
     transferredQty: number;
     soldQty: number;
     returnedQty: number;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Ban, Loader2, Printer, X } from "lucide-react";
+import { Ban, Loader2, Printer, RefreshCw, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
@@ -11,7 +11,12 @@ import {
   type SalesReturnDetail,
 } from "../../api/sales";
 import { voidFinancePayment } from "../../api/finance";
-import { fiscalizeCardPaymentsOnReturn } from "../../lib/omnicashier/fiscalize";
+import {
+  fiscalizeCardPaymentsOnReturn,
+  isOmniFiscalPaymentMethod,
+  retryFiscalizeCardReturn,
+} from "../../lib/omnicashier/fiscalize";
+import { isOmnicashierConfigured } from "../../lib/omnicashierSettings";
 import {
   formatSalesDate,
   mapPaymentMethodToApi,
@@ -53,8 +58,41 @@ export function SalesReturnDetailModal({
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
+  const [retryingFiscalId, setRetryingFiscalId] = useState<string | null>(null);
+  const omniOn = isOmnicashierConfigured();
 
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
+
+  const fiscalLabel = (status: string | null | undefined) => {
+    if (status === "OK") return tr("Fiskal OK", "Fiscal OK");
+    if (status === "FAILED") return tr("Fiskal xəta", "Fiscal failed");
+    if (status === "PENDING") return tr("Fiskal…", "Fiscal…");
+    return null;
+  };
+
+  const handleRetryFiscal = async (paymentId: string) => {
+    if (!detail || isDemo || !omniOn) return;
+    setRetryingFiscalId(paymentId);
+    try {
+      const parent = detail.posOrderId
+        ? await fetchPosOrder(detail.posOrderId).catch(() => null)
+        : null;
+      const result = await retryFiscalizeCardReturn(detail, paymentId, parent);
+      await loadDetail(detail.id);
+      if (result.status === "ok") {
+        notifySuccess(tr("Fiskal qaytarma uğurlu", "Fiscal money back OK"));
+      } else if (result.status === "failed") {
+        notifyWarning(result.error.slice(0, 160));
+      } else if (result.status === "skipped" && result.reason) {
+        notifyWarning(result.reason.slice(0, 160));
+      }
+      onChanged();
+    } catch (err) {
+      notifyFromError(err);
+    } finally {
+      setRetryingFiscalId(null);
+    }
+  };
 
   const loadDetail = async (id: string) => {
     setLoading(true);
@@ -350,13 +388,53 @@ export function SalesReturnDetailModal({
                   <p className="text-xs font-medium text-gray-900 dark:text-white">
                     {tr("Ödəniş tarixçəsi", "Payment history")}
                   </p>
-                  {(detail.payments ?? []).map((p) => (
+                  {(detail.payments ?? []).map((p) => {
+                    const fl = fiscalLabel(p.fiscalStatus);
+                    const canRetryFiscal =
+                      omniOn &&
+                      !isDemo &&
+                      isOmniFiscalPaymentMethod(p.method) &&
+                      (p.fiscalStatus === "FAILED" ||
+                        p.fiscalStatus === "NONE" ||
+                        p.fiscalStatus === "PENDING" ||
+                        !p.fiscalStatus);
+                    return (
                     <div key={p.paymentId} className="flex justify-between items-center gap-2 text-xs">
                       <span className="text-gray-500 min-w-0">
                         {formatSalesDate(p.date)} — {p.method}
+                        {fl ? (
+                          <span
+                            className={cn(
+                              "ml-1.5 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium",
+                              p.fiscalStatus === "OK"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                : p.fiscalStatus === "FAILED"
+                                  ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                                  : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+                            )}
+                            title={p.fiscalError ?? undefined}
+                          >
+                            {fl}
+                          </span>
+                        ) : null}
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span>₼{parseFloat(p.allocatedAmount).toFixed(2)}</span>
+                        {canRetryFiscal ? (
+                          <button
+                            type="button"
+                            disabled={retryingFiscalId === p.paymentId}
+                            onClick={() => void handleRetryFiscal(p.paymentId)}
+                            className="inline-flex items-center gap-1 px-1.5 py-1 rounded border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-900/20 disabled:opacity-50"
+                            title={tr("Fiskalı yenidən cəhd et", "Retry fiscal")}
+                          >
+                            {retryingFiscalId === p.paymentId ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3 h-3" />
+                            )}
+                          </button>
+                        ) : null}
                         {canVoidFinance && !isDemo ? (
                           <button
                             type="button"
@@ -370,7 +448,8 @@ export function SalesReturnDetailModal({
                         ) : null}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

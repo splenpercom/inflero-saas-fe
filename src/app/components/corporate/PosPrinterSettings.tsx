@@ -17,8 +17,11 @@ import { NoAccessPanel } from "../permissions/NoAccessPanel";
 import { ModernSelect } from "../ui/ModernSelect";
 import { notifyFromError, notifySuccess, notifyWarning } from "../../lib/toast";
 import {
+  formatNetworkPrinterTarget,
   getPosTerminalId,
   loadPosPrinterSettings,
+  parsePrinterTarget,
+  printerTargetLabel,
   savePosPrinterSettings,
   type PaperWidthMm,
   type PosPrinterSettings,
@@ -31,6 +34,125 @@ import {
 } from "../../lib/qzTrayClient";
 import { printPosTicket, printBarcodeLabel } from "../../lib/posPrint";
 import type { ThermalReceiptPayload } from "../../lib/thermalReceipt";
+
+type PrinterMode = "named" | "network";
+
+function modeFromStored(raw: string): PrinterMode {
+  const t = parsePrinterTarget(raw);
+  return t?.kind === "network" ? "network" : "named";
+}
+
+function NetworkOrNamedPrinterField({
+  fieldId,
+  label,
+  value,
+  onChange,
+  namedOptions,
+  canMutate,
+  hintEmpty,
+  ipPlaceholder,
+  tr,
+}: {
+  fieldId: string;
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  namedOptions: { value: string; label: string }[];
+  canMutate: boolean;
+  hintEmpty?: string;
+  ipPlaceholder: string;
+  tr: (az: string, en: string, ru?: string) => string;
+}) {
+  const parsed = parsePrinterTarget(value);
+  const mode = modeFromStored(value);
+  const host = parsed?.kind === "network" ? parsed.host : "";
+  const port = parsed?.kind === "network" ? String(parsed.port) : "9100";
+  const namedValue = parsed?.kind === "named" ? parsed.name : "";
+
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-medium text-gray-900 dark:text-white block">{label}</label>
+      <div className="flex flex-wrap gap-3 text-gray-700 dark:text-gray-300">
+        <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] font-normal leading-tight">
+          <input
+            type="radio"
+            name={`printer-mode-${fieldId}`}
+            checked={mode === "named"}
+            disabled={!canMutate}
+            onChange={() => onChange("")}
+            className="text-[#14b8a6] focus:ring-[#14b8a6]"
+          />
+          {tr("Windows printer", "Windows printer")}
+        </label>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] font-normal leading-tight">
+          <input
+            type="radio"
+            name={`printer-mode-${fieldId}`}
+            checked={mode === "network"}
+            disabled={!canMutate}
+            onChange={() =>
+              onChange(formatNetworkPrinterTarget(ipPlaceholder || "192.168.0.21", 9100))
+            }
+            className="text-[#14b8a6] focus:ring-[#14b8a6]"
+          />
+          {tr("Şəbəkə IP (Ethernet/Wi‑Fi)", "Network IP (Ethernet/Wi‑Fi)")}
+        </label>
+      </div>
+
+      {mode === "named" ? (
+        <ModernSelect
+          value={namedValue}
+          onChange={onChange}
+          options={namedOptions}
+          className="w-full"
+          placeholder={tr("Printer seçin", "Select printer")}
+          disabled={!canMutate}
+        />
+      ) : (
+        <div className="grid grid-cols-[1fr_88px] gap-2">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={host}
+            disabled={!canMutate}
+            placeholder={ipPlaceholder}
+            onChange={(e) => {
+              const nextHost = e.target.value.trim();
+              const p = Number(port) || 9100;
+              onChange(nextHost ? formatNetworkPrinterTarget(nextHost, p) : "");
+            }}
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 py-2 text-xs text-gray-900 dark:text-white"
+          />
+          <input
+            type="number"
+            min={1}
+            max={65535}
+            value={port}
+            disabled={!canMutate}
+            title="TCP port"
+            onChange={(e) => {
+              const p = Number(e.target.value) || 9100;
+              onChange(host ? formatNetworkPrinterTarget(host, p) : "");
+            }}
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 py-2 text-xs text-gray-900 dark:text-white"
+          />
+        </div>
+      )}
+
+      {mode === "network" && (
+        <p className="text-[10px] text-gray-500 dark:text-gray-400">
+          {tr(
+            "Self-test IP + TCP 9100. QZ ESC/POS raw göndərir (Windows printer yolundan ayrı). QZ Tray POS PC-də işləməlidir.",
+            "Self-test IP + TCP 9100. QZ sends raw ESC/POS (separate from the Windows printer path). QZ Tray must run on the POS PC.",
+          )}
+        </p>
+      )}
+      {hintEmpty && !value.trim() && mode === "named" && (
+        <p className="text-[10px] text-amber-700 dark:text-amber-300">{hintEmpty}</p>
+      )}
+    </div>
+  );
+}
 
 function samplePayload(language: "az" | "en" | "ru"): ThermalReceiptPayload {
   const isAz = language === "az";
@@ -161,22 +283,22 @@ export function PosPrinterSettings({
           : role === "bar"
             ? settings.barPrinter || settings.receiptPrinter || settings.kotPrinter
             : settings.barcodePrinter || settings.receiptPrinter;
-    if (!printer.trim()) {
+    if (!printer.trim() || !parsePrinterTarget(printer)) {
       notifyWarning(
         tr(
           role === "receipt"
             ? "Qəbz printeri seçin"
             : role === "kot"
-              ? "KOT printeri seçin"
+              ? "KOT printeri və ya şəbəkə IP daxil edin"
               : role === "bar"
-                ? "BAR printeri seçin"
+                ? "BAR printeri və ya şəbəkə IP daxil edin"
                 : "Barkod printeri seçin",
           role === "receipt"
             ? "Select a receipt printer"
             : role === "kot"
-              ? "Select a KOT printer"
+              ? "Select a KOT printer or enter a network IP"
               : role === "bar"
-                ? "Select a BAR printer"
+                ? "Select a BAR printer or enter a network IP"
                 : "Select a barcode printer",
         ),
       );
@@ -200,8 +322,8 @@ export function PosPrinterSettings({
       notifySuccess(
         result.channel === "qz"
           ? tr(
-              `Çap edildi → ${result.printer}`,
-              `Printed → ${result.printer}`,
+              `Çap edildi → ${printerTargetLabel(result.printer || printer)}`,
+              `Printed → ${printerTargetLabel(result.printer || printer)}`,
             )
           : tr(
               "Brauzer çap dialoqu açıldı (QZ mövcud deyil və ya uğursuz oldu)",
@@ -310,8 +432,8 @@ export function PosPrinterSettings({
           )}
 
           <div
-            className={`grid grid-cols-1 gap-3 ${
-              diningEnabled ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2"
+            className={`grid grid-cols-1 gap-4 ${
+              diningEnabled ? "sm:grid-cols-2" : "sm:grid-cols-2"
             }`}
           >
             <div>
@@ -349,52 +471,51 @@ export function PosPrinterSettings({
               )}
             </div>
             {diningEnabled && (
-              <div>
-                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                  {tr("KOT / Mətbəx printeri", "KOT / Kitchen printer")}
-                </label>
-                <ModernSelect
-                  value={settings.kotPrinter}
-                  onChange={(value) => setSettings((s) => ({ ...s, kotPrinter: value }))}
-                  options={printerOptions}
-                  className="w-full"
-                  placeholder={tr("Printer seçin", "Select printer")}
-                  disabled={!canMutate}
-                />
-                {settings.receiptPrinter.trim() && !settings.kotPrinter.trim() && (
-                  <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-1">
-                    {tr(
-                      "KOT boşdursa qəbz printerindən istifadə olunur.",
-                      "If KOT is empty, the receipt printer is used.",
-                    )}
-                  </p>
-                )}
-              </div>
+              <NetworkOrNamedPrinterField
+                fieldId="kot"
+                label={tr("KOT / Mətbəx printeri", "KOT / Kitchen printer")}
+                value={settings.kotPrinter}
+                onChange={(value) => setSettings((s) => ({ ...s, kotPrinter: value }))}
+                namedOptions={printerOptions}
+                canMutate={canMutate}
+                ipPlaceholder="192.168.0.22"
+                hintEmpty={
+                  settings.receiptPrinter.trim()
+                    ? tr(
+                        "KOT boşdursa qəbz printerindən istifadə olunur.",
+                        "If KOT is empty, the receipt printer is used.",
+                      )
+                    : undefined
+                }
+                tr={tr}
+              />
             )}
             {diningEnabled && (
-              <div>
-                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
-                  {tr("BAR printeri", "BAR printer")}
-                </label>
-                <ModernSelect
-                  value={settings.barPrinter}
-                  onChange={(value) => setSettings((s) => ({ ...s, barPrinter: value }))}
-                  options={printerOptions}
-                  className="w-full"
-                  placeholder={tr("Printer seçin", "Select printer")}
-                  disabled={!canMutate}
-                />
-                {!settings.barPrinter.trim() && (
-                  <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-1">
-                    {tr(
-                      "BAR boşdursa qəbz printerindən istifadə olunur.",
-                      "If BAR is empty, the receipt printer is used.",
-                    )}
-                  </p>
+              <NetworkOrNamedPrinterField
+                fieldId="bar"
+                label={tr("BAR printeri", "BAR printer")}
+                value={settings.barPrinter}
+                onChange={(value) => setSettings((s) => ({ ...s, barPrinter: value }))}
+                namedOptions={printerOptions}
+                canMutate={canMutate}
+                ipPlaceholder="192.168.0.21"
+                hintEmpty={tr(
+                  "BAR boşdursa qəbz printerindən istifadə olunur.",
+                  "If BAR is empty, the receipt printer is used.",
                 )}
-              </div>
+                tr={tr}
+              />
             )}
           </div>
+
+          {diningEnabled && (
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+              {tr(
+                "Mətbəx / BAR Ethernet printerləri: self-test-dəki IP (məs. 192.168.0.22 / 192.168.0.21), port 9100. POS PC ilə eyni Wi‑Fi/LAN-da olmalıdır.",
+                "Kitchen / BAR Ethernet printers: use the self-test IP (e.g. 192.168.0.22 / 192.168.0.21), port 9100. Must be on the same Wi‑Fi/LAN as the POS PC.",
+              )}
+            </p>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
