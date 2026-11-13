@@ -117,13 +117,19 @@ export function buildDemoDashboardSummary(period: DashboardPeriod = "1M"): Dashb
         quantitySold: p.sales,
       })),
       lowStock: lowStock.slice(0, 5).map((p, i) => {
-        const qty = Number.parseInt(String(p.stock).replace(/\D/g, ""), 10) || 0;
+        const match = String(p.stock).match(/-?\d+(?:[.,]\d+)?/);
+        const qty = match
+          ? Number(match[0].replace(",", "."))
+          : 0;
+        const qtyRounded = Number.isFinite(qty)
+          ? Math.round((qty + Number.EPSILON) * 1000) / 1000
+          : 0;
         return {
           productId: String(i + 1),
           name: p.name,
           sku: p.id,
-          quantity: qty,
-          quantityAlert: Math.max(qty + 5, 10),
+          quantity: qtyRounded,
+          quantityAlert: Math.max(qtyRounded + 5, 10),
         };
       }),
       expiredProducts: expired.slice(0, 5).map((p) => ({

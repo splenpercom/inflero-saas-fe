@@ -127,6 +127,15 @@ export function ViewExpenseModal({
             {detail(tr("Tarix", "Date"), formatFinanceDate(expense.date))}
             {detail(tr("Məbləğ", "Amount"), `${parseFinanceMoney(expense.amount).toFixed(2)} AZN`)}
             {detail(tr("Bank Hesabı", "Bank Account"), bankLabel)}
+            {detail(
+              tr("Təyinat", "Assign to"),
+              expense.customerName
+                ? `${tr("Müştəri", "Client")}: ${expense.customerName}`
+                : expense.supplierName
+                  ? `${tr("Təchizatçı", "Supplier")}: ${expense.supplierName}`
+                  : "—",
+            )}
+            {detail(tr("İşçi", "Employee"), expense.employeeName ?? "—")}
           </div>
 
           {expense.description && (

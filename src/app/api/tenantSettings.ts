@@ -49,9 +49,13 @@ export interface TenantSettingsRecord {
   /** When true (default), Cost (COGS) is shown on product create/edit/list/details. */
   productsCogsEnabled?: boolean;
   tableHourlyBillingEnabled?: boolean;
+  /** Dining: require table selection on terminal POS for this branch. */
+  posTableRequired?: boolean;
   posStaffPasscodeEnabled?: boolean;
   /** When true, Orders list shows a Products column per order. */
   ordersShowProductsEnabled?: boolean;
+  /** When true, deleting a POS order requires a reason shown on deletion logs. */
+  orderDeletionReasonRequired?: boolean;
   /** Optics: require doctor selection on terminal POS for this branch. */
   opticsDoctorRequired?: boolean;
   /** Default POS payment status pre-selection (NONE = cashier must choose). */
@@ -85,8 +89,10 @@ export type TenantSettingsUpdate = Partial<{
   inventoryServicesEnabled: boolean;
   productsCogsEnabled: boolean;
   tableHourlyBillingEnabled: boolean;
+  posTableRequired: boolean;
   posStaffPasscodeEnabled: boolean;
   ordersShowProductsEnabled: boolean;
+  orderDeletionReasonRequired: boolean;
   opticsDoctorRequired: boolean;
   posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";
   scaleLabelScanEnabled: boolean;

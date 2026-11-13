@@ -64,6 +64,12 @@ export const userManagementTranslations = {
     manage: "Manage",
     managePayments: "Payments",
     managePaymentsHint: "Allow recording payments from Orders. POS Edit also covers payments on the POS screen.",
+    lockEditOrderLineRemove: "No remove",
+    lockEditOrderLineRemoveHint:
+      "When editing an order, cannot remove products that were already on the order.",
+    lockEditOrderLineDecrease: "No decrease",
+    lockEditOrderLineDecreaseHint:
+      "When editing an order, cannot decrease quantity of products that were already on the order.",
     createRole: "Create Role",
     updateRole: "Update Role",
     
@@ -279,6 +285,12 @@ export const userManagementTranslations = {
     manage: "İdarə et",
     managePayments: "Ödənişlər",
     managePaymentsHint: "Sifarişlərdən ödəniş qeyd etməyə icazə. POS Edit POS ekranında da ödənişi əhatə edir.",
+    lockEditOrderLineRemove: "Silmə yox",
+    lockEditOrderLineRemoveHint:
+      "Sifarişi redaktə edərkən artıq sifarişdə olan məhsulları silmək olmur.",
+    lockEditOrderLineDecrease: "Azaltma yox",
+    lockEditOrderLineDecreaseHint:
+      "Sifarişi redaktə edərkən artıq sifarişdə olan məhsulların miqdarını azaltmaq olmur.",
     createRole: "Rol Yarat",
     updateRole: "Rol Yenilə",
     
@@ -477,6 +489,12 @@ export const userManagementTranslations = {
     manage: "Управление",
     managePayments: "Оплаты",
     managePaymentsHint: "Разрешить запись оплат из Заказов. POS Edit также покрывает оплату на экране POS.",
+    lockEditOrderLineRemove: "Без удаления",
+    lockEditOrderLineRemoveHint:
+      "При редактировании заказа нельзя удалять товары, которые уже были в заказе.",
+    lockEditOrderLineDecrease: "Без снижения",
+    lockEditOrderLineDecreaseHint:
+      "При редактировании заказа нельзя уменьшать количество товаров, которые уже были в заказе.",
     createRole: "Создать роль",
     updateRole: "Обновить роль",
     newPassword: "Новый пароль",

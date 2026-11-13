@@ -6,7 +6,6 @@ import { LanguageProvider } from "./i18n/LanguageContext";
 import { ThemeProvider } from "./i18n/ThemeContext";
 import { CorporateSidebar } from "./components/corporate/CorporateSidebar";
 import { CorporateHeader } from "./components/corporate/CorporateHeader";
-import { CorporateDashboard } from "./components/corporate/CorporateDashboard";
 import { CorporateOrders } from "./components/corporate/CorporateOrders";
 import { Settings as CorporateSettings } from "./components/corporate/Settings";
 import { DeletionLogs } from "./components/corporate/DeletionLogs";
@@ -39,7 +38,6 @@ import { PeopleDoctors } from "./components/corporate/people/PeopleDoctors";
 import { DoctorProfile } from "./components/corporate/DoctorProfile";
 import { Suppliers } from "./components/corporate/people/Suppliers";
 import { Warehouses } from "./components/corporate/people/Warehouses";
-import { Reports } from "./components/corporate/Reports";
 import { Marketplace } from "./components/corporate/Marketplace";
 import { UserManagement } from "./components/corporate/UserManagement";
 import { UserDetail } from "./components/corporate/UserDetail";
@@ -404,24 +402,13 @@ function AppShell() {
                 }
               />
 
-              {/* Reports and User Management */}
-              <Route
-                path="reports"
-                element={
-                  <HotelsShellPageGuard
-                    comingSoon={
-                      <HotelsComingSoonPage title="Reports" titleAz="Hesabatlar" />
-                    }
-                  >
-                    <Reports />
-                  </HotelsShellPageGuard>
-                }
-              />
-              <Route path="reports/sales" element={<Navigate to="/dashboard/reports" replace />} />
-              <Route path="reports/employee-sales" element={<Navigate to="/dashboard/reports" replace />} />
-              <Route path="reports/finance" element={<Navigate to="/dashboard/reports" replace />} />
-              <Route path="reports/product" element={<Navigate to="/dashboard/reports" replace />} />
-              <Route path="reports/annual" element={<Navigate to="/dashboard/reports" replace />} />
+              {/* Reports merged into Dashboard */}
+              <Route path="reports" element={<Navigate to="/dashboard" replace />} />
+              <Route path="reports/sales" element={<Navigate to="/dashboard" replace />} />
+              <Route path="reports/employee-sales" element={<Navigate to="/dashboard" replace />} />
+              <Route path="reports/finance" element={<Navigate to="/dashboard" replace />} />
+              <Route path="reports/product" element={<Navigate to="/dashboard" replace />} />
+              <Route path="reports/annual" element={<Navigate to="/dashboard" replace />} />
               {/* Tasks — core surface, not gated by any feature plugin */}
               <Route path="marketplace" element={<Marketplace />} />
               <Route path="tasks" element={<TasksPage />} />

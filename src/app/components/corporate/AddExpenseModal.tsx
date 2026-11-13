@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import type { FinanceCategory } from "../../api/finance";
@@ -9,14 +9,21 @@ import { mapExpenseStatusLabel } from "../../lib/financeMappers";
 import { notifyFromError } from "../../lib/toast";
 import { DateInput } from "../ui/DateInput";
 import { ModernSelect } from "../ui/ModernSelect";
+import { useSalesCustomers } from "../../hooks/useSalesCustomers";
+import { usePurchaseSuppliers } from "../../hooks/usePurchaseSuppliers";
 
 import { pickLang } from "../../i18n/pickLang";
+
+export type ExpensePartyType = "none" | "customer" | "supplier";
+
 export interface ExpenseFormData {
   expenseName: string;
   description: string;
   categoryId: string;
   accountId: string;
   userId: string;
+  customerId: string;
+  supplierId: string;
   date: string;
   amount: string;
   reference?: string;
@@ -52,6 +59,13 @@ export function AddExpenseModal({
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [userId, setUserId] = useState("");
+  const [partyType, setPartyType] = useState<ExpensePartyType>("none");
+  const [customerId, setCustomerId] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [loadedCustomerName, setLoadedCustomerName] = useState("");
+  const [loadedSupplierName, setLoadedSupplierName] = useState("");
   const [date, setDate] = useState("");
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
@@ -61,6 +75,15 @@ export function AddExpenseModal({
   const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const isEdit = !!editExpense;
 
+  const { customers, loading: customersLoading } = useSalesCustomers(
+    customerSearch,
+    isOpen && partyType === "customer",
+  );
+  const { suppliers, loading: suppliersLoading } = usePurchaseSuppliers(
+    supplierSearch,
+    isOpen && partyType === "supplier",
+  );
+
   useEffect(() => {
     if (!isOpen) {
       setExpense("");
@@ -68,6 +91,13 @@ export function AddExpenseModal({
       setCategoryId("");
       setAccountId("");
       setUserId("");
+      setPartyType("none");
+      setCustomerId("");
+      setSupplierId("");
+      setCustomerSearch("");
+      setSupplierSearch("");
+      setLoadedCustomerName("");
+      setLoadedSupplierName("");
       setDate("");
       setAmount("");
       setReference("");
@@ -85,10 +115,71 @@ export function AddExpenseModal({
       setAmount(editExpense.amount);
       setReference(editExpense.reference ?? "");
       setStatus(editExpense.status);
+      if (editExpense.customerId) {
+        setPartyType("customer");
+        setCustomerId(editExpense.customerId);
+        setLoadedCustomerName(editExpense.customerName ?? "");
+        setSupplierId("");
+        setLoadedSupplierName("");
+      } else if (editExpense.supplierId) {
+        setPartyType("supplier");
+        setSupplierId(editExpense.supplierId);
+        setLoadedSupplierName(editExpense.supplierName ?? "");
+        setCustomerId("");
+        setLoadedCustomerName("");
+      } else {
+        setPartyType("none");
+        setCustomerId("");
+        setSupplierId("");
+        setLoadedCustomerName("");
+        setLoadedSupplierName("");
+      }
     }
   }, [isOpen, editExpense]);
 
   const activeCategories = categories.filter((c) => c.isActive);
+
+  const customerOptions = useMemo(() => {
+    const opts = [
+      { value: "", label: tr("Seçin (opsional)", "Select (optional)") },
+      ...customers.map((c) => ({ value: c.id, label: c.name })),
+    ];
+    if (
+      customerId &&
+      loadedCustomerName &&
+      !customers.some((c) => c.id === customerId)
+    ) {
+      opts.push({ value: customerId, label: loadedCustomerName });
+    }
+    return opts;
+  }, [customers, customerId, loadedCustomerName, language]);
+
+  const supplierOptions = useMemo(() => {
+    const opts = [
+      { value: "", label: tr("Seçin (opsional)", "Select (optional)") },
+      ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+    ];
+    if (
+      supplierId &&
+      loadedSupplierName &&
+      !suppliers.some((s) => s.id === supplierId)
+    ) {
+      opts.push({ value: supplierId, label: loadedSupplierName });
+    }
+    return opts;
+  }, [suppliers, supplierId, loadedSupplierName, language]);
+
+  const handlePartyTypeChange = (next: ExpensePartyType) => {
+    setPartyType(next);
+    if (next !== "customer") {
+      setCustomerId("");
+      setCustomerSearch("");
+    }
+    if (next !== "supplier") {
+      setSupplierId("");
+      setSupplierSearch("");
+    }
+  };
 
   const handleSave = async () => {
     if (!expense.trim() || !categoryId || !date || !amount || parseFloat(amount) <= 0) {
@@ -105,6 +196,8 @@ export function AddExpenseModal({
         categoryId,
         accountId,
         userId,
+        customerId: partyType === "customer" ? customerId : "",
+        supplierId: partyType === "supplier" ? supplierId : "",
         date,
         amount,
         reference: reference.trim() || undefined,
@@ -117,7 +210,6 @@ export function AddExpenseModal({
       setSaving(false);
     }
   };
-
 
   if (!isOpen) return null;
 
@@ -256,6 +348,71 @@ export function AddExpenseModal({
               ]}
             />
           </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+              {tr("Təyinat", "Assign to")}{" "}
+              <span className="text-gray-400 font-normal">({tr("opsional", "optional")})</span>
+            </label>
+            <ModernSelect
+              value={partyType}
+              onChange={(v) => handlePartyTypeChange(v as ExpensePartyType)}
+              className="w-full"
+              options={[
+                { value: "none", label: tr("Yoxdur", "None") },
+                { value: "customer", label: tr("Müştəri / Client", "Client") },
+                { value: "supplier", label: tr("Təchizatçı", "Supplier") },
+              ]}
+            />
+          </div>
+
+          {partyType === "customer" && (
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("Müştəri", "Client")}
+              </label>
+              <ModernSelect
+                value={customerId}
+                onChange={(id) => {
+                  setCustomerId(id);
+                  const name = customers.find((c) => c.id === id)?.name;
+                  if (name) setLoadedCustomerName(name);
+                }}
+                className="w-full"
+                searchable
+                searchPlaceholder={tr("Müştəri axtar...", "Search client...")}
+                onSearchChange={setCustomerSearch}
+                placeholder={
+                  customersLoading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select")
+                }
+                options={customerOptions}
+              />
+            </div>
+          )}
+
+          {partyType === "supplier" && (
+            <div>
+              <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                {tr("Təchizatçı", "Supplier")}
+              </label>
+              <ModernSelect
+                value={supplierId}
+                onChange={(id) => {
+                  setSupplierId(id);
+                  const name = suppliers.find((s) => s.id === id)?.name;
+                  if (name) setLoadedSupplierName(name);
+                }}
+                className="w-full"
+                searchable
+                searchPlaceholder={tr("Təchizatçı axtar...", "Search supplier...")}
+                onSearchChange={setSupplierSearch}
+                placeholder={
+                  suppliersLoading ? tr("Yüklənir...", "Loading...") : tr("Seçin", "Select")
+                }
+                options={supplierOptions}
+              />
+            </div>
+          )}
         </div>
 
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2 shrink-0">

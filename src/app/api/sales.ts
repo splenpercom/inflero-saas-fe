@@ -91,6 +91,8 @@ export interface PosOrderLineItem {
   loyaltyOfferName?: string | null;
   /** Rongta scale label audit when line came from a printed weight label. */
   scaleMeta?: PosOrderItemScaleMeta | null;
+  /** When this line was first added to the order (ISO). */
+  createdAt?: string | null;
   /** Units already returned for this product on the order (product-level). */
   returnedQty?: number;
   /** quantity - returnedQty, floored at 0. */
@@ -669,8 +671,10 @@ export async function updatePosOrder(
   return res.data;
 }
 
-export async function deletePosOrder(id: string) {
-  return apiDelete<{ success: boolean; message: string }>(`/tenant/sales/pos-orders/${id}`);
+export async function deletePosOrder(id: string, body?: { reason?: string | null }) {
+  return apiDelete<{ success: boolean; message: string }>(`/tenant/sales/pos-orders/${id}`, {
+    body: body ?? {},
+  });
 }
 
 export async function recordPosOrderPayment(id: string, body: RecordPaymentBody) {

@@ -77,7 +77,7 @@ import {
   StatusPillDropdown,
   type StatusPillOption,
 } from "../../../modules/my-website/features/orders/WebOrderUi";
-import { useConfirm } from "../../context/ConfirmContext";
+import { useConfirm, useConfirmWithReason } from "../../context/ConfirmContext";
 import { DataPagination, dataPaginationShowText } from "../ui/DataPagination";
 import { DEFAULT_LIST_PAGE_SIZE } from "../../hooks/usePagination";
 import { ModernSelect } from "../ui/ModernSelect";
@@ -303,6 +303,7 @@ export function POSOrders() {
   const lastPointerType = useLastPointerType();
   const { customers } = useSalesCustomers("", true);
   const askConfirm = useConfirm();
+  const askConfirmWithReason = useConfirmWithReason();
   const [searchParams, setSearchParams] = useSearchParams();
   const [qrActionBusyId, setQrActionBusyId] = useState<string | null>(null);
 
@@ -330,6 +331,7 @@ export function POSOrders() {
   const [selectedProductionStatus, setSelectedProductionStatus] = useState("all");
   const [posSendToProductionEnabled, setPosSendToProductionEnabled] = useState(false);
   const [ordersShowProductsEnabled, setOrdersShowProductsEnabled] = useState(false);
+  const [orderDeletionReasonRequired, setOrderDeletionReasonRequired] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
   const [updatingProductionId, setUpdatingProductionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("last7days");
@@ -462,6 +464,7 @@ export function POSOrders() {
     if (!(isAuthenticated || isDemo)) {
       setPosSendToProductionEnabled(false);
       setOrdersShowProductsEnabled(false);
+      setOrderDeletionReasonRequired(false);
       setPosStaffPasscodeEnabled(false);
       return;
     }
@@ -471,6 +474,7 @@ export function POSOrders() {
         if (!cancelled) {
           setPosSendToProductionEnabled(s.posSendToProductionEnabled === true);
           setOrdersShowProductsEnabled(s.ordersShowProductsEnabled === true);
+          setOrderDeletionReasonRequired(s.orderDeletionReasonRequired === true);
           setPosStaffPasscodeEnabled(s.posStaffPasscodeEnabled === true);
         }
       })
@@ -478,6 +482,7 @@ export function POSOrders() {
         if (!cancelled) {
           setPosSendToProductionEnabled(false);
           setOrdersShowProductsEnabled(false);
+          setOrderDeletionReasonRequired(false);
           setPosStaffPasscodeEnabled(false);
         }
       });
@@ -1155,16 +1160,45 @@ export function POSOrders() {
 
   const handleDeleteSale = async (order: PosOrderListRow) => {
     if (!canDelete || isDemo) return;
-    if (!(await askConfirm({
-      title: tr("Silmə təsdiqi", "Confirm deletion"),
-      message: tr("Bu satışı silmək istədiyinizə əminsiniz?", "Are you sure you want to delete this sale?"),
-      variant: "danger",
-    }))) {
+    let deletionReason: string | undefined;
+    if (orderDeletionReasonRequired) {
+      const result = await askConfirmWithReason({
+        title: tr("Silmə təsdiqi", "Confirm deletion", "Подтверждение удаления"),
+        message: tr(
+          "Bu satışı silmək istədiyinizə əminsiniz? Silinmə səbəbini daxil edin.",
+          "Are you sure you want to delete this sale? Enter a deletion reason.",
+          "Удалить эту продажу? Укажите причину удаления.",
+        ),
+        variant: "danger",
+        reasonRequired: true,
+        reasonLabel: tr("Silinmə səbəbi", "Deletion reason", "Причина удаления"),
+        reasonPlaceholder: tr(
+          "Səbəbi daxil edin…",
+          "Enter the reason…",
+          "Укажите причину…",
+        ),
+      });
+      if (!result.confirmed) return;
+      deletionReason = result.reason;
+    } else if (
+      !(await askConfirm({
+        title: tr("Silmə təsdiqi", "Confirm deletion", "Подтверждение удаления"),
+        message: tr(
+          "Bu satışı silmək istədiyinizə əminsiniz?",
+          "Are you sure you want to delete this sale?",
+          "Удалить эту продажу?",
+        ),
+        variant: "danger",
+      }))
+    ) {
       return;
     }
     try {
-      await deletePosOrder(order.id);
-      notifySuccess(tr("Satış silindi", "Sale deleted"));
+      await deletePosOrder(
+        order.id,
+        deletionReason ? { reason: deletionReason } : undefined,
+      );
+      notifySuccess(tr("Satış silindi", "Sale deleted", "Продажа удалена"));
       await loadItems();
     } catch (err) {
       if (err instanceof ApiError && err.code === "ORDER_HAS_REFUND") {
@@ -1172,11 +1206,22 @@ export function POSOrders() {
           tr(
             "Əvvəlcə geri qaytarma (refund) qeydini silin, sonra sifarişi silə bilərsiniz",
             "Delete the refund record first, then you can delete this order",
+            "Сначала удалите возврат, затем можно удалить заказ",
           ),
         );
         return;
       }
-      notifyFromError(err, tr("Satış silinə bilmədi", "Failed to delete sale"));
+      if (err instanceof ApiError && err.code === "ORDER_DELETION_REASON_REQUIRED") {
+        notifyWarning(
+          tr(
+            "Silinmə səbəbi mütləqdir",
+            "Deletion reason is required",
+            "Укажите причину удаления",
+          ),
+        );
+        return;
+      }
+      notifyFromError(err, tr("Satış silinə bilmədi", "Failed to delete sale", "Не удалось удалить продажу"));
     }
   };
 

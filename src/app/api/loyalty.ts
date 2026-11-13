@@ -169,8 +169,22 @@ export type LoyaltyBuyGetPreviewLine = {
   loyaltyOfferId?: string | null;
 };
 
+export type LoyaltyStats = {
+  freeProductQty: string;
+  freeProductWorth: string;
+  freeProductOrders: number;
+  cashbackRedeemed: string;
+  cashbackEarned: string;
+  storeId: string | null;
+};
+
 export async function fetchLoyaltySettings(): Promise<LoyaltySettings> {
   const res = await apiGet<Envelope<LoyaltySettings>>("/tenant/loyalty/settings");
+  return res.data;
+}
+
+export async function fetchLoyaltyStats(): Promise<LoyaltyStats> {
+  const res = await apiGet<Envelope<LoyaltyStats>>("/tenant/loyalty/stats");
   return res.data;
 }
 

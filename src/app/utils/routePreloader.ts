@@ -3,7 +3,7 @@ const preloadedRoutes = new Set<string>();
 
 // Map of route paths to their lazy component imports
 const routeImports: Record<string, () => Promise<any>> = {
-  '/dashboard': () => import('../components/corporate/CorporateDashboard'),
+  '/dashboard': () => import('../components/corporate/NewDashboard'),
   '/inventory/products': () => import('../components/corporate/Products'),
   '/inventory/products/create': () => import('../components/corporate/CreateProduct'),
   '/inventory/products/low-stocks': () => import('../components/corporate/LowStocks'),
@@ -27,12 +27,6 @@ const routeImports: Record<string, () => Promise<any>> = {
   '/people/doctors': () => import('../components/corporate/people/PeopleDoctors'),
   '/people/suppliers': () => import('../components/corporate/people/Suppliers'),
   '/people/warehouses': () => import('../components/corporate/people/Warehouses'),
-  '/reports': () => import('../components/corporate/Reports'),
-  '/reports/sales': () => import('../components/corporate/Reports'),
-  '/reports/employee-sales': () => import('../components/corporate/Reports'),
-  '/reports/finance': () => import('../components/corporate/Reports'),
-  '/reports/product': () => import('../components/corporate/Reports'),
-  '/reports/annual': () => import('../components/corporate/Reports'),
   '/user-management': () => import('../components/corporate/UserManagement'),
   '/user-management/roles': () => import('../components/corporate/UserManagement'),
   '/settings': () => import('../components/corporate/Settings'),

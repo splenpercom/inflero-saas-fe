@@ -245,6 +245,7 @@ export function DeletionLogs() {
                   <th className="px-3 py-2.5 font-medium">{tr("Tarix / saat", "Date / time", "Дата / время")}</th>
                   <th className="px-3 py-2.5 font-medium">{tr("Tip", "Type", "Тип")}</th>
                   <th className="px-3 py-2.5 font-medium">{tr("Qeyd", "Record", "Запись")}</th>
+                  <th className="px-3 py-2.5 font-medium">{tr("Səbəb", "Reason", "Причина")}</th>
                   <th className="px-3 py-2.5 font-medium">{tr("Silən", "Deleted by", "Удалил")}</th>
                   <th className="px-3 py-2.5 font-medium">{tr("Vasitası ilə", "Via", "Через")}</th>
                 </tr>
@@ -252,13 +253,13 @@ export function DeletionLogs() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-xs text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-xs text-gray-500">
                       {tr("Yüklənir...", "Loading...", "Загрузка...")}
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-xs text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-xs text-gray-500">
                       {tr(
                         "Silinmə tapılmadı. Köhnə silinmələr jurnalda görünməyə bilər.",
                         "No deletions found. Older deletions may not appear in this log.",
@@ -282,6 +283,7 @@ export function DeletionLogs() {
                         : row.trigger === "void"
                           ? tr("Ləğv", "Void", "Аннулирование")
                           : "—";
+                    const reason = row.reason?.trim() || "—";
                     return (
                       <tr key={row.id} className="text-xs text-gray-700 dark:text-gray-200">
                         <td className="px-3 py-2.5 whitespace-nowrap">
@@ -291,6 +293,11 @@ export function DeletionLogs() {
                         <td className="px-3 py-2.5">
                           <div className="font-medium text-gray-900 dark:text-white">{record}</div>
                           <div className="text-[10px] text-gray-400 font-mono">{row.entityId}</div>
+                        </td>
+                        <td className="px-3 py-2.5 max-w-[220px]">
+                          <div className="whitespace-pre-wrap break-words text-gray-600 dark:text-gray-300">
+                            {reason}
+                          </div>
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap">{who}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-gray-500">{via}</td>

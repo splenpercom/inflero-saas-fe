@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { useModulePermissions } from "../../hooks/useModulePermissions";
 import { useBranchRevision } from "../../hooks/useBranchRevision";
+import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import { useBranch } from "../../context/BranchContext";
 import {
   fetchCategories,
@@ -82,6 +83,37 @@ function productImageUrls(images: unknown): string[] {
   return images.map((img) => (typeof img === "string" ? img : (img as { url: string }).url));
 }
 
+type EditProductSnapshot = {
+  productName: string;
+  category: string;
+  subCategoryIds: string[];
+  brand: string;
+  unit: string;
+  itemBarcode: string;
+  scaleSaleMode: "NONE" | "WEIGHT";
+  scaleItemCode: string;
+  scaleLfCode: string;
+  description: string;
+  quantity: string;
+  price: string;
+  cost: string;
+  discountType: string;
+  discountValue: string;
+  quantityAlert: string;
+  showOnPos: boolean;
+  manufacturedDate: string;
+  expiryDate: string;
+  imageUrls: string[];
+};
+
+function serializeEditSnapshot(s: EditProductSnapshot): string {
+  return JSON.stringify({
+    ...s,
+    subCategoryIds: [...s.subCategoryIds].sort(),
+    imageUrls: [...s.imageUrls],
+  });
+}
+
 export function EditProduct() {
   const { language } = useLanguage();
   const navigate = useNavigate();
@@ -99,7 +131,7 @@ export function EditProduct() {
     (location.state as { returnTo?: string } | null)?.returnTo,
   );
 
-  const goBackToList = () => navigate(returnTo, { replace: true });
+  const [baseline, setBaseline] = useState<string | null>(null);
 
   const pt = (key: string) => {
     const translations: Record<string, { en: string; az: string }> = {
@@ -171,6 +203,79 @@ export function EditProduct() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [subCategoryCategoryMap, setSubCategoryCategoryMap] = useState<Record<string, string>>({});
 
+  const currentSnapshot = useMemo<EditProductSnapshot>(
+    () => ({
+      productName,
+      category,
+      subCategoryIds,
+      brand,
+      unit,
+      itemBarcode,
+      scaleSaleMode,
+      scaleItemCode,
+      scaleLfCode,
+      description,
+      quantity,
+      price,
+      cost,
+      discountType,
+      discountValue,
+      quantityAlert,
+      showOnPos,
+      manufacturedDate,
+      expiryDate,
+      imageUrls: images.map((img) => img.url),
+    }),
+    [
+      productName,
+      category,
+      subCategoryIds,
+      brand,
+      unit,
+      itemBarcode,
+      scaleSaleMode,
+      scaleItemCode,
+      scaleLfCode,
+      description,
+      quantity,
+      price,
+      cost,
+      discountType,
+      discountValue,
+      quantityAlert,
+      showOnPos,
+      manufacturedDate,
+      expiryDate,
+      images,
+    ],
+  );
+
+  const isDirty =
+    !loading && baseline != null && baseline !== serializeEditSnapshot(currentSnapshot);
+  // Guard the whole edit session (not only dirty): Back/Cancel/sidebar must warn.
+  const leaveGuardEnabled = !loading && baseline != null;
+
+  const { confirmLeave, allowNextNavigation } = useUnsavedChangesGuard(leaveGuardEnabled, {
+    title: tr("Saxlanmamış dəyişikliklər", "Unsaved changes", "Несохранённые изменения"),
+    message: isDirty
+      ? tr(
+          "Redaktə səhifəsindən saxlamadan çıxmaq üzrəsiniz. Dəyişikliklər itə bilər.",
+          "You are about to leave the edit page without saving. Your changes may be lost.",
+          "Вы собираетесь покинуть страницу редактирования без сохранения. Изменения могут быть потеряны.",
+        )
+      : tr(
+          "Redaktə səhifəsindən çıxmaq üzrəsiniz. Saxlanmamış dəyişikliklər itə bilər.",
+          "You are about to leave the edit page. Any unsaved changes will be lost.",
+          "Вы собираетесь покинуть страницу редактирования. Несохранённые изменения будут потеряны.",
+        ),
+  });
+
+  const goBackToList = useCallback(async () => {
+    if (!(await confirmLeave())) return;
+    allowNextNavigation();
+    navigate(returnTo, { replace: true });
+  }, [allowNextNavigation, confirmLeave, navigate, returnTo]);
+
   const [categories, setCategories] = useState<SelectOption[]>([]);
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
   const [categoryFormData, setCategoryFormData] = useState({ name: "", status: "active" });
@@ -230,55 +335,99 @@ export function EditProduct() {
       return;
     }
     setLoading(true);
+    setBaseline(null);
     try {
       const product = await fetchProduct(id);
-      setProductName(product.name);
-      setCategory(product.categoryId ?? "");
-      categoryRef.current = product.categoryId ?? "";
       const ids =
         product.subCategoryIds?.length
           ? product.subCategoryIds
           : product.subCategoryId
             ? [product.subCategoryId]
             : [];
-      setSubCategoryIds(ids);
       const names = product.subCategories ?? [];
       const labels: Record<string, string> = {};
       ids.forEach((sid, i) => {
         if (names[i]) labels[sid] = names[i];
         else if (ids.length === 1 && product.subCategory) labels[sid] = product.subCategory;
       });
+      const nextScaleMode = product.scaleSaleMode === "WEIGHT" ? "WEIGHT" : "NONE";
+      const nextQty = formatProductNumericInput(product.quantity ?? 0);
+      const nextPrice = formatProductNumericInput(product.price ?? "");
+      const nextCost = formatProductNumericInput(product.purchasePrice ?? "");
+      const nextDiscountType = mapDiscountToUi(product.discountType);
+      const nextDiscountValue = formatProductNumericInput(product.discountValue ?? "");
+      const nextQtyAlert =
+        product.quantityAlert != null
+          ? formatProductNumericInput(product.quantityAlert)
+          : "";
+      const nextShowOnPos = product.showOnPos !== false;
+      const nextManufactured = product.manufacturedDate?.slice(0, 10) ?? "";
+      const nextExpiry = product.expiryDate?.slice(0, 10) ?? "";
+      const urls = productImageUrls(product.images);
+
+      setProductName(product.name);
+      setCategory(product.categoryId ?? "");
+      categoryRef.current = product.categoryId ?? "";
+      setSubCategoryIds(ids);
       setSubCategoryLabelMap(labels);
       setBrand(product.brandId ?? "");
       setUnit(product.unitId ?? "");
       setItemBarcode(product.itemBarcode ?? "");
-      setScaleSaleMode(product.scaleSaleMode === "WEIGHT" ? "WEIGHT" : "NONE");
+      setScaleSaleMode(nextScaleMode);
       setScaleItemCode(product.scaleItemCode ?? "");
       setScaleLfCode(product.scaleLfCode ?? "");
       setDescription(product.description ?? "");
-      setQuantity(formatProductNumericInput(product.quantity ?? 0));
-      setPrice(formatProductNumericInput(product.price ?? ""));
-      setCost(formatProductNumericInput(product.purchasePrice ?? ""));
-      setDiscountType(mapDiscountToUi(product.discountType));
-      setDiscountValue(formatProductNumericInput(product.discountValue ?? ""));
-      setQuantityAlert(
-        product.quantityAlert != null
-          ? formatProductNumericInput(product.quantityAlert)
-          : "",
-      );
-        setShowOnPos(product.showOnPos !== false);
-        setManufacturedDate(product.manufacturedDate?.slice(0, 10) ?? "");
-        setExpiryDate(product.expiryDate?.slice(0, 10) ?? "");
-
-      const urls = productImageUrls(product.images);
+      setQuantity(nextQty);
+      setPrice(nextPrice);
+      setCost(nextCost);
+      setDiscountType(nextDiscountType);
+      setDiscountValue(nextDiscountValue);
+      setQuantityAlert(nextQtyAlert);
+      setShowOnPos(nextShowOnPos);
+      setManufacturedDate(nextManufactured);
+      setExpiryDate(nextExpiry);
       setImages(urls.map((url, index) => ({ id: `img-${index}`, url })));
+      setBaseline(
+        serializeEditSnapshot({
+          productName: product.name,
+          category: product.categoryId ?? "",
+          subCategoryIds: ids,
+          brand: product.brandId ?? "",
+          unit: product.unitId ?? "",
+          itemBarcode: product.itemBarcode ?? "",
+          scaleSaleMode: nextScaleMode,
+          scaleItemCode: product.scaleItemCode ?? "",
+          scaleLfCode: product.scaleLfCode ?? "",
+          description: product.description ?? "",
+          quantity: nextQty,
+          price: nextPrice,
+          cost: nextCost,
+          discountType: nextDiscountType,
+          discountValue: nextDiscountValue,
+          quantityAlert: nextQtyAlert,
+          showOnPos: nextShowOnPos,
+          manufacturedDate: nextManufactured,
+          expiryDate: nextExpiry,
+          imageUrls: urls,
+        }),
+      );
     } catch (err) {
       notifyFromError(err, pickLang(language, "Məhsulu yükləmək alınmadı", "Failed to load product"));
+      allowNextNavigation();
       navigate(returnTo, { replace: true });
     } finally {
       setLoading(false);
     }
-  }, [id, isDemo, isAuthenticated, navigate, branchRevision, language, returnTo]);
+  }, [
+    id,
+    isDemo,
+    isAuthenticated,
+    navigate,
+    branchRevision,
+    language,
+    returnTo,
+    allowNextNavigation,
+  ]);
 
   useEffect(() => {
     void loadOptions();
@@ -546,7 +695,9 @@ export function EditProduct() {
 
       await updateProduct(id, payload);
       notifySuccess(pt("productUpdated"));
-      goBackToList();
+      allowNextNavigation();
+      setBaseline(serializeEditSnapshot(currentSnapshot));
+      navigate(returnTo, { replace: true });
     } catch (err) {
       notifyFromError(err, tr("Yeniləmək alınmadı", "Failed to update product"));
     } finally {
@@ -571,7 +722,8 @@ export function EditProduct() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{pt("subtitle")}</p>
           </div>
           <button
-            onClick={goBackToList}
+            type="button"
+            onClick={() => void goBackToList()}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-900 dark:bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -974,7 +1126,11 @@ export function EditProduct() {
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={goBackToList} className="px-4 py-2 text-xs bg-gray-900 text-white rounded-lg">
+            <button
+              type="button"
+              onClick={() => void goBackToList()}
+              className="px-4 py-2 text-xs bg-gray-900 text-white rounded-lg"
+            >
               {pt("cancel")}
             </button>
             <button type="button" onClick={() => void handleSubmit()} disabled={saving || optionsLoading} className="px-4 py-2 text-xs bg-orange-500 text-white rounded-lg disabled:opacity-50">

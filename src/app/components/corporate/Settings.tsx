@@ -156,8 +156,10 @@ export function Settings() {
   const [posEditableProductPricesEnabled, setPosEditableProductPricesEnabled] = useState(false);
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
+  const [posTableRequired, setPosTableRequired] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
   const [ordersShowProductsEnabled, setOrdersShowProductsEnabled] = useState(false);
+  const [orderDeletionReasonRequired, setOrderDeletionReasonRequired] = useState(false);
   const [opticsDoctorRequired, setOpticsDoctorRequired] = useState(false);
   const [posDefaultPaymentStatus, setPosDefaultPaymentStatus] = useState<
     "PENDING" | "PAID" | "NONE"
@@ -181,8 +183,10 @@ export function Settings() {
     posEditableProductPricesEnabled: boolean;
     posQrOrderAlarmEnabled: boolean;
     tableHourlyBillingEnabled: boolean;
+    posTableRequired: boolean;
     posStaffPasscodeEnabled: boolean;
     ordersShowProductsEnabled: boolean;
+    orderDeletionReasonRequired: boolean;
     opticsDoctorRequired: boolean;
     posDefaultPaymentStatus: "PENDING" | "PAID" | "NONE";
     inventoryServicesEnabled: boolean;
@@ -249,8 +253,10 @@ export function Settings() {
     setPosEditableProductPricesEnabled(data.posEditableProductPricesEnabled === true);
     setPosQrOrderAlarmEnabled(diningEnabled && data.posQrOrderAlarmEnabled !== false);
     setTableHourlyBillingEnabled(diningEnabled && data.tableHourlyBillingEnabled === true);
+    setPosTableRequired(diningEnabled && data.posTableRequired === true);
     setPosStaffPasscodeEnabled(data.posStaffPasscodeEnabled === true);
     setOrdersShowProductsEnabled(data.ordersShowProductsEnabled === true);
+    setOrderDeletionReasonRequired(data.orderDeletionReasonRequired === true);
     setOpticsDoctorRequired(opticsEnabled && data.opticsDoctorRequired === true);
     setPosDefaultPaymentStatus(
       data.posDefaultPaymentStatus === "PAID"
@@ -319,8 +325,10 @@ export function Settings() {
           posEditableProductPricesEnabled: data.posEditableProductPricesEnabled === true,
           posQrOrderAlarmEnabled: data.posQrOrderAlarmEnabled !== false,
           tableHourlyBillingEnabled: data.tableHourlyBillingEnabled === true,
+          posTableRequired: data.posTableRequired === true,
           posStaffPasscodeEnabled: data.posStaffPasscodeEnabled === true,
           ordersShowProductsEnabled: data.ordersShowProductsEnabled === true,
+          orderDeletionReasonRequired: data.orderDeletionReasonRequired === true,
           opticsDoctorRequired: data.opticsDoctorRequired === true,
           posDefaultPaymentStatus:
             data.posDefaultPaymentStatus === "PAID"
@@ -576,6 +584,7 @@ export function Settings() {
           payload.posEditableProductPricesEnabled = posEditableProductPricesEnabled;
           payload.posStaffPasscodeEnabled = posStaffPasscodeEnabled;
           payload.ordersShowProductsEnabled = ordersShowProductsEnabled;
+          payload.orderDeletionReasonRequired = orderDeletionReasonRequired;
           payload.posDefaultPaymentStatus = posDefaultPaymentStatus;
           if (opticsEnabled) {
             payload.opticsDoctorRequired = opticsDoctorRequired;
@@ -585,6 +594,7 @@ export function Settings() {
             payload.posBarBillShowPricesEnabled = posBarBillShowPricesEnabled;
             payload.posQrOrderAlarmEnabled = posQrOrderAlarmEnabled;
             payload.tableHourlyBillingEnabled = tableHourlyBillingEnabled;
+            payload.posTableRequired = posTableRequired;
           }
         }
         // Clinic uses Products→Services; do not write Inventory services toggle.
@@ -630,8 +640,10 @@ export function Settings() {
           posEditableProductPricesEnabled,
           posQrOrderAlarmEnabled,
           tableHourlyBillingEnabled,
+          posTableRequired,
           posStaffPasscodeEnabled,
           ordersShowProductsEnabled,
+          orderDeletionReasonRequired,
           opticsDoctorRequired,
           posDefaultPaymentStatus,
           inventoryServicesEnabled,
@@ -700,8 +712,10 @@ export function Settings() {
         setPosEditableProductPricesEnabled(addonSnapshotRef.current.posEditableProductPricesEnabled);
         setPosQrOrderAlarmEnabled(addonSnapshotRef.current.posQrOrderAlarmEnabled);
         setTableHourlyBillingEnabled(addonSnapshotRef.current.tableHourlyBillingEnabled);
+        setPosTableRequired(addonSnapshotRef.current.posTableRequired);
         setPosStaffPasscodeEnabled(addonSnapshotRef.current.posStaffPasscodeEnabled);
         setOrdersShowProductsEnabled(addonSnapshotRef.current.ordersShowProductsEnabled);
+        setOrderDeletionReasonRequired(addonSnapshotRef.current.orderDeletionReasonRequired);
         setOpticsDoctorRequired(addonSnapshotRef.current.opticsDoctorRequired);
         setPosDefaultPaymentStatus(addonSnapshotRef.current.posDefaultPaymentStatus);
         setInventoryServicesEnabled(addonSnapshotRef.current.inventoryServicesEnabled);
@@ -740,12 +754,16 @@ export function Settings() {
     if (!diningEnabled && tableHourlyBillingEnabled) {
       setTableHourlyBillingEnabled(false);
     }
+    if (!diningEnabled && posTableRequired) {
+      setPosTableRequired(false);
+    }
   }, [
     diningEnabled,
     posSendToBarEnabled,
     posBarBillShowPricesEnabled,
     posQrOrderAlarmEnabled,
     tableHourlyBillingEnabled,
+    posTableRequired,
   ]);
 
   const navItemClass = (section: SettingsSection) =>
@@ -1579,6 +1597,35 @@ export function Settings() {
                     </button>
                   </div>
 
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Require order deletion reason", "Sifariş silmə səbəbi mütləqdir")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, deleting a POS order requires a reason. That reason is stored and shown on Deletion logs.",
+                          "Aktiv olduqda POS sifarişini silərkən səbəb tələb olunur. Səbəb jurnala yazılır və Silinmə jurnallarında göstərilir.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit || !canEditBranchAddons}
+                      onClick={() => setOrderDeletionReasonRequired((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        orderDeletionReasonRequired ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={orderDeletionReasonRequired}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          orderDeletionReasonRequired ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
                   {opticsEnabled && (
                     <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
                       <div>
@@ -1781,6 +1828,35 @@ export function Settings() {
                       <span
                         className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
                           tableHourlyBillingEnabled ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        {pt("Require table on POS", "POS-da masa mütləqdir")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pt(
+                          "When on, cashiers must select a table before placing a POS order. When off, table selection stays optional.",
+                          "Aktiv olduqda POS sifarişi verməzdən əvvəl masa seçilməlidir. Söndürüldükdə masa seçimi ixtiyaridir.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canEdit || !canEditBranchAddons}
+                      onClick={() => setPosTableRequired((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        posTableRequired ? "bg-[#14b8a6]" : "bg-gray-300 dark:bg-gray-700"
+                      } disabled:opacity-50`}
+                      aria-pressed={posTableRequired}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition mt-0.5 ${
+                          posTableRequired ? "translate-x-5 ml-0.5" : "translate-x-0.5"
                         }`}
                       />
                     </button>

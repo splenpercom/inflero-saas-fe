@@ -9,13 +9,24 @@ export interface RolePermission {
   delete: boolean;
   /** Extra action — e.g. Orders: manage payments on POS Orders. */
   manage: boolean;
+  /** Orders only: block removing lines that existed when edit started. */
+  lockEditOrderLineRemove?: boolean;
+  /** Orders only: block decreasing qty below the snapshot at edit start. */
+  lockEditOrderLineDecrease?: boolean;
 }
 
 /** Modules that use the Manage flag (order payment actions). Others ignore it. */
 export const RBAC_MANAGE_MODULES = ["Orders"] as const;
 
+/** Modules that use order-edit line remove/decrease locks. Others ignore them. */
+export const RBAC_ORDER_EDIT_LINE_LOCK_MODULES = ["Orders"] as const;
+
 export function moduleSupportsManage(module: string): boolean {
   return (RBAC_MANAGE_MODULES as readonly string[]).includes(module);
+}
+
+export function moduleSupportsOrderEditLineLocks(module: string): boolean {
+  return (RBAC_ORDER_EDIT_LINE_LOCK_MODULES as readonly string[]).includes(module);
 }
 
 /** RBAC rows annotated as unavailable when the matching tenant module is off. */
@@ -46,6 +57,13 @@ export function isRbacModuleVisible(
   return hasModule(gate);
 }
 
+function emptyLocks() {
+  return {
+    lockEditOrderLineRemove: false,
+    lockEditOrderLineDecrease: false,
+  };
+}
+
 export function defaultPermissionMatrix(
   _hasModule?: (key: TenantModuleKey) => boolean,
 ): RolePermission[] {
@@ -56,6 +74,7 @@ export function defaultPermissionMatrix(
     edit: false,
     delete: false,
     manage: false,
+    ...emptyLocks(),
   }));
 }
 
@@ -83,6 +102,8 @@ export function mergeApiPermissions(
         edit: existing.edit,
         delete: existing.delete,
         manage: existing.manage ?? false,
+        lockEditOrderLineRemove: existing.lockEditOrderLineRemove ?? false,
+        lockEditOrderLineDecrease: existing.lockEditOrderLineDecrease ?? false,
       };
     }
     if (
@@ -96,9 +117,10 @@ export function mergeApiPermissions(
         edit: offers.edit,
         delete: offers.delete,
         manage: false,
+        ...emptyLocks(),
       };
     }
-    return { module, view: false, create: false, edit: false, delete: false, manage: false };
+    return { module, view: false, create: false, edit: false, delete: false, manage: false, ...emptyLocks() };
   });
 }
 
@@ -113,6 +135,12 @@ export function toApiPermissions(formRows: RolePermission[]): RolePermission[] {
       edit: p.edit,
       delete: p.delete,
       manage: moduleSupportsManage(p.module) ? (p.manage ?? false) : false,
+      lockEditOrderLineRemove: moduleSupportsOrderEditLineLocks(p.module)
+        ? (p.lockEditOrderLineRemove ?? false)
+        : false,
+      lockEditOrderLineDecrease: moduleSupportsOrderEditLineLocks(p.module)
+        ? (p.lockEditOrderLineDecrease ?? false)
+        : false,
     }));
 }
 
@@ -140,6 +168,8 @@ export function toApiPermissionsPreservingHidden(
       edit: row.edit,
       delete: row.delete,
       manage: row.manage ?? false,
+      lockEditOrderLineRemove: row.lockEditOrderLineRemove ?? false,
+      lockEditOrderLineDecrease: row.lockEditOrderLineDecrease ?? false,
     });
   }
   return TENANT_RBAC_MODULES.filter((module) => byModule.has(module)).map(

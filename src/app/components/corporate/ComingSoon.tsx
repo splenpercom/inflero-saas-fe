@@ -19,9 +19,9 @@ export function ComingSoon({
   titleAz,
   description,
   descriptionAz,
-  backTo = "/dashboard/reports",
-  backLabelEn = "Back to Reports",
-  backLabelAz = "Hesabatlara qayıt",
+  backTo = "/dashboard",
+  backLabelEn = "Back to Dashboard",
+  backLabelAz = "İdarə panelinə qayıt",
   hideBack = false,
 }: ComingSoonProps) {
   const { language } = useLanguage();

@@ -21,6 +21,8 @@ interface ModernSelectProps {
   /** Show a search input at the top of the dropdown. */
   searchable?: boolean;
   searchPlaceholder?: string;
+  /** Called when the in-dropdown search text changes (for remote filtering). */
+  onSearchChange?: (query: string) => void;
 }
 
 const DROPDOWN_ESTIMATED_HEIGHT = 280;
@@ -36,25 +38,30 @@ export function ModernSelect({
   disabled = false,
   searchable = false,
   searchPlaceholder = "Search...",
+  onSearchChange,
 }: ModernSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const anchorRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const onSearchChangeRef = useRef(onSearchChange);
+  onSearchChangeRef.current = onSearchChange;
 
   const position = useFloatingPosition(anchorRef, isOpen, DROPDOWN_ESTIMATED_HEIGHT, portalRef);
   const selectedOption = options.find((opt) => opt.value === value);
 
   const filteredOptions = useMemo(() => {
-    if (!searchable || !search.trim()) return options;
+    // Remote search (onSearchChange) already filters options from the parent.
+    if (!searchable || !search.trim() || onSearchChange) return options;
     const q = search.trim().toLocaleLowerCase("az");
     return options.filter((opt) => opt.label.toLocaleLowerCase("az").includes(q));
-  }, [options, search, searchable]);
+  }, [options, search, searchable, onSearchChange]);
 
   useEffect(() => {
     if (!isOpen) {
       setSearch("");
+      onSearchChangeRef.current?.("");
       return;
     }
     if (searchable) {
@@ -127,7 +134,11 @@ export function ModernSelect({
                     ref={searchRef}
                     type="text"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setSearch(next);
+                      onSearchChange?.(next);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Escape") {
                         e.stopPropagation();

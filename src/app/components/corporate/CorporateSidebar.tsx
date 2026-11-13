@@ -413,13 +413,6 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
       ],
     },
     {
-      icon: BarChart3,
-      labelKey: "reports",
-      label: st("reports"),
-      path: "/dashboard/reports",
-      permissionModule: "Reports",
-    },
-    {
       icon: Store,
       labelKey: "marketplace",
       label: st("marketplace"),
@@ -556,7 +549,7 @@ export function CorporateSidebar({ collapsed, onClose }: SidebarProps) {
         if (travelEnabled && ["dashboard", "inventory", "sales", "reports"].includes(item.labelKey)) {
           return null;
         }
-        // Hotels shell: hide inventory/sales/purchases/stock; dashboard+reports stay as Coming Soon.
+        // Hotels shell: hide inventory/sales/purchases/stock; dashboard stays as Coming Soon.
         if (
           hotelsEnabled &&
           ["inventory", "sales", "purchases", "stock"].includes(item.labelKey)

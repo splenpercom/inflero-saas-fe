@@ -2013,6 +2013,95 @@ const inlineRuMap: Record<string, string> = {
   "Visit offer page": "Открыть страницу предложения",
   "vs last year": "к прошлому году",
   "YTD": "С начала года",
+
+  // Settings page (Add-ons / company) — ensure RU coverage for pt(en, az)
+  "Add-ons": "Дополнения",
+  "All-branches mode: pick a branch to manage company settings and add-ons for that branch.":
+    "Режим всех филиалов: выберите филиал, чтобы управлять настройками компании и дополнениями для него.",
+  "Birmarket Commission": "Комиссия Birmarket",
+  "Default %": "По умолчанию %",
+  "Default POS payment status": "Статус оплаты POS по умолчанию",
+  "Editable POS product prices": "Редактируемые цены товаров в POS",
+  "Employee commission": "Комиссия сотрудника",
+  "Enter a Birmarket commission percent between 0 and 100.":
+    "Введите процент комиссии Birmarket от 0 до 100.",
+  "Fiscal device for this PC/terminal (Card payments & sales returns).":
+    "Фискальное устройство для этого ПК/терминала (оплата картой и возвраты).",
+  "Fixed (AZN)": "Фиксированная (AZN)",
+  "For Rongta RLS1000F/1100F label scales: POS reads printed weight barcodes from the scanner (weigh → print → scan). Off by default.":
+    "Для весов Rongta RLS1000F/1100F: POS считывает штрихкоды веса со сканера (взвесить → печать → сканировать). По умолчанию выкл.",
+  "Inventory services": "Складские услуги",
+  "Map receipt, KOT, BAR, and barcode printers for this PC/terminal. Silent print via QZ Tray.":
+    "Назначьте принтеры чеков, KOT, BAR и этикеток для этого ПК/терминала. Тихая печать через QZ Tray.",
+  "No employees assigned to this branch": "К этому филиалу не назначены сотрудники",
+  "None": "Нет",
+  "OmniCashier": "OmniCashier",
+  "POS Printers": "POS-принтеры",
+  "POS service fee": "Сервисный сбор POS",
+  "Pre-selects Pending, Paid, or none on new POS orders. None requires the cashier to choose. Cashiers can still change it per order.":
+    "Предвыбирает «Ожидает», «Оплачено» или ничего для новых заказов POS. «Нет» — кассир выбирает сам. Можно изменить на каждом заказе.",
+  "Print product brand on receipt": "Печатать бренд товара на чеке",
+  "QR order ringtone": "Звонок QR-заказа",
+  "Require doctor on Optics POS": "Требовать врача в Optics POS",
+  "Unsaved changes": "Несохранённые изменения",
+  "You are about to leave the edit page without saving. Your changes may be lost.":
+    "Вы собираетесь покинуть страницу редактирования без сохранения. Изменения могут быть потеряны.",
+  "You are about to leave the edit page. Any unsaved changes will be lost.":
+    "Вы собираетесь покинуть страницу редактирования. Несохранённые изменения будут потеряны.",
+  "Leave": "Уйти",
+  "Stay": "Остаться",
+  "Require order deletion reason": "Требовать причину удаления заказа",
+  "Require table on POS": "Требовать стол в POS",
+  "When on, deleting a POS order requires a reason. That reason is stored and shown on Deletion logs.":
+    "Если включено, при удалении заказа POS требуется указать причину. Она сохраняется и показывается в журнале удалений.",
+  "Rongta weighing scale (POS labels)": "Весы Rongta (этикетки POS)",
+  "Select a branch in the header to save company settings for that branch.":
+    "Выберите филиал в шапке, чтобы сохранить настройки компании для него.",
+  "Select a branch in the header to view and edit add-ons for that branch.":
+    "Выберите филиал в шапке, чтобы просматривать и изменять дополнения для него.",
+  "Select a branch to manage employee commissions for that location.":
+    "Выберите филиал, чтобы управлять комиссиями сотрудников для этой точки.",
+  "Select a branch to manage settings for that branch.":
+    "Выберите филиал, чтобы управлять его настройками.",
+  "Send To Bar & Print": "На бар и печать",
+  "Send to Production": "В производство",
+  "Show COGS on products": "Показывать себестоимость товаров",
+  "Show prices on BAR bill": "Показывать цены на чеке бара",
+  "Show products on Orders": "Показывать товары в заказах",
+  "Staff passcode for POS orders": "Код сотрудника для заказов POS",
+  "Table hourly billing": "Почасовая оплата стола",
+  "When on, BAR tickets print line prices and totals. When off, BAR prints qty-only like a kitchen ticket.":
+    "Если включено, чеки бара печатают цены и итоги. Если выкл. — только количество, как кухонный тикет.",
+  "When on, Cost (COGS) appears on product create, edit, list, and details. Turn off to hide it from the products flow.":
+    "Если включено, себестоимость показывается при создании, редактировании, в списке и карточке товара. Выключите, чтобы скрыть.",
+  "When on, POS can track Birmarket commission per sale (expense mirror). Customer prices and receipts stay unchanged.":
+    "Если включено, POS учитывает комиссию Birmarket по продаже (зеркало расхода). Цены и чеки клиента не меняются.",
+  "When on, POS customer bills show each product's brand (from Create/Edit Product).":
+    "Если включено, чеки POS показывают бренд каждого товара (из создания/редактирования товара).",
+  "When on, POS plays a soft chime and opens the pending QR orders popup when a new QR menu order arrives.":
+    "Если включено, POS издаёт сигнал и открывает окно ожидающих QR-заказов при новом заказе из QR-меню.",
+  "When on, POS requires each employee’s 4-digit passcode (when set) before placing or sending orders. Staff with “Can place order” off are always hidden.":
+    "Если включено, POS требует 4-значный код сотрудника (если задан) перед созданием или отправкой заказа. Сотрудники без права «Может оформлять заказ» всегда скрыты.",
+  "When on, POS shows Send To Bar & Print. Orders are tagged BAR, appear on the KOT board, and print from the BAR printer (falls back to bill printer if unset).":
+    "Если включено, в POS есть «На бар и печать». Заказы помечаются BAR, видны на KOT и печатаются на принтере бара (иначе — принтер чека).",
+  "When on, POS shows Send to Production, and Orders shows the production column and filter.":
+    "Если включено, в POS есть «В производство», а в заказах — колонка и фильтр производства.",
+  "When on, cashiers can change any product’s unit price on POS, including below catalog price or COGS. Reports use the sold amount.":
+    "Если включено, кассир может менять цену товара в POS, в том числе ниже каталога или себестоимости. В отчётах — цена продажи.",
+  "When on, cashiers can enter a service fee on each POS sale; it is added to the customer total.":
+    "Если включено, кассир может указать сервисный сбор на каждой продаже POS; он добавляется к итогу.",
+  "When on, cashiers must select a table before placing a POS order. When off, table selection stays optional.":
+    "Если включено, кассир должен выбрать стол перед оформлением заказа POS. Если выкл. — выбор стола необязателен.",
+  "When on, each POS sale stores a commission snapshot for the selected employee. Customer total is unchanged.":
+    "Если включено, каждая продажа POS сохраняет снимок комиссии выбранного сотрудника. Итог для клиента не меняется.",
+  "When on, manage sellable services under Inventory; they appear on POS and bookings.":
+    "Если включено, управляйте продаваемыми услугами в складе; они появляются в POS и бронированиях.",
+  "When on, tables can set an optional hourly rate and POS can start a timer billed by minutes until the table is emptied.":
+    "Если включено, для столов можно задать почасовую ставку, а в POS — запустить таймер с поминутной оплатой до освобождения стола.",
+  "When on, terminal POS sales for this branch require selecting a doctor. QR Menu / Web orders never require a doctor.":
+    "Если включено, продажи в терминальном POS этого филиала требуют выбора врача. Заказы QR Menu / Web врача не требуют.",
+  "When on, the Orders page shows a Products column with each order’s line items (qty × name).":
+    "Если включено, на странице заказов есть колонка «Товары» со строками заказа (кол-во × название).",
 };
 
 export default inlineRuMap;

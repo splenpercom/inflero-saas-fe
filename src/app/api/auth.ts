@@ -49,6 +49,8 @@ export interface PlatformUser {
       edit: boolean;
       delete: boolean;
       manage?: boolean;
+      lockEditOrderLineRemove?: boolean;
+      lockEditOrderLineDecrease?: boolean;
     }[];
   } | null;
   tenant: {

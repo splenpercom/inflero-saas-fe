@@ -185,6 +185,8 @@ export function FinanceExpenses() {
       categoryId: data.categoryId,
       accountId: data.accountId || null,
       userId: data.userId || null,
+      customerId: data.customerId || null,
+      supplierId: data.supplierId || null,
       date: dateInputToIso(data.date),
       amount: parseFloat(data.amount).toFixed(2),
       reference: data.reference || null,
@@ -272,10 +274,18 @@ export function FinanceExpenses() {
     }
   };
 
+  const partyLabel = (item: ExpenseListRow) =>
+    item.customerName
+      ? `${tr("Müştəri", "Client")}: ${item.customerName}`
+      : item.supplierName
+        ? `${tr("Təchizatçı", "Supplier")}: ${item.supplierName}`
+        : "—";
+
   const exportRows = expenses.map((item) => [
     item.reference ?? "—",
     item.expenseName,
     item.employeeName ?? "—",
+    partyLabel(item),
     item.category,
     item.description,
     formatFinanceDate(item.date),
@@ -291,7 +301,7 @@ export function FinanceExpenses() {
     doc.text(`${tr("Yaradılıb", "Generated")}: ${formatNowDateTime(language)}`, 14, 28);
     autoTable(doc, {
       startY: 35,
-      head: [[tr("İstinad", "Reference"), tr("Xərc Adı", "Expense Name"), tr("İşçi", "Employee"), tr("Kateqoriya", "Category"), tr("Təsvir", "Description"), tr("Tarix", "Date"), tr("Məbləğ", "Amount"), tr("Status", "Status")]],
+      head: [[tr("İstinad", "Reference"), tr("Xərc Adı", "Expense Name"), tr("İşçi", "Employee"), tr("Təyinat", "Assign to"), tr("Kateqoriya", "Category"), tr("Təsvir", "Description"), tr("Tarix", "Date"), tr("Məbləğ", "Amount"), tr("Status", "Status")]],
       body: exportRows,
       styles: { fontSize: 9, cellPadding: 2 },
       headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -300,7 +310,7 @@ export function FinanceExpenses() {
   };
 
   const handleExportExcel = () => {
-    const headers = [tr("İstinad", "Reference"), tr("Xərc Adı", "Expense Name"), tr("İşçi", "Employee"), tr("Kateqoriya", "Category"), tr("Təsvir", "Description"), tr("Tarix", "Date"), tr("Məbləğ", "Amount"), tr("Status", "Status")];
+    const headers = [tr("İstinad", "Reference"), tr("Xərc Adı", "Expense Name"), tr("İşçi", "Employee"), tr("Təyinat", "Assign to"), tr("Kateqoriya", "Category"), tr("Təsvir", "Description"), tr("Tarix", "Date"), tr("Məbləğ", "Amount"), tr("Status", "Status")];
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([headers, ...exportRows]);
     XLSX.utils.book_append_sheet(wb, ws, tr("Xərclər", "Expenses"));
@@ -386,6 +396,7 @@ export function FinanceExpenses() {
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("İSTİNAD", "REFERENCE")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("XƏRC ADI", "EXPENSE NAME")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("İŞÇİ", "EMPLOYEE")}</th>
+                  <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("TƏYİNAT", "ASSIGN TO")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("KATEQORİYA", "CATEGORY")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("TƏSVIR", "DESCRIPTION")}</th>
                   <th className="text-left text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{tr("TARİX", "DATE")}</th>
@@ -396,9 +407,9 @@ export function FinanceExpenses() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
+                  <tr><td colSpan={10} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Yüklənir...", "Loading...")}</td></tr>
                 ) : expenses.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Xərc tapılmadı", "No expenses found")}</td></tr>
+                  <tr><td colSpan={10} className="px-4 py-8 text-center text-xs text-gray-500">{tr("Xərc tapılmadı", "No expenses found")}</td></tr>
                 ) : (
                   expenses.map((expense, index) => (
                     <tr key={expense.id} className={cn("border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors", index % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/30 dark:bg-gray-800/10")}>
@@ -419,6 +430,7 @@ export function FinanceExpenses() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{expense.employeeName || "—"}</td>
+                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{partyLabel(expense)}</td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{expense.category}</td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap max-w-[180px] truncate">{expense.description}</td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatFinanceDate(expense.date)}</td>

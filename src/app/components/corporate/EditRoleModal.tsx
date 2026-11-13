@@ -11,6 +11,7 @@ import {
   isRbacModuleVisible,
   mergeApiPermissions,
   moduleSupportsManage,
+  moduleSupportsOrderEditLineLocks,
   toApiPermissionsPreservingHidden,
   type RolePermission,
 } from "../../lib/rolePermissions";
@@ -60,6 +61,13 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
       const row = prev[moduleIndex];
       if (!row) return prev;
       if (permissionType === "manage" && !moduleSupportsManage(row.module)) return prev;
+      if (
+        (permissionType === "lockEditOrderLineRemove" ||
+          permissionType === "lockEditOrderLineDecrease") &&
+        !moduleSupportsOrderEditLineLocks(row.module)
+      ) {
+        return prev;
+      }
       const updated = [...prev];
       updated[moduleIndex] = {
         ...row,
@@ -89,6 +97,12 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
         edit: next,
         delete: next,
         manage: supportsManage ? next : false,
+        lockEditOrderLineRemove: moduleSupportsOrderEditLineLocks(row.module)
+          ? row.lockEditOrderLineRemove
+          : false,
+        lockEditOrderLineDecrease: moduleSupportsOrderEditLineLocks(row.module)
+          ? row.lockEditOrderLineDecrease
+          : false,
       };
       return updated;
     });
@@ -162,6 +176,8 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
                       <col className="w-14" />
                       <col className="w-14" />
                       <col className="w-16" />
+                      <col className="w-16" />
+                      <col className="w-16" />
                       <col className="w-14" />
                     </colgroup>
                     <thead>
@@ -187,6 +203,18 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
                         >
                           {t("managePayments")}
                         </th>
+                        <th
+                          className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center"
+                          title={t("lockEditOrderLineRemoveHint")}
+                        >
+                          {t("lockEditOrderLineRemove")}
+                        </th>
+                        <th
+                          className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center"
+                          title={t("lockEditOrderLineDecreaseHint")}
+                        >
+                          {t("lockEditOrderLineDecrease")}
+                        </th>
                         <th className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 py-2 text-center">
                           {t("all")}
                         </th>
@@ -196,6 +224,7 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
                       {permissions.map((permission, index) => {
                         const moduleAvailable = isRbacModuleVisible(permission.module, hasModule);
                         const supportsManage = moduleSupportsManage(permission.module);
+                        const supportsLineLocks = moduleSupportsOrderEditLineLocks(permission.module);
                         return (
                         <tr
                           key={permission.module}
@@ -290,6 +319,60 @@ export function EditRoleModal({ isOpen, onClose, onSave, role, saving }: EditRol
                                   }`}
                                 >
                                   {permission.manage ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                </button>
+                              ) : (
+                                <span className="inline-flex w-5 h-5 shrink-0 items-center justify-center text-gray-300 dark:text-gray-600" aria-hidden>
+                                  <Minus className="w-3 h-3" />
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-2">
+                            <div className="flex justify-center">
+                              {supportsLineLocks ? (
+                                <button
+                                  type="button"
+                                  disabled={!moduleAvailable}
+                                  title={t("lockEditOrderLineRemoveHint")}
+                                  onClick={() => togglePermission(index, "lockEditOrderLineRemove")}
+                                  className={`inline-flex w-5 h-5 shrink-0 rounded items-center justify-center transition-colors disabled:opacity-50 ${
+                                    permission.lockEditOrderLineRemove
+                                      ? "bg-rose-500 text-white"
+                                      : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                                  }`}
+                                >
+                                  {permission.lockEditOrderLineRemove ? (
+                                    <Check className="w-3 h-3" />
+                                  ) : (
+                                    <Minus className="w-3 h-3" />
+                                  )}
+                                </button>
+                              ) : (
+                                <span className="inline-flex w-5 h-5 shrink-0 items-center justify-center text-gray-300 dark:text-gray-600" aria-hidden>
+                                  <Minus className="w-3 h-3" />
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-2">
+                            <div className="flex justify-center">
+                              {supportsLineLocks ? (
+                                <button
+                                  type="button"
+                                  disabled={!moduleAvailable}
+                                  title={t("lockEditOrderLineDecreaseHint")}
+                                  onClick={() => togglePermission(index, "lockEditOrderLineDecrease")}
+                                  className={`inline-flex w-5 h-5 shrink-0 rounded items-center justify-center transition-colors disabled:opacity-50 ${
+                                    permission.lockEditOrderLineDecrease
+                                      ? "bg-rose-500 text-white"
+                                      : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                                  }`}
+                                >
+                                  {permission.lockEditOrderLineDecrease ? (
+                                    <Check className="w-3 h-3" />
+                                  ) : (
+                                    <Minus className="w-3 h-3" />
+                                  )}
                                 </button>
                               ) : (
                                 <span className="inline-flex w-5 h-5 shrink-0 items-center justify-center text-gray-300 dark:text-gray-600" aria-hidden>

@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -28,42 +29,120 @@ export type ConfirmOptions = {
   variant?: "default" | "danger";
 };
 
+export type ConfirmWithReasonOptions = ConfirmOptions & {
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+  reasonRequired?: boolean;
+  reasonMaxLength?: number;
+};
+
+export type ConfirmWithReasonResult =
+  | { confirmed: false; reason: "" }
+  | { confirmed: true; reason: string };
+
 type PendingConfirm = ConfirmOptions & {
+  mode: "confirm";
   resolve: (value: boolean) => void;
 };
 
+type PendingReason = ConfirmWithReasonOptions & {
+  mode: "reason";
+  resolve: (value: ConfirmWithReasonResult) => void;
+};
+
+type Pending = PendingConfirm | PendingReason;
+
 type ConfirmContextValue = {
   confirm: (options: ConfirmOptions) => Promise<boolean>;
+  confirmWithReason: (options: ConfirmWithReasonOptions) => Promise<ConfirmWithReasonResult>;
 };
 
 const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const { language } = useLanguage();
-  const [pending, setPending] = useState<PendingConfirm | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [reasonDraft, setReasonDraft] = useState("");
+  const [reasonError, setReasonError] = useState(false);
+  const settledRef = useRef(false);
 
   const confirm = useCallback((options: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
-      setPending({ ...options, resolve });
+      settledRef.current = false;
+      setReasonDraft("");
+      setReasonError(false);
+      setPending({ ...options, mode: "confirm", resolve });
     });
   }, []);
 
-  const close = useCallback((result: boolean) => {
+  const confirmWithReason = useCallback((options: ConfirmWithReasonOptions) => {
+    return new Promise<ConfirmWithReasonResult>((resolve) => {
+      settledRef.current = false;
+      setReasonDraft("");
+      setReasonError(false);
+      setPending({ ...options, mode: "reason", resolve });
+    });
+  }, []);
+
+  const closeConfirm = useCallback((result: boolean) => {
     setPending((current) => {
-      current?.resolve(result);
+      if (current?.mode === "confirm" && !settledRef.current) {
+        settledRef.current = true;
+        current.resolve(result);
+      }
       return null;
     });
   }, []);
 
-  const value = useMemo(() => ({ confirm }), [confirm]);
+  const closeReason = useCallback((result: ConfirmWithReasonResult) => {
+    setPending((current) => {
+      if (current?.mode === "reason" && !settledRef.current) {
+        settledRef.current = true;
+        current.resolve(result);
+      }
+      return null;
+    });
+    setReasonDraft("");
+    setReasonError(false);
+  }, []);
 
-  const tr = (az: string, en: string) => pickLang(language, az, en);
+  const value = useMemo(
+    () => ({ confirm, confirmWithReason }),
+    [confirm, confirmWithReason],
+  );
+
+  const tr = (az: string, en: string, ru?: string) => pickLang(language, az, en, ru);
   const variant = pending?.variant ?? "default";
-  const title = pending?.title ?? tr("Təsdiq", "Confirm");
+  const title = pending?.title ?? tr("Təsdiq", "Confirm", "Подтверждение");
   const confirmLabel =
     pending?.confirmLabel ??
-    (variant === "danger" ? tr("Sil", "Delete") : tr("Təsdiq", "Confirm"));
-  const cancelLabel = pending?.cancelLabel ?? tr("Ləğv et", "Cancel");
+    (variant === "danger"
+      ? tr("Sil", "Delete", "Удалить")
+      : tr("Təsdiq", "Confirm", "Подтвердить"));
+  const cancelLabel = pending?.cancelLabel ?? tr("Ləğv et", "Cancel", "Отмена");
+  const isReason = pending?.mode === "reason";
+  const reasonRequired = isReason ? pending.reasonRequired !== false : false;
+  const reasonMax = isReason ? pending.reasonMaxLength ?? 1000 : 1000;
+  const reasonLabel =
+    (isReason && pending.reasonLabel) ||
+    tr("Silinmə səbəbi", "Deletion reason", "Причина удаления");
+  const reasonPlaceholder =
+    (isReason && pending.reasonPlaceholder) ||
+    tr("Səbəbi daxil edin…", "Enter the reason…", "Укажите причину…");
+
+  const onConfirmClick = () => {
+    if (!pending) return;
+    if (pending.mode === "confirm") {
+      closeConfirm(true);
+      return;
+    }
+    const trimmed = reasonDraft.trim();
+    if (reasonRequired && !trimmed) {
+      setReasonError(true);
+      return;
+    }
+    closeReason({ confirmed: true, reason: trimmed });
+  };
 
   return (
     <ConfirmContext.Provider value={value}>
@@ -71,7 +150,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       <AlertDialog
         open={pending != null}
         onOpenChange={(open) => {
-          if (!open) close(false);
+          if (!open) {
+            if (pending?.mode === "reason") closeReason({ confirmed: false, reason: "" });
+            else closeConfirm(false);
+          }
         }}
       >
         <AlertDialogContent className="z-[100] border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -81,15 +163,56 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               {pending?.message}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {isReason ? (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                {reasonLabel}
+                {reasonRequired ? <span className="text-red-500"> *</span> : null}
+              </label>
+              <textarea
+                value={reasonDraft}
+                onChange={(e) => {
+                  setReasonDraft(e.target.value.slice(0, reasonMax));
+                  if (reasonError) setReasonError(false);
+                }}
+                rows={3}
+                maxLength={reasonMax}
+                placeholder={reasonPlaceholder}
+                className={cn(
+                  "w-full rounded-md border px-3 py-2 text-sm bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 resize-y min-h-[72px]",
+                  reasonError
+                    ? "border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    : "border-gray-200 dark:border-gray-700",
+                )}
+              />
+              {reasonError ? (
+                <p className="text-[11px] text-red-500">
+                  {tr("Səbəb mütləqdir", "Reason is required", "Укажите причину")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel
-              onClick={() => close(false)}
+              onClick={() => {
+                if (pending?.mode === "reason") closeReason({ confirmed: false, reason: "" });
+                else closeConfirm(false);
+              }}
               className="border-gray-300 dark:border-gray-700"
             >
               {cancelLabel}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => close(true)}
+              onClick={(e) => {
+                // Keep dialog open until validation passes (reason mode).
+                if (isReason && reasonRequired && !reasonDraft.trim()) {
+                  e.preventDefault();
+                  setReasonError(true);
+                  return;
+                }
+                // Resolve before Radix unmounts so callers always get an answer.
+                onConfirmClick();
+              }}
               className={cn(
                 variant === "danger"
                   ? "bg-red-600 hover:bg-red-700 text-white"
@@ -111,4 +234,12 @@ export function useConfirm() {
     throw new Error("useConfirm must be used within ConfirmProvider");
   }
   return ctx.confirm;
+}
+
+export function useConfirmWithReason() {
+  const ctx = useContext(ConfirmContext);
+  if (!ctx) {
+    throw new Error("useConfirmWithReason must be used within ConfirmProvider");
+  }
+  return ctx.confirmWithReason;
 }

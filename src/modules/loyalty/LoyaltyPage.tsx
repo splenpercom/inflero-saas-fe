@@ -14,12 +14,14 @@ import {
   fetchBuyGetOffers,
   fetchLoyaltyRates,
   fetchLoyaltySettings,
+  fetchLoyaltyStats,
   updateBuyGetOffer,
   updateLoyaltyRate,
   updateLoyaltySettings,
   type LoyaltyBuyGetOffer,
   type LoyaltyProgramType,
   type LoyaltyRate,
+  type LoyaltyStats,
 } from "../../app/api/loyalty";
 import { fetchCategories, fetchProducts } from "../../app/api/inventory";
 import { fetchCustomers } from "../../app/api/people";
@@ -50,6 +52,7 @@ function LoyaltyPageInner() {
   const [programType, setProgramType] = useState<LoyaltyProgramType>("DISCOUNT");
   const [rates, setRates] = useState<LoyaltyRate[]>([]);
   const [offers, setOffers] = useState<LoyaltyBuyGetOffer[]>([]);
+  const [stats, setStats] = useState<LoyaltyStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -97,6 +100,7 @@ function LoyaltyPageInner() {
     if (!(isAuthenticated || isDemo) || !canView) {
       setRates([]);
       setOffers([]);
+      setStats(null);
       setLoading(false);
       return;
     }
@@ -116,9 +120,21 @@ function LoyaltyPageInner() {
           },
         ]);
         setOffers([]);
+        setStats({
+          freeProductQty: "12.000",
+          freeProductWorth: "240.00",
+          freeProductOrders: 8,
+          cashbackRedeemed: "150.00",
+          cashbackEarned: "420.00",
+          storeId: null,
+        });
       } else {
-        const settings = await fetchLoyaltySettings();
+        const [settings, nextStats] = await Promise.all([
+          fetchLoyaltySettings(),
+          fetchLoyaltyStats().catch(() => null),
+        ]);
         setProgramType(settings.loyaltyProgramType);
+        setStats(nextStats);
         if (settings.loyaltyProgramType === "DISCOUNT") {
           setRates(await fetchLoyaltyRates());
           setOffers([]);
@@ -389,6 +405,93 @@ function LoyaltyPageInner() {
             )}
           </div>
         </div>
+
+        {stats ? (
+          <div
+            className={`mb-4 grid grid-cols-2 gap-3 ${
+              programType === "BUY_GET_FREE" ? "lg:grid-cols-3" : "lg:grid-cols-2 max-w-lg"
+            }`}
+          >
+            {programType === "BUY_GET_FREE" ? (
+              <>
+                <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {tr("Pulsuz məhsullar", "Free products given", "Бесплатных товаров")}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                    {Number(stats.freeProductQty).toLocaleString(undefined, {
+                      maximumFractionDigits: 3,
+                    })}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-gray-400">
+                    {tr("Ümumi miqdar", "Total quantity", "Общее количество")}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {tr("Pulsuz dəyər", "Value given away", "Стоимость подарков")}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                    {Number(stats.freeProductWorth).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    ₼
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-gray-400">
+                    {tr(
+                      "Pərakəndə qiymətə görə (təxmini)",
+                      "At retail price (estimated)",
+                      "По розничной цене (оценка)",
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {tr("Sifarişlər", "Orders with free items", "Заказов с подарками")}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                    {stats.freeProductOrders}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-gray-400">
+                    {tr(
+                      "Pulsuz sətirli satışlar",
+                      "Sales that included free lines",
+                      "Продажи с бесплатными позициями",
+                    )}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {tr("Cashback qazanılıb", "Cashback earned", "Кэшбэк начислен")}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                    {Number(stats.cashbackEarned).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    ₼
+                  </p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {tr("Cashback istifadə", "Cashback redeemed", "Кэшбэк списан")}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                    {Number(stats.cashbackRedeemed).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    ₼
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        ) : null}
 
         {programType === "DISCOUNT" ? (
           <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   TrendingUp,
   Users,
@@ -16,6 +16,7 @@ import {
   Package,
   Loader2,
   RefreshCw,
+  Download,
 } from "lucide-react";
 import {
   AreaChart,
@@ -31,11 +32,16 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas-pro";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
-import type { DashboardPeriod } from "../../api/dashboard";
-import { useDashboardData } from "../../hooks/useDashboardData";
+import {
+  reportPresetToDashboardPeriod,
+  useDashboardData,
+} from "../../hooks/useDashboardData";
+import { useReportDateRange } from "../../hooks/useReportDateRange";
 import { formatDate, localizeMonthLabel } from "../../lib/dateFormat";
 import {
   activityIsCompleted,
@@ -45,29 +51,36 @@ import {
   getInitials,
   heatColor,
   mapTodayReservations,
-  mapTopCategoriesPie,
   parseMoney,
   profitMarginPercent,
   expenseRatioPercent,
   sliceLastMonths,
 } from "../../lib/dashboardMappers";
+import {
+  aggregateCategoriesFromSalesItems,
+  formatReportCurrency,
+  type DateRangePreset,
+} from "../../lib/reportMappers";
+import { notifyFromError } from "../../lib/toast";
+import { DateInput } from "../ui/DateInput";
+import { DashboardReportSections } from "./DashboardReportSections";
 
 import { pickLang } from "../../i18n/pickLang";
-import { formatBxgxQty } from "../../../modules/loyalty/bxgxFormat";
+import { formatProductNumericInput } from "../../lib/numericInput";
+
+function formatStockQty(value: string | number | null | undefined): string {
+  const formatted = formatProductNumericInput(value);
+  return formatted === "" ? "0" : formatted;
+}
 type ChartRange = "1M" | "3M" | "6M";
+
+const CATEGORY_PIE_COLORS = ["#14b8a6", "#0d9488", "#5c85ff", "#85a3ff", "#adc2ff", "#94a3b8", "#64748b"];
 
 function chartMonthCount(range: ChartRange): number {
   if (range === "1M") return 6;
   if (range === "3M") return 3;
   return 6;
 }
-
-const SUMMARY_PERIODS: { key: DashboardPeriod; en: string; az: string; ru?: string }[] = [
-  { key: "1D", en: "Today", az: "Bu gün", ru: "Сегодня" },
-  { key: "1W", en: "Week", az: "Həftə", ru: "Неделя" },
-  { key: "1M", en: "Month", az: "Ay", ru: "Месяц" },
-  { key: "1Y", en: "Year", az: "İl", ru: "Год" },
-];
 
 export function NewDashboard() {
   const { language } = useLanguage();
@@ -79,13 +92,36 @@ export function NewDashboard() {
   const stockEnabled =
     hasModule("STOCK") && (hasPermission("Stock", "view") || hasPermission("Products", "view"));
   const posEnabled = hasModule("POS") && hasPermission("POS", "view");
-  const [summaryPeriod, setSummaryPeriod] = useState<DashboardPeriod>("1D");
+  const {
+    preset,
+    setPreset,
+    customFrom,
+    setCustomFrom,
+    customTo,
+    setCustomTo,
+    dateFrom,
+    dateTo,
+  } = useReportDateRange("today");
+  const summaryPeriod = reportPresetToDashboardPeriod(preset);
   const [selectedPeriod, setSelectedPeriod] = useState<ChartRange>("1M");
   const [finPeriod, setFinPeriod] = useState<ChartRange>("1M");
   const [txTab, setTxTab] = useState<"all" | "completed" | "pending">("all");
+  const [exporting, setExporting] = useState(false);
+  const dashboardPdfRef = useRef<HTMLDivElement>(null);
 
-  const { loading, error, summary, todaySummary, todayReservations, pendingReservationCount, reload } =
-    useDashboardData(summaryPeriod);
+  const {
+    loading,
+    error,
+    summary,
+    todaySummary,
+    todayReservations,
+    pendingReservationCount,
+    overview,
+    products,
+    employees,
+    categories,
+    reload,
+  } = useDashboardData(summaryPeriod, { dateFrom, dateTo });
 
   const tr = (en: string, az: string, ru?: string) => pickLang(language, az, en, ru);
 
@@ -137,10 +173,73 @@ export function NewDashboard() {
     }));
   }, [summary, finPeriod, language]);
 
-  const servicesData = useMemo(
-    () => (summary ? mapTopCategoriesPie(summary.widgets.topCategories) : []),
-    [summary],
+  // Same date-filtered sales lines as the former Reports page (not summary widgets).
+  const servicesData = useMemo(() => {
+    const rows = aggregateCategoriesFromSalesItems(products).slice(0, 8);
+    const total = rows.reduce((s, r) => s + r.value, 0);
+    if (total <= 0) return [] as Array<{ name: string; value: number; color: string; raw: number }>;
+    return rows.map((r, i) => ({
+      name: r.category,
+      value: Math.round((r.value / total) * 100),
+      color: CATEGORY_PIE_COLORS[i % CATEGORY_PIE_COLORS.length],
+      raw: r.value,
+    }));
+  }, [products]);
+
+  const categoryUnitsSold = useMemo(
+    () => products.reduce((s, p) => s + (Number(p.soldQty) || 0), 0),
+    [products],
   );
+
+  const periodLinks: Array<{ key: DateRangePreset; label: string }> = [
+    { key: "today", label: tr("Today", "Bu gün", "Сегодня") },
+    { key: "week", label: tr("Week", "Həftə", "Неделя") },
+    { key: "month", label: tr("Month", "Ay", "Месяц") },
+    { key: "year", label: tr("Year", "İl", "Год") },
+    { key: "custom", label: tr("Choose Date", "Tarix seç", "Выбрать дату") },
+  ];
+
+  const handleExportPdf = async () => {
+    const el = dashboardPdfRef.current;
+    if (!el || exporting || loading) return;
+    setExporting(true);
+    try {
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: Math.max(el.scrollWidth, 1100),
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2;
+      const imgHeight = (canvas.height * usableWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let offsetY = margin;
+
+      pdf.addImage(imgData, "PNG", margin, offsetY, usableWidth, imgHeight);
+      heightLeft -= usableHeight;
+
+      while (heightLeft > 0) {
+        offsetY = margin - (imgHeight - heightLeft);
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", margin, offsetY, usableWidth, imgHeight);
+        heightLeft -= usableHeight;
+      }
+
+      pdf.save("dashboard.pdf");
+    } catch (err) {
+      notifyFromError(err, tr("Failed to export PDF", "PDF ixracı alınmadı"));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const topCustomers = useMemo(
     () =>
@@ -179,29 +278,22 @@ export function NewDashboard() {
   const topSelling = summary?.widgets.topSelling ?? [];
 
   const totals = summary?.totals;
-  const revenueNum = parseMoney(totals?.salesPaid);
-  const expensesNum = parseMoney(totals?.approvedExpenses);
-  const profitNum = parseMoney(totals?.profitApprox);
+  // Prefer reports overview for P&L accuracy (sold COGS, income − expenses − COGS).
+  const revenueNum = parseMoney(overview.totalIncome);
+  const expensesNum = parseMoney(overview.totalExpenses);
+  const profitNum = parseMoney(overview.profit);
 
   const todayDateLabel = formatDate(new Date(), language);
 
   const periodSub =
-    summaryPeriod === "1D"
-      ? tr("Today", "Bu gün", "Сегодня")
-      : summaryPeriod === "1W"
-        ? tr("This week", "Bu həftə")
-        : summaryPeriod === "1Y"
-          ? tr("This year", "Bu il")
-          : tr("This month", "Bu ay");
+    periodLinks.find((p) => p.key === preset)?.label ?? tr("Today", "Bu gün", "Сегодня");
 
-  /** Reflects the same local range the API used (aligned with Reports). */
+  /** Reflects the same local range the overview + summary APIs used. */
   const periodChipLabel = useMemo(() => {
-    const fromIso = summary?.range?.from;
-    const toIso = summary?.range?.to;
-    if (fromIso && toIso) {
+    if (dateFrom && dateTo) {
       try {
-        const from = new Date(fromIso);
-        const to = new Date(toIso);
+        const from = new Date(dateFrom);
+        const to = new Date(dateTo);
         if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
           const sameDay =
             from.getFullYear() === to.getFullYear() &&
@@ -215,12 +307,12 @@ export function NewDashboard() {
       }
     }
     return todayDateLabel;
-  }, [summary?.range?.from, summary?.range?.to, language, todayDateLabel]);
+  }, [dateFrom, dateTo, language, todayDateLabel]);
 
   const financeStats = [
     {
-      label: tr("Total Revenue", "Ümumi Gəlir"),
-      value: formatMoney(totals?.salesPaid),
+      label: tr("Total Income", "Ümumi Gəlir"),
+      value: formatReportCurrency(revenueNum),
       sub: periodSub,
       trend: "up" as const,
       icon: Banknote,
@@ -228,19 +320,16 @@ export function NewDashboard() {
     },
     {
       label: tr("Total Expenses", "Ümumi Xərclər"),
-      value: formatMoney(totals?.approvedExpenses),
-      sub: tr(
-        "Approved (incl. paid purchases)",
-        "Təsdiqlənmiş (ödənilmiş satınalmalar daxil)",
-      ),
+      value: formatReportCurrency(expensesNum),
+      sub: tr("Period expenses", "Dövr xərcləri"),
       trend: "up" as const,
       icon: CreditCard,
       color: "from-red-500 to-red-600",
     },
     {
-      label: tr("Net Profit", "Xalis Mənfəət"),
-      value: formatMoney(totals?.profitApprox),
-      sub: tr("Sales − purchases − expenses", "Satış − satınalma − xərc"),
+      label: tr("Profit", "Mənfəət"),
+      value: formatReportCurrency(profitNum),
+      sub: tr("Income − expenses − sold COGS", "Gəlir − xərc − satılmış maya"),
       trend: "up" as const,
       icon: TrendingUp,
       color: "from-[#14b8a6] to-[#0d9488]",
@@ -248,9 +337,9 @@ export function NewDashboard() {
     ...(stockEnabled
       ? [
           {
-            label: tr("COGS", "Maya dəyəri"),
-            value: formatMoney(totals?.stockCogs),
-            sub: tr("Total stock value at cost", "Ümumi stok dəyəri (maya)"),
+            label: tr("COGS (sold)", "Maya dəyəri (satılmış)"),
+            value: formatReportCurrency(parseMoney(overview.stockCogs)),
+            sub: tr("Sold goods cost in period", "Dövrdə satılmış malların mayası"),
             trend: "up" as const,
             icon: Package,
             color: "from-violet-500 to-violet-600",
@@ -259,8 +348,8 @@ export function NewDashboard() {
       : []),
     {
       label: tr("Invoice Due", "Ödəniləcək Faktura"),
-      value: formatMoney(totals?.unpaidInvoiceTotal),
-      sub: tr("Unpaid invoice balance", "Ödənilməmiş faktura"),
+      value: formatMoney(totals?.unpaidInvoiceTotal ?? overview.unpaid),
+      sub: tr("Unpaid balance", "Ödənilməmiş balans"),
       trend: "warn" as const,
       icon: ReceiptText,
       color: "from-orange-500 to-orange-600",
@@ -268,16 +357,16 @@ export function NewDashboard() {
   ];
 
   const categoryBreakdown = useMemo(() => {
-    const cats = summary?.widgets.topCategories ?? [];
-    const total = cats.reduce((s, c) => s + c.value, 0) || 1;
+    const rows = aggregateCategoriesFromSalesItems(products).slice(0, 5);
+    const total = rows.reduce((s, r) => s + r.value, 0) || 1;
     const colors = ["#14b8a6", "#f97316", "#0ea5e9", "#10b981", "#a78bfa"];
-    return cats.slice(0, 5).map((c, i) => ({
-      name: c.name,
+    return rows.map((c, i) => ({
+      name: c.category,
       amount: c.value,
       pct: Math.round((c.value / total) * 100),
       color: colors[i % colors.length],
     }));
-  }, [summary]);
+  }, [products]);
 
   if (loading && !summary) {
     return (
@@ -326,18 +415,18 @@ export function NewDashboard() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex bg-white/10 border border-white/20 rounded-xl p-0.5 gap-0.5">
-              {SUMMARY_PERIODS.map((p) => (
+              {periodLinks.map((p) => (
                 <button
                   key={p.key}
                   type="button"
-                  onClick={() => setSummaryPeriod(p.key)}
+                  onClick={() => setPreset(p.key)}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    summaryPeriod === p.key
+                    preset === p.key
                       ? "bg-white text-[#14b8a6] shadow-sm"
                       : "text-white/80 hover:text-white"
                   }`}
                 >
-                  {pickLang(language, p.az, p.en, p.ru)}
+                  {p.label}
                 </button>
               ))}
             </div>
@@ -345,6 +434,15 @@ export function NewDashboard() {
               <Calendar className="w-3.5 h-3.5 text-white/70" />
               <span className="text-white/80">{periodChipLabel}</span>
             </div>
+            <button
+              type="button"
+              onClick={() => void handleExportPdf()}
+              disabled={exporting || loading}
+              className="flex items-center gap-1.5 bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-xs font-medium hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? tr("Exporting…", "İxrac olunur…") : tr("Export PDF", "PDF ixrac")}
+            </button>
             {reservationsEnabled && <button
               type="button"
               onClick={() => navigate("/dashboard/reservations")}
@@ -356,6 +454,16 @@ export function NewDashboard() {
           </div>
         </div>
       </div>
+
+      {preset === "custom" && (
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3 flex flex-wrap items-center gap-2">
+          <DateInput value={customFrom} onChange={setCustomFrom} className="w-36" defaultYearsAgo={0} />
+          <span className="text-xs text-gray-400">—</span>
+          <DateInput value={customTo} onChange={setCustomTo} className="w-36" defaultYearsAgo={0} />
+        </div>
+      )}
+
+      <div ref={dashboardPdfRef} className="space-y-5">
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -388,11 +496,11 @@ export function NewDashboard() {
           }] : []),
           {
             label:
-              summaryPeriod === "1D"
+              preset === "today"
                 ? tr("Today's Revenue", "Bugünkü Gəlir")
                 : tr("Period Revenue", "Dövr Gəliri"),
-            value: formatMoney(totals?.salesPaid),
-            sub: tr("Paid sales", "Ödənilmiş satışlar"),
+            value: formatReportCurrency(revenueNum),
+            sub: tr("Total income", "Ümumi gəlir"),
             icon: DollarSign,
             iconBg: "bg-green-50 dark:bg-green-900/20",
             iconColor: "text-green-600 dark:text-green-400",
@@ -467,7 +575,7 @@ export function NewDashboard() {
             {tr("Sales by Category", "Kateqoriya üzrə satış")}
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            {servicesData.reduce((s, c) => s + c.raw, 0)} {tr("units sold", "satılan vahid")}
+            {categoryUnitsSold} {tr("units sold", "satılan vahid")}
           </p>
           {servicesData.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-8">{tr("No category data yet", "Hələ məlumat yoxdur")}</p>
@@ -668,17 +776,22 @@ export function NewDashboard() {
                       <p className="text-[10px] text-gray-400">{p.sku}</p>
                     </div>
                     <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
-                      {formatBxgxQty(p.quantity)} {tr("left", "qaldı")}
+                      {formatStockQty(p.quantity)} {tr("left", "qaldı")}
                     </span>
                   </div>
                   <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-orange-500 rounded-full"
-                      style={{ width: `${Math.min(100, p.quantityAlert > 0 ? (p.quantity / p.quantityAlert) * 100 : 0)}%` }}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          p.quantityAlert > 0 ? (Number(p.quantity) / Number(p.quantityAlert)) * 100 : 0,
+                        )}%`,
+                      }}
                     />
                   </div>
                   <p className="text-[9px] text-gray-400 mt-1">
-                    {tr("Min", "Min")}: {formatBxgxQty(p.quantityAlert)}
+                    {tr("Min", "Min")}: {formatStockQty(p.quantityAlert)}
                   </p>
                 </div>
               ))}
@@ -692,7 +805,7 @@ export function NewDashboard() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Order Activity Heatmap", "Sifariş Aktivliyi")}</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{tr("Busiest time slots this week", "Bu həftə ən məşğul slotlar")}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{tr("Busiest time slots in the selected period", "Seçilmiş dövrdə ən məşğul slotlar")}</p>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -866,6 +979,16 @@ export function NewDashboard() {
             </>
           )}
         </div>
+      </div>
+
+      <DashboardReportSections
+        overview={overview}
+        products={products}
+        employees={employees}
+        categories={categories}
+        summary={summary}
+        posEnabled={posEnabled}
+      />
       </div>
     </div>
   );

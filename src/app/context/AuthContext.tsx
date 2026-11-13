@@ -154,7 +154,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasPermission = useCallback(
-    (module: string, action: "view" | "create" | "edit" | "delete" | "manage" = "view") => {
+    (
+      module: string,
+      action:
+        | "view"
+        | "create"
+        | "edit"
+        | "delete"
+        | "manage"
+        | "lockEditOrderLineRemove"
+        | "lockEditOrderLineDecrease" = "view",
+    ) => {
+      const isOrderEditLineLock =
+        action === "lockEditOrderLineRemove" || action === "lockEditOrderLineDecrease";
+      // Locks restrict users — owners/demo stay unrestricted (false = unlocked).
+      if (isOrderEditLineLock) {
+        if (isDemoSession()) return false;
+        if (!user) return false;
+        if (user.isTenantOwner) return false;
+        const p = user.role?.permissions.find((x) => x.module === module);
+        return !!p?.[action];
+      }
       if (isDemoSession()) return true;
       if (!user) return false;
       if (user.isTenantOwner) return true;

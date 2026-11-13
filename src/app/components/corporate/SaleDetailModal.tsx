@@ -750,6 +750,9 @@ export function SaleDetailModal({
                           {tr("Məhsul", "Product")}
                         </th>
                         <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">SKU</th>
+                        <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3 whitespace-nowrap">
+                          {tr("Əlavə edilib", "Added", "Добавлено")}
+                        </th>
                         <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 py-2 px-3">
                           {tr("Miqdar", "Qty")}
                         </th>
@@ -775,7 +778,7 @@ export function SaleDetailModal({
                       {order.items.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={showBirmarketLineColumns ? 7 : 5}
+                            colSpan={showBirmarketLineColumns ? 8 : 6}
                             className="py-4 text-center text-xs text-gray-500"
                           >
                             {tr("Məhsul yoxdur", "No items")}
@@ -834,6 +837,11 @@ export function SaleDetailModal({
                                 </div>
                               </td>
                               <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400">{item.sku}</td>
+                              <td className="py-2 px-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                {item.createdAt
+                                  ? formatSalesDateTime(item.createdAt, language)
+                                  : "—"}
+                              </td>
                               <td className="py-2 px-3 text-xs text-right text-gray-900 dark:text-white">
                                 <div className="flex flex-col items-end gap-0.5">
                                   <span>{item.quantity}</span>

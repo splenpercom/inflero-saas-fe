@@ -39,6 +39,7 @@ import {
   Glasses,
   LayoutGrid,
   List,
+  Calculator,
 } from "lucide-react";
 import { TouchKeyboard } from "../ui/TouchKeyboard";
 import {
@@ -486,6 +487,30 @@ function ProductThumb({ image, className }: { image: string; className?: string 
   return <span>{image || "📦"}</span>;
 }
 
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/** Match label/sub/keywords; phone-like queries also match digits ignoring spaces/dashes/+. */
+function optionMatchesSearch(
+  opt: { label: string; sub?: string; keywords?: string },
+  rawQuery: string,
+): boolean {
+  const q = rawQuery.trim().toLocaleLowerCase("az");
+  if (!q) return true;
+  const label = opt.label.toLocaleLowerCase("az");
+  const sub = (opt.sub ?? "").toLocaleLowerCase("az");
+  const keywords = (opt.keywords ?? "").toLocaleLowerCase("az");
+  if (label.includes(q) || sub.includes(q) || keywords.includes(q)) return true;
+  const qDigits = digitsOnly(rawQuery);
+  if (qDigits.length >= 2) {
+    const phoneDigits = digitsOnly(opt.sub ?? "");
+    const keywordDigits = digitsOnly(opt.keywords ?? "");
+    if (phoneDigits.includes(qDigits) || keywordDigits.includes(qDigits)) return true;
+  }
+  return false;
+}
+
 // ─── Reusable dropdown ────────────────────────────────────────────────────────
 function SelectDropdown({
   value,
@@ -497,16 +522,19 @@ function SelectDropdown({
   variant = "row",
   searchable = false,
   searchPlaceholder = "Search...",
+  onSearchChange,
 }: {
   value: string;
   onChange: (val: string) => void;
-  options: { id: string; label: string; sub?: string }[];
+  options: { id: string; label: string; sub?: string; keywords?: string }[];
   placeholder: string;
   icon?: React.ElementType;
   disabled?: boolean;
   variant?: "row" | "box";
   searchable?: boolean;
   searchPlaceholder?: string;
+  /** When set, parent can refetch options (e.g. customers by phone via API). */
+  onSearchChange?: (query: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -520,17 +548,13 @@ function SelectDropdown({
 
   const filteredOptions = useMemo(() => {
     if (!searchable || !search.trim()) return options;
-    const q = search.trim().toLocaleLowerCase("az");
-    return options.filter((opt) => {
-      const label = opt.label.toLocaleLowerCase("az");
-      const sub = (opt.sub ?? "").toLocaleLowerCase("az");
-      return label.includes(q) || sub.includes(q);
-    });
+    return options.filter((opt) => optionMatchesSearch(opt, search));
   }, [options, search, searchable]);
 
   useEffect(() => {
     if (!open) {
       setSearch("");
+      onSearchChange?.("");
       return;
     }
     if (searchable) {
@@ -538,6 +562,12 @@ function SelectDropdown({
       return () => window.clearTimeout(id);
     }
   }, [open, searchable]);
+
+  useEffect(() => {
+    if (!open || !searchable || !onSearchChange) return;
+    const t = window.setTimeout(() => onSearchChange(search.trim()), 280);
+    return () => window.clearTimeout(t);
+  }, [search, open, searchable, onSearchChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -1282,6 +1312,10 @@ export function CorporatePOS() {
   const { branchId, isGlobalMode } = useBranch();
   const branchRevision = useBranchRevision();
   const { canCreate, canEdit } = useModulePermissions("POS");
+  const {
+    lockEditOrderLineRemove,
+    lockEditOrderLineDecrease,
+  } = useModulePermissions("Orders");
   const { canCreate: canCreateCustomer } = useModulePermissions("Customers");
   const prefersTouchKeyboard = usePrefersTouchKeyboard();
   const lastPointerType = useLastPointerType();
@@ -1348,6 +1382,8 @@ export function CorporatePOS() {
   const [paymentStatusChoice, setPaymentStatusChoice] = useState<PaymentStatusChoiceState>("pending");
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [shippingModalOpen, setShippingModalOpen] = useState(false);
+  const [changeCalcOpen, setChangeCalcOpen] = useState(false);
+  const [changeReceivedInput, setChangeReceivedInput] = useState("");
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState("");
   const [appliedDiscount, setAppliedDiscount] = useState<{ type: "percent" | "fixed"; value: number } | null>(null);
@@ -1380,6 +1416,7 @@ export function CorporatePOS() {
   const [posEditableProductPricesEnabled, setPosEditableProductPricesEnabled] = useState(false);
   const [posQrOrderAlarmEnabled, setPosQrOrderAlarmEnabled] = useState(true);
   const [tableHourlyBillingEnabled, setTableHourlyBillingEnabled] = useState(false);
+  const [posTableRequired, setPosTableRequired] = useState(false);
   const [posStaffPasscodeEnabled, setPosStaffPasscodeEnabled] = useState(false);
   const [posDefaultPaymentStatus, setPosDefaultPaymentStatus] = useState<
     "PENDING" | "PAID" | "NONE"
@@ -1532,18 +1569,32 @@ export function CorporatePOS() {
     }
   }, [isDemo, isAuthenticated, branchRevision, language, mapListItemToProduct]);
 
-  const loadCustomers = useCallback(async () => {
-    if (!(isAuthenticated || isDemo)) {
-      setCustomers([]);
-      return;
-    }
-    try {
-      const rows = await fetchCustomers();
-      setCustomers(rows);
-    } catch {
-      setCustomers([]);
-    }
-  }, [isDemo, isAuthenticated, branchRevision]);
+  const loadCustomers = useCallback(
+    async (search?: string) => {
+      if (!(isAuthenticated || isDemo)) {
+        setCustomers([]);
+        return;
+      }
+      try {
+        // Same list/search surface as /dashboard/people/customers (name, phone, code, …).
+        const rows = await fetchCustomers({
+          search: search?.trim() || undefined,
+          status: "active",
+        });
+        setCustomers(rows);
+      } catch {
+        setCustomers([]);
+      }
+    },
+    [isDemo, isAuthenticated, branchRevision],
+  );
+
+  const handleCustomerSearchChange = useCallback(
+    (query: string) => {
+      void loadCustomers(query);
+    },
+    [loadCustomers],
+  );
 
   const loadDoctors = useCallback(async () => {
     if (!(isAuthenticated || isDemo) || !opticsEnabled) {
@@ -1672,6 +1723,7 @@ export function CorporatePOS() {
           setPosEditableProductPricesEnabled(s.posEditableProductPricesEnabled === true);
           setPosQrOrderAlarmEnabled(diningEnabled && s.posQrOrderAlarmEnabled !== false);
           setTableHourlyBillingEnabled(diningEnabled && s.tableHourlyBillingEnabled === true);
+          setPosTableRequired(diningEnabled && s.posTableRequired === true);
           setPosStaffPasscodeEnabled(s.posStaffPasscodeEnabled === true);
           setOpticsDoctorRequired(opticsEnabled && s.opticsDoctorRequired === true);
           const defaultPay =
@@ -2391,7 +2443,13 @@ export function CorporatePOS() {
   // Derived selections
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? null;
 
-  const customerOptions = customers.map((c) => ({ id: c.id, label: c.name, sub: c.phone }));
+  const customerOptions = customers.map((c) => ({
+    id: c.id,
+    label: c.name,
+    sub: c.phone || undefined,
+    // Extra match text: code / email / loyalty card (phone also matched via digit-normalized `sub`).
+    keywords: [c.code, c.email, c.loyaltyCardBarcode].filter(Boolean).join(" "),
+  }));
   const billerOptions = billers.map((b) => ({ id: b.id, label: b.name, sub: b.code }));
   const doctorOptions = useMemo(() => {
     const rows = [...doctors];
@@ -3533,6 +3591,22 @@ export function CorporatePOS() {
 
   const removeFromCart = (lineKeyOrId: string) => {
     if (!canMutateCart) return;
+    const item = cart.find((i) => cartLineKey(i) === lineKeyOrId);
+    if (
+      item &&
+      editingOrderId &&
+      lockEditOrderLineRemove &&
+      (editingOriginalQtyByProduct[item.id] ?? 0) > 0
+    ) {
+      notifyWarning(
+        tr(
+          "Bu sifarişdə mövcud məhsulu silmək olmaz",
+          "Cannot remove a product that was already on this order",
+          "Нельзя удалить товар, который уже был в этом заказе",
+        ),
+      );
+      return;
+    }
     setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
   };
 
@@ -3552,10 +3626,72 @@ export function CorporatePOS() {
       !product?.trackStock ||
       product?.productType === "SERVICE";
 
+    const originalQty =
+      editingOrderId != null ? (editingOriginalQtyByProduct[item.id] ?? 0) : 0;
+    const isOriginalEditProduct = originalQty > 0;
+    const otherSameProductQtyForLocks = cart
+      .filter((i) => i.id === item.id && cartLineKey(i) !== lineKeyOrId)
+      .reduce((s, i) => s + i.quantity, 0);
+
     let next = roundToMaxDp(quantity, PRODUCT_NUMERIC_MAX_DP);
     if (!Number.isFinite(next) || next <= 0) {
-      setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
-      return null;
+      if (editingOrderId && isOriginalEditProduct) {
+        const remainingWithoutLine = otherSameProductQtyForLocks;
+        if (lockEditOrderLineDecrease) {
+          const minForLine = Math.max(0, originalQty - remainingWithoutLine);
+          if (minForLine > 0) {
+            notifyWarning(
+              tr(
+                "Mövcud məhsulun miqdarını azaltmaq olmaz",
+                "Cannot decrease quantity of a product that was already on this order",
+                "Нельзя уменьшить количество товара, который уже был в этом заказе",
+              ),
+            );
+            next = minForLine;
+          } else if (lockEditOrderLineRemove && remainingWithoutLine <= 0) {
+            notifyWarning(
+              tr(
+                "Bu sifarişdə mövcud məhsulu silmək olmaz",
+                "Cannot remove a product that was already on this order",
+                "Нельзя удалить товар, который уже был в этом заказе",
+              ),
+            );
+            return item.quantity;
+          } else {
+            setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
+            return null;
+          }
+        } else if (lockEditOrderLineRemove) {
+          notifyWarning(
+            tr(
+              "Bu sifarişdə mövcud məhsulu silmək olmaz",
+              "Cannot remove a product that was already on this order",
+              "Нельзя удалить товар, который уже был в этом заказе",
+            ),
+          );
+          next = 1;
+        } else {
+          setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
+          return null;
+        }
+      } else {
+        setCart((p) => p.filter((i) => cartLineKey(i) !== lineKeyOrId));
+        return null;
+      }
+    }
+
+    if (editingOrderId && isOriginalEditProduct && next > 0) {
+      const totalNext = otherSameProductQtyForLocks + next;
+      if (lockEditOrderLineDecrease && totalNext < originalQty) {
+        notifyWarning(
+          tr(
+            "Mövcud məhsulun miqdarını azaltmaq olmaz",
+            "Cannot decrease quantity of a product that was already on this order",
+            "Нельзя уменьшить количество товара, который уже был в этом заказе",
+          ),
+        );
+        next = Math.max(next, originalQty - otherSameProductQtyForLocks);
+      }
     }
 
     // Loyalty free lines: cannot exceed remaining redeemable for that offer.
@@ -4054,6 +4190,10 @@ export function CorporatePOS() {
       notifyWarning(tr("Həkim seçin", "Please select a doctor"));
       return false;
     }
+    if (diningEnabled && posTableRequired && !selectedTableId) {
+      notifyWarning(tr("Masa seçin", "Please select a table"));
+      return false;
+    }
     if (!paymentStatusChoice) {
       notifyWarning(
         tr("Ödəniş statusunu seçin", "Please select payment status (Paid / Pending)"),
@@ -4353,6 +4493,10 @@ export function CorporatePOS() {
     }
     if (opticsEnabled && opticsDoctorRequired && !selectedDoctorId) {
       notifyWarning(tr("Həkim seçin", "Please select a doctor"));
+      return;
+    }
+    if (diningEnabled && posTableRequired && !selectedTableId) {
+      notifyWarning(tr("Masa seçin", "Please select a table"));
       return;
     }
     if (cart.length === 0) {
@@ -5451,6 +5595,16 @@ export function CorporatePOS() {
                   const expired = !isService && isPosProductExpired(product.expiryDate);
                   const atStockLimit =
                     !isService && stockEnabled && available > 0 && qtyInCart >= available;
+                  const originalEditQtyGrid = editingOrderId
+                    ? (editingOriginalQtyByProduct[product.id] ?? 0)
+                    : 0;
+                  const gridDecreaseLocked =
+                    Boolean(editingOrderId) &&
+                    originalEditQtyGrid > 0 &&
+                    ((lockEditOrderLineDecrease && qtyInCart <= originalEditQtyGrid) ||
+                      (lockEditOrderLineRemove &&
+                        !lockEditOrderLineDecrease &&
+                        qtyInCart <= 1));
                   const allowAdd = canMutateCart && !outOfStock && !productReorderMode;
                   const isDragging = dragProductId === product.id;
                   const isDropTarget =
@@ -5646,7 +5800,8 @@ export function CorporatePOS() {
                           <button
                             type="button"
                             onClick={() => updateQuantity(product.id, -1, available)}
-                            className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-lg transition-colors"
+                            disabled={gridDecreaseLocked}
+                            className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-lg transition-colors disabled:opacity-40"
                             aria-label={tr("Azalt", "Decrease quantity")}
                           >
                             <Minus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
@@ -5848,7 +6003,11 @@ export function CorporatePOS() {
                           options={customerOptions}
                           placeholder={tr("Müştəri seçin", "Select customer")}
                           searchable
-                          searchPlaceholder={tr("Müştəri axtar...", "Search customer...")}
+                          searchPlaceholder={tr(
+                            "Ad, telefon ilə axtar...",
+                            "Search name, phone...",
+                          )}
+                          onSearchChange={handleCustomerSearchChange}
                         />
                       </div>
                       {canCreateCustomer && (
@@ -5921,7 +6080,10 @@ export function CorporatePOS() {
                               : "text-gray-500 dark:text-gray-400"
                           }`}
                         >
-                          {selectedTableLabel || tr("Masa", "Table")}
+                          {selectedTableLabel ||
+                            (posTableRequired
+                              ? tr("Masa *", "Table *")
+                              : tr("Masa", "Table"))}
                         </span>
                       </button>
                     )}
@@ -6150,6 +6312,27 @@ export function CorporatePOS() {
                         : 0;
                     const freeQtyAtCap =
                       Boolean(item.isLoyaltyFree) && freeOfferRemaining <= 0;
+                    const originalEditQty = editingOrderId
+                      ? (editingOriginalQtyByProduct[item.id] ?? 0)
+                      : 0;
+                    const isOriginalEditProduct = originalEditQty > 0;
+                    const otherSameProductQty = cart
+                      .filter((c) => c.id === item.id && cartLineKey(c) !== cartLineKey(item))
+                      .reduce((s, c) => s + c.quantity, 0);
+                    const lineRemoveLocked =
+                      Boolean(editingOrderId) &&
+                      lockEditOrderLineRemove &&
+                      isOriginalEditProduct;
+                    const lineDecreaseFloor = lockEditOrderLineDecrease
+                      ? Math.max(0, originalEditQty - otherSameProductQty)
+                      : lockEditOrderLineRemove && isOriginalEditProduct && otherSameProductQty <= 0
+                        ? 1
+                        : 0;
+                    const lineDecreaseLocked =
+                      Boolean(editingOrderId) &&
+                      isOriginalEditProduct &&
+                      (lockEditOrderLineDecrease || lockEditOrderLineRemove) &&
+                      item.quantity <= lineDecreaseFloor;
 
                     return (
                     <div key={cartLineKey(item)} className={`bg-gray-50 dark:bg-gray-800/50 rounded-md px-2 py-1.5 border ${
@@ -6314,7 +6497,7 @@ export function CorporatePOS() {
                             <button
                               type="button"
                               onClick={() => updateQuantity(cartLineKey(item), -1, available)}
-                              disabled={!canMutateCart}
+                              disabled={!canMutateCart || lineDecreaseLocked}
                               className="p-0.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-l-md transition-colors disabled:opacity-40"
                               aria-label={tr("Azalt", "Decrease quantity")}
                             >
@@ -6386,7 +6569,7 @@ export function CorporatePOS() {
                           <button
                             type="button"
                             onClick={() => removeFromCart(cartLineKey(item))}
-                            disabled={!canMutateCart}
+                            disabled={!canMutateCart || lineRemoveLocked}
                             className="p-0.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-40"
                             aria-label={tr("Sil", "Remove")}
                           >
@@ -6560,9 +6743,23 @@ export function CorporatePOS() {
               {/* Fixed checkout: Total + actions stay visible while cart scrolls */}
               {(cart.length > 0 || canCheckoutHourlyOnly) && (
                 <div className="shrink-0 border-t border-gray-200 dark:border-gray-800 pt-2.5 mt-1 bg-white dark:bg-gray-900">
-                  <div className="flex justify-between items-baseline mb-2.5 pb-2 border-b border-gray-200 dark:border-gray-800">
+                  <div className="flex justify-between items-center mb-2.5 pb-2 border-b border-gray-200 dark:border-gray-800">
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{tr("Cəmi", "Total")}</span>
-                    <span className="text-base font-bold text-[#14b8a6] dark:text-[#14b8a6]">{formatCurrency(total)}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChangeReceivedInput("");
+                          setChangeCalcOpen(true);
+                        }}
+                        className="p-1 rounded-md text-gray-400 hover:text-[#14b8a6] hover:bg-[#ccfbf1]/60 dark:hover:bg-[#14b8a6]/15 transition-colors"
+                        title={tr("Qalıq kalkulyatoru", "Change calculator")}
+                        aria-label={tr("Qalıq kalkulyatoru", "Change calculator")}
+                      >
+                        <Calculator className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-base font-bold text-[#14b8a6] dark:text-[#14b8a6]">{formatCurrency(total)}</span>
+                    </div>
                   </div>
 
                   {(canCreate || (editingOrderId && canEdit)) && (
@@ -6789,6 +6986,101 @@ export function CorporatePOS() {
           </div>
         </div>
       </div>
+
+      {/* Change calculator — amount received → change due (helper only; does not alter checkout). */}
+      {changeCalcOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-5 w-80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-[#14b8a6]" />
+                {tr("Qalıq kalkulyatoru", "Change calculator")}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setChangeCalcOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500 dark:text-gray-400">{tr("Ödəniləcək", "Amount due")}</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(total)}</span>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-900 dark:text-white mb-1.5 block">
+                  {tr("Alınan məbləğ", "Amount received")}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoFocus
+                    value={changeReceivedInput}
+                    onChange={(e) =>
+                      setChangeReceivedInput(
+                        sanitizeNumericTypingMaxDp(e.target.value, PRODUCT_NUMERIC_MAX_DP, {
+                          allowDecimal: true,
+                        }),
+                      )
+                    }
+                    placeholder="0.00"
+                    className="w-full pr-8 pl-2.5 py-2 text-sm text-right bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#14b8a6]"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">₼</span>
+                </div>
+              </div>
+              {(() => {
+                const received = parseNumericInput(changeReceivedInput, NaN);
+                const due = Number(total) || 0;
+                const hasInput = changeReceivedInput.trim() !== "" && Number.isFinite(received);
+                const change = hasInput ? Math.round((received - due) * 100) / 100 : null;
+                const short = change != null && change < -0.001;
+                return (
+                  <div
+                    className={`rounded-lg px-3 py-2.5 flex justify-between items-center ${
+                      short
+                        ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+                        : "bg-[#ccfbf1]/50 dark:bg-[#14b8a6]/10 border border-[#99f6e4] dark:border-[#14b8a6]/30"
+                    }`}
+                  >
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                      {short
+                        ? tr("Çatışmazlıq", "Short by")
+                        : tr("Qalıq (veriləcək)", "Change due")}
+                    </span>
+                    <span
+                      className={`text-base font-bold ${
+                        short
+                          ? "text-amber-700 dark:text-amber-400"
+                          : "text-[#14b8a6]"
+                      }`}
+                    >
+                      {change == null
+                        ? "—"
+                        : formatCurrency(Math.abs(change))}
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
+            <button
+              type="button"
+              onClick={() => setChangeCalcOpen(false)}
+              className="mt-4 w-full py-2 text-xs font-medium rounded-lg bg-[#14b8a6] hover:bg-[#0d9488] text-white transition-colors"
+            >
+              {tr("Bağla", "Close")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Discount Modal */}
       {discountModalOpen && (

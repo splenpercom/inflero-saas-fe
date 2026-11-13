@@ -11,7 +11,7 @@ function isTravelBlockedPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/dashboard";
   if (path.startsWith("/dashboard/inventory")) return true;
   if (path.startsWith("/dashboard/sales")) return true;
-  // ERP Reports only — keep /dashboard/travel-reports reachable.
+  // Legacy ERP reports path (now redirects to dashboard) — keep /dashboard/travel-reports reachable.
   if (path === "/dashboard/reports" || path.startsWith("/dashboard/reports/")) return true;
   if (TRAVEL_BLOCKED_EXACT.has(path)) return true;
   return false;

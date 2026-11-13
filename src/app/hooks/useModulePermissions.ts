@@ -12,6 +12,10 @@ export function useModulePermissions(module: TenantRbacModule) {
       canEdit: hasPermission(module, "edit"),
       canDelete: hasPermission(module, "delete"),
       canManage: hasPermission(module, "manage"),
+      lockEditOrderLineRemove:
+        module === "Orders" ? hasPermission(module, "lockEditOrderLineRemove") : false,
+      lockEditOrderLineDecrease:
+        module === "Orders" ? hasPermission(module, "lockEditOrderLineDecrease") : false,
     }),
     [hasPermission, module],
   );

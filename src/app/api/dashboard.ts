@@ -77,6 +77,7 @@ export interface DashboardSummary {
   };
   widgets: {
     topSelling: Array<{ productId: string; name: string; sku: string; quantitySold: number }>;
+    /** quantity / quantityAlert use inventory Decimal(12,3) precision (may be fractional). */
     lowStock: Array<{ productId: string; name: string; sku: string; quantity: number; quantityAlert: number }>;
     expiredProducts: Array<{ id: string; name: string; sku: string; manufacturedDate: string | null; expiryDate: string | null }>;
     recentlyAddedProducts: Array<{ id: string; name: string; sku: string; price: string; unit: string; createdAt: string }>;
