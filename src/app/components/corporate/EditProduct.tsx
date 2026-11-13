@@ -54,6 +54,10 @@ import JsBarcode from "jsbarcode";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { useProductsCogsEnabled } from "../../hooks/useProductsCogsEnabled";
 import { useScaleLabelScanEnabled } from "../../hooks/useScaleLabelScanEnabled";
+import {
+  ProductIngredientsEditor,
+  type ProductIngredientDraft,
+} from "./ProductIngredientsEditor";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 const LIST_PATH = PRODUCTS_LIST_PATH;
@@ -121,6 +125,7 @@ export function EditProduct() {
   const { id } = useParams();
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
+  const ingredientsEnabled = hasModule("INGREDIENTS");
   const productsCogsEnabled = useProductsCogsEnabled();
   const scaleLabelScanEnabled = useScaleLabelScanEnabled();
   const { canCreate, canEdit } = useModulePermissions("Products");
@@ -194,6 +199,8 @@ export function EditProduct() {
   const [discountValue, setDiscountValue] = useState("");
   const [quantityAlert, setQuantityAlert] = useState("");
   const [showOnPos, setShowOnPos] = useState(true);
+  const [hasIngredients, setHasIngredients] = useState(false);
+  const [ingredientRows, setIngredientRows] = useState<ProductIngredientDraft[]>([]);
   const [manufacturedDate, setManufacturedDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -384,6 +391,15 @@ export function EditProduct() {
       setDiscountValue(nextDiscountValue);
       setQuantityAlert(nextQtyAlert);
       setShowOnPos(nextShowOnPos);
+      setHasIngredients(product.hasIngredients === true);
+      setIngredientRows(
+        (product.ingredients ?? []).map((row) => ({
+          ingredientProductId: row.ingredientProductId,
+          name: row.name ?? "",
+          sku: row.sku ?? "",
+          quantity: formatProductNumericInput(row.quantity),
+        })),
+      );
       setManufacturedDate(nextManufactured);
       setExpiryDate(nextExpiry);
       setImages(urls.map((url, index) => ({ id: `img-${index}`, url })));
@@ -627,6 +643,17 @@ export function EditProduct() {
       );
       return;
     }
+    if (ingredientsEnabled && hasIngredients) {
+      const validIngredients = ingredientRows.filter(
+        (r) => r.ingredientProductId && parsePrice(r.quantity) > 0,
+      );
+      if (validIngredients.length === 0) {
+        notifyFromError(
+          new Error(tr("Ən azı bir inqredient əlavə edin", "Add at least one ingredient")),
+        );
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -677,6 +704,19 @@ export function EditProduct() {
           ? String(roundToMaxDp(parsePrice(discountValue), PRODUCT_NUMERIC_MAX_DP))
           : null,
         showOnPos,
+        ...(ingredientsEnabled
+          ? {
+              hasIngredients,
+              ingredients: hasIngredients
+                ? ingredientRows
+                    .filter((r) => r.ingredientProductId && parsePrice(r.quantity) > 0)
+                    .map((r) => ({
+                      ingredientProductId: r.ingredientProductId,
+                      quantity: roundToMaxDp(parsePrice(r.quantity), PRODUCT_NUMERIC_MAX_DP),
+                    }))
+                : [],
+            }
+          : {}),
         ...(stockEnabled
           ? {
               quantityAlert: quantityAlert.trim()
@@ -1012,6 +1052,15 @@ export function EditProduct() {
                       {tr("POS-da göstər", "Show on POS")}
                     </label>
                   </div>
+                  <ProductIngredientsEditor
+                    enabled={ingredientsEnabled}
+                    hasIngredients={hasIngredients}
+                    onHasIngredientsChange={setHasIngredients}
+                    rows={ingredientRows}
+                    onRowsChange={setIngredientRows}
+                    excludeProductId={id}
+                    storeId={branchId}
+                  />
                   {scaleLabelScanEnabled && (
                   <div className="col-span-2 md:col-span-3 xl:col-span-4 pt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">
                     <div className="flex items-center gap-2">

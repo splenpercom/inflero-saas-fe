@@ -48,6 +48,10 @@ import JsBarcode from "jsbarcode";
 import { useBarcodeWedge } from "../../hooks/useBarcodeWedge";
 import { useProductsCogsEnabled } from "../../hooks/useProductsCogsEnabled";
 import { useScaleLabelScanEnabled } from "../../hooks/useScaleLabelScanEnabled";
+import {
+  ProductIngredientsEditor,
+  type ProductIngredientDraft,
+} from "./ProductIngredientsEditor";
 
 import { pickLang, mapLang } from "../../i18n/pickLang";
 interface ProductImage {
@@ -88,6 +92,7 @@ export function CreateProduct({
   const duplicateId = embedded ? "" : searchParams.get("duplicate")?.trim() || "";
   const { isDemo, isAuthenticated, hasModule } = useAuth();
   const stockEnabled = hasModule("STOCK");
+  const ingredientsEnabled = hasModule("INGREDIENTS");
   const productsCogsEnabled = useProductsCogsEnabled();
   const scaleLabelScanEnabled = useScaleLabelScanEnabled();
   const { canCreate } = useModulePermissions("Products");
@@ -191,6 +196,8 @@ export function CreateProduct({
   const [discountValue, setDiscountValue] = useState("");
   const [quantityAlert, setQuantityAlert] = useState("");
   const [showOnPos, setShowOnPos] = useState(true);
+  const [hasIngredients, setHasIngredients] = useState(false);
+  const [ingredientRows, setIngredientRows] = useState<ProductIngredientDraft[]>([]);
   const [manufacturedDate, setManufacturedDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
 
@@ -315,6 +322,15 @@ export function CreateProduct({
             : "",
         );
         setShowOnPos(product.showOnPos !== false);
+        setHasIngredients(product.hasIngredients === true);
+        setIngredientRows(
+          (product.ingredients ?? []).map((row) => ({
+            ingredientProductId: row.ingredientProductId,
+            name: row.name ?? "",
+            sku: row.sku ?? "",
+            quantity: formatProductNumericInput(row.quantity),
+          })),
+        );
         setManufacturedDate(product.manufacturedDate?.slice(0, 10) ?? "");
         setExpiryDate(product.expiryDate?.slice(0, 10) ?? "");
         const urls = productImageUrls(product.images);
@@ -519,6 +535,8 @@ export function CreateProduct({
     setDiscountValue("");
     setQuantityAlert("");
     setShowOnPos(true);
+    setHasIngredients(false);
+    setIngredientRows([]);
     setManufacturedDate("");
     setExpiryDate("");
     setImages((prev) => {
@@ -558,6 +576,17 @@ export function CreateProduct({
         ),
       );
       return;
+    }
+    if (ingredientsEnabled && hasIngredients) {
+      const validIngredients = ingredientRows.filter(
+        (r) => r.ingredientProductId && parsePrice(r.quantity) > 0,
+      );
+      if (validIngredients.length === 0) {
+        notifyFromError(
+          new Error(tr("Ən azı bir inqredient əlavə edin", "Add at least one ingredient")),
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -612,6 +641,19 @@ export function CreateProduct({
           ? String(roundToMaxDp(parsePrice(discountValue), PRODUCT_NUMERIC_MAX_DP))
           : null,
         showOnPos,
+        ...(ingredientsEnabled
+          ? {
+              hasIngredients,
+              ingredients: hasIngredients
+                ? ingredientRows
+                    .filter((r) => r.ingredientProductId && parsePrice(r.quantity) > 0)
+                    .map((r) => ({
+                      ingredientProductId: r.ingredientProductId,
+                      quantity: roundToMaxDp(parsePrice(r.quantity), PRODUCT_NUMERIC_MAX_DP),
+                    }))
+                : [],
+            }
+          : {}),
         ...(stockEnabled
           ? {
               quantityAlert: quantityAlert.trim()
@@ -1129,6 +1171,15 @@ export function CreateProduct({
                       {tr("POS-da göstər", "Show on POS")}
                     </label>
                   </div>
+
+                  <ProductIngredientsEditor
+                    enabled={ingredientsEnabled}
+                    hasIngredients={hasIngredients}
+                    onHasIngredientsChange={setHasIngredients}
+                    rows={ingredientRows}
+                    onRowsChange={setIngredientRows}
+                    storeId={branchId}
+                  />
 
                   {scaleLabelScanEnabled && (
                   <div className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">
