@@ -33,7 +33,14 @@ export async function ensureOmnicashierSession(
     let lastDocNumber: number | null = null;
     try {
       const info = await omniGetInfo(token, s);
-      if (typeof info.last_doc_number === "number") lastDocNumber = info.last_doc_number;
+      // Omni treats prev_doc_number as unsigned — never cache negatives / NaN.
+      if (
+        typeof info.last_doc_number === "number" &&
+        Number.isFinite(info.last_doc_number) &&
+        info.last_doc_number >= 1
+      ) {
+        lastDocNumber = Math.trunc(info.last_doc_number);
+      }
     } catch {
       // Get Info optional for login path
     }
@@ -61,8 +68,12 @@ export async function ensureOmnicashierSession(
     // Refresh shift / last doc; re-login on 401
     try {
       const info = await omniGetInfo(session.token, s);
-      if (typeof info.last_doc_number === "number") {
-        session.lastDocNumber = info.last_doc_number;
+      if (
+        typeof info.last_doc_number === "number" &&
+        Number.isFinite(info.last_doc_number) &&
+        info.last_doc_number >= 1
+      ) {
+        session.lastDocNumber = Math.trunc(info.last_doc_number);
       }
       const st = await omniShiftStatus(session.token, s);
       if (!st.shiftStatus) await omniOpenShift(session.token, s);
@@ -83,5 +94,6 @@ export async function ensureOmnicashierSession(
 }
 
 export function rememberLastDocNumber(n: number): void {
-  if (session) session.lastDocNumber = n;
+  if (!session) return;
+  if (Number.isFinite(n) && n >= 1) session.lastDocNumber = Math.trunc(n);
 }

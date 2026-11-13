@@ -8,6 +8,7 @@ import {
   round2,
   sumOmniItemNets,
 } from "./allocatePaymentLines";
+import { omniPrevDocNumberField } from "./payloadGuards";
 
 export type OmniReturnLineIn = {
   productName: string;
@@ -81,7 +82,7 @@ export function mapCardReturnToOmni(input: MapCardReturnInput): {
   const isCash = input.tender === "CASH";
 
   return {
-    ...(input.prevDocNumber != null ? { prev_doc_number: input.prevDocNumber } : {}),
+    ...omniPrevDocNumberField(input.prevDocNumber),
     data: {
       cashier: (input.cashier || "Cashier").slice(0, 64),
       currency: "AZN",
@@ -95,7 +96,8 @@ export function mapCardReturnToOmni(input: MapCardReturnInput): {
       prepaymentSum: 0,
       creditSum: 0,
       bonusSum: 0,
-      incomingSum: 0,
+      // Same cash fix as sale — incomingSum must cover cashSum.
+      incomingSum: isCash ? sum : 0,
       vatAmounts: [{ vatPercent, vatSum: sum }],
     },
   };

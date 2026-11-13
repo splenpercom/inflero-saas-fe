@@ -10,6 +10,7 @@ import {
   round2,
   sumOmniItemNets,
 } from "./allocatePaymentLines";
+import { omniPrevDocNumberField } from "./payloadGuards";
 
 export type OmniSaleLineIn = {
   productName: string;
@@ -98,7 +99,8 @@ export function mapCardSaleToOmni(input: MapCardSaleInput): OmnicashierSaleMappe
 
   return {
     int_ref: input.intRef.slice(0, 128),
-    ...(input.prevDocNumber != null ? { prev_doc_number: input.prevDocNumber } : {}),
+    // Same as before for valid docs (≥1); omit 0/negative so Omni unsigned Integer is safe.
+    ...omniPrevDocNumberField(input.prevDocNumber),
     data: {
       cashier: (input.cashier || "Cashier").slice(0, 64),
       currency: "AZN",
@@ -109,7 +111,9 @@ export function mapCardSaleToOmni(input: MapCardSaleInput): OmnicashierSaleMappe
       prepaymentSum: 0,
       creditSum: 0,
       bonusSum: 0,
-      incomingSum: 0,
+      // Fix cash 1023: Omni change = incomingSum − cashSum. Exact tender for cash;
+      // card stays 0 (unchanged from prior working CARD path).
+      incomingSum: isCash ? sum : 0,
       // Device prints S.V.% from vatPercent; keep prior shape (vatSum = document sum).
       vatAmounts: [{ vatPercent, vatSum: sum }],
     },

@@ -11,6 +11,7 @@ import {
   omnicashierUsesTargetHeader,
   type OmnicashierSettings,
 } from "../omnicashierSettings";
+import { omniPrevDocNumberField } from "./payloadGuards";
 
 export type OmnicashierFiscalResult = {
   document_number: number;
@@ -214,7 +215,7 @@ export async function omniCreateSale(
       tokenData: {
         parameters: {
           doc_type: "sale",
-          ...(payload.prev_doc_number != null ? { prev_doc_number: payload.prev_doc_number } : {}),
+          ...omniPrevDocNumberField(payload.prev_doc_number),
           data: payload.data,
         },
         operationId: "createDocument",
@@ -247,7 +248,7 @@ export async function omniMoneyBack(
         tokenData: {
           parameters: {
             doc_type: "money_back",
-            ...(payload.prev_doc_number != null ? { prev_doc_number: payload.prev_doc_number } : {}),
+            ...omniPrevDocNumberField(payload.prev_doc_number),
             data: payload.data,
           },
           version: 1,
