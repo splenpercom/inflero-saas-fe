@@ -9,30 +9,20 @@ import {
   Search,
   ShoppingCart,
   Target,
-  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
   Cell,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { pickLang } from "../../i18n/pickLang";
 import type { BillerReportItem, ReportsOverview, SalesReportItem } from "../../api/reports";
-import type { DashboardSummary } from "../../api/dashboard";
 import { ModernSelect } from "../ui/ModernSelect";
 import { parseMoney } from "../../lib/dashboardMappers";
 import { formatReportCurrency } from "../../lib/reportMappers";
-import { localizeMonthLabel } from "../../lib/dateFormat";
 
 function moneyLabel(value: string | number | null | undefined): string {
   return formatReportCurrency(parseMoney(value));
@@ -119,7 +109,6 @@ type Props = {
   products: SalesReportItem[];
   employees: BillerReportItem[];
   categories: Array<{ id: string; name: string }>;
-  summary: DashboardSummary | null;
   posEnabled: boolean;
 };
 
@@ -129,7 +118,6 @@ export function DashboardReportSections({
   products,
   employees,
   categories,
-  summary,
   posEnabled,
 }: Props) {
   const { language } = useLanguage();
@@ -155,29 +143,10 @@ export function DashboardReportSections({
     return Array.from(new Set(products.map((p) => p.category).filter(Boolean))).sort();
   }, [products]);
 
-  const monthlyChart = useMemo(() => {
-    const rows = summary?.charts.salesStatsMonthly ?? [];
-    return rows.map((r) => ({
-      month: localizeMonthLabel(r.month, language),
-      revenue: r.revenue ?? 0,
-      profit: Math.round(((r.revenue ?? 0) - (r.expense ?? 0)) * 100) / 100,
-    }));
-  }, [summary, language]);
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 pt-2">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-5 bg-[#14b8a6] rounded-full" />
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">
-            {pt("Reports & Analytics", "Hesabatlar və Analitika")}
-          </h2>
-        </div>
-        <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800" />
-      </div>
-
+    <div className="space-y-3 sm:space-y-4">
       <MetricCards
-        cols="lg:grid-cols-4"
+        cols="xl:grid-cols-4"
         cards={[
           {
             label: pt("Total Orders", "Ümumi Sifarişlər"),
@@ -248,15 +217,15 @@ export function DashboardReportSections({
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
             {pt("Products", "Məhsullar")}
           </h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-auto">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
                 placeholder={pt("Search products…", "Məhsul axtar…")}
-                className="pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg w-44"
+                className="pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg w-full sm:w-44"
               />
             </div>
             <ModernSelect
@@ -274,7 +243,7 @@ export function DashboardReportSections({
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[480px]">
             <thead>
               <tr className="text-left text-xs text-gray-500 border-b border-gray-100 dark:border-gray-800">
                 <th className="px-4 py-3 font-medium">{pt("Product", "Məhsul")}</th>
@@ -398,67 +367,16 @@ export function DashboardReportSections({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
-          <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3">
-            <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-          </div>
-          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-            {pt("Avg Monthly Revenue", "Orta aylıq gəlir")}
-          </p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {overview.avgMonthlyRevenue != null ? moneyLabel(overview.avgMonthlyRevenue) : "N/A"}
-          </p>
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 sm:p-5 w-full sm:max-w-sm">
+        <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3">
+          <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
         </div>
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
-          <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mb-3">
-            <TrendingUp className="w-4 h-4 text-orange-500" />
-          </div>
-          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-            {pt("YoY Growth", "İllik artım")}
-          </p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {overview.yoyGrowthPercent != null ? `${overview.yoyGrowthPercent}%` : "N/A"}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-          {pt("Monthly Performance", "Aylıq performans")}
-        </h3>
-        <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={monthlyChart}>
-            <defs>
-              <linearGradient id="dashRepRevGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#14b8a6" stopOpacity={0.02} />
-              </linearGradient>
-              <linearGradient id="dashRepProfitGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#86efac" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#86efac" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
-            <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#9ca3af" />
-            <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" />
-            <Tooltip
-              formatter={(v: number, name: string) => [
-                moneyLabel(v),
-                name === "revenue" ? pt("Revenue", "Gəlir") : pt("Profit", "Mənfəət"),
-              ]}
-              contentStyle={{ fontSize: 11, borderRadius: 8 }}
-            />
-            <Legend
-              verticalAlign="bottom"
-              formatter={(value) =>
-                value === "revenue" ? pt("Revenue", "Gəlir") : pt("Profit", "Mənfəət")
-              }
-            />
-            <Area type="monotone" dataKey="revenue" stroke="#14b8a6" strokeWidth={2} fill="url(#dashRepRevGrad)" />
-            <Area type="monotone" dataKey="profit" stroke="#86efac" strokeWidth={2} fill="url(#dashRepProfitGrad)" />
-          </AreaChart>
-        </ResponsiveContainer>
+        <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+          {pt("Avg Monthly Revenue", "Orta aylıq gəlir")}
+        </p>
+        <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-all">
+          {overview.avgMonthlyRevenue != null ? moneyLabel(overview.avgMonthlyRevenue) : "N/A"}
+        </p>
       </div>
     </div>
   );
